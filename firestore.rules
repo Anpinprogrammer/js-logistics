@@ -1,0 +1,55 @@
+rules_version = '2';
+// Quién puede leer y escribir cada parte de la base de datos.
+// Solo entra quien tiene un documento en "usuarios" (lo crea el administrador desde la app).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function autenticado() { return request.auth != null; }
+    function esMiembro() { return autenticado() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)); }
+    function esAdmin() { return autenticado() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    // Configuración inicial: solo si todavía no existe meta/config, y en la misma escritura que la crea.
+    function primerAdmin(uid) {
+      return autenticado() && request.auth.uid == uid
+        && !exists(/databases/$(database)/documents/meta/config)
+        && existsAfter(/databases/$(database)/documents/meta/config);
+    }
+
+    match /meta/config {
+      allow read: if autenticado();
+      allow create: if autenticado()
+        && request.resource.data.primerAdmin == request.auth.uid
+        && existsAfter(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    // Contador de guías y otros datos compartidos
+    match /meta/{id} {
+      allow read: if esMiembro();
+      allow write: if esMiembro() && id != "config";
+    }
+
+    match /admins/{uid} {
+      allow read: if autenticado() && (request.auth.uid == uid || esMiembro());
+      allow create: if primerAdmin(uid) || esAdmin();
+      allow delete: if esAdmin() && uid != request.auth.uid;
+    }
+    match /usuarios/{uid} {
+      allow read: if esMiembro() || (autenticado() && request.auth.uid == uid);
+      allow create: if primerAdmin(uid) || esAdmin();
+      allow update, delete: if esAdmin();
+    }
+
+    // Vínculo cuenta ↔ nombre en Personal: cada quien puede vincularse a sí mismo
+    match /vinculos/{uid} {
+      allow read: if esMiembro();
+      allow write: if esAdmin() || (esMiembro() && request.auth.uid == uid);
+    }
+
+    // Lo que solo cambia administración
+    match /{col}/{id} {
+      allow read: if esMiembro() && col in ["clientes", "movimientos", "recaudos", "liquidaciones", "jornadas", "cajamovs", "mensajeros", "papelera", "papelera_fotos"];
+      allow write: if esAdmin() && col in ["clientes", "movimientos", "recaudos", "liquidaciones", "jornadas", "cajamovs", "mensajeros", "papelera", "papelera_fotos"];
+    }
+    // Lo que también registran los mensajeros (pedidos, fotos, entregas, historial)
+    match /{col}/{id} {
+      allow read, write: if esMiembro() && col in ["pedidos", "fotos", "entregas", "historial"];
+    }
+  }
+}

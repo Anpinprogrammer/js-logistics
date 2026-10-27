@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#042A3A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="JS Logistics">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" type="image/png" href="img/icono-96.png">
+<link rel="apple-touch-icon" href="img/icono-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>JS Logistics</title>
+<script defer src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+<header class="barra">
+  <div class="marca"><img src="img/logo.png" alt=""><span>JS Logistics<small>Servir es nuestra labor</small></span></div>
+  <div class="rol" id="rol" role="group" aria-label="Modo">
+    <button data-rol="mensajero" aria-pressed="true">Mensajero</button>
+    <button data-rol="admin" aria-pressed="false" id="btnAdmin">Administración</button>
+  </div>
+  <button class="salir oculto" id="btnSalir" aria-label="Cerrar sesión">Salir</button>
+</header>
+<div class="splash" id="splash" aria-hidden="true"><img src="img/logo-splash.png" alt=""><b>JS Logistics</b><span>Servir es nuestra labor</span></div>
+<main id="vista"></main>
+<nav class="pestanas" id="pestanas" aria-label="Secciones"></nav>
+<input type="file" id="inCamara" accept="image/*" capture="environment" class="oculto">
+<dialog id="dlg"><div class="dlg" id="dlgCont"></div></dialog>
+
+<script type="module" src="js/plataforma.js"></script>
+</body>
+</html>

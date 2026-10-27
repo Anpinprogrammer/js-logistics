@@ -1,0 +1,13 @@
+# Datos reales del negocio (clientes, teléfonos, fotos): no van al historial del código
+datos-migracion/
+respaldo-*.zip
+*.xlsx
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+.firebaserc
+
+# macOS
+.DS_Store
