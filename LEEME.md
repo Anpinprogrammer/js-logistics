@@ -73,12 +73,14 @@ pantalla de inicio". Queda como una app con su ícono.
 | Rol | Qué puede hacer |
 |---|---|
 | Mensajero | Sus pedidos (crear, entregar, devolver), su caja y su sueldo. No ve clientes ni datos de otros. |
-| Asistente | Lo de un mensajero, más "Oficina": Pedidos (asignar remitente y valores, también de pedidos entregados), registrar y editar clientes, ver saldos y enviar recibos por WhatsApp. No ve Caja, Sueldos, Personal, Historial ni Respaldo; no borra nada ni registra pagos. |
+| Asistente | Solo "Oficina": Pedidos (asignar remitente y valores, también de pedidos entregados; tomar la foto de pedidos que quedan a cargo de la Oficina y marcarlos entregados), registrar y editar clientes, ver saldos y enviar recibos por WhatsApp. No ve Caja, Sueldos, Personal, Historial ni Respaldo; no borra nada ni registra pagos. |
 | Administración | Todo. |
 
 En Personal, el **tipo** define cómo se paga a cada persona:
 mensajero (70% de sus domicilios − 25.000 al día), dueño, **oficina** (sus pedidos son 100% de JS y
-suman al sueldo del dueño; a la persona se le paga fijo por día), patinador y empresa (fijo por día).
+suman al sueldo del dueño; si quieres llevar ahí el pago de la persona de oficina, ponle pago por día),
+patinador y empresa (fijo por día). Para que Oficina → Pedidos muestre el botón de foto, crea en Personal
+una entrada de tipo Oficina (JS), por ejemplo "Oficina".
 
 El rol se cambia en Más → Personal → Accesos a la app. Las reglas de `firestore.rules` hacen cumplir
 estos permisos en el servidor: aunque alguien modifique la app, no puede leer lo que su rol no permite.

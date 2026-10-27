@@ -164,6 +164,7 @@ let limiteA=100, subMas="panel";
 let rol="mensajero", tabM="nuevo", tabA="pedidos", filtroA="sin", buscarA="", diaCaja=hoy(), diaMiCaja=hoy();
 let miMensajero = lsGet("js_mensajero") || "";
 let ultimaGuia=null;
+let fotoPara=""; // id en Personal de la oficina cuando la foto se toma desde Oficina → Pedidos
 
 const iconCam='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>';
 
@@ -171,6 +172,7 @@ function pintar(){
   document.querySelectorAll("#rol button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.rol===rol)));
   $("#btnAdmin").classList.toggle("oculto", !esAdmin&&!esAsistente);
   $("#btnAdmin").textContent = esAdmin ? "Administración" : "Oficina";
+  $("#rol").classList.toggle("oculto", esAsistente); // el asistente solo trabaja en Oficina
   const foco=document.activeElement&&document.activeElement.id&&$("#vista").contains(document.activeElement)?document.activeElement.id:null;
   if(rol==="mensajero") pintarMensajero(); else pintarAdmin();
   if(foco){ const el=document.getElementById(foco); if(el&&el!==document.activeElement) el.focus(); }
@@ -260,7 +262,7 @@ function pintarMensajero(){
   const cr=$("#colaRe"); if(cr) cr.onclick=()=>procesarCola(true);
   const sm=$("#selMens"); if(sm) sm.onchange=()=>elegirMensajero(sm.value);
   const cy=$("#cambiarYo"); if(cy) cy.onclick=e=>{e.preventDefault(); if(actuarComo){ actuarComo=false; aplicarVinculo(); pintar(); return; } if(vinc&&esAdmin) actuarComo=true; miMensajero=""; pintar();};
-  const bf=$("#btnFoto"); if(bf) bf.onclick=()=>{$("#inCamara").value=""; $("#inCamara").click();};
+  const bf=$("#btnFoto"); if(bf) bf.onclick=()=>{fotoPara=""; $("#inCamara").value=""; $("#inCamara").click();};
   document.querySelectorAll("[data-entregar]").forEach(b=>b.onclick=()=>abrirEntrega(b.dataset.entregar));
   const sa=$("#msAnt"), ss=$("#msSig"), sh=$("#msHoy");
   if(sa) sa.onclick=()=>{semM=moverSemana(semM,-1); pintar();};
@@ -270,13 +272,14 @@ function pintarMensajero(){
 
 $("#inCamara").addEventListener("change", async e=>{
   const f=e.target.files[0]; if(!f) return;
-  const bf=$("#btnFoto"); if(bf){bf.disabled=true; bf.lastChild.textContent="Guardando…";}
+  const mid=fotoPara||miMensajero, desdeOficina=!!fotoPara; fotoPara="";
+  const bf=$("#btnFoto")||$("#fotoOfi"); if(bf){bf.disabled=true; bf.lastChild.textContent="Guardando…";}
   try{
     const [foto,mini]=await Promise.all([comprimir(f,900,.6), comprimir(f,140,.6)]);
     const n=await siguienteGuia(); const guia=formatoGuia(n);
     await guardar("fotos",guia,{salida:foto});
-    await guardar("pedidos",guia,{guia,n,estado:"pendiente",creado:Date.now(),mensajeroId:miMensajero,mini,clienteId:"",valorServicio:0,aCobrar:0,por:uid||""});
-    ultimaGuia=guia; toast("Guía "+guia+" creada"); pintar();
+    await guardar("pedidos",guia,{guia,n,estado:"pendiente",creado:Date.now(),mensajeroId:mid,mini,clienteId:"",valorServicio:0,aCobrar:0,por:uid||""});
+    toast("Guía "+guia+" creada"); if(desdeOficina){ pintar(); abrirPedido(guia); } else { ultimaGuia=guia; pintar(); }
   }catch(err){ console.error(err); toast(navigator.onLine===false?"Sin señal: la guía necesita conexión para darle número. Intenta cuando tengas señal.":"No se pudo guardar el pedido. Revisa la conexión e intenta de nuevo."); pintar(); }
 });
 
@@ -404,7 +407,10 @@ function pintarAdmin(){
     else if(filtroA==="dev") ps=ps.filter(p=>p.estado==="devuelto");
     else if(filtroA==="dif") ps=ps.filter(p=>Number(p.difCobro));
     if(buscarA) ps=ps.filter(p=>(p.guia+" "+nombreCliente(p.clienteId)+" "+(p.destinatario||"")).toLowerCase().includes(buscarA.toLowerCase()));
-    v.innerHTML=aviso+`<h1>Pedidos</h1><p class="sub">Asigna el remitente, el valor del servicio y el valor a cobrar a cada guía.</p>
+    const ofis=listaOrdenada(S.mensajeros,"nombre").filter(m=>tipoDe(m)==="oficina");
+    const fotoOfi=ofis.length?`<div class="acciones" style="margin:0 0 14px;align-items:center"><button class="btn" id="fotoOfi">${iconCam.replace('<svg','<svg width="22" height="22"')}<span>Tomar foto del pedido</span></button>${ofis.length>1?`<select id="ofiSel" aria-label="Oficina encargada">${ofis.map(m=>`<option value="${esc(m.id)}">${esc(m.nombre)}</option>`).join("")}</select>`:""}<span class="sub">Queda a cargo de ${ofis.length>1?"la oficina elegida":esc(ofis[0].nombre)}; el domicilio es 100% de JS.</span></div>`
+      :`<div class="aviso">${esAdmin?"Para registrar pedidos con foto desde aquí, agrega en Más → Personal una persona de tipo “Oficina (JS)”.":"Para registrar pedidos con foto, el administrador debe crear la Oficina en Personal."}</div>`;
+    v.innerHTML=aviso+`<h1>Pedidos</h1><p class="sub">Asigna el remitente, el valor del servicio y el valor a cobrar a cada guía.</p>${fotoOfi}
       ${(()=>{ const n=Object.values(S.pedidos).filter(p=>Number(p.difCobro)&&!p.difRevisada).length; return n?`<div class="aviso alerta">${n===1?"1 entrega tiene":n+" entregas tienen"} un valor cobrado distinto al que debían cobrar. Revísalas en “Con diferencia”.</div>`:""; })()}
       <div class="filtros">${[["sin","Sin remitente"],["pend","Por entregar"],["ent","Entregados"],["dev","Devueltos"],["dif","Con diferencia"],["todos","Todos"]].map(([k,t])=>`<button data-f="${k}" aria-pressed="${filtroA===k}">${t}</button>`).join("")}</div>
       <div class="campo"><input id="buscar" type="search" placeholder="Buscar guía, remitente o destinatario" value="${esc(buscarA)}" aria-label="Buscar"></div>
@@ -413,6 +419,7 @@ function pintarAdmin(){
     const mp=$("#masPed"); if(mp) mp.onclick=()=>{limiteA+=200; pintar();};
     const bu=$("#buscar"); bu.oninput=()=>{buscarA=bu.value; clearTimeout(bu._t); bu._t=setTimeout(()=>{pintar(); const n=$("#buscar"); n.focus(); n.setSelectionRange(n.value.length,n.value.length);},300);};
     v.querySelectorAll("[data-ped]").forEach(b=>b.onclick=()=>abrirPedido(b.dataset.ped));
+    const fo=$("#fotoOfi"); if(fo) fo.onclick=()=>{ fotoPara=$("#ofiSel")?.value||ofis[0].id; $("#inCamara").value=""; $("#inCamara").click(); };
   }
   else if(tabA==="clientes"){
     const cs=listaOrdenada(S.clientes,"nombre").map(c=>({...c,s:saldoCliente(c.id)}));
@@ -587,7 +594,7 @@ async function abrirPedido(guia, cliElegido){
     <dt>Efecto en saldo</dt><dd class="${saldoPedido(p)<0?"neg":"pos"}">${pesos(saldoPedido(p))}</dd>`:""}
   </dl>
   <div class="fotos" id="pFotos"><span class="sub">Cargando fotos…</span></div>
-  <div class="acciones">${cerrado(p)?(esAdmin?'<button class="btn sec chico" id="pReabrir">Devolver a por entregar</button>':""):'<button class="btn sec chico" id="pNoEnt">Registrar que no se pudo entregar</button>'}${Number(p.difCobro)&&!p.difRevisada?'<button class="btn sec chico" id="pDifOk">Marcar diferencia como revisada</button>':""}${esAdmin?'<button class="btn peligro chico" id="pBorrar">Eliminar pedido</button>':""}</div>`;
+  <div class="acciones">${!cerrado(p)&&tipoDe(S.mensajeros[p.mensajeroId])==="oficina"?'<button class="btn ok chico" id="pEntregar">Marcar entregado</button>':""}${cerrado(p)?(esAdmin?'<button class="btn sec chico" id="pReabrir">Devolver a por entregar</button>':""):'<button class="btn sec chico" id="pNoEnt">Registrar que no se pudo entregar</button>'}${Number(p.difCobro)&&!p.difRevisada?'<button class="btn sec chico" id="pDifOk">Marcar diferencia como revisada</button>':""}${esAdmin?'<button class="btn peligro chico" id="pBorrar">Eliminar pedido</button>':""}</div>`;
   abrirDlg();
   $("#pNuevoCli").onclick=()=>{ const sv=$("#pServ").value; formCliente(null, cid=>{ abrirPedido(guia, cid).then(()=>{ if(sv) $("#pServ").value=sv; }); }); };
   $("#pCli").onchange=e=>{ const t=S.clientes[e.target.value]?.tarifa; if(t && !$("#pServ").value) $("#pServ").value=t; };
@@ -598,6 +605,7 @@ async function abrirPedido(guia, cliElegido){
   if($("#pBorrar")) $("#pBorrar").onclick=async()=>{ if(!await confirmar("Eliminar la guía "+guia,"Se borran el pedido y sus fotos. No se puede deshacer.","Eliminar")) return abrirPedido(guia);
     const grupo=nuevoId(); try{ await borrar("pedidos",guia,{grupo}); await borrar("fotos",guia,{grupo}).catch(()=>{}); await borrar("entregas",guia,{grupo}).catch(()=>{}); cerrarDlg(); toast("Guía enviada a la papelera"); }catch(e){ toast("No se pudo eliminar"); } };
   const ne=$("#pNoEnt"); if(ne) ne.onclick=()=>abrirDevolucion(guia);
+  const pe=$("#pEntregar"); if(pe) pe.onclick=()=>abrirEntrega(guia);
   const dk=$("#pDifOk"); if(dk) dk.onclick=async()=>{ try{ await actualizar("pedidos",guia,{difRevisada:true}); abrirPedido(guia); }catch(e){ toast("No se pudo guardar"); } };
   const rb=$("#pReabrir"); if(rb) rb.onclick=async()=>{ if(!await confirmar("Reabrir la guía "+guia,"La entrega se borrará y el pedido volverá a por entregar.","Reabrir")) return abrirPedido(guia);
     await actualizar("pedidos",guia,{estado:"pendiente",entregado:null,destinatario:"",valorCobrado:0,metodo:"",cuentaJs:"",difCobro:0,difRevisada:false,motivoDev:"",notaDev:"",cobrarDev:false}); await borrar("entregas",guia,{grupo:nuevoId()}).catch(()=>{}); cerrarDlg(); };
@@ -1437,7 +1445,7 @@ pintar();
     [db,usuario,descargas]=[P.db,P.usuario,P.descargas];
   }catch(e){ db=null; }
   if(usuario){ try{ uid=await usuario.id(); esAdmin = await usuario.canEdit(); esAsistente = !esAdmin && usuario.rol()==="asistente"; }catch(e){} }
-  if((esAdmin||esAsistente) && lsGet("js_rol")==="admin") rol="admin";
+  if(esAsistente || (esAdmin && lsGet("js_rol")==="admin")) rol="admin";
   if(!esAdmin&&!esAsistente) rol="mensajero";
   if(db){ cargarDatos(); procesarCola(); }
   else { cargado=true; }
