@@ -1,55 +1,115 @@
 rules_version = '2';
 // Quién puede leer y escribir cada parte de la base de datos.
 // Solo entra quien tiene un documento en "usuarios" (lo crea el administrador desde la app).
+// Roles: admin (todo), asistente (pedidos, clientes y saldos; lo propio en caja y sueldo),
+//        mensajero (solo sus pedidos, su caja y su sueldo).
 service cloud.firestore {
   match /databases/{database}/documents {
     function autenticado() { return request.auth != null; }
-    function esMiembro() { return autenticado() && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)); }
-    function esAdmin() { return autenticado() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+    function ruta(c, id) { return /databases/$(database)/documents/$(c)/$(id); }
+    function esMiembro() { return autenticado() && exists(ruta("usuarios", request.auth.uid)); }
+    function esAdmin() { return autenticado() && exists(ruta("admins", request.auth.uid)); }
+    function esAsistente() { return esMiembro() && get(ruta("usuarios", request.auth.uid)).data.rol == "asistente"; }
+    function esOficina() { return esAdmin() || esAsistente(); }
+    // Nombre en Personal vinculado a la cuenta que hace la petición
+    function tengoVinculo() { return autenticado() && exists(ruta("vinculos", request.auth.uid)); }
+    function esMio(mid) { return tengoVinculo() && mid == get(ruta("vinculos", request.auth.uid)).data.mensajeroId; }
+    function pedidoMio(guia) { return exists(ruta("pedidos", guia)) && esMio(get(ruta("pedidos", guia)).data.mensajeroId); }
+
     // Configuración inicial: solo si todavía no existe meta/config, y en la misma escritura que la crea.
     function primerAdmin(uid) {
       return autenticado() && request.auth.uid == uid
-        && !exists(/databases/$(database)/documents/meta/config)
-        && existsAfter(/databases/$(database)/documents/meta/config);
+        && !exists(ruta("meta", "config"))
+        && existsAfter(ruta("meta", "config"));
     }
-
     match /meta/config {
       allow read: if autenticado();
       allow create: if autenticado()
         && request.resource.data.primerAdmin == request.auth.uid
-        && existsAfter(/databases/$(database)/documents/admins/$(request.auth.uid));
+        && existsAfter(ruta("admins", request.auth.uid));
     }
-    // Contador de guías y otros datos compartidos
+    // Contador de guías
     match /meta/{id} {
       allow read: if esMiembro();
       allow write: if esMiembro() && id != "config";
     }
 
+    // Cuentas, roles y vínculos: cada quien ve lo suyo; solo administración los cambia
     match /admins/{uid} {
-      allow read: if autenticado() && (request.auth.uid == uid || esMiembro());
+      allow read: if autenticado() && (request.auth.uid == uid || esAdmin());
       allow create: if primerAdmin(uid) || esAdmin();
       allow delete: if esAdmin() && uid != request.auth.uid;
     }
     match /usuarios/{uid} {
-      allow read: if esMiembro() || (autenticado() && request.auth.uid == uid);
+      allow read: if autenticado() && (request.auth.uid == uid || esAdmin());
       allow create: if primerAdmin(uid) || esAdmin();
-      allow update, delete: if esAdmin();
+      allow update: if esAdmin() && (uid != request.auth.uid || request.resource.data.rol == resource.data.rol);
+      allow delete: if esAdmin() && uid != request.auth.uid;
     }
-
-    // Vínculo cuenta ↔ nombre en Personal: cada quien puede vincularse a sí mismo
     match /vinculos/{uid} {
-      allow read: if esMiembro();
-      allow write: if esAdmin() || (esMiembro() && request.auth.uid == uid);
+      allow read: if autenticado() && (request.auth.uid == uid || resource.data.uid == request.auth.uid || esAdmin());
+      allow write: if esAdmin();
     }
 
-    // Lo que solo cambia administración
-    match /{col}/{id} {
-      allow read: if esMiembro() && col in ["clientes", "movimientos", "recaudos", "liquidaciones", "jornadas", "cajamovs", "mensajeros", "papelera", "papelera_fotos"];
-      allow write: if esAdmin() && col in ["clientes", "movimientos", "recaudos", "liquidaciones", "jornadas", "cajamovs", "mensajeros", "papelera", "papelera_fotos"];
+    // Pedidos: oficina ve y organiza todos; cada mensajero solo los suyos. Borrar: solo administración.
+    match /pedidos/{guia} {
+      allow read: if esOficina() || esMio(resource.data.mensajeroId);
+      allow create: if esOficina() || esMio(request.resource.data.mensajeroId);
+      allow update: if esOficina() || (esMio(resource.data.mensajeroId) && esMio(request.resource.data.mensajeroId));
+      allow delete: if esAdmin();
     }
-    // Lo que también registran los mensajeros (pedidos, fotos, entregas, historial)
-    match /{col}/{id} {
-      allow read, write: if esMiembro() && col in ["pedidos", "fotos", "entregas", "historial"];
+    // Fotos de salida y de entrega (el documento se llama como la guía)
+    match /fotos/{guia} {
+      allow read, update: if esOficina() || pedidoMio(guia);
+      allow create: if esMiembro();
+      allow delete: if esAdmin();
+    }
+    match /entregas/{guia} {
+      allow read, update: if esOficina() || pedidoMio(guia);
+      allow create: if esOficina() || pedidoMio(guia);
+      allow delete: if esAdmin();
+    }
+
+    // Clientes: oficina los ve y registra; borrar solo administración
+    match /clientes/{id} {
+      allow read: if esOficina();
+      allow create, update: if esOficina();
+      allow delete: if esAdmin();
+    }
+    // Pagos y ajustes de clientes: oficina los ve (saldos); solo administración los registra
+    match /movimientos/{id} {
+      allow read: if esOficina();
+      allow write: if esAdmin();
+    }
+    // Personal: oficina ve la lista; cada mensajero solo su propia ficha
+    match /mensajeros/{id} {
+      allow read: if esOficina() || esMio(resource.data.id);
+      allow write: if esAdmin();
+    }
+    // Dinero entregado y liquidaciones: cada quien lo suyo
+    match /recaudos/{id} {
+      allow read: if esAdmin() || esMio(resource.data.mensajeroId);
+      allow write: if esAdmin();
+    }
+    match /liquidaciones/{id} {
+      allow read: if esAdmin() || esMio(resource.data.mensajeroId);
+      allow write: if esAdmin();
+    }
+    // Caja general: cada quien solo sus adelantos y pagos de sueldo
+    match /cajamovs/{id} {
+      allow read: if esAdmin() || esMio(resource.data.personaId);
+      allow write: if esAdmin();
+    }
+    // Solo administración
+    match /jornadas/{id} { allow read, write: if esAdmin(); }
+    match /papelera/{id} { allow read, write: if esAdmin(); }
+    match /papelera_fotos/{id} { allow read, write: if esAdmin(); }
+
+    // Historial: un documento por día y por persona ("AAAA-MM-DD_<uid>"); cada quien escribe el suyo
+    match /historial/{id} {
+      allow read: if esAdmin() || (autenticado() && id.matches("^[0-9-]+_" + request.auth.uid + "$"));
+      allow create, update: if esMiembro() && (esAdmin() || id.matches("^[0-9-]+_" + request.auth.uid + "$"));
+      allow delete: if esAdmin();
     }
   }
 }

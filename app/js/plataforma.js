@@ -83,6 +83,15 @@ async function iniciar(){
     b.delete(F.doc(fs, "usuarios", id)); b.delete(F.doc(fs, "admins", id)); b.delete(F.doc(fs, "vinculos", id));
     await b.commit();
   }
+  async function cambiarRol(id, rol){
+    const b = F.writeBatch(fs);
+    b.update(F.doc(fs, "usuarios", id), { rol });
+    if(rol === "admin") b.set(F.doc(fs, "admins", id), { uid: id }); else b.delete(F.doc(fs, "admins", id));
+    await b.commit();
+  }
+  const vincular = (id, mensajeroId) => mensajeroId
+    ? F.setDoc(F.doc(fs, "vinculos", id), { uid: id, mensajeroId, fecha: Date.now() })
+    : F.deleteDoc(F.doc(fs, "vinculos", id));
   const enviarCambioClave = email => A.sendPasswordResetEmail(auth, email);
 
   /* --- importar un respaldo {coleccion:{id:documento}} --- */
@@ -110,9 +119,9 @@ async function iniciar(){
     if(!u){ if(arrancada){ location.reload(); return; } quitarSplash(); mostrarIngreso(); return; }
     if(arrancada) return;
     try{
-      const [miembro, admin] = await Promise.all([F.getDoc(F.doc(fs, "usuarios", u.uid)), F.getDoc(F.doc(fs, "admins", u.uid))]);
+      const [miembro, admin, vinculo] = await Promise.all(["usuarios", "admins", "vinculos"].map(c => F.getDoc(F.doc(fs, c, u.uid))));
       if(!miembro.exists()){ quitarSplash(); mostrarSinAcceso(u.email); return; }
-      usuarioActual = { uid: u.uid, email: u.email, admin: admin.exists(), datos: miembro.data() };
+      usuarioActual = { uid: u.uid, email: u.email, admin: admin.exists(), datos: miembro.data(), mensajeroId: vinculo.exists() ? vinculo.data().mensajeroId : "" };
     }catch(e){ console.error(e); quitarSplash(); mostrarSinAcceso(u.email); return; }
     arrancada = true;
     $("#acceso")?.remove();
@@ -123,6 +132,8 @@ async function iniciar(){
       usuario: {
         id: async () => usuarioActual.uid,
         canEdit: async () => usuarioActual.admin,
+        rol: () => usuarioActual.admin ? "admin" : (usuarioActual.datos.rol || "mensajero"),
+        mensajeroId: () => usuarioActual.mensajeroId,
         email: () => usuarioActual.email,
         profiles: async ids => {
           const out = {};
@@ -130,7 +141,7 @@ async function iniciar(){
           return out;
         }
       },
-      cuentas: { crear: crearAcceso, quitar: quitarAcceso, cambiarClave: enviarCambioClave },
+      cuentas: { crear: crearAcceso, quitar: quitarAcceso, cambiarRol, vincular, cambiarClave: enviarCambioClave },
       importar
     };
     cargarApp();

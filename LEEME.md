@@ -68,6 +68,17 @@ firebase deploy
 En el celular: abre la dirección en Chrome (Android) o Safari (iPhone) → menú → "Agregar a la
 pantalla de inicio". Queda como una app con su ícono.
 
+## Roles
+
+| Rol | Qué puede hacer |
+|---|---|
+| Mensajero | Sus pedidos (crear, entregar, devolver), su caja y su sueldo. No ve clientes ni datos de otros. |
+| Asistente | Lo de un mensajero, más "Oficina": Pedidos (asignar remitente y valores, también de pedidos entregados), registrar y editar clientes, ver saldos y enviar recibos por WhatsApp. No ve Caja, Sueldos, Personal, Historial ni Respaldo; no borra nada ni registra pagos. |
+| Administración | Todo. |
+
+El rol se cambia en Más → Personal → Accesos a la app. Las reglas de `firestore.rules` hacen cumplir
+estos permisos en el servidor: aunque alguien modifique la app, no puede leer lo que su rol no permite.
+
 ## Bueno saber
 
 - **Costo:** el plan gratis de Firebase (Spark) alcanza de sobra para este volumen.

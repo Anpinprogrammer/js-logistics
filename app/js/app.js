@@ -29,7 +29,7 @@ async function comprimir(file, max, q){
 }
 
 /* ---------- datos (db compartida, o memoria si no hay) ---------- */
-let db=null, usuario=null, uid=null, esAdmin=true;
+let db=null, usuario=null, uid=null, esAdmin=true, esAsistente=false; // asistente: Pedidos, Clientes y Recibos, sin caja ni sueldos
 const S={pedidos:{},clientes:{},mensajeros:{},movimientos:{},recaudos:{},liquidaciones:{},jornadas:{},cajamovs:{},vinculos:{},usuarios:{}};
 const memDocs={}; let memContador=0;
 let cargado=false;
@@ -117,8 +117,8 @@ async function procesarCola(manual){
 addEventListener("online",()=>procesarCola());
 setInterval(()=>procesarCola(),30000);
 async function leer(col,id){ if(db){ const s=await db.collection(col).doc(id).get(); return s.exists?s.data():null; } return memDocs[col+"/"+id]||null; }
-function suscribir(col){
-  db.collection(col).onSnapshot(q=>{ const m={}; q.docs.forEach(d=>m[d.id]=d.data()); S[col]=m; cargado=true; pintar(); },
+function suscribir(col,filtro){ // filtro [campo,"==",valor]: solo los documentos propios (ver firestore.rules)
+  (filtro?db.collection(col).where(...filtro):db.collection(col)).onSnapshot(q=>{ const m={}; q.docs.forEach(d=>m[d.id]=d.data()); S[col]=m; cargado=true; pintar(); },
     e=>{ console.warn(col,e); if(e.code==="permission-denied"){ toast("Se perdió el acceso a los datos"); } });
 }
 async function siguienteGuia(){
@@ -156,7 +156,7 @@ function saldoCliente(cid){
   for(const m of Object.values(S.movimientos)) if(m.clienteId===cid) s+=signoMov(m);
   return s;
 }
-const nombreCliente = id => S.clientes[id]?.nombre || "";
+const nombreCliente = id => S.clientes[id]?.nombre || (id && Object.values(S.pedidos).find(p=>p.clienteId===id&&p.clienteNombre)?.clienteNombre) || "";
 const listaOrdenada = (obj,campo,desc) => Object.values(obj).sort((a,b)=> desc ? (b[campo]||0)-(a[campo]||0) : String(a[campo]||"").localeCompare(String(b[campo]||""),"es"));
 
 /* ---------- estado de interfaz ---------- */
@@ -169,7 +169,8 @@ const iconCam='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 
 function pintar(){
   document.querySelectorAll("#rol button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.rol===rol)));
-  $("#btnAdmin").classList.toggle("oculto", !esAdmin);
+  $("#btnAdmin").classList.toggle("oculto", !esAdmin&&!esAsistente);
+  $("#btnAdmin").textContent = esAdmin ? "Administración" : "Oficina";
   const foco=document.activeElement&&document.activeElement.id&&$("#vista").contains(document.activeElement)?document.activeElement.id:null;
   if(rol==="mensajero") pintarMensajero(); else pintarAdmin();
   if(foco){ const el=document.getElementById(foco); if(el&&el!==document.activeElement) el.focus(); }
@@ -217,8 +218,10 @@ function pintarMensajero(){
   const cola=colaLeer();
   const avisoCola=cola.length?`<div class="aviso alerta"><b>${cola.length===1?"1 entrega guardada":cola.length+" entregas guardadas"} en este teléfono</b>, esperando señal (${cola.map(x=>esc(x.guia)).join(", ")}). Se envían solas cuando vuelva la conexión.<br><button class="btn chico" id="colaRe">Reintentar ahora</button></div>`:"";
   let h="";
-  if(!mens.length){
+  if(!mens.length && (esAdmin||!db)){
     h=`<h1>Hola</h1><div class="vacio">${cargado||!db?"Todavía no hay mensajeros registrados. El administrador los crea en Administración → Más → Personal.":"Cargando…"}</div>`;
+  } else if(!S.mensajeros[miMensajero] && db && uid && !esAdmin){
+    h=`<h1>Hola</h1><div class="vacio">Tu cuenta todavía no está vinculada a tu nombre. Pídele al administrador que la vincule en Más → Personal → Accesos a la app.</div>`;
   } else if(!S.mensajeros[miMensajero]){
     h=`<h1>Hola</h1><p class="sub">${db&&uid?"Elige tu nombre una sola vez. Quedará vinculado a tu cuenta y solo el administrador lo puede cambiar.":"Elige tu nombre una sola vez; este teléfono lo recordará."}</p>${selector}`;
   } else if(tabM==="nuevo"){
@@ -385,7 +388,9 @@ function tablaEntregas(ps,conCliente){
 
 function pintarAdmin(){
   const sin=Object.values(S.pedidos).filter(p=>!p.clienteId).length;
-  $("#pestanas").innerHTML=[["pedidos","Pedidos",sin],["clientes","Clientes"],["recibos","Recibos"],["caja","Caja"],["sueldos","Sueldos"],["mas","Más"]]
+  const tabs=[["pedidos","Pedidos",sin],["clientes","Clientes"],["recibos","Recibos"],["caja","Caja"],["sueldos","Sueldos"],["mas","Más"]].filter(([k])=>esAdmin||["pedidos","clientes","recibos"].includes(k));
+  if(!tabs.some(([k])=>k===tabA)) tabA="pedidos";
+  $("#pestanas").innerHTML=tabs
     .map(([k,t,n])=>`<button data-t="${k}" ${tabA===k?'aria-current="page"':''}>${t}${n?`<span class="num">${n}</span>`:""}</button>`).join("");
   $("#pestanas").querySelectorAll("button").forEach(b=>b.onclick=()=>{tabA=b.dataset.t; pintar(); scrollTo(0,0);});
   const v=$("#vista");
@@ -419,7 +424,7 @@ function pintarAdmin(){
         <div class="cifra"><span>Cuentas por cobrar (te deben)</span><b class="neg">${pesos(totC)}</b><span>${cobrar.length} cliente${cobrar.length===1?"":"s"}</span></div>
         <div class="cifra"><span>Cuentas por pagar (les debes)</span><b class="pos">${pesos(totP)}</b><span>${pagar.length} cliente${pagar.length===1?"":"s"}</span></div>
       </div>
-      <div class="acciones" style="margin-bottom:16px"><button class="btn" id="nuevoCli">Registrar cliente</button>${descargas?'<button class="btn sec" id="xlsCartera">Descargar cartera en Excel</button>':""}</div>
+      <div class="acciones" style="margin-bottom:16px"><button class="btn" id="nuevoCli">Registrar cliente</button>${descargas&&esAdmin?'<button class="btn sec" id="xlsCartera">Descargar cartera en Excel</button>':""}</div>
       <div class="filtros">${[["todos","Todos"],["cobrar","Por cobrar"],["pagar","Por pagar"]].map(([k,t])=>`<button data-fc="${k}" aria-pressed="${filtroCli===k}">${t}</button>`).join("")}</div>
       ${vis.length?`<div class="tabla-env"><table><thead><tr><th>Cliente</th><th>Número</th><th>Cuenta</th><th class="n">Saldo</th><th></th></tr></thead><tbody>
       ${vis.map(c=>`<tr><td><b>${esc(c.nombre)}</b>${Number(c.tarifa)?`<br><span class="sub" style="font-size:.8rem">Domicilio ${pesos(c.tarifa)}</span>`:""}</td><td>${esc(c.telefono||"")}</td><td>${c.s<0?'<span class="etq sin">Por cobrar</span>':c.s>0?'<span class="etq ent">Por pagar</span>':'<span class="sub">Paz y salvo</span>'}</td><td class="n ${c.s<0?"neg":c.s>0?"pos":""}">${pesos(Math.abs(c.s))}</td><td><button class="btn sec chico" data-cli="${esc(c.id)}">Ver cuenta</button></td></tr>`).join("")}
@@ -506,20 +511,21 @@ function pintarPersonal(v,aviso){
   }
 
 /* ---- accesos a la app (cuentas de correo y contraseña) ---- */
-const ROLES={mensajero:"Mensajero",admin:"Administración"};
+const ROLES={mensajero:"Mensajero",asistente:"Asistente",admin:"Administración"};
+const ROLES_AYUDA="Mensajero: solo sus pedidos, su caja y su sueldo. Asistente: además organiza Pedidos, registra clientes, ve saldos y envía recibos; no ve caja, sueldos ni personal. Administración: todo.";
 function htmlAccesos(){
   const cu=window.plataforma?.cuentas; if(!cu||!esAdmin) return "";
   const us=listaOrdenada(S.usuarios,"nombre");
   const reps=listaOrdenada(S.mensajeros,"nombre").filter(esRepartidor);
   return `<h2>Accesos a la app</h2>
-    <p class="sub">Cada persona entra con su correo y contraseña. Si eliges su nombre de Personal, queda vinculada de una vez.</p>
+    <p class="sub">Cada persona entra con su correo y contraseña. Si eliges su nombre de Personal, queda vinculada de una vez. ${ROLES_AYUDA}</p>
     <div class="linea2"><div class="campo"><label for="acNom">Nombre</label><input id="acNom"></div><div class="campo"><label for="acEmail">Correo</label><input id="acEmail" type="email" autocomplete="off"></div></div>
     <div class="linea2"><div class="campo"><label for="acClave">Contraseña inicial (mínimo 6)</label><input id="acClave" type="text" autocomplete="off" minlength="6"></div>
     <div class="campo"><label for="acRol">Rol</label><select id="acRol">${Object.entries(ROLES).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>
     <div class="campo"><label for="acMen">Nombre en Personal</label><select id="acMen"><option value="">— Ninguno —</option>${reps.map(m=>`<option value="${esc(m.id)}">${esc(m.nombre)}</option>`).join("")}</select></div></div>
     <button class="btn" id="acCrear">Crear acceso</button>
-    ${us.length?`<div class="tabla-env" style="margin-top:14px"><table><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Personal</th><th></th></tr></thead><tbody>${us.map(u=>`<tr><td><b>${esc(u.nombre||"")}</b>${u.uid===uid?' <span class="etq ent">Tú</span>':""}</td><td>${esc(u.email||"")}</td><td>${ROLES[u.rol]||esc(u.rol||"")}</td>
-      <td>${esc(S.mensajeros[S.vinculos[u.uid]?.mensajeroId]?.nombre||"—")}</td>
+    ${us.length?`<div class="tabla-env" style="margin-top:14px"><table><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Personal</th><th></th></tr></thead><tbody>${us.map(u=>`<tr><td><b>${esc(u.nombre||"")}</b>${u.uid===uid?' <span class="etq ent">Tú</span>':""}</td><td>${esc(u.email||"")}</td><td>${u.uid===uid?ROLES[u.rol]||esc(u.rol||""):`<select data-rolde="${esc(u.uid)}" aria-label="Rol de ${esc(u.nombre||"")}">${Object.entries(ROLES).map(([k,t])=>`<option value="${k}" ${u.rol===k?"selected":""}>${t}</option>`).join("")}</select>`}</td>
+      <td><select data-vinc="${esc(u.uid)}" aria-label="Nombre en Personal de ${esc(u.nombre||"")}"><option value="">— Ninguno —</option>${reps.map(m=>`<option value="${esc(m.id)}" ${S.vinculos[u.uid]?.mensajeroId===m.id?"selected":""}>${esc(m.nombre)}</option>`).join("")}</select></td>
       <td><button class="btn sec chico" data-clave="${esc(u.email||"")}">Cambiar contraseña</button>${u.uid!==uid?` <button class="btn peligro chico" data-sinacc="${esc(u.uid)}">Quitar acceso</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:""}`;
 }
 function activarAccesos(v){
@@ -533,6 +539,12 @@ function activarAccesos(v){
     try{ await cu.crear({email,clave,nombre,rol,mensajeroId}); registrar("Creó acceso para "+nombre+" ("+email+")"); toast("Acceso creado. Entrega a "+nombre+" su correo y contraseña."); }
     catch(e){ console.error(e); const c=e?.code||""; toast(c.includes("email-already-in-use")?"Ese correo ya tiene una cuenta":c.includes("invalid-email")?"El correo no es válido":c.includes("weak-password")?"Contraseña muy corta":"No se pudo crear el acceso"); bc.disabled=false; }
   };
+  v.querySelectorAll("[data-rolde]").forEach(sel=>sel.onchange=async()=>{ const id=sel.dataset.rolde, u=S.usuarios[id], nuevo=sel.value;
+    if(!await confirmar("Cambiar el rol de "+(u?.nombre||u?.email||""),"Pasará a "+ROLES[nuevo]+". El cambio se aplica la próxima vez que abra la app.","Cambiar rol")){ sel.value=u?.rol||"mensajero"; return; }
+    try{ await cu.cambiarRol(id,nuevo); registrar("Cambió el rol de "+(u?.nombre||"")+" a "+ROLES[nuevo]); toast("Rol actualizado"); }catch(e){ console.error(e); sel.value=u?.rol||"mensajero"; toast("No se pudo cambiar el rol"); } });
+  v.querySelectorAll("[data-vinc]").forEach(sel=>sel.onchange=async()=>{ const id=sel.dataset.vinc, mid=sel.value, u=S.usuarios[id];
+    const otro=mid&&vinculosDe(mid).find(x=>x.uid!==id); if(otro){ toast("Ese nombre ya está vinculado a otra cuenta. Cámbialo allá primero."); sel.value=S.vinculos[id]?.mensajeroId||""; return; }
+    try{ await cu.vincular(id,mid); registrar(mid?"Vinculó a "+(u?.nombre||"")+" con "+(S.mensajeros[mid]?.nombre||""):"Desvinculó a "+(u?.nombre||"")); toast(mid?"Vinculado. Se aplica la próxima vez que abra la app.":"Vínculo quitado"); }catch(e){ console.error(e); toast("No se pudo cambiar el vínculo"); } });
   v.querySelectorAll("[data-clave]").forEach(b=>b.onclick=async()=>{ const em=b.dataset.clave; if(!em) return;
     if(!await confirmar("Cambiar contraseña de "+em,"Le llegará un correo con un enlace para crear una contraseña nueva.","Enviar correo")) return;
     try{ await cu.cambiarClave(em); toast("Correo enviado a "+em); }catch(e){ toast("No se pudo enviar el correo"); } });
@@ -575,15 +587,15 @@ async function abrirPedido(guia, cliElegido){
     <dt>Efecto en saldo</dt><dd class="${saldoPedido(p)<0?"neg":"pos"}">${pesos(saldoPedido(p))}</dd>`:""}
   </dl>
   <div class="fotos" id="pFotos"><span class="sub">Cargando fotos…</span></div>
-  <div class="acciones">${cerrado(p)?'<button class="btn sec chico" id="pReabrir">Devolver a por entregar</button>':'<button class="btn sec chico" id="pNoEnt">Registrar que no se pudo entregar</button>'}${Number(p.difCobro)&&!p.difRevisada?'<button class="btn sec chico" id="pDifOk">Marcar diferencia como revisada</button>':""}<button class="btn peligro chico" id="pBorrar">Eliminar pedido</button></div>`;
+  <div class="acciones">${cerrado(p)?(esAdmin?'<button class="btn sec chico" id="pReabrir">Devolver a por entregar</button>':""):'<button class="btn sec chico" id="pNoEnt">Registrar que no se pudo entregar</button>'}${Number(p.difCobro)&&!p.difRevisada?'<button class="btn sec chico" id="pDifOk">Marcar diferencia como revisada</button>':""}${esAdmin?'<button class="btn peligro chico" id="pBorrar">Eliminar pedido</button>':""}</div>`;
   abrirDlg();
   $("#pNuevoCli").onclick=()=>{ const sv=$("#pServ").value; formCliente(null, cid=>{ abrirPedido(guia, cid).then(()=>{ if(sv) $("#pServ").value=sv; }); }); };
   $("#pCli").onchange=e=>{ const t=S.clientes[e.target.value]?.tarifa; if(t && !$("#pServ").value) $("#pServ").value=t; };
   $("#pGuardar").onclick=async()=>{ const cid=$("#pCli").value; if(!cid) return toast("Elige el remitente");
-    const datos={clienteId:cid,valorServicio:Number($("#pServ").value)||0,domiPagado:$("#pDomi").checked,aCobrar:Number($("#pCob").value)||0};
+    const datos={clienteId:cid,clienteNombre:S.clientes[cid]?.nombre||"",valorServicio:Number($("#pServ").value)||0,domiPagado:$("#pDomi").checked,aCobrar:Number($("#pCob").value)||0};
     if($("#pDev")) datos.cobrarDev=$("#pDev").checked; if($("#pCta")) datos.cuentaJs=$("#pCta").value;
     try{ await actualizar("pedidos",guia,datos); toast("Guía "+guia+" actualizada"); cerrarDlg(); }catch(e){toast("No se pudo guardar");} };
-  $("#pBorrar").onclick=async()=>{ if(!await confirmar("Eliminar la guía "+guia,"Se borran el pedido y sus fotos. No se puede deshacer.","Eliminar")) return abrirPedido(guia);
+  if($("#pBorrar")) $("#pBorrar").onclick=async()=>{ if(!await confirmar("Eliminar la guía "+guia,"Se borran el pedido y sus fotos. No se puede deshacer.","Eliminar")) return abrirPedido(guia);
     const grupo=nuevoId(); try{ await borrar("pedidos",guia,{grupo}); await borrar("fotos",guia,{grupo}).catch(()=>{}); await borrar("entregas",guia,{grupo}).catch(()=>{}); cerrarDlg(); toast("Guía enviada a la papelera"); }catch(e){ toast("No se pudo eliminar"); } };
   const ne=$("#pNoEnt"); if(ne) ne.onclick=()=>abrirDevolucion(guia);
   const dk=$("#pDifOk"); if(dk) dk.onclick=async()=>{ try{ await actualizar("pedidos",guia,{difRevisada:true}); abrirPedido(guia); }catch(e){ toast("No se pudo guardar"); } };
@@ -609,6 +621,7 @@ function formCliente(id, alGuardar){
     if(!n) return toast("Escribe el nombre"); if(!t) return toast("Escribe el número");
     const cid=id||nuevoId();
     try{ await guardar("clientes",cid,{id:cid,nombre:n,telefono:t,tarifa:Number($("#cTar").value)||0}); toast("Cliente "+n+" guardado");
+      if(id&&c.nombre!==n) for(const p of Object.values(S.pedidos)) if(p.clienteId===cid&&p.estado==="pendiente") rawUpd("pedidos",p.guia,{clienteNombre:n}).catch(()=>{});
       if(alGuardar) setTimeout(()=>alGuardar(cid),150); else cerrarDlg(); }catch(e){toast("No se pudo guardar");} };
 }
 
@@ -622,20 +635,20 @@ function abrirCuenta(cid){
   $("#dlgCont").innerHTML=`<header><div><h2>${esc(c.nombre)}</h2><span class="sub">${esc(c.telefono||"")}${pendientes?` · ${pendientes} en ruta`:""}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     <div class="saldo-grande ${s<0?"neg":s>0?"pos":""}">${pesos(Math.abs(s))}</div>
     <p class="sub">${s>0?"Cuenta por pagar: JS le debe este valor al cliente.":s<0?"Cuenta por cobrar: el cliente le debe este valor a JS.":"Cuenta a paz y salvo."}</p>
-    <h2>Registrar pago o ajuste</h2>
+    ${esAdmin?`<h2>Registrar pago o ajuste</h2>
     <div class="campo"><label for="mTipo">Tipo</label><select id="mTipo">${Object.entries(MOVS).map(([k,x])=>`<option value="${k}">${x.t}</option>`).join("")}</select></div>
     <div class="linea2"><div class="campo"><label for="mFecha">Día</label><input id="mFecha" type="date" value="${hoy()}"></div>
     <div class="campo"><label for="mVal">Valor</label><input id="mVal" type="number" inputmode="numeric" min="0" step="100" value="${Math.abs(s)||""}"></div></div>
     <div class="linea2"><div class="campo"><label for="mMedio">Medio (para pagos)</label><select id="mMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>
     <div class="campo"><label for="mNota">Nota (opcional)</label><input id="mNota" placeholder="Ej: compra, transferencia Nequi"></div></div>
-    <div class="acciones"><button class="btn ok" id="mReg">Registrar</button><button class="btn sec" id="cEdit">Editar cliente</button>${descargas?'<button class="btn sec" id="cCsv">Descargar para Excel</button>':""}</div>
+    <div class="acciones"><button class="btn ok" id="mReg">Registrar</button><button class="btn sec" id="cEdit">Editar cliente</button>${descargas?'<button class="btn sec" id="cCsv">Descargar para Excel</button>':""}</div>`:'<div class="acciones"><button class="btn sec" id="cEdit">Editar cliente</button></div>'}
     <h2>Movimientos</h2>
     ${rows.length?`<div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Detalle</th><th class="n">Valor</th><th></th></tr></thead><tbody>
-    ${rows.map(r=>`<tr><td>${hora(r.fecha)}</td><td>${esc(r.det)}</td><td class="n ${r.v<0?"neg":"pos"}">${pesos(r.v)}</td><td>${r.mid?`<button class="btn peligro chico" data-delmov="${esc(r.mid)}">Quitar</button>`:(r.pid&&(r.v<0||r.dp))?`<button class="btn sec chico" data-domi="${esc(r.pid)}">${r.dp?"Desmarcar pago":"Ya pagó domicilio"}</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:'<div class="vacio">Sin movimientos.</div>'}`;
+    ${rows.map(r=>`<tr><td>${hora(r.fecha)}</td><td>${esc(r.det)}</td><td class="n ${r.v<0?"neg":"pos"}">${pesos(r.v)}</td><td>${r.mid?(esAdmin?`<button class="btn peligro chico" data-delmov="${esc(r.mid)}">Quitar</button>`:""):(r.pid&&(r.v<0||r.dp))?`<button class="btn sec chico" data-domi="${esc(r.pid)}">${r.dp?"Desmarcar pago":"Ya pagó domicilio"}</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:'<div class="vacio">Sin movimientos.</div>'}`;
   if(!$("#dlg").open) abrirDlg();
-  $("#mTipo").value = s<0 ? "pago_de_cliente" : "pago_a_cliente";
+  if($("#mTipo")) $("#mTipo").value = s<0 ? "pago_de_cliente" : "pago_a_cliente";
   $("#cEdit").onclick=()=>formCliente(cid);
-  $("#mReg").onclick=async()=>{ const val=Number($("#mVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero"); const id=nuevoId();
+  if($("#mReg")) $("#mReg").onclick=async()=>{ const val=Number($("#mVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero"); const id=nuevoId();
     try{ await guardar("movimientos",id,{id,clienteId:cid,tipo:$("#mTipo").value,valor:val,medio:$("#mMedio").value,nota:$("#mNota").value.trim(),fecha:fechaDia($("#mFecha").value||hoy())}); toast("Movimiento registrado"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){toast("No se pudo guardar");} };
   document.querySelectorAll("[data-domi]").forEach(b=>b.onclick=async()=>{ b.disabled=true; const g=b.dataset.domi;
     try{ await actualizar("pedidos",g,{domiPagado:!S.pedidos[g]?.domiPagado}); toast("Guía "+g+" actualizada"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){ b.disabled=false; toast("No se pudo guardar"); } });
@@ -771,7 +784,7 @@ function pintarRecibos(v,aviso){
   const sinRem=Object.values(S.pedidos).filter(p=>cerrado(p)&&!p.clienteId&&diaDe(p.entregado)===diaRec).length;
   v.innerHTML=aviso+`<h1>Recibos de cuadre</h1><p class="sub">El saldo de cada cliente en el día, listo para imprimir o descargar en Excel.</p>
     <div class="linea2" style="align-items:end"><div class="campo" style="max-width:220px"><label for="diaR">Día</label><input type="date" id="diaR" value="${diaRec}"></div>
-    <div class="campo">${descargas?`<button class="btn" id="xlsDia" ${lista.length?"":"disabled"}>Descargar Excel del día</button>`:""}</div></div>
+    <div class="campo">${descargas&&esAdmin?`<button class="btn" id="xlsDia" ${lista.length?"":"disabled"}>Descargar Excel del día</button>`:""}</div></div>
     ${sinRem?`<div class="aviso">${sinRem===1?"1 entrega de este día no tiene remitente":sinRem+" entregas de este día no tienen remitente"} y no sale en los recibos. Asígnalo en Pedidos.</div>`:""}
     ${lista.length?`<div class="tabla-env"><table><thead><tr><th>Cliente</th><th class="n">Entregas</th><th class="n">Saldo anterior</th><th class="n">Del día</th><th class="n">Total</th><th class="n">Pagado</th><th></th></tr></thead><tbody>
     ${lista.map(r=>`<tr><td><b>${esc(r.nombre)}</b></td><td class="n">${r.lineas.filter(l=>l.p).length}</td><td class="n">${pesos(r.anterior)}</td><td class="n">${pesos(r.delDia)}</td><td class="n ${r.total<0?"neg":r.total>0?"pos":""}">${pesos(r.total)}</td><td class="n">${r.pagos?pesos(r.pagos):"—"}</td><td><button class="btn sec chico" data-rec="${esc(r.cid)}">Ver recibo</button></td></tr>`).join("")}
@@ -805,7 +818,7 @@ function verRecibo(cid){
     <div class="t-pie">${EMPRESA.lema}<br>${EMPRESA.tel}<br>${EMPRESA.ig}</div>
   </div>
   <p class="sub" style="margin-top:12px;text-align:center">${r.queda>0?"Cuenta por pagar: JS le debe entregar este valor al cliente.":r.queda<0?"Cuenta por cobrar: el cliente le debe este valor a JS.":"Cuadre en cero."}</p>
-  <div class="acciones" style="justify-content:center"><a class="btn ok" href="${linkWhatsApp(S.clientes[cid]?.telefono,textoRecibo(r))}" target="_blank" rel="noopener">Enviar por WhatsApp</a><button class="btn sec" id="copiarRec">Copiar texto</button>${descargas?'<button class="btn" id="xlsUno">Descargar recibo en Excel</button>':""}${r.queda?`<button class="btn ok" id="liquidar">${r.queda>0?"Registrar que JS pagó ":"Registrar que el cliente pagó "}${pesos(Math.abs(r.queda))}</button>`:""}</div>`;
+  <div class="acciones" style="justify-content:center"><a class="btn ok" href="${linkWhatsApp(S.clientes[cid]?.telefono,textoRecibo(r))}" target="_blank" rel="noopener">Enviar por WhatsApp</a><button class="btn sec" id="copiarRec">Copiar texto</button>${descargas?'<button class="btn" id="xlsUno">Descargar recibo en Excel</button>':""}${r.queda&&esAdmin?`<button class="btn ok" id="liquidar">${r.queda>0?"Registrar que JS pagó ":"Registrar que el cliente pagó "}${pesos(Math.abs(r.queda))}</button>`:""}</div>`;
   abrirDlg();
   const bx=$("#xlsUno"); if(bx) bx.onclick=()=>descargarExcel(diaRec,cid,bx);
   $("#copiarRec").onclick=async()=>{ try{ await navigator.clipboard.writeText(textoRecibo(r)); toast("Texto copiado. Pégalo en WhatsApp."); }catch(e){ toast("No se pudo copiar en este navegador"); } };
@@ -1420,13 +1433,28 @@ pintar();
     const P=window.plataforma; if(!P) throw 0;
     [db,usuario,descargas]=[P.db,P.usuario,P.descargas];
   }catch(e){ db=null; }
-  if(usuario){ try{ uid=await usuario.id(); esAdmin = await usuario.canEdit(); }catch(e){} }
-  if(esAdmin && lsGet("js_rol")==="admin") rol="admin";
-  if(!esAdmin) rol="mensajero";
-  if(db){ ["pedidos","clientes","mensajeros","movimientos","recaudos","liquidaciones","jornadas","cajamovs","vinculos","usuarios"].forEach(suscribir); procesarCola(); }
+  if(usuario){ try{ uid=await usuario.id(); esAdmin = await usuario.canEdit(); esAsistente = !esAdmin && usuario.rol()==="asistente"; }catch(e){} }
+  if((esAdmin||esAsistente) && lsGet("js_rol")==="admin") rol="admin";
+  if(!esAdmin&&!esAsistente) rol="mensajero";
+  if(db){ cargarDatos(); procesarCola(); }
   else { cargado=true; }
   pintar();
   quitarSplash();
 })();
+/* Cada rol descarga solo lo que le corresponde; las reglas de Firebase rechazan el resto. */
+function cargarDatos(){
+  if(esAdmin){ setTimeout(completarNombres,8000); ["pedidos","clientes","mensajeros","movimientos","recaudos","liquidaciones","jornadas","cajamovs","vinculos","usuarios"].forEach(c=>suscribir(c)); return; }
+  const mid=usuario.mensajeroId();
+  suscribir("vinculos",["uid","==",uid]);
+  if(esAsistente){ ["pedidos","clientes","mensajeros","movimientos"].forEach(c=>suscribir(c)); setTimeout(completarNombres,8000); }
+  else if(mid){ suscribir("pedidos",["mensajeroId","==",mid]); suscribir("mensajeros",["id","==",mid]); }
+  if(mid){ suscribir("recaudos",["mensajeroId","==",mid]); suscribir("liquidaciones",["mensajeroId","==",mid]); suscribir("cajamovs",["personaId","==",mid]); }
+  if(!mid&&!esAsistente) cargado=true;
+}
+/* Los mensajeros no leen la lista de clientes: el pedido lleva el nombre del remitente. */
+function completarNombres(){
+  for(const p of Object.values(S.pedidos)){ const n=S.clientes[p.clienteId]?.nombre;
+    if(p.estado==="pendiente"&&n&&p.clienteNombre!==n) rawUpd("pedidos",p.guia,{clienteNombre:n}).catch(()=>{}); }
+}
 function quitarSplash(){ const sp=$("#splash"); if(sp&&!sp.classList.contains("fuera")){ sp.classList.add("fuera"); setTimeout(()=>sp.remove(),400); } }
 setTimeout(quitarSplash,2500);
