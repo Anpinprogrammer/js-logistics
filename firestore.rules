@@ -101,7 +101,11 @@ service cloud.firestore {
       allow write: if esAdmin();
     }
     // Solo administración
-    match /jornadas/{id} { allow read, write: if esAdmin(); }
+    // Días de pago fijo (patinadores, oficina, JS): cada quien ve los suyos
+    match /jornadas/{id} {
+      allow read: if esAdmin() || esMio(resource.data.personaId);
+      allow write: if esAdmin();
+    }
     match /papelera/{id} { allow read, write: if esAdmin(); }
     match /papelera_fotos/{id} { allow read, write: if esAdmin(); }
 

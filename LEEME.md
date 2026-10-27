@@ -76,6 +76,10 @@ pantalla de inicio". Queda como una app con su ícono.
 | Asistente | Lo de un mensajero, más "Oficina": Pedidos (asignar remitente y valores, también de pedidos entregados), registrar y editar clientes, ver saldos y enviar recibos por WhatsApp. No ve Caja, Sueldos, Personal, Historial ni Respaldo; no borra nada ni registra pagos. |
 | Administración | Todo. |
 
+En Personal, el **tipo** define cómo se paga a cada persona:
+mensajero (70% de sus domicilios − 25.000 al día), dueño, **oficina** (sus pedidos son 100% de JS y
+suman al sueldo del dueño; a la persona se le paga fijo por día), patinador y empresa (fijo por día).
+
 El rol se cambia en Más → Personal → Accesos a la app. Las reglas de `firestore.rules` hacen cumplir
 estos permisos en el servidor: aunque alguien modifique la app, no puede leer lo que su rol no permite.
 

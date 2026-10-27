@@ -490,12 +490,12 @@ function pintarPersonal(v,aviso){
     v.innerHTML=aviso+`<h1>Personal</h1><p class="sub">Mensajeros y el dueño entregan pedidos desde la app. Patinadores y la empresa (JS) solo aparecen en Sueldos. Cuando un mensajero elige su nombre por primera vez, queda vinculado a su cuenta; “Liberar” le permite elegir de nuevo (por ejemplo, si cambió de celular o de cuenta).</p>
       <div class="linea2"><div class="campo"><label for="mNom">Nombre</label><input id="mNom"></div><div class="campo"><label for="mTel">Teléfono</label><input id="mTel" inputmode="tel"></div></div>
       <div class="linea2"><div class="campo"><label for="mTipoP">Tipo</label><select id="mTipoP">${Object.entries(TIPOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>
-      <div class="campo"><label for="mTar">Pago por día (solo patinadores)</label><input id="mTar" type="number" inputmode="numeric" step="1000" min="0" placeholder="70000"></div></div>
+      <div class="campo"><label for="mTar">Pago por día (patinadores y oficina)</label><input id="mTar" type="number" inputmode="numeric" step="1000" min="0" placeholder="70000"></div></div>
       <button class="btn" id="mAdd">Agregar</button>
       <h2>${ms.length} registrado${ms.length===1?"":"s"}</h2>
       ${ms.length?`<div class="tabla-env"><table><thead><tr><th>Nombre</th><th>Teléfono</th><th>Tipo</th><th class="n">Pago por día</th><th>Cuenta</th><th></th></tr></thead><tbody>${ms.map(m=>`<tr><td><b>${esc(m.nombre)}</b></td><td>${esc(m.telefono||"")}</td>
         <td><select data-tipo="${esc(m.id)}" aria-label="Tipo de ${esc(m.nombre)}">${Object.entries(TIPOS).map(([k,t])=>`<option value="${k}" ${tipoDe(m)===k?"selected":""}>${t}</option>`).join("")}</select></td>
-        <td class="n">${tipoDe(m)==="patinador"?`<input data-tar="${esc(m.id)}" type="number" step="1000" min="0" value="${Number(m.tarifa)||""}" style="width:110px" aria-label="Pago por día de ${esc(m.nombre)}">`:"—"}</td>
+        <td class="n">${["patinador","oficina"].includes(tipoDe(m))?`<input data-tar="${esc(m.id)}" type="number" step="1000" min="0" value="${Number(m.tarifa)||""}" style="width:110px" aria-label="Pago por día de ${esc(m.nombre)}">`:"—"}</td>
         <td>${!esRepartidor(m)?"—":vinculosDe(m.id).length?`<span class="etq ent">Vinculado${vinculosDe(m.id).length>1?" ×"+vinculosDe(m.id).length:""}</span> <button class="btn sec chico" data-liberar="${esc(m.id)}">Liberar</button>`:'<span class="sub">Sin vincular</span>'}</td>
         <td><button class="btn peligro chico" data-delm="${esc(m.id)}">Quitar</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Agrega a tu personal para empezar.</div>`}
       ${htmlAccesos()}`;
@@ -667,10 +667,13 @@ const PCT_SUELDO=0.7, DESC_SUELDO=25000;
 const sueldoDe = domicilios => domicilios*PCT_SUELDO - DESC_SUELDO;
 const sueldoPedidos = ps => { const g={}; ps.forEach(p=>{ const d=diaDe(p.entregado); g[d]=(g[d]||0)+servicio(p); }); return Object.values(g).reduce((a,x)=>a+sueldoDe(x),0); };
 const MEDIOS={efectivo:"Efectivo",nequi:"Nequi",bancolombia:"Bancolombia"};
-const TIPOS={mensajero:"Mensajero",dueno:"Dueño (Javier)",patinador:"Patinador",empresa:"Empresa (JS)"};
+const TIPOS={mensajero:"Mensajero",dueno:"Dueño (Javier)",oficina:"Oficina (JS)",patinador:"Patinador",empresa:"Empresa (JS)"};
+/* Oficina: sus pedidos son 100% de JS (suman al sueldo del dueño); a la persona se le paga fijo por día. */
+const PAGO_FIJO=["patinador","oficina","empresa"];
 const tipoDe = m => m?.tipo || "mensajero";
-const esRepartidor = m => ["mensajero","dueno"].includes(tipoDe(m));
-const sueldoTexto = (mid,ps) => tipoDe(S.mensajeros[mid])==="dueno" ? "Ver “Mi sueldo”" : pesos(sueldoPedidos(ps));
+const esRepartidor = m => ["mensajero","dueno","oficina"].includes(tipoDe(m));
+const ganaPorcentaje = m => tipoDe(m)==="mensajero";
+const sueldoTexto = (mid,ps) => tipoDe(S.mensajeros[mid])==="dueno" ? "Ver “Mi sueldo”" : tipoDe(S.mensajeros[mid])==="oficina" ? "Pago por día" : pesos(sueldoPedidos(ps));
 function liquidacionesDe(mid){ return Object.values(S.liquidaciones).filter(l=>l.mensajeroId===mid).sort((a,b)=>b.fecha-a.fecha); }
 function periodoMensajero(mid){
   const ul=liquidacionesDe(mid)[0]||null, desde=ul?ul.fecha:0, anterior=ul?(Number(ul.debe)||0):0;
@@ -684,7 +687,7 @@ const textoLiq = d => d>0 ? "Debe "+pesos(d) : d<0 ? "Sobró "+pesos(-d) : "Qued
 
 function liquidar(mid){
   const m=S.mensajeros[mid]; if(!m) return;
-  const pm=periodoMensajero(mid), t=totales(pm.ps), sueldo=sueldoPedidos(pm.ps);
+  const pm=periodoMensajero(mid), t=totales(pm.ps), sueldo=ganaPorcentaje(m)?sueldoPedidos(pm.ps):0;
   const enRuta=Object.values(S.pedidos).filter(p=>p.estado==="pendiente"&&p.mensajeroId===mid).length;
   const sinValor=pm.ps.filter(p=>!Number(p.valorServicio)).length;
   $("#dlgCont").innerHTML=`<header><div><h2>Liquidar período</h2><span class="sub">${esc(m.nombre)} · desde ${pm.ul?hora(pm.ul.fecha):"el inicio"} hasta ahora</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
@@ -698,7 +701,7 @@ function liquidar(mid){
       <dt>Pendiente por entregar</dt><dd class="neg">${pesos(pm.debe)}</dd>
       <dt>Transferencias a JS</dt><dd>${pesos(t.transfJs)}</dd>
       <dt>Pagado directo al cliente</dt><dd>${pesos(t.transfCli)}</dd>
-      <dt>Sueldo del período</dt><dd>${pesos(sueldo)}</dd>
+      <dt>Sueldo del período</dt><dd>${ganaPorcentaje(m)?pesos(sueldo):sueldoTexto(mid,pm.ps)}</dd>
     </dl>
     <div class="linea2"><div class="campo"><label for="lVal">Entrega final (lo que te da ahora)</label><input id="lVal" type="number" inputmode="numeric" min="0" step="1000" value="${pm.debe>0?pm.debe:0}"></div>
     <div class="campo"><label for="lMedio">Medio</label><select id="lMedio">${Object.entries(MEDIOS).map(([k,x])=>`<option value="${k}">${x}</option>`).join("")}</select></div></div>
@@ -910,7 +913,7 @@ async function descargarExcel(dia,soloCid,btn){
         wm.addRow([nom,null,null,null,null,null,null,null,null]);
         wm.getCell("B"+k).value={formula:`COUNTIF(Pedidos!B:B,A${k})`,result:ps.length};
         wm.getCell("C"+k).value={formula:`SUMIF(Pedidos!B:B,A${k},Pedidos!C:C)`,result:t.servicio};
-        wm.getCell("D"+k).value={formula:`C${k}*${PCT_SUELDO}-${DESC_SUELDO}`,result:sueldoPedidos(ps)};
+        wm.getCell("D"+k).value=ganaPorcentaje(S.mensajeros[mid])?{formula:`C${k}*${PCT_SUELDO}-${DESC_SUELDO}`,result:sueldoPedidos(ps)}:(TIPOS[tipoDe(S.mensajeros[mid])]||"");
         wm.getCell("E"+k).value={formula:`SUMIFS(Pedidos!F:F,Pedidos!B:B,A${k},Pedidos!G:G,"${METODOS.efectivo.t}")`,result:t.efectivo};
         wm.getCell("F"+k).value={formula:`SUMIFS(Pedidos!F:F,Pedidos!B:B,A${k},Pedidos!G:G,"${METODOS.transf_js.t}")`,result:t.transfJs};
         wm.getCell("G"+k).value={formula:`SUMIFS(Pedidos!F:F,Pedidos!B:B,A${k},Pedidos!G:G,"${METODOS.transf_cliente.t}")`,result:t.transfCli};
@@ -1071,15 +1074,15 @@ function sueldosDia(dia){
   const res={}, porM={}; ent.forEach(p=>(porM[p.mensajeroId]=porM[p.mensajeroId]||[]).push(p));
   let dom30=0, propios=0, desc=0, fijos=0, nMens=0;
   for(const [mid,ps] of Object.entries(porM)){ const dom=ps.reduce((a,p)=>a+servicio(p),0);
-    if(tipoDe(S.mensajeros[mid])==="dueno") propios+=dom;
+    if(["dueno","oficina"].includes(tipoDe(S.mensajeros[mid]))) propios+=dom; // 100% para JS
     else { res[mid]=sueldoDe(dom); dom30+=dom*(1-PCT_SUELDO); desc+=DESC_SUELDO; nMens++; } }
-  for(const m of Object.values(S.mensajeros)) if(["patinador","empresa"].includes(tipoDe(m))){ const x=jornada(m.id,dia); if(x){ res[m.id]=x; fijos+=x; } }
+  for(const m of Object.values(S.mensajeros)) if(PAGO_FIJO.includes(tipoDe(m))){ const x=jornada(m.id,dia); if(x){ res[m.id]=x; fijos+=x; } }
   const javier=dom30+propios+desc-fijos;
   const dueno=Object.values(S.mensajeros).find(m=>tipoDe(m)==="dueno");
   if(dueno&&(ent.length||fijos)) res[dueno.id]=javier;
   return {res,dom30,propios,desc,fijos,nMens,javier};
 }
-const ORDEN_TIPO=["mensajero","patinador","empresa","dueno"];
+const ORDEN_TIPO=["mensajero","oficina","patinador","empresa","dueno"];
 function resumenSemana(sem){
   const dias=diasSemana(sem), porDia=dias.map(sueldosDia);
   const personas=listaOrdenada(S.mensajeros,"nombre").sort((a,b)=>ORDEN_TIPO.indexOf(tipoDe(a))-ORDEN_TIPO.indexOf(tipoDe(b)));
@@ -1127,7 +1130,7 @@ function miSueldoHtml(mid){
     <h2>Día por día</h2>
     <div class="tabla-env"><table><thead><tr><th>Día</th><th class="n">Entregas</th><th class="n">Domicilios</th><th class="n">Sueldo</th></tr></thead><tbody>${filas}
       <tr><td><b>Total</b></td><td class="n">${ent.filter(p=>R.dias.includes(diaDe(p.entregado))).length}</td><td class="n"></td><td class="n"><b>${pesos(R.total)}</b></td></tr></tbody></table></div>
-    <p class="sub" style="margin-top:8px">${esDueno?"Tu sueldo diario: 30% de los domicilios de los mensajeros + tus domicilios + "+pesos(DESC_SUELDO)+" por mensajero − patinadores y JS.":"Cada día: 70% de tus domicilios − "+pesos(DESC_SUELDO)+"."}</p>
+    <p class="sub" style="margin-top:8px">${esDueno?"Tu sueldo diario: 30% de los domicilios de los mensajeros + tus domicilios y los de oficina + "+pesos(DESC_SUELDO)+" por mensajero − pagos fijos (patinadores, oficina y JS).":tipoDe(yo)==="oficina"?"Pago fijo por día trabajado. Los domicilios de tus pedidos son 100% de JS.":"Cada día: 70% de tus domicilios − "+pesos(DESC_SUELDO)+"."}</p>
     <h2>Adelantos y pagos</h2>
     ${movs.length?`<div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Medio</th><th class="n">Valor</th></tr></thead><tbody>${movs.map(c=>`<tr><td>${hora(c.fecha)}</td><td>${c.t}${c.concepto?`<br><span class="sub" style="font-size:.8rem">${esc(c.concepto)}</span>`:""}</td><td>${MEDIOS[c.medio]||""}</td><td class="n">${pesos(c.valor)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Sin adelantos ni pagos esta semana.</div>`}`;
 }
@@ -1147,15 +1150,15 @@ function pintarSueldos(v,aviso){
       <div class="cifra fuerte"><span>Neto por pagar</span><b>${pesos(tot.neto)}</b></div>
     </div>
     ${R.filas.length?`<div class="tabla-env"><table><thead><tr><th>Persona</th>${R.dias.map((d,i)=>`<th class="n">${DIAS_SEM[i]} ${d.slice(8)}</th>`).join("")}<th class="n">Total</th><th class="n">Adelantos</th><th class="n">Pagado</th><th class="n">Neto</th><th></th></tr></thead><tbody>
-    ${R.filas.map(f=>{ const t=tipoDe(f.m), editable=["patinador","empresa"].includes(t);
-      return `<tr><td><b>${esc(f.m.nombre)}</b><br><span class="sub" style="font-size:.8rem">${TIPOS[t]}</span>${t==="patinador"&&f.m.tarifa?`<br><button class="btn sec chico" data-tarifa="${esc(f.m.id)}" style="margin-top:4px">Llenar ${pesos(f.m.tarifa)}</button>`:""}</td>
+    ${R.filas.map(f=>{ const t=tipoDe(f.m), editable=PAGO_FIJO.includes(t);
+      return `<tr><td><b>${esc(f.m.nombre)}</b><br><span class="sub" style="font-size:.8rem">${TIPOS[t]}</span>${["patinador","oficina"].includes(t)&&f.m.tarifa?`<br><button class="btn sec chico" data-tarifa="${esc(f.m.id)}" style="margin-top:4px">Llenar ${pesos(f.m.tarifa)}</button>`:""}</td>
       ${R.dias.map((d,i)=>`<td class="n">${editable?`<input id="j_${esc(f.m.id)}_${d}" data-jor="${esc(f.m.id)}|${d}" type="number" inputmode="numeric" step="1000" min="0" value="${jornada(f.m.id,d)||""}" style="width:92px;text-align:right" aria-label="${esc(f.m.nombre)} ${DIAS_SEM[i]}">`:(f.vals[i]?`<span class="${f.vals[i]<0?"neg":""}">${pesos(f.vals[i])}</span>`:"—")}</td>`).join("")}
       <td class="n"><b>${pesos(f.total)}</b></td><td class="n">${f.adel?pesos(f.adel):"—"}</td><td class="n">${f.pagado?pesos(f.pagado):"—"}</td><td class="n"><b class="${f.neto<0?"neg":""}">${pesos(f.neto)}</b></td>
       <td><div class="acciones" style="margin:0;flex-wrap:nowrap"><button class="btn sec chico" data-adel="${esc(f.m.id)}">Adelanto</button>${f.neto>0?`<button class="btn ok chico" data-pagar="${esc(f.m.id)}">Pagar</button>`:""}</div></td></tr>`; }).join("")}
     <tr><td><b>Total</b></td>${R.dias.map((d,i)=>`<td class="n">${pesos(R.filas.reduce((a,f)=>a+f.vals[i],0))}</td>`).join("")}<td class="n"><b>${pesos(tot.total)}</b></td><td class="n">${pesos(tot.adel)}</td><td class="n">${pesos(tot.pagado)}</td><td class="n"><b>${pesos(tot.neto)}</b></td><td></td></tr>
     </tbody></table></div>`:`<div class="vacio">Registra tu personal en la pestaña Personal.</div>`}
-    <p class="sub" style="margin-top:10px">Mensajeros: 70% de sus domicilios del día − ${pesos(DESC_SUELDO)}. Patinadores y JS: escribe el valor de cada día.</p>
-    ${dueno?`<h2>Cálculo del sueldo de ${esc(dueno.nombre)}</h2><div class="tabla-env"><table><thead><tr><th>Día</th><th class="n">30% domicilios mensajeros</th><th class="n">Domicilios propios</th><th class="n">${pesos(DESC_SUELDO)} × mensajeros</th><th class="n">− Patinadores y JS</th><th class="n">Sueldo</th></tr></thead><tbody>
+    <p class="sub" style="margin-top:10px">Mensajeros: 70% de sus domicilios del día − ${pesos(DESC_SUELDO)}. Patinadores, oficina y JS: escribe el valor de cada día. Los domicilios de pedidos a nombre de oficina son 100% de JS y suman al sueldo de Javier.</p>
+    ${dueno?`<h2>Cálculo del sueldo de ${esc(dueno.nombre)}</h2><div class="tabla-env"><table><thead><tr><th>Día</th><th class="n">30% domicilios mensajeros</th><th class="n">Domicilios propios y de oficina</th><th class="n">${pesos(DESC_SUELDO)} × mensajeros</th><th class="n">− Pagos fijos (patinadores, oficina, JS)</th><th class="n">Sueldo</th></tr></thead><tbody>
     ${R.dias.map((d,i)=>{ const x=R.porDia[i]; if(!x.dom30&&!x.propios&&!x.fijos) return ""; return `<tr><td>${DIAS_SEM[i]} ${d.slice(8)}</td><td class="n">${pesos(x.dom30)}</td><td class="n">${pesos(x.propios)}</td><td class="n">${pesos(x.desc)} (${x.nMens})</td><td class="n neg">${pesos(-x.fijos)}</td><td class="n"><b>${pesos(x.javier)}</b></td></tr>`; }).join("")||`<tr><td colspan="6" class="sub">Sin movimiento esta semana.</td></tr>`}
     </tbody></table></div>`:""}
     <h2>Adelantos de la semana</h2>
@@ -1448,7 +1451,7 @@ function cargarDatos(){
   suscribir("vinculos",["uid","==",uid]);
   if(esAsistente){ ["pedidos","clientes","mensajeros","movimientos"].forEach(c=>suscribir(c)); setTimeout(completarNombres,8000); }
   else if(mid){ suscribir("pedidos",["mensajeroId","==",mid]); suscribir("mensajeros",["id","==",mid]); }
-  if(mid){ suscribir("recaudos",["mensajeroId","==",mid]); suscribir("liquidaciones",["mensajeroId","==",mid]); suscribir("cajamovs",["personaId","==",mid]); }
+  if(mid){ suscribir("jornadas",["personaId","==",mid]); suscribir("recaudos",["mensajeroId","==",mid]); suscribir("liquidaciones",["mensajeroId","==",mid]); suscribir("cajamovs",["personaId","==",mid]); }
   if(!mid&&!esAsistente) cargado=true;
 }
 /* Los mensajeros no leen la lista de clientes: el pedido lleva el nombre del remitente. */
