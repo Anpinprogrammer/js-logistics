@@ -7,7 +7,6 @@ respaldo-*.zip
 .firebase/
 firebase-debug.log
 firestore-debug.log
-.firebaserc
 
 # macOS
 .DS_Store
