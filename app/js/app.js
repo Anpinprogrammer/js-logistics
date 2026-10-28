@@ -13,6 +13,8 @@ const METODOS = {
   transf_js:{t:"Transferencia a JS", d:"El destinatario le transfiere a la empresa"},
   transf_cliente:{t:"Transferencia al cliente", d:"Le pagaron directo al remitente: el remitente queda debiendo el domicilio"}
 };
+/* Solo se muestran imágenes que la app misma produce; cualquier otro texto en una foto se descarta. */
+const fotoSegura = s => typeof s==="string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(s) ? s : "";
 function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.setAttribute("role","status"); t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
 function lsGet(k){ try{return localStorage.getItem(k)}catch(e){return null} }
 function lsSet(k,v){ try{localStorage.setItem(k,v)}catch(e){} }
@@ -235,7 +237,7 @@ function pintarMensajero(){
     const ps=pendientesMios();
     h=`<h1>Por entregar</h1><p class="sub">${ps.length} pedido${ps.length===1?"":"s"} en ruta</p>`+
       (ps.length?`<div class="lista">${ps.map(p=>`<button class="fila" data-entregar="${esc(p.guia)}">
-        ${p.mini?`<img src="${p.mini}" alt="">`:'<span class="sinfoto"></span>'}
+        ${fotoSegura(p.mini)?`<img src="${fotoSegura(p.mini)}" alt="">`:'<span class="sinfoto"></span>'}
         <span class="info"><span class="guia">${esc(p.guia)}</span>${Number(p.aCobrar)?` <b>Cobrar ${pesos(p.aCobrar)}</b>`:""}${(p.intentos||[]).length?` <span class="etq sin">${p.intentos.length} intento${p.intentos.length===1?"":"s"}</span>`:""}<p>${esc(nombreCliente(p.clienteId)||"Remitente sin asignar")} · salió ${hora(p.creado)}</p></span>
         <span class="btn chico ok">Entregar</span></button>`).join("")}</div>`
       :`<div class="vacio">No tienes pedidos pendientes. Toma la foto en “Nuevo pedido” al salir.</div>`);
@@ -276,10 +278,11 @@ $("#inCamara").addEventListener("change", async e=>{
   const bf=$("#btnFoto")||$("#fotoOfi"); if(bf){bf.disabled=true; bf.lastChild.textContent="Guardando…";}
   try{
     const [foto,mini]=await Promise.all([comprimir(f,900,.6), comprimir(f,140,.6)]);
-    const n=await siguienteGuia(); const guia=formatoGuia(n);
-    await guardar("fotos",guia,{salida:foto});
-    await guardar("pedidos",guia,{guia,n,estado:"pendiente",creado:Date.now(),mensajeroId:mid,mini,clienteId:"",valorServicio:0,aCobrar:0,por:uid||""});
-    toast("Guía "+guia+" creada"); if(desdeOficina){ pintar(); abrirPedido(guia); } else { ultimaGuia=guia; pintar(); }
+    const armar=n=>{ const guia=formatoGuia(n); return {guia,foto,pedido:{guia,n,estado:"pendiente",creado:Date.now(),mensajeroId:mid,mini,clienteId:"",valorServicio:0,aCobrar:0,por:uid||""}}; };
+    let guia;
+    if(db){ let armado; guia=await db.crearPedido(n=>armado=armar(n)); logCambio("crear","pedidos",guia,armado.pedido,null); }
+    else { const x=armar(await siguienteGuia()); guia=x.guia; await guardar("fotos",guia,{salida:foto}); await guardar("pedidos",guia,x.pedido); }
+    toast("Guía "+guia+" creada"); if(desdeOficina){ pintar(); for(let i=0;i<20&&!S.pedidos[guia];i++) await sleep(250); abrirPedido(guia); } // la guía llega por la suscripción un instante después else { ultimaGuia=guia; pintar(); }
   }catch(err){ console.error(err); toast(navigator.onLine===false?"Sin señal: la guía necesita conexión para darle número. Intenta cuando tengas señal.":"No se pudo guardar el pedido. Revisa la conexión e intenta de nuevo."); pintar(); }
 });
 
@@ -564,7 +567,7 @@ const etqEstado = p => p.estado==="entregado" ? '<span class="etq ent">Entregado
 function filaPedido(p){
   const est = etqEstado(p)+(Number(p.difCobro)?` <span class="etq sin">Diferencia ${pesos(p.difCobro)}</span>`:"");
   const cli = p.clienteId ? esc(nombreCliente(p.clienteId)) : `<span class="etq sin">Sin remitente</span>`;
-  return `<button class="fila" data-ped="${esc(p.guia)}">${p.mini?`<img src="${p.mini}" alt="">`:'<span class="sinfoto"></span>'}
+  return `<button class="fila" data-ped="${esc(p.guia)}">${fotoSegura(p.mini)?`<img src="${fotoSegura(p.mini)}" alt="">`:'<span class="sinfoto"></span>'}
     <span class="info"><span class="guia">${esc(p.guia)}</span> ${est}<p>${cli} · ${esc(S.mensajeros[p.mensajeroId]?.nombre||"")} · ${hora(p.creado)}</p></span>
     <span class="n" style="text-align:right;font-weight:700">${p.estado==="entregado"?pesos(p.valorCobrado):""}</span></button>`;
 }
@@ -612,7 +615,7 @@ async function abrirPedido(guia, cliElegido){
   try{
     const [f,e]=await Promise.all([leer("fotos",guia), cerrado(p)?leer("entregas",guia):null]);
     const box=$("#pFotos"); if(!box) return;
-    const items=[]; if(f?.salida) items.push(["Salida",f.salida]); if(e?.foto) items.push([p.estado==="devuelto"?"Evidencia":"Entrega",e.foto]); if(e?.firma) items.push(["Firma",e.firma]);
+    const items=[["Salida",f?.salida],[p.estado==="devuelto"?"Evidencia":"Entrega",e?.foto],["Firma",e?.firma]].map(([t,x])=>[t,fotoSegura(x)]).filter(([,x])=>x);
     box.innerHTML=items.length?items.map(([t,s])=>`<figure><img src="${s}" alt="${t}"><figcaption>${t}</figcaption></figure>`).join(""):'<span class="sub">Sin fotos.</span>';
   }catch(err){ const box=$("#pFotos"); if(box) box.innerHTML='<span class="sub">No se pudieron cargar las fotos.</span>'; }
 }

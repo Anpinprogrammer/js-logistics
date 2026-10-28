@@ -60,6 +60,17 @@ async function iniciar(){
     siguienteContador: () => F.runTransaction(fs, async t => {
       const r = F.doc(fs, "meta", "contador"); const s = await t.get(r);
       const n = ((s.exists() && s.data().n) || 0) + 1; t.set(r, { n }); return n;
+    }),
+    /* Número de guía, pedido y foto de salida en una sola operación: si la guía ya existe, no se toca nada. */
+    crearPedido: armar => F.runTransaction(fs, async t => {
+      const rc = F.doc(fs, "meta", "contador"); const sc = await t.get(rc);
+      const n = ((sc.exists() && sc.data().n) || 0) + 1;
+      const { guia, pedido, foto } = armar(n);
+      const rp = F.doc(fs, "pedidos", guia);
+      if((await t.get(rp)).exists()) throw new Error("La guía " + guia + " ya existe");
+      t.set(rc, { n }); t.set(rp, pedido);
+      if(foto) t.set(F.doc(fs, "fotos", guia), { salida: foto });
+      return guia;
     })
   };
 

@@ -28,10 +28,13 @@ service cloud.firestore {
         && request.resource.data.primerAdmin == request.auth.uid
         && existsAfter(ruta("admins", request.auth.uid));
     }
-    // Contador de guías
+    // Contador de guías: solo sube de uno en uno (administración puede corregirlo)
     match /meta/{id} {
       allow read: if esMiembro();
-      allow write: if esMiembro() && id != "config";
+      allow create: if esAdmin() || (esMiembro() && id == "contador"
+        && request.resource.data.keys().hasOnly(["n"]) && request.resource.data.n == 1);
+      allow update: if esAdmin() || (esMiembro() && id == "contador"
+        && request.resource.data.keys().hasOnly(["n"]) && request.resource.data.n == resource.data.n + 1);
     }
 
     // Cuentas, roles y vínculos: cada quien ve lo suyo; solo administración los cambia
@@ -52,10 +55,25 @@ service cloud.firestore {
     }
 
     // Pedidos: oficina ve y organiza todos; cada mensajero solo los suyos. Borrar: solo administración.
+    // El mensajero crea la guía en cero (los valores los pone la oficina) y después solo cambia
+    // los datos de la entrega, incluido el valor cobrado.
+    function pedidoNuevoDeMensajero(guia) {
+      let d = request.resource.data;
+      return esMio(d.mensajeroId) && d.guia == guia && d.estado == "pendiente"
+        && d.clienteId == "" && d.valorServicio == 0 && d.aCobrar == 0
+        && d.keys().hasOnly(["guia", "n", "estado", "creado", "mensajeroId", "mini", "clienteId", "valorServicio", "aCobrar", "por"]);
+    }
+    function entregaDeMensajero() {
+      return esMio(resource.data.mensajeroId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "estado", "entregado", "destinatario", "valorCobrado", "metodo", "cuentaJs", "difCobro",
+          "entregoUid", "intentos", "motivoDev", "notaDev", "cobrarDev"]);
+    }
     match /pedidos/{guia} {
-      allow read: if esOficina() || esMio(resource.data.mensajeroId);
-      allow create: if esOficina() || esMio(request.resource.data.mensajeroId);
-      allow update: if esOficina() || (esMio(resource.data.mensajeroId) && esMio(request.resource.data.mensajeroId));
+      // Leer una guía que no existe solo dice que está libre (lo usa la creación de guías)
+      allow read: if esOficina() || (esMiembro() && resource == null) || esMio(resource.data.mensajeroId);
+      allow create: if esOficina() || pedidoNuevoDeMensajero(guia);
+      allow update: if esOficina() || entregaDeMensajero();
       allow delete: if esAdmin();
     }
     // Fotos de salida y de entrega (el documento se llama como la guía)
