@@ -50,7 +50,7 @@ async function listar(col,filtros=[],orden,lim){
 const NO_LOG=["fotos","entregas","meta","historial","papelera","papelera_fotos"];
 const COL_NOM={pedidos:"pedido",clientes:"cliente",movimientos:"movimiento de cliente",recaudos:"entrega de dinero",liquidaciones:"liquidación",cajamovs:"movimiento de caja",mensajeros:"personal",jornadas:"día de sueldo",vinculos:"vínculo de cuenta"};
 const ESTADOS={pendiente:"por entregar",entregado:"entregado",devuelto:"devuelto"};
-const CAMPOS={estado:"estado",valorServicio:"servicio",clienteId:"remitente",valorCobrado:"cobrado",metodo:"método",domiPagado:"domicilio pagado",aCobrar:"a cobrar",cobrarDev:"cobrar devolución",cuentaJs:"cuenta",tipo:"tipo",tarifa:"pago por día",nombre:"nombre",telefono:"teléfono",motivoDev:"motivo"};
+const CAMPOS={cambioRecibido:"cambio",gasto:"flete/gasto",domiPagoValor:"pago de domicilio",domiPagoMedio:"medio del pago",estado:"estado",valorServicio:"servicio",clienteId:"remitente",valorCobrado:"cobrado",metodo:"método",domiPagado:"domicilio pagado",aCobrar:"a cobrar",cobrarDev:"cobrar devolución",cuentaJs:"cuenta",tipo:"tipo",tarifa:"pago por día",nombre:"nombre",telefono:"teléfono",motivoDev:"motivo"};
 const memHist=[]; let histCadena=Promise.resolve();
 function registrar(txt){
   const e={t:Date.now(),a:txt,u:uid||"",m:miMensajero||"",r:rol};
@@ -72,8 +72,8 @@ function resumenDoc(col,id,d){ d=d||{}; const nm=x=>S.mensajeros[x]?.nombre||"";
 }
 function fmtCampo(k,v){
   if(k==="clienteId") return nombreCliente(v)||"—"; if(k==="estado") return ESTADOS[v]||v; if(k==="metodo") return METODOS[v]?.t||(v==="devuelto"?"devolución":v||"—");
-  if(k==="motivoDev") return MOTIVOS[v]||v; if(k==="cuentaJs") return CUENTAS_JS[v]||"—"; if(k==="tipo") return TIPOS[v]||MOVS[v]?.corto||v;
-  if(typeof v==="boolean") return v?"sí":"no"; if(["valorServicio","valorCobrado","aCobrar","tarifa"].includes(k)) return pesos(v); return String(v??"");
+  if(k==="cambioRecibido") return v?"recibido "+hora(v):"pendiente"; if(k==="motivoDev") return MOTIVOS[v]||v; if(k==="cuentaJs") return CUENTAS_JS[v]||"—"; if(k==="tipo") return TIPOS[v]||MOVS[v]?.corto||v;
+  if(typeof v==="boolean") return v?"sí":"no"; if(["valorServicio","valorCobrado","aCobrar","tarifa","gasto","domiPagoValor"].includes(k)) return pesos(v); if(k==="domiPagoMedio") return MEDIOS[v]||"—"; return String(v??"");
 }
 function logCambio(op,col,id,data,antes){
   if(NO_LOG.includes(col)) return;
@@ -81,7 +81,7 @@ function logCambio(op,col,id,data,antes){
   if(op==="borrar") return registrar("Eliminó "+nom+": "+resumenDoc(col,id,antes));
   if(op==="crear") return registrar("Creó "+nom+": "+resumenDoc(col,id,data));
   const d={...(antes||{}),...data};
-  if(col==="pedidos"&&data.estado==="entregado") return registrar(`Entregó ${id}: cobró ${pesos(data.valorCobrado)} (${fmtCampo("metodo",data.metodo)}${data.cuentaJs?" a "+CUENTAS_JS[data.cuentaJs]:""})${data.difCobro?" · diferencia "+pesos(data.difCobro):""}`);
+  if(col==="pedidos"&&data.estado==="entregado") return registrar(`Entregó ${id}: cobró ${pesos(data.valorCobrado)} (${fmtCampo("metodo",data.metodo)}${data.cuentaJs?" a "+CUENTAS_JS[data.cuentaJs]:""})${data.difCobro?" · diferencia "+pesos(data.difCobro):""}${data.cambio?" · recibió un cambio":""}${data.gasto?" · gastó "+pesos(data.gasto)+(data.gastoNota?" ("+data.gastoNota+")":""):""}`);
   if(col==="pedidos"&&data.estado==="devuelto") return registrar(`Devolución de ${id}: ${MOTIVOS[data.motivoDev]||""}${data.notaDev?" · "+data.notaDev:""}`);
   if(col==="pedidos"&&data.intentos&&!data.estado){ const u=data.intentos[data.intentos.length-1]; return registrar(`Intento fallido en ${id}: ${MOTIVOS[u?.motivo]||""}${u?.nota?" · "+u.nota:""}`); }
   const det=Object.entries(data).filter(([k])=>CAMPOS[k]&&(!antes||antes[k]!==data[k])).map(([k,v])=>CAMPOS[k]+": "+fmtCampo(k,v)).join(", ");
@@ -136,12 +136,17 @@ const servicio = p => p.estado==="devuelto"&&!p.cobrarDev ? 0 : (Number(p.valorS
 const metodoTxt = p => p.estado==="devuelto" ? "Devolución"+(p.motivoDev?" ("+(MOTIVOS[p.motivoDev]||"").toLowerCase()+")":"") : (METODOS[p.metodo]?.t||"");
 const MOTIVOS={no_contesta:"No contestan",direccion:"Dirección errada",rechazo:"Lo rechazaron",reprogramar:"Reprogramar (sigue en ruta)",otro:"Otro motivo"};
 const CUENTAS_JS={nequi:"Nequi",bancolombia:"Bancolombia"};
-function saldoPedido(p){ // saldo = cobrado - servicio. + cuenta por pagar al cliente, - cuenta por cobrar al cliente
+/* Gasto: lo que el mensajero pagó de su plata en el envío (flete de bus, terminal); se le cobra al cliente. */
+const gastoDe = p => Number(p.gasto)||0;
+/* Pago del domicilio: lo que el cliente pagó aparte por este envío. Los pedidos marcados antes sin valor cubren el domicilio. */
+const pagoDomi = p => !p.domiPagado ? 0 : p.domiPagoValor!=null&&p.domiPagoValor!=="" ? (Number(p.domiPagoValor)||0) : servicio(p);
+const cargoEnvio = p => servicio(p)+gastoDe(p); // lo que el envío le cobra al cliente
+function saldoPedido(p){ // saldo = cobrado - domicilio - gasto + pagado aparte. + cuenta por pagar al cliente, - cuenta por cobrar al cliente
   if(!cerrado(p)) return 0;
-  const serv = p.domiPagado ? 0 : servicio(p);
   const cob = p.metodo==="transf_cliente"||p.estado==="devuelto" ? 0 : (Number(p.valorCobrado)||0);
-  return cob-serv;
+  return cob-cargoEnvio(p)+pagoDomi(p);
 }
+const textoDomi = p => (p.domiPagado?"pagó domicilio "+pesos(pagoDomi(p)):"domicilio "+pesos(servicio(p)))+(gastoDe(p)?" · flete "+pesos(gastoDe(p)):"");
 const tipoCuenta = s => s>0 ? "Por pagar" : s<0 ? "Por cobrar" : "Paz y salvo";
 const MOVS={
   cargo:{t:"Cargo al cliente (queda debiendo)", corto:"Cargo", s:-1},
@@ -233,7 +238,8 @@ function pintarMensajero(){
     const yo=S.mensajeros[miMensajero];
     h=`<h1>Salida de pedidos</h1><p class="sub">${esc(yo.nombre)}${puedeCambiar?` · <a href="#" id="cambiarYo">${actuarComo?"volver a mi nombre":"cambiar"}</a>`:""}</p>
       <button class="camara" id="btnFoto">${iconCam}Tomar foto del pedido<small>Se le asigna número de guía y pasa a “Por entregar”</small></button>
-      ${ultimaGuia?`<div class="recien"><div><div class="guia">${esc(ultimaGuia)}</div><span>Guardado en por entregar. Escribe este número en el paquete.</span></div></div>`:""}`;
+      <button class="btn sec" id="btnGaleria" style="width:100%;margin-top:10px">Subir fotos de la galería (puedes elegir varias)</button>
+      ${ultimaGuia?`<div class="recien"><div><div class="guia">${esc(ultimaGuia)}</div><span>Guardado en por entregar. Escribe ${ultimaGuia.includes(" a ")?"cada número en su paquete":"este número en el paquete"}.</span></div></div>`:""}`;
   } else if(tabM==="pend"){
     const ps=pendientesMios();
     h=`<h1>Por entregar</h1><p class="sub">${ps.length} pedido${ps.length===1?"":"s"} en ruta</p>`+
@@ -251,6 +257,8 @@ function pintarMensajero(){
         <div class="cifra fuerte"><span>Te falta entregar</span><b>${pesos(pm.debe)}</b></div>
         <div class="cifra"><span>Sueldo del período</span><b>${sueldoTexto(miMensajero,pm.ps)}</b></div>
         <div class="cifra"><span>Efectivo cobrado</span><b>${pesos(t.efectivo)}</b></div>
+        ${pm.base?`<div class="cifra"><span>Base para vueltos</span><b>${pesos(pm.base)}</b></div>`:""}
+        ${pm.gastos?`<div class="cifra"><span>Fletes / gastos que pagaste</span><b>− ${pesos(pm.gastos)}</b></div>`:""}
         <div class="cifra"><span>Ya entregaste</span><b>${pesos(pm.recibido)}</b></div>
         ${pm.anterior?`<div class="cifra"><span>Pendiente de la liquidación anterior</span><b>${pesos(pm.anterior)}</b></div>`:""}
         <div class="cifra"><span>Transferencias a JS</span><b>${pesos(t.transfJs)}</b></div>
@@ -266,6 +274,7 @@ function pintarMensajero(){
   const sm=$("#selMens"); if(sm) sm.onchange=()=>elegirMensajero(sm.value);
   const cy=$("#cambiarYo"); if(cy) cy.onclick=e=>{e.preventDefault(); if(actuarComo){ actuarComo=false; aplicarVinculo(); pintar(); return; } if(vinc&&esAdmin) actuarComo=true; miMensajero=""; pintar();};
   const bf=$("#btnFoto"); if(bf) bf.onclick=()=>{fotoPara=""; $("#inCamara").value=""; $("#inCamara").click();};
+  const bg=$("#btnGaleria"); if(bg) bg.onclick=()=>{fotoPara=""; $("#inGaleria").value=""; $("#inGaleria").click();};
   document.querySelectorAll("[data-entregar]").forEach(b=>b.onclick=()=>abrirEntrega(b.dataset.entregar));
   const sa=$("#msAnt"), ss=$("#msSig"), sh=$("#msHoy");
   if(sa) sa.onclick=()=>{semM=moverSemana(semM,-1); pintar();};
@@ -273,19 +282,33 @@ function pintarMensajero(){
   if(sh) sh.onclick=()=>{semM=semanaDe(hoy()); pintar();};
 }
 
-$("#inCamara").addEventListener("change", async e=>{
-  const f=e.target.files[0]; if(!f) return;
+/* Crear guías: una por foto. La cámara toma una; "Subir fotos" permite elegir varias de la galería. */
+const MAX_FOTOS=30;
+async function crearGuias(files){
+  files=[...files].filter(f=>f.type.startsWith("image/")); if(!files.length) return;
+  if(files.length>MAX_FOTOS){ toast("Máximo "+MAX_FOTOS+" fotos a la vez"); files=files.slice(0,MAX_FOTOS); }
   const mid=fotoPara||miMensajero, desdeOficina=!!fotoPara; fotoPara="";
-  const bf=$("#btnFoto")||$("#fotoOfi"); if(bf){bf.disabled=true; bf.lastChild.textContent="Guardando…";}
+  document.querySelectorAll("#btnFoto,#btnGaleria,#fotoOfi,#galeriaOfi").forEach(b=>b.disabled=true);
+  const hechas=[];
   try{
-    const [foto,mini]=await Promise.all([comprimir(f,900,.6), comprimir(f,140,.6)]);
-    const armar=n=>{ const guia=formatoGuia(n); return {guia,foto,pedido:{guia,n,estado:"pendiente",creado:Date.now(),mensajeroId:mid,mini,clienteId:"",valorServicio:0,aCobrar:0,por:uid||""}}; };
-    let guia;
-    if(db){ let armado; guia=await db.crearPedido(n=>armado=armar(n)); logCambio("crear","pedidos",guia,armado.pedido,null); }
-    else { const x=armar(await siguienteGuia()); guia=x.guia; await guardar("fotos",guia,{salida:foto}); await guardar("pedidos",guia,x.pedido); }
-    toast("Guía "+guia+" creada"); if(desdeOficina){ pintar(); for(let i=0;i<20&&!S.pedidos[guia];i++) await sleep(250); abrirPedido(guia); } // la guía llega por la suscripción un instante después else { ultimaGuia=guia; pintar(); }
-  }catch(err){ console.error(err); toast(navigator.onLine===false?"Sin señal: la guía necesita conexión para darle número. Intenta cuando tengas señal.":"No se pudo guardar el pedido. Revisa la conexión e intenta de nuevo."); pintar(); }
-});
+    for(const f of files){
+      if(files.length>1) toast("Creando guía "+(hechas.length+1)+" de "+files.length+"…");
+      const [foto,mini]=await Promise.all([comprimir(f,900,.6), comprimir(f,140,.6)]);
+      const armar=n=>{ const guia=formatoGuia(n); return {guia,foto,pedido:{guia,n,estado:"pendiente",creado:Date.now(),mensajeroId:mid,mini,clienteId:"",valorServicio:0,aCobrar:0,por:uid||""}}; };
+      let guia;
+      if(db){ let armado; guia=await db.crearPedido(n=>armado=armar(n)); logCambio("crear","pedidos",guia,armado.pedido,null); }
+      else { const x=armar(await siguienteGuia()); guia=x.guia; await guardar("fotos",guia,{salida:foto}); await guardar("pedidos",guia,x.pedido); }
+      hechas.push(guia);
+    }
+  }catch(err){ console.error(err); toast((hechas.length?"Se crearon "+hechas.length+" guías, pero falló la siguiente. ":"")+(navigator.onLine===false?"Sin señal: la guía necesita conexión para darle número.":"No se pudo guardar el pedido. Revisa la conexión e intenta de nuevo.")); }
+  if(hechas.length){
+    toast(hechas.length===1?"Guía "+hechas[0]+" creada":"Se crearon "+hechas.length+" guías");
+    if(desdeOficina&&hechas.length===1){ pintar(); const g=hechas[0]; for(let i=0;i<20&&!S.pedidos[g];i++) await sleep(250); abrirPedido(g); return; } // la guía llega por la suscripción un instante después
+    ultimaGuia=hechas.length===1?hechas[0]:hechas[0]+" a "+hechas[hechas.length-1];
+  }
+  pintar();
+}
+["#inCamara","#inGaleria"].forEach(sel=>$(sel).addEventListener("change",e=>crearGuias(e.target.files)));
 
 function abrirEntrega(guia){
   const p=S.pedidos[guia]; if(!p) return;
@@ -305,6 +328,9 @@ function abrirEntrega(guia){
   </div></div>
   <div class="campo oculto" id="eCtaC"><label for="eCta">¿A qué cuenta de JS llegó la transferencia?</label><select id="eCta"><option value="">Elige…</option>${Object.entries(CUENTAS_JS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>
   <div id="eDif"></div>
+  <div class="linea2"><div class="campo"><label for="eGasto">Gasté en este envío (flete, bus…)</label><input id="eGasto" type="number" inputmode="numeric" min="0" step="1000" placeholder="0"></div>
+  <div class="campo"><label for="eGastoNota">Detalle del gasto (opcional)</label><input id="eGastoNota" placeholder="Ej: bus a Popayán"></div></div>
+  <label class="check"><input type="checkbox" id="eCambio"> Recibí un cambio (prenda de vuelta para el remitente)</label>
   <button class="btn ok" id="eGuardar" style="width:100%">Confirmar entrega</button>
   <button class="btn peligro" id="eNoEnt" style="width:100%;margin-top:10px">No se pudo entregar</button>`;
   abrirDlg();
@@ -324,12 +350,13 @@ function abrirEntrega(guia){
     if(!fotoEnt) return toast("Falta la foto de entrega");
     if(val===""||Number(val)<0) return toast("Escribe el valor cobrado (0 si no cobró)");
     if(met==="transf_js"&&!cta) return toast("Elige a qué cuenta llegó la transferencia");
+    const gasto=Number($("#eGasto").value)||0, gastoNota=$("#eGastoNota").value.trim(); if(gasto<0) return toast("El gasto no puede ser negativo");
     const v=Number(val), esperado=met==="transf_cliente"?0:aC, dif=aC?v-esperado:0;
     if(dif&&!aceptoDif){ aceptoDif=true; $("#eDif").innerHTML=`<div class="aviso alerta">Debías cobrar <b>${pesos(esperado)}</b> y escribiste <b>${pesos(v)}</b> (${dif>0?"sobran":"faltan"} ${pesos(Math.abs(dif))}). Revisa el valor. Si está bien, toca otra vez el botón.</div>`; $("#eGuardar").textContent="Sí, guardar con diferencia"; return; }
     const b=$("#eGuardar"); b.disabled=true; b.textContent="Guardando…";
     try{
       const r=await enviarOps([{op:"set",col:"entregas",id:guia,data:{foto:fotoEnt,firma:firma.imagen()}},
-        {op:"upd",col:"pedidos",id:guia,data:{estado:"entregado",entregado:Date.now(),destinatario:nom,valorCobrado:v,metodo:met,cuentaJs:cta,difCobro:dif,entregoUid:uid||""}}],guia);
+        {op:"upd",col:"pedidos",id:guia,data:{estado:"entregado",entregado:Date.now(),destinatario:nom,valorCobrado:v,metodo:met,cuentaJs:cta,difCobro:dif,entregoUid:uid||"",...($("#eCambio").checked?{cambio:true}:{}),...(gasto>0?{gasto,gastoNota}:{})}}],guia);
       cerrarDlg(); toast(r==="ok"?"Entrega de "+guia+" registrada":"Sin señal: la entrega quedó guardada en el teléfono y se enviará sola");
     }catch(err){ console.error(err); b.disabled=false; b.textContent="Confirmar entrega"; toast("No se pudo guardar. Intenta de nuevo."); }
   };
@@ -410,13 +437,15 @@ function pintarAdmin(){
     else if(filtroA==="ent") ps=ps.filter(p=>p.estado==="entregado");
     else if(filtroA==="dev") ps=ps.filter(p=>p.estado==="devuelto");
     else if(filtroA==="dif") ps=ps.filter(p=>Number(p.difCobro));
+    else if(filtroA==="cambio") ps=ps.filter(cambioPendiente);
     if(buscarA) ps=ps.filter(p=>(p.guia+" "+nombreCliente(p.clienteId)+" "+(p.destinatario||"")).toLowerCase().includes(buscarA.toLowerCase()));
     const ofis=listaOrdenada(S.mensajeros,"nombre").filter(m=>tipoDe(m)==="oficina");
-    const fotoOfi=ofis.length?`<div class="acciones" style="margin:0 0 14px;align-items:center"><button class="btn" id="fotoOfi">${iconCam.replace('<svg','<svg width="22" height="22"')}<span>Tomar foto del pedido</span></button>${ofis.length>1?`<select id="ofiSel" aria-label="Oficina encargada">${ofis.map(m=>`<option value="${esc(m.id)}">${esc(m.nombre)}</option>`).join("")}</select>`:""}<span class="sub">Queda a cargo de ${ofis.length>1?"la oficina elegida":esc(ofis[0].nombre)}; el domicilio es 100% de JS.</span></div>`
+    const fotoOfi=ofis.length?`<div class="acciones" style="margin:0 0 14px;align-items:center"><button class="btn" id="fotoOfi">${iconCam.replace('<svg','<svg width="22" height="22"')}<span>Tomar foto del pedido</span></button><button class="btn sec" id="galeriaOfi">Subir fotos (varias)</button>${ofis.length>1?`<select id="ofiSel" aria-label="Oficina encargada">${ofis.map(m=>`<option value="${esc(m.id)}">${esc(m.nombre)}</option>`).join("")}</select>`:""}<span class="sub">Queda a cargo de ${ofis.length>1?"la oficina elegida":esc(ofis[0].nombre)}; el domicilio es 100% de JS.</span></div>`
       :`<div class="aviso">${esAdmin?"Para registrar pedidos con foto desde aquí, agrega en Más → Personal una persona de tipo “Oficina (JS)”.":"Para registrar pedidos con foto, el administrador debe crear la Oficina en Personal."}</div>`;
     v.innerHTML=aviso+`<h1>Pedidos</h1><p class="sub">Asigna el remitente, el valor del servicio y el valor a cobrar a cada guía.</p>${fotoOfi}
+      ${(()=>{ const n=Object.values(S.pedidos).filter(cambioPendiente).length; return n&&filtroA!=="cambio"?`<div class="aviso">${n===1?"Hay 1 prenda de cambio":"Hay "+n+" prendas de cambio"} por entregar a los clientes. Míralas en “Cambios por entregar”.</div>`:""; })()}
       ${(()=>{ const n=Object.values(S.pedidos).filter(p=>Number(p.difCobro)&&!p.difRevisada).length; return n?`<div class="aviso alerta">${n===1?"1 entrega tiene":n+" entregas tienen"} un valor cobrado distinto al que debían cobrar. Revísalas en “Con diferencia”.</div>`:""; })()}
-      <div class="filtros">${[["sin","Sin remitente"],["pend","Por entregar"],["ent","Entregados"],["dev","Devueltos"],["dif","Con diferencia"],["todos","Todos"]].map(([k,t])=>`<button data-f="${k}" aria-pressed="${filtroA===k}">${t}</button>`).join("")}</div>
+      <div class="filtros">${[["sin","Sin remitente"],["pend","Por entregar"],["ent","Entregados"],["dev","Devueltos"],["dif","Con diferencia"],["cambio","Cambios por entregar"],["todos","Todos"]].map(([k,t])=>`<button data-f="${k}" aria-pressed="${filtroA===k}">${t}</button>`).join("")}</div>
       <div class="campo"><input id="buscar" type="search" placeholder="Buscar guía, remitente o destinatario" value="${esc(buscarA)}" aria-label="Buscar"></div>
       ${ps.length?`<div class="lista">${ps.slice(0,limiteA).map(p=>filaPedido(p)).join("")}</div>${ps.length>limiteA?`<div class="acciones" style="justify-content:center"><button class="btn sec" id="masPed">Ver más (${ps.length-limiteA} restantes)</button></div>`:""}`:`<div class="vacio">${filtroA==="sin"?"Todos los pedidos tienen remitente asignado.":"No hay pedidos aquí."}</div>`}`;
     v.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{filtroA=b.dataset.f; limiteA=100; pintar();});
@@ -424,6 +453,7 @@ function pintarAdmin(){
     const bu=$("#buscar"); bu.oninput=()=>{buscarA=bu.value; clearTimeout(bu._t); bu._t=setTimeout(()=>{pintar(); const n=$("#buscar"); n.focus(); n.setSelectionRange(n.value.length,n.value.length);},300);};
     v.querySelectorAll("[data-ped]").forEach(b=>b.onclick=()=>abrirPedido(b.dataset.ped));
     const fo=$("#fotoOfi"); if(fo) fo.onclick=()=>{ fotoPara=$("#ofiSel")?.value||ofis[0].id; $("#inCamara").value=""; $("#inCamara").click(); };
+    const go=$("#galeriaOfi"); if(go) go.onclick=()=>{ fotoPara=$("#ofiSel")?.value||ofis[0].id; $("#inGaleria").value=""; $("#inGaleria").click(); };
   }
   else if(tabA==="clientes"){
     const cs=listaOrdenada(S.clientes,"nombre").map(c=>({...c,s:saldoCliente(c.id)}));
@@ -464,11 +494,12 @@ function pintarAdmin(){
       </div>
       <div style="height:14px"></div>
       ${ids.length?`<div class="mgrid">${ids.map(id=>{const pm=pms[id], tt=totales(pm.ps); return `<div class="mcard">
-        <div class="mcard-top"><b>${esc(S.mensajeros[id].nombre)}</b><button class="btn ok chico" data-recibir="${esc(id)}">Recibir dinero</button></div>
+        <div class="mcard-top"><b>${esc(S.mensajeros[id].nombre)}</b><span class="acciones" style="margin:0;gap:6px"><button class="btn sec chico" data-base="${esc(id)}">Dar base</button><button class="btn ok chico" data-recibir="${esc(id)}">Recibir dinero</button></span></div>
         <span class="sub" style="font-size:.85rem">Período desde ${pm.ul?hora(pm.ul.fecha):"el inicio"}</span>
         <dl class="datos">
           <dt>Entregas / en ruta</dt><dd>${pm.ps.length} / ${pendM[id]||0}</dd>
           <dt>Efectivo cobrado</dt><dd>${pesos(tt.efectivo)}</dd>
+          ${pm.base?`<dt>Base para vueltos</dt><dd>${pesos(pm.base)}</dd>`:""}${pm.gastos?`<dt>Fletes / gastos pagados</dt><dd>− ${pesos(pm.gastos)}</dd>`:""}
           ${pm.anterior?`<dt>Pendiente anterior</dt><dd>${pesos(pm.anterior)}</dd>`:""}
           <dt>Ya entregó</dt><dd>${pesos(pm.recibido)}</dd>
           <div class="debe" style="display:contents"><dt>Debe</dt><dd>${pesos(pm.debe)}</dd></div>
@@ -487,6 +518,7 @@ function pintarAdmin(){
     $("#diaC").onchange=e=>{diaCaja=e.target.value||hoy(); pintar();};
     conectarCajaGeneral(v);
     v.querySelectorAll("[data-recibir]").forEach(b=>b.onclick=()=>recibirDinero(b.dataset.recibir));
+    v.querySelectorAll("[data-base]").forEach(b=>b.onclick=()=>movCaja("sale",{cat:"base",personaId:b.dataset.base}));
     v.querySelectorAll("[data-liquidar]").forEach(b=>b.onclick=()=>liquidar(b.dataset.liquidar));
     v.querySelectorAll("[data-verliq]").forEach(b=>b.onclick=()=>verLiquidacion(b.dataset.verliq));
     v.querySelectorAll("[data-delrec]").forEach(b=>b.onclick=async()=>{ b.disabled=true; try{ await borrar("recaudos",b.dataset.delrec); toast("Entrega de dinero quitada"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
@@ -500,19 +532,20 @@ function pintarAdmin(){
 let tabC="pedidos", filtroC="todos", buscarC="";
 function pintarCliente(){
   const c=S.clientes[miCliente], v=$("#vista");
-  const enRuta=Object.values(S.pedidos).filter(p=>p.estado==="pendiente").length;
-  $("#pestanas").innerHTML=[["pedidos","Mis pedidos",enRuta],["cuenta","Mi cuenta"]].map(([k,t,n])=>`<button data-t="${k}" ${tabC===k?'aria-current="page"':''}>${t}${n?`<span class="num">${n}</span>`:""}</button>`).join("");
+  const enRuta=Object.values(S.pedidos).filter(p=>p.estado==="pendiente").length, cambios=Object.values(S.pedidos).filter(cambioPendiente);
+  $("#pestanas").innerHTML=[["pedidos","Mis pedidos",enRuta+cambios.length],["cuenta","Mi cuenta"]].map(([k,t,n])=>`<button data-t="${k}" ${tabC===k?'aria-current="page"':''}>${t}${n?`<span class="num">${n}</span>`:""}</button>`).join("");
   $("#pestanas").querySelectorAll("button").forEach(b=>b.onclick=()=>{tabC=b.dataset.t; pintar(); scrollTo(0,0);});
   if(!c){ v.innerHTML=`<h1>Hola</h1><div class="vacio">${cargado?"Tu cuenta todavía no está asociada a un cliente. Escríbele a JS Logistics.":"Cargando…"}</div>`; return; }
   if(tabC==="pedidos"){
     let ps=Object.values(S.pedidos).sort((a,b)=>b.creado-a.creado);
-    if(filtroC==="ruta") ps=ps.filter(p=>p.estado==="pendiente"); else if(filtroC==="ent") ps=ps.filter(p=>p.estado==="entregado"); else if(filtroC==="dev") ps=ps.filter(p=>p.estado==="devuelto");
+    if(filtroC==="cambio") ps=ps.filter(cambioPendiente); else if(filtroC==="ruta") ps=ps.filter(p=>p.estado==="pendiente"); else if(filtroC==="ent") ps=ps.filter(p=>p.estado==="entregado"); else if(filtroC==="dev") ps=ps.filter(p=>p.estado==="devuelto");
     if(buscarC) ps=ps.filter(p=>(p.guia+" "+(p.destinatario||"")).toLowerCase().includes(buscarC.toLowerCase()));
     v.innerHTML=`<h1>Hola, ${esc(c.nombre)}</h1><p class="sub">Tus envíos con JS Logistics y sus pruebas de entrega.</p>
-      <div class="filtros">${[["todos","Todos"],["ruta","En ruta"],["ent","Entregados"],["dev","Devueltos"]].map(([k,t])=>`<button data-fc="${k}" aria-pressed="${filtroC===k}">${t}</button>`).join("")}</div>
+      ${cambios.length?`<div class="aviso alerta">Tienes ${cambios.length===1?"1 prenda de cambio":cambios.length+" prendas de cambio"} por recibir (${cambios.map(p=>esc(p.guia)).join(", ")}). Cuando te la entreguen, ábrela y confirma que la recibiste.</div>`:""}
+      <div class="filtros">${[["todos","Todos"],["ruta","En ruta"],["ent","Entregados"],["dev","Devueltos"],["cambio","Cambios por recibir"]].map(([k,t])=>`<button data-fc="${k}" aria-pressed="${filtroC===k}">${t}</button>`).join("")}</div>
       <div class="campo"><input id="buscarC" type="search" placeholder="Buscar guía o quien recibió" value="${esc(buscarC)}" aria-label="Buscar"></div>
       ${ps.length?`<div class="lista">${ps.slice(0,300).map(p=>`<button class="fila" data-pc="${esc(p.guia)}">${fotoSegura(p.mini)?`<img src="${fotoSegura(p.mini)}" alt="">`:'<span class="sinfoto"></span>'}
-        <span class="info"><span class="guia">${esc(p.guia)}</span> ${etqEstado(p)}<p>${p.estado==="entregado"?"Recibió "+esc(p.destinatario||"")+" · "+hora(p.entregado):p.estado==="devuelto"?esc(MOTIVOS[p.motivoDev]||"Devuelto")+" · "+hora(p.entregado):"Salió "+hora(p.creado)}</p></span>
+        <span class="info"><span class="guia">${esc(p.guia)}</span> ${etqEstado(p)}${etqCambio(p)}<p>${p.estado==="entregado"?"Recibió "+esc(p.destinatario||"")+" · "+hora(p.entregado):p.estado==="devuelto"?esc(MOTIVOS[p.motivoDev]||"Devuelto")+" · "+hora(p.entregado):"Salió "+hora(p.creado)}</p></span>
         <span class="n" style="text-align:right;font-weight:700">${p.estado==="entregado"?pesos(p.valorCobrado):""}</span></button>`).join("")}</div>`:`<div class="vacio">No hay envíos aquí.</div>`}`;
     v.querySelectorAll("[data-fc]").forEach(b=>b.onclick=()=>{filtroC=b.dataset.fc; pintar();});
     const bu=$("#buscarC"); bu.oninput=()=>{buscarC=bu.value; clearTimeout(bu._t); bu._t=setTimeout(()=>{pintar(); const n=$("#buscarC"); n.focus(); n.setSelectionRange(n.value.length,n.value.length);},300);};
@@ -539,9 +572,12 @@ async function verPedidoCliente(guia){
     ${(p.intentos||[]).map((i,k)=>`<dt>Intento ${k+1}</dt><dd>${hora(i.fecha)} · ${esc(MOTIVOS[i.motivo]||"")}</dd>`).join("")}
     ${p.estado==="entregado"?`<dt>Entregado</dt><dd>${hora(p.entregado)}</dd><dt>Recibió</dt><dd>${esc(p.destinatario)}</dd><dt>Cobrado</dt><dd>${pesos(p.valorCobrado)}</dd><dt>Método</dt><dd>${metodoTxt(p)}</dd>`:""}
     ${p.estado==="devuelto"?`<dt>Devuelto</dt><dd>${hora(p.entregado)}</dd><dt>Motivo</dt><dd>${esc(MOTIVOS[p.motivoDev]||"")}</dd>`:""}
-    ${cerrado(p)?`<dt>Domicilio</dt><dd>${p.domiPagado?"Ya pagado":pesos(servicio(p))}</dd><dt>Efecto en tu saldo</dt><dd class="${saldoPedido(p)<0?"neg":"pos"}">${pesos(saldoPedido(p))}</dd>`:""}
+    ${cerrado(p)?`<dt>Domicilio</dt><dd>${pesos(servicio(p))}</dd>${gastoDe(p)?`<dt>Flete / gasto del envío</dt><dd>${pesos(gastoDe(p))}${p.gastoNota?" · "+esc(p.gastoNota):""}</dd>`:""}${p.domiPagado?`<dt>Pagaste aparte</dt><dd>${pesos(pagoDomi(p))}</dd>`:""}<dt>Efecto en tu saldo</dt><dd class="${saldoPedido(p)<0?"neg":"pos"}">${pesos(saldoPedido(p))}</dd>`:""}
   </dl>
+  ${p.cambio?(p.cambioRecibido?`<div class="aviso">Recibiste la prenda de cambio el ${hora(p.cambioRecibido)}.</div>`:`<div class="aviso alerta">JS Logistics tiene una prenda de cambio de este envío para entregarte.<br><button class="btn ok chico" id="pcCambio">Confirmar que recibí el cambio</button></div>`):""}
   <h2>Pruebas</h2><div class="fotos" id="pcFotos"><span class="sub">Cargando fotos…</span></div>`;
+  const cc=$("#pcCambio"); if(cc) cc.onclick=async()=>{ if(!await confirmar("Confirmar cambio de "+guia,"Confirmas que ya recibiste la prenda de cambio de este envío.","Sí, la recibí")) return verPedidoCliente(guia);
+    try{ await rawUpd("pedidos",guia,{cambioRecibido:Date.now(),cambioConfirmo:uid}); toast("¡Gracias! Cambio confirmado"); setTimeout(()=>verPedidoCliente(guia),400); }catch(e){ toast("No se pudo confirmar. Revisa la conexión."); } };
   abrirDlg();
   try{
     const [f,e]=await Promise.all([leer("fotos",guia), cerrado(p)?leer("entregas",guia):null]);
@@ -624,9 +660,12 @@ function activarAccesos(v){
     try{ await cu.quitar(id); registrar("Quitó acceso a "+(u?.nombre||"")+" ("+(u?.email||"")+")"); toast("Acceso quitado"); }catch(e){ toast("No se pudo quitar el acceso"); } });
 }
 
+/* Cambio: el mensajero recibió una prenda de vuelta para el remitente; queda pendiente hasta que el cliente la reciba. */
+const cambioPendiente = p => !!p.cambio && !p.cambioRecibido;
+const etqCambio = p => p.cambio ? (p.cambioRecibido?' <span class="etq ent">Cambio recibido</span>':' <span class="etq sin">Cambio por entregar</span>') : "";
 const etqEstado = p => p.estado==="entregado" ? '<span class="etq ent">Entregado</span>' : p.estado==="devuelto" ? '<span class="etq dev">Devuelto</span>' : '<span class="etq pend">Por entregar</span>'+((p.intentos||[]).length?` <span class="etq sin">${p.intentos.length} intento${p.intentos.length===1?"":"s"}</span>`:"");
 function filaPedido(p){
-  const est = etqEstado(p)+(Number(p.difCobro)?` <span class="etq sin">Diferencia ${pesos(p.difCobro)}</span>`:"");
+  const est = etqEstado(p)+etqCambio(p)+(Number(p.difCobro)?` <span class="etq sin">Diferencia ${pesos(p.difCobro)}</span>`:"");
   const cli = p.clienteId ? esc(nombreCliente(p.clienteId)) : `<span class="etq sin">Sin remitente</span>`;
   return `<button class="fila" data-ped="${esc(p.guia)}">${fotoSegura(p.mini)?`<img src="${fotoSegura(p.mini)}" alt="">`:'<span class="sinfoto"></span>'}
     <span class="info"><span class="guia">${esc(p.guia)}</span> ${est}<p>${cli} · ${esc(S.mensajeros[p.mensajeroId]?.nombre||"")} · ${hora(p.creado)}</p></span>
@@ -645,9 +684,14 @@ async function abrirPedido(guia, cliElegido){
   <div class="campo"><label for="pCob">Valor a cobrar al destinatario (opcional)</label><input id="pCob" type="number" inputmode="numeric" min="0" step="100" value="${Number(p.aCobrar)||""}" placeholder="Lo que el mensajero debe recoger"></div>
   ${p.estado==="devuelto"?`<label class="check"><input type="checkbox" id="pDev" ${p.cobrarDev?"checked":""}> Cobrarle al cliente el domicilio de esta devolución</label>`:""}
   ${p.metodo==="transf_js"&&p.estado==="entregado"?`<div class="campo"><label for="pCta">Cuenta de JS donde llegó la transferencia</label><select id="pCta"><option value="">Sin especificar</option>${Object.entries(CUENTAS_JS).map(([k,t])=>`<option value="${k}" ${p.cuentaJs===k?"selected":""}>${t}</option>`).join("")}</select></div>`:""}
+  <div class="linea2"><div class="campo"><label for="pGasto">Flete / gasto pagado por el mensajero (se le cobra al cliente)</label><input id="pGasto" type="number" inputmode="numeric" min="0" step="1000" value="${gastoDe(p)||""}" placeholder="0"></div>
+  <div class="campo"><label for="pGastoNota">Detalle del gasto</label><input id="pGastoNota" value="${esc(p.gastoNota||"")}" placeholder="Ej: bus a Pasto"></div></div>
   <label class="check"><input type="checkbox" id="pDomi" ${p.domiPagado?"checked":""}> El cliente ya pagó el domicilio</label>
+  <div class="linea2 ${p.domiPagado?"":"oculto"}" id="pDomiBox"><div class="campo"><label for="pDomiMedio">¿Cómo pagó? (entra a la caja)</label><select id="pDomiMedio">${p.domiPagado&&!p.domiPagoMedio?'<option value="">No registrado en caja</option>':'<option value="">Elige…</option>'}${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}" ${p.domiPagoMedio===k?"selected":""}>${t}</option>`).join("")}</select></div>
+  <div class="campo"><label for="pDomiVal">Valor que pagó</label><input id="pDomiVal" type="number" inputmode="numeric" min="0" step="100" value="${p.domiPagado?pagoDomi(p):""}"></div></div>
   <button class="btn" id="pGuardar">Guardar</button>
   <dl class="datos" style="margin-top:18px">
+    ${p.cambio?`<dt>Cambio</dt><dd>${p.cambioRecibido?"El cliente lo recibió "+hora(p.cambioRecibido):"Prenda por entregar al cliente"}</dd>`:""}
     <dt>Mensajero</dt><dd>${esc(S.mensajeros[p.mensajeroId]?.nombre||"—")}</dd>
     <dt>Salió</dt><dd>${hora(p.creado)}</dd>
     ${(p.intentos||[]).map((i,k)=>`<dt>Intento ${k+1}</dt><dd>${hora(i.fecha)} · ${esc(MOTIVOS[i.motivo]||"")}${i.nota?" · "+esc(i.nota):""}</dd>`).join("")}
@@ -655,21 +699,30 @@ async function abrirPedido(guia, cliElegido){
     ${p.estado==="entregado"&&Number(p.difCobro)?`<dt>Debía cobrar</dt><dd>${pesos(p.aCobrar)}</dd><dt>Diferencia</dt><dd class="neg">${pesos(p.difCobro)}${p.difRevisada?" (revisada)":""}</dd>`:""}
     ${p.estado==="entregado"?`<dt>Entregado</dt><dd>${hora(p.entregado)}</dd><dt>Recibió</dt><dd>${esc(p.destinatario)}</dd>
     <dt>Cobrado</dt><dd>${pesos(p.valorCobrado)}</dd><dt>Método</dt><dd>${metodoTxt(p)}</dd>
+    ${p.domiPagado?`<dt>Pago de domicilio</dt><dd>${pesos(pagoDomi(p))}${p.domiPagoMedio?" · "+MEDIOS[p.domiPagoMedio]+" · "+hora(p.domiPagoFecha):" · sin registrar en caja"}</dd>`:""}
     <dt>Efecto en saldo</dt><dd class="${saldoPedido(p)<0?"neg":"pos"}">${pesos(saldoPedido(p))}</dd>`:""}
   </dl>
   <div class="fotos" id="pFotos"><span class="sub">Cargando fotos…</span></div>
-  <div class="acciones">${!cerrado(p)&&tipoDe(S.mensajeros[p.mensajeroId])==="oficina"?'<button class="btn ok chico" id="pEntregar">Marcar entregado</button>':""}${cerrado(p)?(esAdmin?'<button class="btn sec chico" id="pReabrir">Devolver a por entregar</button>':""):'<button class="btn sec chico" id="pNoEnt">Registrar que no se pudo entregar</button>'}${Number(p.difCobro)&&!p.difRevisada?'<button class="btn sec chico" id="pDifOk">Marcar diferencia como revisada</button>':""}${esAdmin?'<button class="btn peligro chico" id="pBorrar">Eliminar pedido</button>':""}</div>`;
+  <div class="acciones">${!cerrado(p)&&tipoDe(S.mensajeros[p.mensajeroId])==="oficina"?'<button class="btn ok chico" id="pEntregar">Marcar entregado</button>':""}${cerrado(p)?(esAdmin?'<button class="btn sec chico" id="pReabrir">Devolver a por entregar</button>':""):'<button class="btn sec chico" id="pNoEnt">Registrar que no se pudo entregar</button>'}${Number(p.difCobro)&&!p.difRevisada?'<button class="btn sec chico" id="pDifOk">Marcar diferencia como revisada</button>':""}${cambioPendiente(p)?'<button class="btn sec chico" id="pCambioOk">Cambio entregado al cliente</button>':""}${esAdmin?'<button class="btn peligro chico" id="pBorrar">Eliminar pedido</button>':""}</div>`;
   abrirDlg();
   $("#pNuevoCli").onclick=()=>{ const sv=$("#pServ").value; formCliente(null, cid=>{ abrirPedido(guia, cid).then(()=>{ if(sv) $("#pServ").value=sv; }); }); };
   $("#pCli").onchange=e=>{ const t=S.clientes[e.target.value]?.tarifa; if(t && !$("#pServ").value) $("#pServ").value=t; };
+  $("#pDomi").onchange=e=>{ $("#pDomiBox").classList.toggle("oculto",!e.target.checked); if(e.target.checked&&!$("#pDomiVal").value) $("#pDomiVal").value=(Number($("#pServ").value)||0)+(Number($("#pGasto").value)||0)||""; };
   $("#pGuardar").onclick=async()=>{ const cid=$("#pCli").value; if(!cid) return toast("Elige el remitente");
-    const datos={clienteId:cid,clienteNombre:S.clientes[cid]?.nombre||"",valorServicio:Number($("#pServ").value)||0,domiPagado:$("#pDomi").checked,aCobrar:Number($("#pCob").value)||0};
+    const datos={clienteId:cid,clienteNombre:S.clientes[cid]?.nombre||"",valorServicio:Number($("#pServ").value)||0,domiPagado:$("#pDomi").checked,aCobrar:Number($("#pCob").value)||0,
+      gasto:Math.max(0,Number($("#pGasto").value)||0),gastoNota:$("#pGastoNota").value.trim()};
+    if(datos.domiPagado){ const medio=$("#pDomiMedio").value, val=Number($("#pDomiVal").value)||0, antiguo=p.domiPagado&&!p.domiPagoMedio;
+      if(!medio&&!antiguo) return toast("Elige cómo pagó el domicilio"); if(!(val>0)) return toast("Escribe el valor que pagó");
+      Object.assign(datos,{domiPagoMedio:medio,domiPagoValor:val,domiPagoFecha:p.domiPagado&&p.domiPagoFecha?p.domiPagoFecha:Date.now()}); }
+    else Object.assign(datos,{domiPagoMedio:"",domiPagoValor:"",domiPagoFecha:0});
     if($("#pDev")) datos.cobrarDev=$("#pDev").checked; if($("#pCta")) datos.cuentaJs=$("#pCta").value;
     try{ await actualizar("pedidos",guia,datos); toast("Guía "+guia+" actualizada"); cerrarDlg(); }catch(e){toast("No se pudo guardar");} };
   if($("#pBorrar")) $("#pBorrar").onclick=async()=>{ if(!await confirmar("Eliminar la guía "+guia,"Se borran el pedido y sus fotos. No se puede deshacer.","Eliminar")) return abrirPedido(guia);
     const grupo=nuevoId(); try{ await borrar("pedidos",guia,{grupo}); await borrar("fotos",guia,{grupo}).catch(()=>{}); await borrar("entregas",guia,{grupo}).catch(()=>{}); cerrarDlg(); toast("Guía enviada a la papelera"); }catch(e){ toast("No se pudo eliminar"); } };
   const ne=$("#pNoEnt"); if(ne) ne.onclick=()=>abrirDevolucion(guia);
   const pe=$("#pEntregar"); if(pe) pe.onclick=()=>abrirEntrega(guia);
+  const pc=$("#pCambioOk"); if(pc) pc.onclick=async()=>{ if(!await confirmar("Cambio de "+guia+" entregado","Se marca que el cliente ya recibió la prenda de cambio.","Marcar entregado")) return abrirPedido(guia);
+    try{ await actualizar("pedidos",guia,{cambioRecibido:Date.now(),cambioConfirmo:uid||""}); toast("Cambio marcado como entregado"); abrirPedido(guia); }catch(e){ toast("No se pudo guardar"); } };
   const dk=$("#pDifOk"); if(dk) dk.onclick=async()=>{ try{ await actualizar("pedidos",guia,{difRevisada:true}); abrirPedido(guia); }catch(e){ toast("No se pudo guardar"); } };
   const rb=$("#pReabrir"); if(rb) rb.onclick=async()=>{ if(!await confirmar("Reabrir la guía "+guia,"La entrega se borrará y el pedido volverá a por entregar.","Reabrir")) return abrirPedido(guia);
     await actualizar("pedidos",guia,{estado:"pendiente",entregado:null,destinatario:"",valorCobrado:0,metodo:"",cuentaJs:"",difCobro:0,difRevisada:false,motivoDev:"",notaDev:"",cobrarDev:false}); await borrar("entregas",guia,{grupo:nuevoId()}).catch(()=>{}); cerrarDlg(); };
@@ -697,8 +750,23 @@ function formCliente(id, alGuardar){
       if(alGuardar) setTimeout(()=>alGuardar(cid),150); else cerrarDlg(); }catch(e){toast("No se pudo guardar");} };
 }
 
+/* Registrar que el cliente pagó el domicilio de una guía: cómo y cuánto; entra a la caja. */
+function pagoDomicilio(guia,despues){
+  const p=S.pedidos[guia]; if(!p) return;
+  $("#dlgCont").innerHTML=`<header><div><h2>Pago del domicilio</h2><span class="sub guia">${esc(guia)}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <p class="sub">Domicilio ${pesos(servicio(p))}${gastoDe(p)?" + flete "+pesos(gastoDe(p)):""}. El valor entra a la caja.</p>
+    <div class="linea2"><div class="campo"><label for="dpMedio">¿Cómo pagó?</label><select id="dpMedio"><option value="">Elige…</option>${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>
+    <div class="campo"><label for="dpVal">Valor que pagó</label><input id="dpVal" type="number" inputmode="numeric" min="0" step="100" value="${cargoEnvio(p)||""}"></div></div>
+    <button class="btn ok" id="dpGuardar" style="width:100%">Registrar pago</button>`;
+  abrirDlg();
+  $("#dpGuardar").onclick=async()=>{ const medio=$("#dpMedio").value, val=Number($("#dpVal").value)||0;
+    if(!medio) return toast("Elige cómo pagó"); if(!(val>0)) return toast("Escribe el valor que pagó");
+    const b=$("#dpGuardar"); b.disabled=true;
+    try{ await actualizar("pedidos",guia,{domiPagado:true,domiPagoMedio:medio,domiPagoValor:val,domiPagoFecha:Date.now()}); toast("Pago de "+pesos(val)+" registrado"); setTimeout(despues,200); }
+    catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
+}
 function filasCuenta(cid){
-  const ps=Object.values(S.pedidos).filter(p=>p.clienteId===cid&&cerrado(p)).map(p=>({fecha:p.entregado,det:`${p.guia} · ${p.destinatario||""} · ${metodoTxt(p)} · cobró ${pesos(p.valorCobrado)} · ${p.domiPagado?"domicilio ya pagado":"domicilio "+pesos(servicio(p))}`,v:saldoPedido(p),pid:p.guia,dp:!!p.domiPagado}));
+  const ps=Object.values(S.pedidos).filter(p=>p.clienteId===cid&&cerrado(p)).map(p=>({fecha:p.entregado,det:`${p.guia} · ${p.destinatario||""} · ${metodoTxt(p)} · cobró ${pesos(p.valorCobrado)} · ${textoDomi(p)}`,v:saldoPedido(p),pid:p.guia,dp:!!p.domiPagado}));
   const ms=Object.values(S.movimientos).filter(m=>m.clienteId===cid).map(m=>({fecha:m.fecha,det:(MOVS[m.tipo]?.corto||"Movimiento")+(m.nota?" · "+m.nota:""),v:signoMov(m),mid:m.id}));
   return [...ps,...ms].sort((a,b)=>b.fecha-a.fecha);
 }
@@ -725,8 +793,10 @@ function abrirCuenta(cid){
   $("#cEdit").onclick=()=>formCliente(cid);
   if($("#mReg")) $("#mReg").onclick=async()=>{ const val=Number($("#mVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero"); const id=nuevoId();
     try{ await guardar("movimientos",id,{id,clienteId:cid,tipo:$("#mTipo").value,valor:val,medio:$("#mMedio").value,nota:$("#mNota").value.trim(),fecha:fechaDia($("#mFecha").value||hoy())}); toast("Movimiento registrado"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){toast("No se pudo guardar");} };
-  document.querySelectorAll("[data-domi]").forEach(b=>b.onclick=async()=>{ b.disabled=true; const g=b.dataset.domi;
-    try{ await actualizar("pedidos",g,{domiPagado:!S.pedidos[g]?.domiPagado}); toast("Guía "+g+" actualizada"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){ b.disabled=false; toast("No se pudo guardar"); } });
+  document.querySelectorAll("[data-domi]").forEach(b=>b.onclick=async()=>{ const g=b.dataset.domi, ped=S.pedidos[g];
+    if(ped?.domiPagado){ if(!await confirmar("Desmarcar el pago de "+g,"El pago del domicilio se quita de la caja y vuelve a sumarse al saldo del cliente.","Desmarcar")) return abrirCuenta(cid);
+      try{ await actualizar("pedidos",g,{domiPagado:false,domiPagoMedio:"",domiPagoValor:"",domiPagoFecha:0}); toast("Guía "+g+" actualizada"); }catch(e){ toast("No se pudo guardar"); } return setTimeout(()=>abrirCuenta(cid),200); }
+    pagoDomicilio(g,()=>abrirCuenta(cid)); });
   document.querySelectorAll("[data-delmov]").forEach(b=>b.onclick=async()=>{ b.disabled=true; try{ await borrar("movimientos",b.dataset.delmov); toast("Movimiento quitado"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
   const bc=$("#cCsv"); if(bc) bc.onclick=async()=>{
     const lin=[["Fecha","Detalle","Valor"],...rows.slice().reverse().map(r=>[new Date(r.fecha).toLocaleString("es-CO"),r.det,Math.round(r.v)]),["","Saldo",Math.round(s)]];
@@ -754,8 +824,9 @@ function periodoMensajero(mid){
   const ul=liquidacionesDe(mid)[0]||null, desde=ul?ul.fecha:0, anterior=ul?(Number(ul.debe)||0):0;
   const ps=Object.values(S.pedidos).filter(p=>cerrado(p)&&p.mensajeroId===mid&&p.entregado>desde).sort((a,b)=>a.entregado-b.entregado);
   const recs=Object.values(S.recaudos).filter(r=>r.mensajeroId===mid&&r.fecha>desde).sort((a,b)=>a.fecha-b.fecha);
-  const efectivo=totales(ps).efectivo, recibido=recs.reduce((a,r)=>a+(Number(r.valor)||0),0);
-  return {ul,desde,anterior,ps,recs,efectivo,recibido,debe:anterior+efectivo-recibido};
+  const bases=Object.values(S.cajamovs).filter(c=>c.cat==="base"&&c.personaId===mid&&c.fecha>desde).sort((a,b)=>a.fecha-b.fecha);
+  const efectivo=totales(ps).efectivo, recibido=recs.reduce((a,r)=>a+(Number(r.valor)||0),0), base=bases.reduce((a,c)=>a+(Number(c.valor)||0),0), gastos=ps.reduce((a,p)=>a+gastoDe(p),0);
+  return {ul,desde,anterior,ps,recs,bases,base,gastos,efectivo,recibido,debe:anterior+efectivo+base-gastos-recibido}; // la base vuelve con lo cobrado; los fletes que pagó se descuentan
 }
 const recibidoDia=(mid,dia)=>Object.values(S.recaudos).filter(r=>r.mensajeroId===mid&&diaDe(r.fecha)===dia).reduce((a,r)=>a+(Number(r.valor)||0),0);
 const textoLiq = d => d>0 ? "Debe "+pesos(d) : d<0 ? "Sobró "+pesos(-d) : "Quedó en $ 0";
@@ -771,6 +842,7 @@ function liquidar(mid){
     <dl class="datos">
       <dt>Entregas</dt><dd>${pm.ps.length}</dd>
       <dt>Efectivo cobrado</dt><dd>${pesos(t.efectivo)}</dd>
+      ${pm.base?`<dt>Base para vueltos</dt><dd>${pesos(pm.base)}</dd>`:""}${pm.gastos?`<dt>Fletes / gastos pagados</dt><dd>− ${pesos(pm.gastos)}</dd>`:""}
       ${pm.anterior?`<dt>Pendiente de la liquidación anterior</dt><dd>${pesos(pm.anterior)}</dd>`:""}
       <dt>Ya entregó</dt><dd>${pesos(pm.recibido)}</dd>
       <dt>Pendiente por entregar</dt><dd class="neg">${pesos(pm.debe)}</dd>
@@ -792,7 +864,7 @@ function liquidar(mid){
       const t0=Date.now();
       if(val>0){ const rid=nuevoId(); await guardar("recaudos",rid,{id:rid,mensajeroId:mid,valor:val,medio:$("#lMedio").value,nota:"Liquidación",fecha:t0}); }
       const fecha=Math.max(Date.now(),t0+1), id=mid+"_"+fecha;
-      await guardar("liquidaciones",id,{id,mensajeroId:mid,desde:pm.desde,fecha,dia:diaDe(fecha),entregas:pm.ps.length,guias:pm.ps.map(p=>p.guia),efectivo:t.efectivo,anterior:pm.anterior,recibidoAntes:pm.recibido,entregaFinal:val,recibido:pm.recibido+val,debe:pm.debe-val,transfJs:t.transfJs,transfCli:t.transfCli,sueldo,enRuta});
+      await guardar("liquidaciones",id,{id,mensajeroId:mid,desde:pm.desde,fecha,dia:diaDe(fecha),entregas:pm.ps.length,guias:pm.ps.map(p=>p.guia),efectivo:t.efectivo,base:pm.base,gastos:pm.gastos,anterior:pm.anterior,recibidoAntes:pm.recibido,entregaFinal:val,recibido:pm.recibido+val,debe:pm.debe-val,transfJs:t.transfJs,transfCli:t.transfCli,sueldo,enRuta});
       toast(`${m.nombre}: ${textoLiq(pm.debe-val).toLowerCase()}`); setTimeout(()=>verLiquidacion(id),200);
     }catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
@@ -806,6 +878,8 @@ function verLiquidacion(id){
     <dl class="datos">
       <dt>Entregas</dt><dd>${l.entregas}</dd>
       <dt>Efectivo cobrado</dt><dd>${pesos(l.efectivo)}</dd>
+      ${l.base?`<dt>Base para vueltos</dt><dd>${pesos(l.base)}</dd>`:""}
+      ${l.gastos?`<dt>Fletes / gastos pagados</dt><dd>− ${pesos(l.gastos)}</dd>`:""}
       ${l.anterior?`<dt>Pendiente anterior</dt><dd>${pesos(l.anterior)}</dd>`:""}
       <dt>Entregó durante el período</dt><dd>${pesos(l.recibidoAntes)}</dd>
       <dt>Entrega final</dt><dd>${pesos(l.entregaFinal)}</dd>
@@ -823,7 +897,7 @@ function recibirDinero(mid){
   const m=S.mensajeros[mid]; if(!m) return;
   const pm=periodoMensajero(mid);
   $("#dlgCont").innerHTML=`<header><div><h2>Recibir dinero</h2><span class="sub">${esc(m.nombre)}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
-    <dl class="datos"><dt>Efectivo cobrado</dt><dd>${pesos(pm.efectivo)}</dd>${pm.anterior?`<dt>Pendiente anterior</dt><dd>${pesos(pm.anterior)}</dd>`:""}<dt>Ya entregó</dt><dd>${pesos(pm.recibido)}</dd><dt>Debe</dt><dd class="neg">${pesos(pm.debe)}</dd></dl>
+    <dl class="datos"><dt>Efectivo cobrado</dt><dd>${pesos(pm.efectivo)}</dd>${pm.base?`<dt>Base para vueltos</dt><dd>${pesos(pm.base)}</dd>`:""}${pm.gastos?`<dt>Fletes / gastos pagados</dt><dd>− ${pesos(pm.gastos)}</dd>`:""}${pm.anterior?`<dt>Pendiente anterior</dt><dd>${pesos(pm.anterior)}</dd>`:""}<dt>Ya entregó</dt><dd>${pesos(pm.recibido)}</dd><dt>Debe</dt><dd class="neg">${pesos(pm.debe)}</dd></dl>
     <div class="linea2"><div class="campo"><label for="rVal">Valor que entrega</label><input id="rVal" type="number" inputmode="numeric" min="0" step="1000" value="${pm.debe>0?pm.debe:""}"></div>
     <div class="campo"><label for="rMedio">Medio</label><select id="rMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div></div>
     <div class="campo"><label for="rNota">Nota (opcional)</label><input id="rNota" placeholder="Ej: primera entrega de la tarde"></div>
@@ -877,7 +951,7 @@ const linkWhatsApp=(tel,txt)=>"https://wa.me/"+telWhatsApp(tel)+"?text="+encodeU
 function textoRecibo(r){
   const L=[`*${EMPRESA.nombre}*`,`Recibo de cuadre · ${fechaLarga(diaRec)}`,`Cliente: *${r.nombre}*`,""];
   if(r.anterior) L.push(`Saldo anterior: ${pesos(r.anterior)}`);
-  r.lineas.forEach(l=>L.push(l.p?`• ${l.t} (${l.guia}) · ${metodoTxt(l.p)} · cobró ${pesos(l.p.valorCobrado)} · ${l.p.domiPagado?"domicilio ya pagado":"domicilio "+pesos(servicio(l.p))} → ${pesos(l.v)}`:`• ${l.t} → ${pesos(l.v)}`));
+  r.lineas.forEach(l=>L.push(l.p?`• ${l.t} (${l.guia}) · ${metodoTxt(l.p)} · cobró ${pesos(l.p.valorCobrado)} · ${textoDomi(l.p)} → ${pesos(l.v)}`:`• ${l.t} → ${pesos(l.v)}`));
   L.push("",`*Total: ${pesos(r.total)}*`);
   if(r.pagos) L.push(`Pagado: ${pesos(r.pagos)}`,`*Queda pendiente: ${pesos(r.queda)}*`);
   L.push(r.queda>0?"JS le debe este valor.":r.queda<0?"Este valor queda pendiente por pagar a JS.":"Cuadre en cero.","",EMPRESA.lema,EMPRESA.tel);
@@ -890,7 +964,7 @@ function verRecibo(cid){
     <div class="t-cab"><img src="${LOGO}" alt=""><b>${EMPRESA.nombre}</b><span>Recibo de cuadre</span><span>${fechaLarga(diaRec)}</span></div>
     <div class="t-cli">${esc(r.nombre)}</div>
     ${r.anterior?`<div class="t-l"><span>Saldo anterior</span><span>${pesos(r.anterior)}</span></div>`:""}
-    ${r.lineas.map(l=>`<div class="t-l"><span>${esc(l.t)}${l.p?`<small>${esc(l.guia)} · ${metodoTxt(l.p)} · cobró ${pesos(l.p.valorCobrado)} · ${l.p.domiPagado?"domicilio ya pagado":"domicilio "+pesos(servicio(l.p))}</small>`:""}</span><span>${pesos(l.v)}</span></div>`).join("")}
+    ${r.lineas.map(l=>`<div class="t-l"><span>${esc(l.t)}${l.p?`<small>${esc(l.guia)} · ${metodoTxt(l.p)} · cobró ${pesos(l.p.valorCobrado)} · ${textoDomi(l.p)}</small>`:""}</span><span>${pesos(l.v)}</span></div>`).join("")}
     <div class="t-l t-total"><span>Total</span><span>${pesos(r.total)}</span></div>
     ${r.pagos?`<div class="t-l"><span>Pagado</span><span>${pesos(r.pagos)}</span></div><div class="t-l t-total"><span>Queda pendiente</span><span>${pesos(r.queda)}</span></div>`:""}
     <div class="t-pie">${EMPRESA.lema}<br>${EMPRESA.tel}<br>${EMPRESA.ig}</div>
@@ -969,11 +1043,11 @@ async function descargarExcel(dia,soloCid,btn){
 
       // Pedidos del día (como tu hoja diaria)
       const wp=wb.addWorksheet("Pedidos",{views:[{state:"frozen",ySplit:1}]});
-      wp.columns=[{header:"Guía",width:11},{header:"Mensajero",width:16},{header:"Precio",width:11,style:{numFmt:MON}},{header:"Cliente",width:22},{header:"Destinatario",width:24},{header:"Cobro",width:12,style:{numFmt:MON}},{header:"Método",width:24},{header:"Saldo",width:12,style:{numFmt:MON}},{header:"Domicilio pagado",width:16}];
+      wp.columns=[{header:"Guía",width:11},{header:"Mensajero",width:16},{header:"Precio",width:11,style:{numFmt:MON}},{header:"Cliente",width:22},{header:"Destinatario",width:24},{header:"Cobro",width:12,style:{numFmt:MON}},{header:"Método",width:24},{header:"Saldo",width:12,style:{numFmt:MON}},{header:"Pagó domicilio",width:15,style:{numFmt:MON}},{header:"Flete / gasto",width:13,style:{numFmt:MON}}];
       cab(wp.getRow(1));
       ent.forEach((p,i)=>{ const k=i+2;
-        wp.addRow([p.guia,S.mensajeros[p.mensajeroId]?.nombre||"",servicio(p),nombreCliente(p.clienteId)||"SIN REMITENTE",p.destinatario||"",Number(p.valorCobrado)||0,metodoTxt(p),null,p.domiPagado?"SÍ":"NO"]);
-        wp.getCell("H"+k).value={formula:`IF(G${k}="${METODOS.transf_cliente.t}",0,F${k})-IF(I${k}="SÍ",0,C${k})`,result:saldoPedido(p)}; });
+        wp.addRow([p.guia,S.mensajeros[p.mensajeroId]?.nombre||"",servicio(p),nombreCliente(p.clienteId)||"SIN REMITENTE",p.destinatario||"",Number(p.valorCobrado)||0,metodoTxt(p),null,pagoDomi(p),gastoDe(p)]);
+        wp.getCell("H"+k).value={formula:`IF(G${k}="${METODOS.transf_cliente.t}",0,F${k})-C${k}-J${k}+I${k}`,result:saldoPedido(p)}; });
       const tp=n+2; wp.getCell("A"+tp).value="TOTAL"; wp.getRow(tp).font={bold:true};
       wp.getCell("C"+tp).value={formula:`SUM(C2:C${tp-1})`,result:ent.reduce((a,p)=>a+servicio(p),0)};
       wp.getCell("F"+tp).value={formula:`SUM(F2:F${tp-1})`,result:ent.reduce((a,p)=>a+(Number(p.valorCobrado)||0),0)};
@@ -1037,13 +1111,15 @@ async function descargarCartera(btn){
 
 /* ======================= CAJA GENERAL ======================= */
 const MEDIOS_CAJA={...MEDIOS, cuentas:"Cuentas JS (transferencias)"};
-const CATS={inicial:"Caja inicial",otro_entra:"Otra entrada",gasto:"Gasto",arriendo:"Arriendo",adelanto:"Adelanto",sueldo:"Pago de sueldo",otro:"Otra salida"};
-const CATS_TIPO={entra:["inicial","otro_entra"],sale:["gasto","arriendo","adelanto","sueldo","otro"]};
+const CATS={inicial:"Caja inicial",otro_entra:"Otra entrada",gasto:"Gasto",base:"Base para vueltos",arriendo:"Arriendo",adelanto:"Adelanto",sueldo:"Pago de sueldo",otro:"Otra salida"};
+const CATS_TIPO={entra:["inicial","otro_entra"],sale:["gasto","base","arriendo","adelanto","sueldo","otro"]};
+const CATS_PERSONA=["adelanto","sueldo","base"]; // movimientos de caja que van a nombre de una persona
 let diaLibro=hoy();
 function libroCaja(){
   const L=[], nomM=id=>S.mensajeros[id]?.nombre||"";
   for(const r of Object.values(S.recaudos)) L.push({fecha:r.fecha,concepto:"Entrega de "+nomM(r.mensajeroId)+(r.nota?" · "+r.nota:""),valor:Number(r.valor)||0,medio:r.medio||"efectivo",cat:"Mensajeros",ref:"recaudos|"+r.id});
   for(const p of Object.values(S.pedidos)) if(cerrado(p)&&p.metodo==="transf_js") L.push({fecha:p.entregado,concepto:"Transferencia a JS · "+p.guia+(p.destinatario?" · "+p.destinatario:""),valor:Number(p.valorCobrado)||0,medio:p.cuentaJs||"cuentas",cat:"Transferencias"});
+  for(const p of Object.values(S.pedidos)) if(p.domiPagado&&p.domiPagoMedio) L.push({fecha:p.domiPagoFecha||p.entregado||p.creado,concepto:"Pago de domicilio · "+p.guia+(p.clienteId?" · "+nombreCliente(p.clienteId):""),valor:pagoDomi(p),medio:p.domiPagoMedio,cat:"Clientes"});
   for(const m of Object.values(S.movimientos)) if(esPago(m)) L.push({fecha:m.fecha,concepto:(m.tipo==="pago_a_cliente"?"Pago a ":"Pago de ")+nombreCliente(m.clienteId)+(m.nota?" · "+m.nota:""),valor:signoMov(m),medio:m.medio||"efectivo",cat:"Clientes"});
   for(const c of Object.values(S.cajamovs)) L.push({fecha:c.fecha,concepto:(CATS[c.cat]||"Movimiento")+(c.personaId?" · "+nomM(c.personaId):"")+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:CATS[c.cat]||"Otro",ref:"cajamovs|"+c.id});
   return L.sort((a,b)=>a.fecha-b.fecha);
@@ -1096,10 +1172,10 @@ function movCaja(tipo,pre={}){
     <div class="campo"><label for="cjCon">Detalle (opcional)</label><input id="cjCon" placeholder="Ej: gasolina, arriendo de mayo"></div></div>
     <button class="btn ${tipo==="entra"?"ok":""}" id="cjGuardar" style="width:100%">Guardar</button>`;
   abrirDlg();
-  const ver=()=>$("#cjPerC").classList.toggle("oculto",!["adelanto","sueldo"].includes($("#cjCat").value)); $("#cjCat").onchange=ver; ver();
+  const ver=()=>$("#cjPerC").classList.toggle("oculto",!CATS_PERSONA.includes($("#cjCat").value)); $("#cjCat").onchange=ver; ver();
   $("#cjVal").focus();
-  $("#cjGuardar").onclick=async()=>{ const val=Number($("#cjVal").value), cat=$("#cjCat").value, per=["adelanto","sueldo"].includes(cat)?$("#cjPer").value:"";
-    if(!(val>0)) return toast("Escribe un valor mayor a cero"); if(["adelanto","sueldo"].includes(cat)&&!per) return toast("Elige la persona");
+  $("#cjGuardar").onclick=async()=>{ const val=Number($("#cjVal").value), cat=$("#cjCat").value, per=CATS_PERSONA.includes(cat)?$("#cjPer").value:"";
+    if(!(val>0)) return toast("Escribe un valor mayor a cero"); if(CATS_PERSONA.includes(cat)&&!per) return toast("Elige la persona");
     const dia=$("#cjDia").value||hoy(), id=nuevoId(); const b=$("#cjGuardar"); b.disabled=true;
     try{ await guardar("cajamovs",id,{id,tipo,cat,personaId:per,valor:val,medio:$("#cjMedio").value,concepto:$("#cjCon").value.trim(),fecha:fechaDia(dia),semana:cat==="sueldo"?(pre.semana||semanaDe(dia)):""});
       cerrarDlg(); toast((CATS[cat]||"Movimiento")+" registrado"); }catch(e){ b.disabled=false; toast("No se pudo guardar"); } };

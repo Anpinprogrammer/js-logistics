@@ -73,14 +73,22 @@ service cloud.firestore {
       return esMio(resource.data.mensajeroId)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           "estado", "entregado", "destinatario", "valorCobrado", "metodo", "cuentaJs", "difCobro",
-          "entregoUid", "intentos", "motivoDev", "notaDev", "cobrarDev"]);
+          "entregoUid", "intentos", "motivoDev", "notaDev", "cobrarDev", "cambio", "gasto", "gastoNota"]);
+    }
+    // El cliente solo puede confirmar que recibió la prenda de un cambio de sus pedidos
+    function confirmaCambioCliente() {
+      return esClienteDe(resource.data.clienteId) && resource.data.get("cambio", false) == true
+        && resource.data.get("cambioRecibido", 0) == 0
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["cambioRecibido", "cambioConfirmo"])
+        && request.resource.data.cambioConfirmo == request.auth.uid
+        && request.resource.data.cambioRecibido is int;
     }
     match /pedidos/{guia} {
       // Leer una guía que no existe solo dice que está libre (lo usa la creación de guías)
       allow read: if esOficina() || (esEquipo() && resource == null) || esMio(resource.data.mensajeroId)
         || esClienteDe(resource.data.clienteId);
       allow create: if esOficina() || pedidoNuevoDeMensajero(guia);
-      allow update: if esOficina() || entregaDeMensajero();
+      allow update: if esOficina() || entregaDeMensajero() || confirmaCambioCliente();
       allow delete: if esAdmin();
     }
     // Fotos de salida y de entrega (el documento se llama como la guía)
