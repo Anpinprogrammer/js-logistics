@@ -308,6 +308,8 @@ async function crearGuias(files){
   }
   pintar();
 }
+/* Si el navegador trae una página guardada de una versión anterior, se crea lo que falte en vez de detener la app. */
+if(!$("#inGaleria")){ const g=document.createElement("input"); Object.assign(g,{type:"file",id:"inGaleria",accept:"image/*",multiple:true,className:"oculto"}); document.body.appendChild(g); }
 ["#inCamara","#inGaleria"].forEach(sel=>$(sel).addEventListener("change",e=>crearGuias(e.target.files)));
 
 function abrirEntrega(guia){
