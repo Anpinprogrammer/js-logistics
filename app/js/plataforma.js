@@ -75,13 +75,13 @@ async function iniciar(){
   };
 
   /* --- cuentas de la app --- */
-  async function crearAcceso({ email, clave, nombre, rol, mensajeroId }){
+  async function crearAcceso({ email, clave, nombre, rol, mensajeroId, clienteId }){
     // Se usa una segunda conexión para que el administrador no pierda su sesión al crear la cuenta.
     const sec = initializeApp(firebaseConfig, "alta-" + Date.now());
     try{
       const c = await A.createUserWithEmailAndPassword(A.getAuth(sec), email, clave);
       const id = c.user.uid, b = F.writeBatch(fs);
-      b.set(F.doc(fs, "usuarios", id), { uid: id, email, nombre, rol, creado: Date.now() });
+      b.set(F.doc(fs, "usuarios", id), { uid: id, email, nombre, rol, ...(clienteId ? { clienteId } : {}), creado: Date.now() });
       if(rol === "admin") b.set(F.doc(fs, "admins", id), { uid: id });
       if(mensajeroId) b.set(F.doc(fs, "vinculos", id), { uid: id, mensajeroId, fecha: Date.now() });
       await b.commit();
@@ -145,6 +145,7 @@ async function iniciar(){
         canEdit: async () => usuarioActual.admin,
         rol: () => usuarioActual.admin ? "admin" : (usuarioActual.datos.rol || "mensajero"),
         mensajeroId: () => usuarioActual.mensajeroId,
+        clienteId: () => usuarioActual.datos.clienteId || "",
         email: () => usuarioActual.email,
         profiles: async ids => {
           const out = {};

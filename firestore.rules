@@ -1,8 +1,8 @@
 rules_version = '2';
 // Quién puede leer y escribir cada parte de la base de datos.
 // Solo entra quien tiene un documento en "usuarios" (lo crea el administrador desde la app).
-// Roles: admin (todo), asistente (pedidos, clientes y saldos; lo propio en caja y sueldo),
-//        mensajero (solo sus pedidos, su caja y su sueldo).
+// Roles: admin (todo), asistente (pedidos, clientes y saldos), mensajero (solo sus pedidos,
+//        su caja y su sueldo), cliente (solo lee sus pedidos, pruebas de entrega y saldo).
 service cloud.firestore {
   match /databases/{database}/documents {
     function autenticado() { return request.auth != null; }
@@ -11,6 +11,12 @@ service cloud.firestore {
     function esAdmin() { return autenticado() && exists(ruta("admins", request.auth.uid)); }
     function esAsistente() { return esMiembro() && get(ruta("usuarios", request.auth.uid)).data.rol == "asistente"; }
     function esOficina() { return esAdmin() || esAsistente(); }
+    // Cliente: cuenta de solo lectura asociada a un cliente (usuarios/{uid}.clienteId)
+    function esCliente() { return esMiembro() && get(ruta("usuarios", request.auth.uid)).data.rol == "cliente"; }
+    function esClienteDe(cid) { return esCliente() && cid == get(ruta("usuarios", request.auth.uid)).data.clienteId; }
+    function pedidoDeMiCliente(guia) { return esCliente() && exists(ruta("pedidos", guia)) && esClienteDe(get(ruta("pedidos", guia)).data.clienteId); }
+    // Equipo de trabajo: cualquier cuenta que no sea de cliente
+    function esEquipo() { return esMiembro() && get(ruta("usuarios", request.auth.uid)).data.rol != "cliente"; }
     // Nombre en Personal vinculado a la cuenta que hace la petición
     function tengoVinculo() { return autenticado() && exists(ruta("vinculos", request.auth.uid)); }
     function esMio(mid) { return tengoVinculo() && mid == get(ruta("vinculos", request.auth.uid)).data.mensajeroId; }
@@ -30,10 +36,10 @@ service cloud.firestore {
     }
     // Contador de guías: solo sube de uno en uno (administración puede corregirlo)
     match /meta/{id} {
-      allow read: if esMiembro();
-      allow create: if esAdmin() || (esMiembro() && id == "contador"
+      allow read: if esEquipo();
+      allow create: if esAdmin() || (esEquipo() && id == "contador"
         && request.resource.data.keys().hasOnly(["n"]) && request.resource.data.n == 1);
-      allow update: if esAdmin() || (esMiembro() && id == "contador"
+      allow update: if esAdmin() || (esEquipo() && id == "contador"
         && request.resource.data.keys().hasOnly(["n"]) && request.resource.data.n == resource.data.n + 1);
     }
 
@@ -71,32 +77,35 @@ service cloud.firestore {
     }
     match /pedidos/{guia} {
       // Leer una guía que no existe solo dice que está libre (lo usa la creación de guías)
-      allow read: if esOficina() || (esMiembro() && resource == null) || esMio(resource.data.mensajeroId);
+      allow read: if esOficina() || (esEquipo() && resource == null) || esMio(resource.data.mensajeroId)
+        || esClienteDe(resource.data.clienteId);
       allow create: if esOficina() || pedidoNuevoDeMensajero(guia);
       allow update: if esOficina() || entregaDeMensajero();
       allow delete: if esAdmin();
     }
     // Fotos de salida y de entrega (el documento se llama como la guía)
     match /fotos/{guia} {
-      allow read, update: if esOficina() || pedidoMio(guia);
-      allow create: if esMiembro();
+      allow read: if esOficina() || pedidoMio(guia) || pedidoDeMiCliente(guia);
+      allow update: if esOficina() || pedidoMio(guia);
+      allow create: if esEquipo();
       allow delete: if esAdmin();
     }
     match /entregas/{guia} {
-      allow read, update: if esOficina() || pedidoMio(guia);
+      allow read: if esOficina() || pedidoMio(guia) || pedidoDeMiCliente(guia);
+      allow update: if esOficina() || pedidoMio(guia);
       allow create: if esOficina() || pedidoMio(guia);
       allow delete: if esAdmin();
     }
 
     // Clientes: oficina los ve y registra; borrar solo administración
     match /clientes/{id} {
-      allow read: if esOficina();
+      allow read: if esOficina() || esClienteDe(resource.data.id);
       allow create, update: if esOficina();
       allow delete: if esAdmin();
     }
     // Pagos y ajustes de clientes: oficina los ve (saldos); solo administración los registra
     match /movimientos/{id} {
-      allow read: if esOficina();
+      allow read: if esOficina() || esClienteDe(resource.data.clienteId);
       allow write: if esAdmin();
     }
     // Personal: oficina ve la lista; cada mensajero solo su propia ficha
@@ -130,7 +139,7 @@ service cloud.firestore {
     // Historial: un documento por día y por persona ("AAAA-MM-DD_<uid>"); cada quien escribe el suyo
     match /historial/{id} {
       allow read: if esAdmin() || (autenticado() && id.matches("^[0-9-]+_" + request.auth.uid + "$"));
-      allow create, update: if esMiembro() && (esAdmin() || id.matches("^[0-9-]+_" + request.auth.uid + "$"));
+      allow create, update: if esEquipo() && (esAdmin() || id.matches("^[0-9-]+_" + request.auth.uid + "$"));
       allow delete: if esAdmin();
     }
   }

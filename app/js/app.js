@@ -32,6 +32,7 @@ async function comprimir(file, max, q){
 
 /* ---------- datos (db compartida, o memoria si no hay) ---------- */
 let db=null, usuario=null, uid=null, esAdmin=true, esAsistente=false; // asistente: Pedidos, Clientes y Recibos, sin caja ni sueldos
+let esCliente=false, miCliente=""; // cliente: solo ve sus pedidos, pruebas y saldo
 const S={pedidos:{},clientes:{},mensajeros:{},movimientos:{},recaudos:{},liquidaciones:{},jornadas:{},cajamovs:{},vinculos:{},usuarios:{}};
 const memDocs={}; let memContador=0;
 let cargado=false;
@@ -174,9 +175,9 @@ function pintar(){
   document.querySelectorAll("#rol button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.rol===rol)));
   $("#btnAdmin").classList.toggle("oculto", !esAdmin&&!esAsistente);
   $("#btnAdmin").textContent = esAdmin ? "Administración" : "Oficina";
-  $("#rol").classList.toggle("oculto", esAsistente); // el asistente solo trabaja en Oficina
+  $("#rol").classList.toggle("oculto", esAsistente||esCliente); // asistente: solo Oficina; cliente: solo su vista
   const foco=document.activeElement&&document.activeElement.id&&$("#vista").contains(document.activeElement)?document.activeElement.id:null;
-  if(rol==="mensajero") pintarMensajero(); else pintarAdmin();
+  if(esCliente) pintarCliente(); else if(rol==="mensajero") pintarMensajero(); else pintarAdmin();
   if(foco){ const el=document.getElementById(foco); if(el&&el!==document.activeElement) el.focus(); }
 }
 
@@ -495,6 +496,60 @@ function pintarAdmin(){
   else pintarMas(v,aviso);
 }
 
+/* ======================= CLIENTE (solo lectura) ======================= */
+let tabC="pedidos", filtroC="todos", buscarC="";
+function pintarCliente(){
+  const c=S.clientes[miCliente], v=$("#vista");
+  const enRuta=Object.values(S.pedidos).filter(p=>p.estado==="pendiente").length;
+  $("#pestanas").innerHTML=[["pedidos","Mis pedidos",enRuta],["cuenta","Mi cuenta"]].map(([k,t,n])=>`<button data-t="${k}" ${tabC===k?'aria-current="page"':''}>${t}${n?`<span class="num">${n}</span>`:""}</button>`).join("");
+  $("#pestanas").querySelectorAll("button").forEach(b=>b.onclick=()=>{tabC=b.dataset.t; pintar(); scrollTo(0,0);});
+  if(!c){ v.innerHTML=`<h1>Hola</h1><div class="vacio">${cargado?"Tu cuenta todavía no está asociada a un cliente. Escríbele a JS Logistics.":"Cargando…"}</div>`; return; }
+  if(tabC==="pedidos"){
+    let ps=Object.values(S.pedidos).sort((a,b)=>b.creado-a.creado);
+    if(filtroC==="ruta") ps=ps.filter(p=>p.estado==="pendiente"); else if(filtroC==="ent") ps=ps.filter(p=>p.estado==="entregado"); else if(filtroC==="dev") ps=ps.filter(p=>p.estado==="devuelto");
+    if(buscarC) ps=ps.filter(p=>(p.guia+" "+(p.destinatario||"")).toLowerCase().includes(buscarC.toLowerCase()));
+    v.innerHTML=`<h1>Hola, ${esc(c.nombre)}</h1><p class="sub">Tus envíos con JS Logistics y sus pruebas de entrega.</p>
+      <div class="filtros">${[["todos","Todos"],["ruta","En ruta"],["ent","Entregados"],["dev","Devueltos"]].map(([k,t])=>`<button data-fc="${k}" aria-pressed="${filtroC===k}">${t}</button>`).join("")}</div>
+      <div class="campo"><input id="buscarC" type="search" placeholder="Buscar guía o quien recibió" value="${esc(buscarC)}" aria-label="Buscar"></div>
+      ${ps.length?`<div class="lista">${ps.slice(0,300).map(p=>`<button class="fila" data-pc="${esc(p.guia)}">${fotoSegura(p.mini)?`<img src="${fotoSegura(p.mini)}" alt="">`:'<span class="sinfoto"></span>'}
+        <span class="info"><span class="guia">${esc(p.guia)}</span> ${etqEstado(p)}<p>${p.estado==="entregado"?"Recibió "+esc(p.destinatario||"")+" · "+hora(p.entregado):p.estado==="devuelto"?esc(MOTIVOS[p.motivoDev]||"Devuelto")+" · "+hora(p.entregado):"Salió "+hora(p.creado)}</p></span>
+        <span class="n" style="text-align:right;font-weight:700">${p.estado==="entregado"?pesos(p.valorCobrado):""}</span></button>`).join("")}</div>`:`<div class="vacio">No hay envíos aquí.</div>`}`;
+    v.querySelectorAll("[data-fc]").forEach(b=>b.onclick=()=>{filtroC=b.dataset.fc; pintar();});
+    const bu=$("#buscarC"); bu.oninput=()=>{buscarC=bu.value; clearTimeout(bu._t); bu._t=setTimeout(()=>{pintar(); const n=$("#buscarC"); n.focus(); n.setSelectionRange(n.value.length,n.value.length);},300);};
+    v.querySelectorAll("[data-pc]").forEach(b=>b.onclick=()=>verPedidoCliente(b.dataset.pc));
+  } else {
+    const s=saldoCliente(miCliente), rows=filasCuenta(miCliente);
+    v.innerHTML=`<h1>Mi cuenta</h1><p class="sub">${esc(c.nombre)}</p>
+      <div class="saldo-grande ${s<0?"neg":s>0?"pos":""}">${pesos(Math.abs(s))}</div>
+      <p class="sub">${s>0?"JS Logistics te debe este valor.":s<0?"Este valor queda pendiente por pagar a JS Logistics.":"Cuenta a paz y salvo."}</p>
+      <div class="linea2" style="align-items:end"><div class="campo" style="max-width:220px"><label for="diaRC">Recibo de cuadre del día</label><input type="date" id="diaRC" value="${diaRec}"></div>
+      <div class="campo"><button class="btn" id="verRC">Ver recibo</button></div></div>
+      <h2>Movimientos</h2>
+      ${rows.length?`<div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Detalle</th><th class="n">Valor</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${hora(r.fecha)}</td><td>${esc(r.det)}</td><td class="n ${r.v<0?"neg":"pos"}">${pesos(r.v)}</td></tr>`).join("")}</tbody></table></div>`:'<div class="vacio">Sin movimientos.</div>'}`;
+    $("#diaRC").onchange=e=>{diaRec=e.target.value||hoy();};
+    $("#verRC").onclick=()=>{ if(cuadreDia(diaRec).some(r=>r.cid===miCliente)) verRecibo(miCliente); else toast("No hay entregas ni pagos ese día"); };
+  }
+}
+async function verPedidoCliente(guia){
+  const p=S.pedidos[guia]; if(!p) return;
+  $("#dlgCont").innerHTML=`<header><div><h2 class="guia">${esc(guia)}</h2>${etqEstado(p)}</div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+  <dl class="datos">
+    <dt>Salió</dt><dd>${hora(p.creado)}</dd>
+    ${Number(p.aCobrar)?`<dt>Valor a cobrar</dt><dd>${pesos(p.aCobrar)}</dd>`:""}
+    ${(p.intentos||[]).map((i,k)=>`<dt>Intento ${k+1}</dt><dd>${hora(i.fecha)} · ${esc(MOTIVOS[i.motivo]||"")}</dd>`).join("")}
+    ${p.estado==="entregado"?`<dt>Entregado</dt><dd>${hora(p.entregado)}</dd><dt>Recibió</dt><dd>${esc(p.destinatario)}</dd><dt>Cobrado</dt><dd>${pesos(p.valorCobrado)}</dd><dt>Método</dt><dd>${metodoTxt(p)}</dd>`:""}
+    ${p.estado==="devuelto"?`<dt>Devuelto</dt><dd>${hora(p.entregado)}</dd><dt>Motivo</dt><dd>${esc(MOTIVOS[p.motivoDev]||"")}</dd>`:""}
+    ${cerrado(p)?`<dt>Domicilio</dt><dd>${p.domiPagado?"Ya pagado":pesos(servicio(p))}</dd><dt>Efecto en tu saldo</dt><dd class="${saldoPedido(p)<0?"neg":"pos"}">${pesos(saldoPedido(p))}</dd>`:""}
+  </dl>
+  <h2>Pruebas</h2><div class="fotos" id="pcFotos"><span class="sub">Cargando fotos…</span></div>`;
+  abrirDlg();
+  try{
+    const [f,e]=await Promise.all([leer("fotos",guia), cerrado(p)?leer("entregas",guia):null]);
+    const items=[["Salida",f?.salida],[p.estado==="devuelto"?"Evidencia":"Entrega",e?.foto],["Firma de quien recibió",e?.firma]].map(([t,x])=>[t,fotoSegura(x)]).filter(([,x])=>x);
+    const box=$("#pcFotos"); if(box) box.innerHTML=items.length?items.map(([t,x])=>`<figure><img src="${x}" alt="${t}"><figcaption>${t}</figcaption></figure>`).join(""):'<span class="sub">Sin fotos.</span>';
+  }catch(err){ const box=$("#pcFotos"); if(box) box.innerHTML='<span class="sub">No se pudieron cargar las fotos.</span>'; }
+}
+
 function pintarPersonal(v,aviso){
     const ms=listaOrdenada(S.mensajeros,"nombre").sort((a,b)=>Object.keys(TIPOS).indexOf(tipoDe(a))-Object.keys(TIPOS).indexOf(tipoDe(b)));
     v.innerHTML=aviso+`<h1>Personal</h1><p class="sub">Mensajeros y el dueño entregan pedidos desde la app. Patinadores y la empresa (JS) solo aparecen en Sueldos. Cuando un mensajero elige su nombre por primera vez, queda vinculado a su cuenta; “Liberar” le permite elegir de nuevo (por ejemplo, si cambió de celular o de cuenta).</p>
@@ -521,8 +576,9 @@ function pintarPersonal(v,aviso){
   }
 
 /* ---- accesos a la app (cuentas de correo y contraseña) ---- */
-const ROLES={mensajero:"Mensajero",asistente:"Asistente",admin:"Administración"};
-const ROLES_AYUDA="Mensajero: solo sus pedidos, su caja y su sueldo. Asistente: además organiza Pedidos, registra clientes, ve saldos y envía recibos; no ve caja, sueldos ni personal. Administración: todo.";
+const ROLES={mensajero:"Mensajero",asistente:"Asistente",admin:"Administración",cliente:"Cliente"};
+const ROLES_EQUIPO=Object.entries(ROLES).filter(([k])=>k!=="cliente");
+const ROLES_AYUDA="Mensajero: solo sus pedidos, su caja y su sueldo. Asistente: trabaja en Oficina (pedidos, clientes, saldos y recibos); no ve caja, sueldos ni personal. Cliente: solo ve sus pedidos, sus pruebas de entrega y su saldo, sin editar nada. Administración: todo.";
 function htmlAccesos(){
   const cu=window.plataforma?.cuentas; if(!cu||!esAdmin) return "";
   const us=listaOrdenada(S.usuarios,"nombre");
@@ -532,21 +588,26 @@ function htmlAccesos(){
     <div class="linea2"><div class="campo"><label for="acNom">Nombre</label><input id="acNom"></div><div class="campo"><label for="acEmail">Correo</label><input id="acEmail" type="email" autocomplete="off"></div></div>
     <div class="linea2"><div class="campo"><label for="acClave">Contraseña inicial (mínimo 6)</label><input id="acClave" type="text" autocomplete="off" minlength="6"></div>
     <div class="campo"><label for="acRol">Rol</label><select id="acRol">${Object.entries(ROLES).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>
-    <div class="campo"><label for="acMen">Nombre en Personal</label><select id="acMen"><option value="">— Ninguno —</option>${reps.map(m=>`<option value="${esc(m.id)}">${esc(m.nombre)}</option>`).join("")}</select></div></div>
+    <div class="campo" id="acMenC"><label for="acMen">Nombre en Personal</label><select id="acMen"><option value="">— Ninguno —</option>${reps.map(m=>`<option value="${esc(m.id)}">${esc(m.nombre)}</option>`).join("")}</select></div>
+    <div class="campo oculto" id="acCliC"><label for="acCli">Cliente</label><select id="acCli"><option value="">Elige…</option>${listaOrdenada(S.clientes,"nombre").map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("")}</select></div></div>
     <button class="btn" id="acCrear">Crear acceso</button>
-    ${us.length?`<div class="tabla-env" style="margin-top:14px"><table><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Personal</th><th></th></tr></thead><tbody>${us.map(u=>`<tr><td><b>${esc(u.nombre||"")}</b>${u.uid===uid?' <span class="etq ent">Tú</span>':""}</td><td>${esc(u.email||"")}</td><td>${u.uid===uid?ROLES[u.rol]||esc(u.rol||""):`<select data-rolde="${esc(u.uid)}" aria-label="Rol de ${esc(u.nombre||"")}">${Object.entries(ROLES).map(([k,t])=>`<option value="${k}" ${u.rol===k?"selected":""}>${t}</option>`).join("")}</select>`}</td>
-      <td><select data-vinc="${esc(u.uid)}" aria-label="Nombre en Personal de ${esc(u.nombre||"")}"><option value="">— Ninguno —</option>${reps.map(m=>`<option value="${esc(m.id)}" ${S.vinculos[u.uid]?.mensajeroId===m.id?"selected":""}>${esc(m.nombre)}</option>`).join("")}</select></td>
+    ${us.length?`<div class="tabla-env" style="margin-top:14px"><table><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Personal</th><th></th></tr></thead><tbody>${us.map(u=>`<tr><td><b>${esc(u.nombre||"")}</b>${u.uid===uid?' <span class="etq ent">Tú</span>':""}</td><td>${esc(u.email||"")}</td><td>${u.uid===uid||u.rol==="cliente"?ROLES[u.rol]||esc(u.rol||""):`<select data-rolde="${esc(u.uid)}" aria-label="Rol de ${esc(u.nombre||"")}">${ROLES_EQUIPO.map(([k,t])=>`<option value="${k}" ${u.rol===k?"selected":""}>${t}</option>`).join("")}</select>`}</td>
+      <td>${u.rol==="cliente"?"Cliente: "+esc(S.clientes[u.clienteId]?.nombre||"(no existe)"):`<select data-vinc="${esc(u.uid)}" aria-label="Nombre en Personal de ${esc(u.nombre||"")}"><option value="">— Ninguno —</option>${reps.map(m=>`<option value="${esc(m.id)}" ${S.vinculos[u.uid]?.mensajeroId===m.id?"selected":""}>${esc(m.nombre)}</option>`).join("")}</select>`}</td>
       <td><button class="btn sec chico" data-clave="${esc(u.email||"")}">Cambiar contraseña</button>${u.uid!==uid?` <button class="btn peligro chico" data-sinacc="${esc(u.uid)}">Quitar acceso</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:""}`;
 }
 function activarAccesos(v){
   const cu=window.plataforma?.cuentas, bc=$("#acCrear"); if(!cu||!bc) return;
   $("#acMen").onchange=e=>{ const n=$("#acNom"); if(!n.value&&e.target.value) n.value=S.mensajeros[e.target.value]?.nombre||""; };
+  $("#acCli").onchange=e=>{ const n=$("#acNom"); if(!n.value&&e.target.value) n.value=S.clientes[e.target.value]?.nombre||""; };
+  $("#acRol").onchange=e=>{ const cl=e.target.value==="cliente"; $("#acCliC").classList.toggle("oculto",!cl); $("#acMenC").classList.toggle("oculto",cl); };
   bc.onclick=async()=>{
-    const nombre=$("#acNom").value.trim(), email=$("#acEmail").value.trim().toLowerCase(), clave=$("#acClave").value, rol=$("#acRol").value, mensajeroId=$("#acMen").value;
+    const nombre=$("#acNom").value.trim(), email=$("#acEmail").value.trim().toLowerCase(), clave=$("#acClave").value, rol=$("#acRol").value;
+    const clienteId=rol==="cliente"?$("#acCli").value:"", mensajeroId=rol==="cliente"?"":$("#acMen").value;
     if(!nombre||!email) return toast("Escribe el nombre y el correo"); if(clave.length<6) return toast("La contraseña debe tener al menos 6 caracteres");
+    if(rol==="cliente"&&!clienteId) return toast("Elige a qué cliente corresponde este acceso");
     if(mensajeroId&&vinculosDe(mensajeroId).length) return toast("Ese nombre ya está vinculado. Libéralo primero en la tabla de arriba.");
     bc.disabled=true;
-    try{ await cu.crear({email,clave,nombre,rol,mensajeroId}); registrar("Creó acceso para "+nombre+" ("+email+")"); toast("Acceso creado. Entrega a "+nombre+" su correo y contraseña."); }
+    try{ await cu.crear({email,clave,nombre,rol,mensajeroId,clienteId}); registrar("Creó acceso para "+nombre+" ("+email+")"); toast("Acceso creado. Entrega a "+nombre+" su correo y contraseña."); }
     catch(e){ console.error(e); const c=e?.code||""; toast(c.includes("email-already-in-use")?"Ese correo ya tiene una cuenta":c.includes("invalid-email")?"El correo no es válido":c.includes("weak-password")?"Contraseña muy corta":"No se pudo crear el acceso"); bc.disabled=false; }
   };
   v.querySelectorAll("[data-rolde]").forEach(sel=>sel.onchange=async()=>{ const id=sel.dataset.rolde, u=S.usuarios[id], nuevo=sel.value;
@@ -636,11 +697,14 @@ function formCliente(id, alGuardar){
       if(alGuardar) setTimeout(()=>alGuardar(cid),150); else cerrarDlg(); }catch(e){toast("No se pudo guardar");} };
 }
 
-function abrirCuenta(cid){
-  const c=S.clientes[cid]; if(!c) return;
+function filasCuenta(cid){
   const ps=Object.values(S.pedidos).filter(p=>p.clienteId===cid&&cerrado(p)).map(p=>({fecha:p.entregado,det:`${p.guia} · ${p.destinatario||""} · ${metodoTxt(p)} · cobró ${pesos(p.valorCobrado)} · ${p.domiPagado?"domicilio ya pagado":"domicilio "+pesos(servicio(p))}`,v:saldoPedido(p),pid:p.guia,dp:!!p.domiPagado}));
   const ms=Object.values(S.movimientos).filter(m=>m.clienteId===cid).map(m=>({fecha:m.fecha,det:(MOVS[m.tipo]?.corto||"Movimiento")+(m.nota?" · "+m.nota:""),v:signoMov(m),mid:m.id}));
-  const rows=[...ps,...ms].sort((a,b)=>b.fecha-a.fecha);
+  return [...ps,...ms].sort((a,b)=>b.fecha-a.fecha);
+}
+function abrirCuenta(cid){
+  const c=S.clientes[cid]; if(!c) return;
+  const rows=filasCuenta(cid);
   const pendientes=Object.values(S.pedidos).filter(p=>p.clienteId===cid&&p.estado==="pendiente").length;
   const s=saldoCliente(cid);
   $("#dlgCont").innerHTML=`<header><div><h2>${esc(c.nombre)}</h2><span class="sub">${esc(c.telefono||"")}${pendientes?` · ${pendientes} en ruta`:""}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
@@ -832,7 +896,7 @@ function verRecibo(cid){
     <div class="t-pie">${EMPRESA.lema}<br>${EMPRESA.tel}<br>${EMPRESA.ig}</div>
   </div>
   <p class="sub" style="margin-top:12px;text-align:center">${r.queda>0?"Cuenta por pagar: JS le debe entregar este valor al cliente.":r.queda<0?"Cuenta por cobrar: el cliente le debe este valor a JS.":"Cuadre en cero."}</p>
-  <div class="acciones" style="justify-content:center"><a class="btn ok" href="${linkWhatsApp(S.clientes[cid]?.telefono,textoRecibo(r))}" target="_blank" rel="noopener">Enviar por WhatsApp</a><button class="btn sec" id="copiarRec">Copiar texto</button>${descargas?'<button class="btn" id="xlsUno">Descargar recibo en Excel</button>':""}${r.queda&&esAdmin?`<button class="btn ok" id="liquidar">${r.queda>0?"Registrar que JS pagó ":"Registrar que el cliente pagó "}${pesos(Math.abs(r.queda))}</button>`:""}</div>`;
+  <div class="acciones" style="justify-content:center">${esCliente?"":`<a class="btn ok" href="${linkWhatsApp(S.clientes[cid]?.telefono,textoRecibo(r))}" target="_blank" rel="noopener">Enviar por WhatsApp</a>`}<button class="btn sec" id="copiarRec">Copiar texto</button>${descargas?'<button class="btn" id="xlsUno">Descargar recibo en Excel</button>':""}${r.queda&&esAdmin?`<button class="btn ok" id="liquidar">${r.queda>0?"Registrar que JS pagó ":"Registrar que el cliente pagó "}${pesos(Math.abs(r.queda))}</button>`:""}</div>`;
   abrirDlg();
   const bx=$("#xlsUno"); if(bx) bx.onclick=()=>descargarExcel(diaRec,cid,bx);
   $("#copiarRec").onclick=async()=>{ try{ await navigator.clipboard.writeText(textoRecibo(r)); toast("Texto copiado. Pégalo en WhatsApp."); }catch(e){ toast("No se pudo copiar en este navegador"); } };
@@ -1447,7 +1511,7 @@ pintar();
     const P=window.plataforma; if(!P) throw 0;
     [db,usuario,descargas]=[P.db,P.usuario,P.descargas];
   }catch(e){ db=null; }
-  if(usuario){ try{ uid=await usuario.id(); esAdmin = await usuario.canEdit(); esAsistente = !esAdmin && usuario.rol()==="asistente"; }catch(e){} }
+  if(usuario){ try{ uid=await usuario.id(); esAdmin = await usuario.canEdit(); esAsistente = !esAdmin && usuario.rol()==="asistente"; esCliente = !esAdmin && usuario.rol()==="cliente"; if(esCliente) miCliente=usuario.clienteId()||""; }catch(e){} }
   if(esAsistente || (esAdmin && lsGet("js_rol")==="admin")) rol="admin";
   if(!esAdmin&&!esAsistente) rol="mensajero";
   if(db){ cargarDatos(); procesarCola(); }
@@ -1457,6 +1521,7 @@ pintar();
 })();
 /* Cada rol descarga solo lo que le corresponde; las reglas de Firebase rechazan el resto. */
 function cargarDatos(){
+  if(esCliente){ if(!miCliente){ cargado=true; return; } suscribir("pedidos",["clienteId","==",miCliente]); suscribir("clientes",["id","==",miCliente]); suscribir("movimientos",["clienteId","==",miCliente]); return; }
   if(esAdmin){ setTimeout(completarNombres,8000); ["pedidos","clientes","mensajeros","movimientos","recaudos","liquidaciones","jornadas","cajamovs","vinculos","usuarios"].forEach(c=>suscribir(c)); return; }
   const mid=usuario.mensajeroId();
   suscribir("vinculos",["uid","==",uid]);
