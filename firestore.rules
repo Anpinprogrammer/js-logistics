@@ -69,11 +69,23 @@ service cloud.firestore {
         && d.clienteId == "" && d.valorServicio == 0 && d.aCobrar == 0
         && d.keys().hasOnly(["guia", "n", "estado", "creado", "mensajeroId", "mini", "clienteId", "valorServicio", "aCobrar", "por"]);
     }
+    // Mientras el pedido está por entregar: lo entrega, lo devuelve o anota un intento.
+    // Ya cerrado: durante 24 horas solo corrige lo cobrado y el flete; no cambia el estado,
+    // la hora de entrega ni el cobro de la devolución. Después, solo administración.
     function entregaDeMensajero() {
-      return esMio(resource.data.mensajeroId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          "estado", "entregado", "destinatario", "valorCobrado", "metodo", "cuentaJs", "difCobro",
-          "entregoUid", "intentos", "motivoDev", "notaDev", "cobrarDev", "cambio", "gasto", "gastoNota"]);
+      let campos = request.resource.data.diff(resource.data).affectedKeys();
+      return esMio(resource.data.mensajeroId) && (
+        (resource.data.estado == "pendiente"
+          && request.resource.data.estado in ["pendiente", "entregado", "devuelto"]
+          && campos.hasOnly([
+            "estado", "entregado", "destinatario", "valorCobrado", "metodo", "cuentaJs", "difCobro",
+            "entregoUid", "intentos", "motivoDev", "notaDev", "cobrarDev", "cambio", "gasto", "gastoNota"]))
+        || (resource.data.estado in ["entregado", "devuelto"]
+          && resource.data.entregado is int
+          && request.time.toMillis() - resource.data.entregado < 86400000
+          && campos.hasOnly([
+            "destinatario", "valorCobrado", "metodo", "cuentaJs", "difCobro",
+            "entregoUid", "motivoDev", "notaDev", "cambio", "gasto", "gastoNota"])));
     }
     // El cliente solo puede confirmar que recibió la prenda de un cambio de sus pedidos
     function confirmaCambioCliente() {
@@ -98,10 +110,12 @@ service cloud.firestore {
       allow create: if esEquipo();
       allow delete: if esAdmin();
     }
+    // Las pruebas de entregas anteriores ("previas", se guardan al reabrir) solo las toca la oficina
     match /entregas/{guia} {
       allow read: if esOficina() || pedidoMio(guia) || pedidoDeMiCliente(guia);
-      allow update: if esOficina() || pedidoMio(guia);
-      allow create: if esOficina() || pedidoMio(guia);
+      allow update: if esOficina() || (pedidoMio(guia)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(["previas"]));
+      allow create: if esOficina() || (pedidoMio(guia) && !("previas" in request.resource.data));
       allow delete: if esAdmin();
     }
 

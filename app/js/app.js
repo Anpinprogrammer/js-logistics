@@ -26,6 +26,8 @@ function toast(msg){ const t=document.createElement("div"); t.className="toast";
 function lsGet(k){ try{return localStorage.getItem(k)}catch(e){return null} }
 function lsSet(k,v){ try{localStorage.setItem(k,v)}catch(e){} }
 
+/* Fotos de salida, entrega y devolución: 800 px y calidad 0,5 (~35% más livianas que 900/0,6, igual de legibles). */
+const FOTO_PX=800, FOTO_Q=.5;
 async function comprimir(file, max, q){
   const url = URL.createObjectURL(file);
   try{
@@ -318,7 +320,7 @@ async function crearGuias(files){
   try{
     for(const f of files){
       if(files.length>1) toast("Creando guía "+(hechas.length+1)+" de "+files.length+"…");
-      const [foto,mini]=await Promise.all([comprimir(f,900,.6), comprimir(f,140,.6)]);
+      const [foto,mini]=await Promise.all([comprimir(f,FOTO_PX,FOTO_Q), comprimir(f,140,.6)]);
       const armar=n=>{ const guia=formatoGuia(n); return {guia,foto,pedido:{guia,n,estado:"pendiente",creado:Date.now(),mensajeroId:mid,mini,clienteId:"",valorServicio:0,aCobrar:0,por:uid||""}}; };
       let guia;
       if(db){ let armado; guia=await db.crearPedido(n=>armado=armar(n)); logCambio("crear","pedidos",guia,armado.pedido,null); }
@@ -372,7 +374,7 @@ function abrirEntrega(guia){
   leer("fotos",guia).then(f=>{ const x=fotoSegura(f?.salida), box=$("#eFotoPed"); if(!box) return;
     if(x) box.innerHTML=`<img src="${x}" alt="Foto del pedido" data-ampliar><span class="sub">Toca la foto para verla completa</span>`; else if(!fotoSegura(p.mini)) box.innerHTML='<span class="sub">Sin foto del pedido.</span>'; }).catch(()=>{});
   $("#eFotoBtn").onclick=()=>$("#eFoto").click(); $("#eFotoGalBtn").onclick=()=>$("#eFotoGal").click();
-  $("#eFoto").onchange=$("#eFotoGal").onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return; fotoEnt=await comprimir(f,900,.6); const im=$("#eFotoPrev"); im.src=fotoEnt; im.classList.remove("oculto"); $("#eFotoBtn").lastChild.textContent=" Cambiar foto"; };
+  $("#eFoto").onchange=$("#eFotoGal").onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return; fotoEnt=await comprimir(f,FOTO_PX,FOTO_Q); const im=$("#eFotoPrev"); im.src=fotoEnt; im.classList.remove("oculto"); $("#eFotoBtn").lastChild.textContent=" Cambiar foto"; };
   $("#eGuardar").onclick=async()=>{
     const nom=$("#eNom").value.trim(), val=$("#eValor").value, met=metodo(), cta=met==="transf_js"?$("#eCta").value:"";
     if(!nom) return toast("Escribe el nombre de quien recibe");
@@ -405,7 +407,7 @@ function abrirDevolucion(guia){
   let foto=null;
   $("#dVolver").onclick=()=>abrirEntrega(guia);
   $("#dFotoBtn").onclick=()=>$("#dFoto").click(); $("#dFotoGalBtn").onclick=()=>$("#dFotoGal").click();
-  $("#dFoto").onchange=$("#dFotoGal").onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return; foto=await comprimir(f,900,.6); const im=$("#dFotoPrev"); im.src=foto; im.classList.remove("oculto"); };
+  $("#dFoto").onchange=$("#dFotoGal").onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return; foto=await comprimir(f,FOTO_PX,FOTO_Q); const im=$("#dFotoPrev"); im.src=foto; im.classList.remove("oculto"); };
   $("#dGuardar").onclick=async()=>{
     const motivo=document.querySelector('input[name="motivo"]:checked').value, nota=$("#dNota").value.trim();
     if(motivo==="otro"&&!nota) return toast("Escribe qué pasó");
@@ -470,6 +472,7 @@ function pintarAdmin(){
     else if(filtroA==="dev") ps=ps.filter(p=>p.estado==="devuelto");
     else if(filtroA==="dif") ps=ps.filter(p=>Number(p.difCobro));
     else if(filtroA==="cambio") ps=ps.filter(cambioPendiente);
+    else if(filtroA==="serv") ps=ps.filter(sinServicio);
     if(buscarA) ps=ps.filter(p=>(p.guia+" "+nombreCliente(p.clienteId)+" "+(p.destinatario||"")+" "+(S.mensajeros[p.mensajeroId]?.nombre||"")).toLowerCase().includes(buscarA.toLowerCase()));
     if(mensPedA) ps=ps.filter(p=>p.mensajeroId===mensPedA);
     if(diaPedA) ps=ps.filter(p=>delDia(p,diaPedA));
@@ -480,12 +483,13 @@ function pintarAdmin(){
       :`<div class="aviso">${esAdmin?"Para registrar pedidos con foto desde aquí, agrega en Más → Personal una persona de tipo “Oficina (JS)”.":"Para registrar pedidos con foto, el administrador debe crear la Oficina en Personal."}</div>`;
     v.innerHTML=aviso+`<h1>Pedidos</h1><p class="sub">Asigna el remitente, el valor del servicio y el valor a cobrar a cada guía.</p>${fotoOfi}
       ${(()=>{ const n=Object.values(S.pedidos).filter(cambioPendiente).length; return n&&filtroA!=="cambio"?`<div class="aviso">${n===1?"Hay 1 prenda de cambio":"Hay "+n+" prendas de cambio"} por entregar a los clientes. Míralas en “Cambios por entregar”.</div>`:""; })()}
+      ${(()=>{ const n=Object.values(S.pedidos).filter(sinServicio).length; return n&&filtroA!=="serv"?`<div class="aviso alerta">${n===1?"1 pedido entregado no tiene":n+" pedidos entregados no tienen"} valor de servicio: el saldo del cliente queda mal hasta que lo pongas. <button class="btn chico" data-f="serv">Verlos</button></div>`:filtroA==="serv"?`<div class="aviso">Mostrando los pedidos entregados sin valor de servicio. Ábrelos y ponles el domicilio.</div>`:""; })()}
       ${(()=>{ const n=Object.values(S.pedidos).filter(p=>Number(p.difCobro)&&!p.difRevisada).length; return n?`<div class="aviso alerta">${n===1?"1 entrega tiene":n+" entregas tienen"} un valor cobrado distinto al que debían cobrar. Revísalas en “Con diferencia”.</div>`:""; })()}
       <div class="filtros">${[["sin","Sin remitente"],["pend","Por entregar",porEntregar],["ent","Entregados"],["dev","Devueltos"],["dif","Con diferencia"],["cambio","Cambios por entregar"],["todos","Todos"]].map(([k,t,n])=>`<button data-f="${k}" aria-pressed="${filtroA===k}">${t}${n!==undefined?` <span class="num">${n}</span>`:""}</button>`).join("")}</div>
       <div class="linea2"><div class="campo" style="flex:2;min-width:220px"><input id="buscar" type="search" placeholder="Buscar guía, remitente, destinatario o mensajero" value="${esc(buscarA)}" aria-label="Buscar"></div>
       <div class="campo"><select id="mensPed" aria-label="Filtrar por mensajero"><option value="">Todos los mensajeros</option>${repartidores.map(m=>`<option value="${esc(m.id)}" ${m.id===mensPedA?"selected":""}>${esc(m.nombre)}</option>`).join("")}</select></div></div>
       ${filtroDiaHtml(diaPedA)}${diaPedA||mensPedA?`<p class="sub">${ps.length} pedido${ps.length===1?"":"s"}${mensPedA?" de "+esc(S.mensajeros[mensPedA]?.nombre||""):""}${diaPedA?" que salieron o se cerraron ese día":""}</p>`:""}
-      ${ps.length?`<div class="lista">${ps.slice(0,limiteA).map(p=>filaPedido(p)).join("")}</div>${ps.length>limiteA?`<div class="acciones" style="justify-content:center"><button class="btn sec" id="masPed">Ver más (${ps.length-limiteA} restantes)</button></div>`:""}`:`<div class="vacio">${filtroA==="sin"?"Todos los pedidos tienen remitente asignado.":"No hay pedidos aquí."}</div>`}`;
+      ${ps.length?`<div class="lista">${ps.slice(0,limiteA).map(p=>filaPedido(p)).join("")}</div>${ps.length>limiteA?`<div class="acciones" style="justify-content:center"><button class="btn sec" id="masPed">Ver más (${ps.length-limiteA} restantes)</button></div>`:""}`:`<div class="vacio">${filtroA==="sin"?"Todos los pedidos tienen remitente asignado.":filtroA==="serv"?"Todos los pedidos entregados tienen valor de servicio.":"No hay pedidos aquí."}</div>`}`;
     v.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{filtroA=b.dataset.f; limiteA=100; pintar();});
     const mp=$("#masPed"); if(mp) mp.onclick=()=>{limiteA+=200; pintar();};
     const bu=$("#buscar"); bu.oninput=()=>{buscarA=bu.value; clearTimeout(bu._t); bu._t=setTimeout(()=>{pintar(); const n=$("#buscar"); n.focus(); n.setSelectionRange(n.value.length,n.value.length);},300);};
@@ -807,6 +811,7 @@ function activarAccesos(v){
 
 /* Cambio: el mensajero recibió una prenda de vuelta para el remitente; queda pendiente hasta que el cliente la reciba. */
 const cambioPendiente = p => !!p.cambio && !p.cambioRecibido;
+const sinServicio = p => p.estado==="entregado" && !!p.clienteId && !Number(p.valorServicio); // el saldo del cliente queda mal
 const etqCambio = p => p.cambio ? (p.cambioRecibido?' <span class="etq ent">Cambio recibido</span>':' <span class="etq sin">Cambio por entregar</span>') : "";
 const etqEstado = p => p.estado==="entregado" ? '<span class="etq ent">Entregado</span>' : p.estado==="devuelto" ? '<span class="etq dev">Devuelto</span>' : '<span class="etq pend">Por entregar</span>'+((p.intentos||[]).length?` <span class="etq sin">${p.intentos.length} intento${p.intentos.length===1?"":"s"}</span>`:"");
 function filaPedido(p){
@@ -1735,17 +1740,30 @@ function pintarPapelera(v,aviso){
 }
 
 /* ---- Respaldo y espacio ---- */
-const CUPO_DOCS=25000;
-let diasLiberar=90, liberando=false;
+/* Firebase (plan gratis) guarda hasta 1 GB. El tamaño de las fotos se mide con una muestra de los pedidos recientes. */
+const CUPO_MB=1024, MARGEN_INDICES=1.15; // Firestore suma índices y metadatos a cada documento
+let diasLiberar=90, liberando=false, tamFotos=null, midiendo=false; // tamFotos: {foto, entrega} en bytes promedio
+async function medirFotos(){
+  const ps=Object.values(S.pedidos).filter(p=>!p.fotosBorradas).sort((a,b)=>b.creado-a.creado).slice(0,8);
+  let f=0,nf=0,e=0,ne=0;
+  for(const p of ps){ const a=await leer("fotos",p.guia).catch(()=>null); if(a){ f+=JSON.stringify(a).length; nf++; }
+    if(cerrado(p)){ const b=await leer("entregas",p.guia).catch(()=>null); if(b){ e+=JSON.stringify(b).length; ne++; } } }
+  tamFotos={foto:nf?f/nf:100e3, entrega:ne?e/ne:110e3}; pintar();
+}
 function usoEstimado(){
-  const ps=Object.values(S.pedidos);
-  const base=Object.keys(S).reduce((a,k)=>a+Object.keys(S[k]).length,0);
-  const fotos=ps.filter(p=>!p.fotosBorradas).length, ent=ps.filter(p=>cerrado(p)&&!p.fotosBorradas).length;
-  const hist=Math.ceil(Math.max(1,(Date.now()-Math.min(Date.now(),...ps.map(p=>p.creado||Date.now())))/864e5))*Math.max(1,Object.keys(S.vinculos).length+1);
-  return {total:base+fotos+ent+hist+(papDatos.length||0)+1,fotos:fotos+ent};
+  const ps=Object.values(S.pedidos), t=tamFotos||{foto:100e3,entrega:110e3};
+  const datos=Object.values(S).reduce((a,c)=>a+(c&&typeof c==="object"?JSON.stringify(c).length:0),0);
+  const conFoto=ps.filter(p=>!p.fotosBorradas), cerrados=conFoto.filter(cerrado);
+  const bytes=(datos+conFoto.length*t.foto+cerrados.length*t.entrega)*MARGEN_INDICES;
+  const semana=ps.filter(p=>p.creado>Date.now()-7*864e5), dias=Math.max(1,new Set(semana.map(p=>diaDe(p.creado))).size); // días con pedidos
+  const porPedido=(datos/Math.max(1,ps.length)+t.foto+t.entrega)*MARGEN_INDICES;
+  const mb=bytes/1048576, mbDia=semana.length*porPedido/dias/1048576;
+  return {mb, pct:Math.min(100,Math.round(mb*100/CUPO_MB)), mbDia, diasRestantes:mbDia>0?Math.floor((CUPO_MB-mb)/mbDia):Infinity, medido:!!tamFotos,
+    fotoKB:Math.round(t.foto/1024), entregaKB:Math.round(t.entrega/1024)};
 }
 function pintarRespaldo(v,aviso){
-  const u=usoEstimado(), pct=Math.min(100,Math.round(u.total*100/CUPO_DOCS));
+  if(!tamFotos&&!midiendo&&db){ midiendo=true; medirFotos().finally(()=>midiendo=false); }
+  const u=usoEstimado(), pct=u.pct, lleno=u.diasRestantes<Infinity?new Date(Date.now()+u.diasRestantes*864e5).toLocaleDateString("es-CO",{day:"numeric",month:"long",year:"numeric"}):"";
   const lim=Date.now()-diasLiberar*864e5;
   const viejos=Object.values(S.pedidos).filter(p=>cerrado(p)&&!p.fotosBorradas&&p.entregado<lim);
   v.innerHTML=aviso+`<h1>Respaldo y espacio</h1>
@@ -1756,10 +1774,11 @@ function pintarRespaldo(v,aviso){
     <p class="sub">Carga un archivo .json con datos de la versión anterior (por ejemplo, datos-migracion/datos.json). Los registros con el mismo número se reemplazan; no se borra nada.</p>
     <label class="btn sec">Elegir archivo .json<input type="file" id="impJson" accept=".json,application/json" class="oculto"></label> <span class="sub" id="impEstado"></span>`:""}
     <h2>Espacio de la base de datos</h2>
-    <p class="sub">La app guarda hasta ${CUPO_DOCS.toLocaleString("es-CO")} registros. Cada pedido usa 2 o 3 (el pedido, la foto de salida y la de entrega).</p>
+    <p class="sub">El plan gratis de Firebase guarda hasta 1 GB. Casi todo el espacio lo ocupan las fotos: cada pedido usa unos ${u.fotoKB+u.entregaKB} KB (foto de salida ${u.fotoKB} KB, foto y firma de entrega ${u.entregaKB} KB)${u.medido?"":" (calculando…)"}.</p>
     <div class="medidor" role="img" aria-label="Uso aproximado ${pct}%"><i style="width:${pct}%;${pct>80?"background:var(--rojo)":""}"></i></div>
-    <p><b>${u.total.toLocaleString("es-CO")}</b> de ${CUPO_DOCS.toLocaleString("es-CO")} registros usados (aprox. ${pct}%). ${u.fotos.toLocaleString("es-CO")} son fotos.</p>
-    ${pct>70?`<div class="aviso alerta">Te estás acercando al límite. Descarga la copia de seguridad y libera fotos viejas.</div>`:""}
+    <p><b>≈ ${u.mb.toLocaleString("es-CO",{maximumFractionDigits:0})} MB</b> de ${CUPO_MB.toLocaleString("es-CO")} MB usados (aprox. ${pct}%).
+      ${u.mbDia>0?`Al ritmo de los últimos días (≈ ${u.mbDia.toLocaleString("es-CO",{maximumFractionDigits:1})} MB por día) se llena en unos <b>${u.diasRestantes.toLocaleString("es-CO")} días</b>, hacia el ${lleno}.`:""}</p>
+    ${pct>70||u.diasRestantes<45?`<div class="aviso alerta">Te estás acercando al límite. Descarga la copia de seguridad y libera fotos viejas, o pasa Firebase al plan Blaze (sin límite; a este volumen cuesta centavos de dólar al mes).</div>`:""}
     <h2>Liberar espacio</h2>
     <p class="sub">Borra las fotos y firmas de pedidos ya cerrados hace tiempo. El pedido, sus valores y los saldos se conservan; solo se pierden las imágenes.</p>
     <div class="linea2" style="align-items:end"><div class="campo" style="max-width:240px"><label for="libDias">Pedidos cerrados hace más de</label><select id="libDias">${[60,90,180,365].map(d=>`<option value="${d}" ${diasLiberar===d?"selected":""}>${d} días</option>`).join("")}</select></div>
