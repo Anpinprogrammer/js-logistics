@@ -479,12 +479,13 @@ function pintarAdmin(){
         <div class="cifra"><span>Cuentas por cobrar (te deben)</span><b class="neg">${pesos(totC)}</b><span>${cobrar.length} cliente${cobrar.length===1?"":"s"}</span></div>
         <div class="cifra"><span>Cuentas por pagar (les debes)</span><b class="pos">${pesos(totP)}</b><span>${pagar.length} cliente${pagar.length===1?"":"s"}</span></div>
       </div>
-      <div class="acciones" style="margin-bottom:16px"><button class="btn" id="nuevoCli">Registrar cliente</button>${descargas&&esAdmin?'<button class="btn sec" id="xlsCartera">Descargar cartera en Excel</button>':""}</div>
+      <div class="acciones" style="margin-bottom:16px"><button class="btn" id="nuevoCli">Registrar cliente</button><button class="btn ok" id="waMasivo">Enviar saldos por WhatsApp</button>${descargas&&esAdmin?'<button class="btn sec" id="xlsCartera">Descargar cartera en Excel</button>':""}</div>
       <div class="filtros">${[["todos","Todos"],["cobrar","Por cobrar"],["pagar","Por pagar"]].map(([k,t])=>`<button data-fc="${k}" aria-pressed="${filtroCli===k}">${t}</button>`).join("")}</div>
       ${vis.length?`<div class="tabla-env"><table><thead><tr><th>Cliente</th><th>Número</th><th>Cuenta</th><th class="n">Saldo</th><th></th></tr></thead><tbody>
       ${vis.map(c=>`<tr><td><b>${esc(c.nombre)}</b>${Number(c.tarifa)?`<br><span class="sub" style="font-size:.8rem">Domicilio ${pesos(c.tarifa)}</span>`:""}</td><td>${esc(c.telefono||"")}</td><td>${c.s<0?'<span class="etq sin">Por cobrar</span>':c.s>0?'<span class="etq ent">Por pagar</span>':'<span class="sub">Paz y salvo</span>'}</td><td class="n ${c.s<0?"neg":c.s>0?"pos":""}">${pesos(Math.abs(c.s))}</td><td><button class="btn sec chico" data-cli="${esc(c.id)}">Ver cuenta</button></td></tr>`).join("")}
       </tbody></table></div>`:`<div class="vacio">${cs.length?"No hay clientes en esta lista.":"Registra tus clientes (los remitentes) para llevar su saldo."}</div>`}`;
     $("#nuevoCli").onclick=()=>formCliente();
+    $("#waMasivo").onclick=()=>envioMasivo(filtroCli==="pagar"?"pagar":"cobrar");
     const xc=$("#xlsCartera"); if(xc) xc.onclick=()=>descargarCartera(xc);
     v.querySelectorAll("[data-fc]").forEach(b=>b.onclick=()=>{filtroCli=b.dataset.fc; pintar();});
     v.querySelectorAll("[data-cli]").forEach(b=>b.onclick=()=>abrirCuenta(b.dataset.cli));
@@ -784,6 +785,51 @@ function pagoDomicilio(guia,despues){
     try{ await actualizar("pedidos",guia,{domiPagado:true,domiPagoMedio:medio,domiPagoValor:val,domiPagoFecha:Date.now()}); toast("Pago de "+pesos(val)+" registrado"); setTimeout(despues,200); }
     catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
+/* Mensaje de WhatsApp con el saldo del cliente y lo que lo forma desde la última vez que quedó en cero. */
+function textoSaldo(cid){
+  const c=S.clientes[cid], s=saldoCliente(cid); if(!c) return "";
+  const asc=filasCuenta(cid).slice().reverse(); let acum=0, desde=0;
+  asc.forEach((r,i)=>{ acum+=r.v; if(Math.round(acum)===0) desde=i+1; });
+  const abiertas=asc.slice(desde), MAX=25;
+  const L=[`*${EMPRESA.nombre}*`,`Hola ${c.nombre} 👋`,""];
+  if(s<0) L.push(`Según nuestro registro tienes un saldo *pendiente por pagar de ${pesos(-s)}*.`);
+  else if(s>0) L.push(`Según nuestro registro tienes un saldo *a tu favor de ${pesos(s)}* que JS Logistics te debe entregar.`);
+  else L.push("Tu cuenta está a paz y salvo. ¡Gracias!");
+  if(s&&abiertas.length){ L.push("","*Detalle:*");
+    abiertas.slice(-MAX).forEach(r=>L.push(`• ${new Date(r.fecha).toLocaleDateString("es-CO",{day:"2-digit",month:"short"})} · ${r.det} → ${r.v<0?"− ":"+ "}${pesos(Math.abs(r.v))}`));
+    if(abiertas.length>MAX) L.push(`(y ${abiertas.length-MAX} movimientos anteriores)`);
+    L.push("",s<0?`*Total a pagar: ${pesos(-s)}*`:`*Total a tu favor: ${pesos(s)}*`); }
+  L.push("",s<0?"Quedamos atentos a tu pago. Si ya lo hiciste, por favor envíanos el comprobante.":s>0?"Cuéntanos cómo prefieres recibirlo.":"","",EMPRESA.lema,EMPRESA.tel);
+  return L.filter((x,i,a)=>!(x===""&&a[i-1]==="")).join("\n");
+}
+const linkSaldo = cid => linkWhatsApp(S.clientes[cid]?.telefono,textoSaldo(cid));
+const ENVIADOS_K = () => "js_wa_saldos_"+hoy();
+function enviadosHoy(){ try{ return new Set(JSON.parse(lsGet(ENVIADOS_K())||"[]")); }catch(e){ return new Set(); } }
+function marcarEnviado(cid){ const e=enviadosHoy(); e.add(cid); lsSet(ENVIADOS_K(),JSON.stringify([...e])); registrar("Envió saldo por WhatsApp a "+nombreCliente(cid)+" ("+pesos(saldoCliente(cid))+")"); }
+
+/* Envío en cadena: WhatsApp no permite mandar mensajes solos desde una página, así que se abre un chat tras otro. */
+let tipoMasivo="cobrar";
+function envioMasivo(tipo){
+  tipoMasivo=tipo||tipoMasivo;
+  const env=enviadosHoy();
+  const lista=listaOrdenada(S.clientes,"nombre").map(c=>({...c,s:saldoCliente(c.id)})).filter(c=>tipoMasivo==="cobrar"?c.s<0:c.s>0);
+  const conTel=lista.filter(c=>telWhatsApp(c.telefono)), sinTel=lista.filter(c=>!telWhatsApp(c.telefono));
+  const pend=conTel.filter(c=>!env.has(c.id)), sig=pend[0];
+  $("#dlgCont").innerHTML=`<header><div><h2>Enviar saldos por WhatsApp</h2><span class="sub">${conTel.length-pend.length} de ${conTel.length} enviados hoy</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <div class="filtros">${[["cobrar","Clientes que deben"],["pagar","Saldos a favor"]].map(([k,t])=>`<button data-tm="${k}" aria-pressed="${tipoMasivo===k}">${t}</button>`).join("")}</div>
+    <p class="sub">Toca “Enviar al siguiente”: se abre el chat con el mensaje listo; envíalo en WhatsApp y vuelve aquí para el próximo.</p>
+    ${sig?`<a class="btn ok" id="waSig" style="width:100%" href="${linkSaldo(sig.id)}" target="_blank" rel="noopener">Enviar al siguiente: ${esc(sig.nombre)} (${pesos(Math.abs(sig.s))})</a>`:`<div class="vacio">${conTel.length?"¡Listo! Ya se envió a todos.":"No hay clientes en esta lista."}</div>`}
+    ${conTel.length?`<div class="tabla-env" style="margin-top:12px"><table><thead><tr><th>Cliente</th><th class="n">Saldo</th><th></th></tr></thead><tbody>${conTel.map(c=>`<tr><td><b>${esc(c.nombre)}</b></td><td class="n ${c.s<0?"neg":"pos"}">${pesos(Math.abs(c.s))}</td><td>${env.has(c.id)?'<span class="etq ent">✓ Enviado</span> ':""}<a class="btn sec chico" data-wa="${esc(c.id)}" href="${linkSaldo(c.id)}" target="_blank" rel="noopener">${env.has(c.id)?"Reenviar":"Enviar"}</a></td></tr>`).join("")}</tbody></table></div>`:""}
+    ${sinTel.length?`<div class="aviso" style="margin-top:12px">Sin celular registrado: ${sinTel.map(c=>esc(c.nombre)).join(", ")}.</div>`:""}
+    ${env.size?`<div class="acciones"><button class="btn sec chico" id="waReiniciar">Volver a empezar la lista de hoy</button></div>`:""}`;
+  abrirDlg();
+  $("#dlgCont").querySelectorAll("[data-tm]").forEach(b=>b.onclick=()=>envioMasivo(b.dataset.tm));
+  const tras=cid=>{ marcarEnviado(cid); setTimeout(()=>envioMasivo(),300); };
+  const ws=$("#waSig"); if(ws) ws.onclick=()=>tras(sig.id);
+  $("#dlgCont").querySelectorAll("[data-wa]").forEach(a=>a.onclick=()=>tras(a.dataset.wa));
+  const wr=$("#waReiniciar"); if(wr) wr.onclick=()=>{ lsSet(ENVIADOS_K(),"[]"); envioMasivo(); };
+}
+
 function filasCuenta(cid){
   const ps=Object.values(S.pedidos).filter(p=>p.clienteId===cid&&cerrado(p)).map(p=>({fecha:p.entregado,det:`${p.guia} · ${p.destinatario||""} · ${metodoTxt(p)} · cobró ${pesos(p.valorCobrado)} · ${textoDomi(p)}`,v:saldoPedido(p),pid:p.guia,dp:!!p.domiPagado}));
   const ms=Object.values(S.movimientos).filter(m=>m.clienteId===cid).map(m=>({fecha:m.fecha,det:(MOVS[m.tipo]?.corto||"Movimiento")+(m.nota?" · "+m.nota:""),v:signoMov(m),mid:m.id}));
@@ -797,6 +843,7 @@ function abrirCuenta(cid){
   $("#dlgCont").innerHTML=`<header><div><h2>${esc(c.nombre)}</h2><span class="sub">${esc(c.telefono||"")}${pendientes?` · ${pendientes} en ruta`:""}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     <div class="saldo-grande ${s<0?"neg":s>0?"pos":""}">${pesos(Math.abs(s))}</div>
     <p class="sub">${s>0?"Cuenta por pagar: JS le debe este valor al cliente.":s<0?"Cuenta por cobrar: el cliente le debe este valor a JS.":"Cuenta a paz y salvo."}</p>
+    ${s?(telWhatsApp(c.telefono)?`<div class="acciones" style="margin:0 0 6px"><a class="btn ok" id="cWa" href="${linkSaldo(cid)}" target="_blank" rel="noopener">Enviar ${s<0?"cobro":"saldo a favor"} por WhatsApp</a><button class="btn sec" id="cWaCopiar" type="button">Copiar mensaje</button></div>`:'<div class="aviso">Agrega el celular del cliente para enviarle el saldo por WhatsApp.</div>'):""}
     ${esAdmin?`<h2>Registrar pago o ajuste</h2>
     <div class="campo"><label for="mTipo">Tipo</label><select id="mTipo">${Object.entries(MOVS).map(([k,x])=>`<option value="${k}">${x.t}</option>`).join("")}</select></div>
     <div class="linea2"><div class="campo"><label for="mFecha">Día</label><input id="mFecha" type="date" value="${hoy()}"></div>
@@ -810,6 +857,8 @@ function abrirCuenta(cid){
   if(!$("#dlg").open) abrirDlg();
   if($("#mTipo")) $("#mTipo").value = s<0 ? "pago_de_cliente" : "pago_a_cliente";
   $("#cEdit").onclick=()=>formCliente(cid);
+  const wa=$("#cWa"); if(wa) wa.onclick=()=>marcarEnviado(cid);
+  const wc=$("#cWaCopiar"); if(wc) wc.onclick=async()=>{ try{ await navigator.clipboard.writeText(textoSaldo(cid)); toast("Mensaje copiado. Pégalo en WhatsApp."); }catch(e){ toast("No se pudo copiar en este navegador"); } };
   if($("#mReg")) $("#mReg").onclick=async()=>{ const val=Number($("#mVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero"); const id=nuevoId();
     try{ await guardar("movimientos",id,{id,clienteId:cid,tipo:$("#mTipo").value,valor:val,medio:$("#mMedio").value,nota:$("#mNota").value.trim(),fecha:fechaDia($("#mFecha").value||hoy())}); toast("Movimiento registrado"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){toast("No se pudo guardar");} };
   document.querySelectorAll("[data-domi]").forEach(b=>b.onclick=async()=>{ const g=b.dataset.domi, ped=S.pedidos[g];
