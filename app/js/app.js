@@ -629,7 +629,7 @@ function pintarCuentas(v,aviso){
     <h2>Compras por encargo y ganancias de clientes</h2>
     <p class="sub">La compra sale de la caja y queda como deuda del cliente; al entregar se compensa con lo cobrado. La ganancia ocasional se le carga al cliente y suma al sueldo de JS.</p>
     <div class="acciones"><button class="btn" id="cuCompra">Compra para un cliente</button><button class="btn sec" id="cuGanancia">Ganancia ocasional</button></div>
-    ${extra.length?`<div class="tabla-env" style="margin-top:10px"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Detalle</th><th class="n">Valor</th></tr></thead><tbody>${extra.map(m=>`<tr><td>${hora(m.fecha)}</td><td>${esc(nombreCliente(m.clienteId)||"—")}</td><td>${m.tipo==="ganancia"?"Ganancia JS":"Compra"}</td><td>${esc(m.nota||"")}</td><td class="n">${pesos(m.valor)}</td></tr>`).join("")}</tbody></table></div>`:""}`;
+    ${extra.length?`<div class="tabla-env" style="margin-top:10px"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Detalle</th><th class="n">Valor</th>${esAdmin?"<th></th>":""}</tr></thead><tbody>${extra.map(m=>`<tr><td>${hora(m.fecha)}</td><td>${esc(nombreCliente(m.clienteId)||"—")}</td><td>${m.tipo==="ganancia"?"Ganancia JS":"Compra"}</td><td>${esc(m.nota||"")}</td><td class="n">${pesos(m.valor)}</td>${esAdmin?`<td style="white-space:nowrap"><button class="btn sec chico" data-mxed="${esc(m.id)}">Editar</button> <button class="btn peligro chico" data-mxdel="${esc(m.id)}">Quitar</button></td>`:""}</tr>`).join("")}</tbody></table></div>`:""}`;
   v.querySelectorAll("[data-ce]").forEach(b=>b.onclick=()=>movCuenta(b.dataset.ce,"entra"));
   v.querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>movCuenta(b.dataset.cs,"sale"));
   v.querySelectorAll("[data-cudel]").forEach(b=>b.onclick=async()=>{ if(!await confirmar("Quitar movimiento","Se borra de la cuenta y de la caja.","Quitar")) return; try{ await borrar("cajamovs",b.dataset.cudel); toast("Movimiento quitado"); }catch(e){ toast("No se pudo quitar"); } });
@@ -637,6 +637,10 @@ function pintarCuentas(v,aviso){
   const nu=$("#cuNueva"); if(nu) nu.onclick=()=>nuevaCuenta();
   $("#cuCompra").onclick=()=>movClienteOficina("compra_cliente");
   $("#cuGanancia").onclick=()=>movClienteOficina("ganancia");
+  v.querySelectorAll("[data-mxed]").forEach(b=>b.onclick=()=>{ const m=S.movimientos[b.dataset.mxed]; if(m) movClienteOficina(m.tipo,m); });
+  v.querySelectorAll("[data-mxdel]").forEach(b=>b.onclick=async()=>{ const m=S.movimientos[b.dataset.mxdel]; if(!m) return;
+    if(!await confirmar("Quitar "+(m.tipo==="ganancia"?"ganancia":"compra"),`${nombreCliente(m.clienteId)||"Cliente"} · ${pesos(m.valor)}. Se quita de la cuenta del cliente${m.tipo==="ganancia"?" y del sueldo de JS":" y de la caja"}.`,"Quitar")) return;
+    try{ await borrar("movimientos",m.id); toast("Movimiento quitado"); }catch(e){ toast("No se pudo quitar"); } });
 }
 function nuevaCuenta(){
   $("#dlgCont").innerHTML=`<header><h2>Nueva cuenta</h2><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
@@ -664,25 +668,40 @@ function movCuenta(id,tipo){
       registrar((tipo==="entra"?"Entrada de ":"Salida a ")+cu.nombre+": "+pesos(val)+" · "+mot); cerrarDlg(); toast((tipo==="entra"?"Entrada":"Salida")+" registrada"); }
     catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
-/* Compra por encargo o ganancia ocasional de un cliente, desde la pestaña Cuentas. */
-function movClienteOficina(tipo){
+/* Compra por encargo o ganancia ocasional de un cliente, desde la pestaña Cuentas.
+   mov: el movimiento a editar (solo administración). pre: lo que ya estaba escrito al volver de crear un cliente. */
+function movClienteOficina(tipo,mov,pre){
   const cs=listaOrdenada(S.clientes,"nombre"), compra=tipo==="compra_cliente";
-  $("#dlgCont").innerHTML=`<header><h2>${compra?"Compra para un cliente":"Ganancia ocasional"}</h2><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+  const v0=pre||(mov?{cid:mov.clienteId,val:mov.valor,medio:mov.medio,dia:diaDe(mov.fecha),nota:mov.nota}:{});
+  $("#dlgCont").innerHTML=`<header><h2>${mov?"Editar ":""}${compra?(mov?"compra":"Compra para un cliente"):(mov?"ganancia ocasional":"Ganancia ocasional")}</h2><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    ${mov?`<div class="campo"><label for="mxTipo">Tipo</label><select id="mxTipo">${MOVS_OFICINA.map(k=>`<option value="${k}"${k===tipo?" selected":""}>${MOVS[k].t}</option>`).join("")}</select></div>`:""}
     <p class="sub">${compra?"Sale de la caja y queda como deuda del cliente. En el pedido pon el domicilio y en “a cobrar” lo que se le cobra al destinatario; al entregar se compensa.":"Se le carga al cliente (queda por cobrar) y suma 100% al sueldo de JS ese día. Ej: $4.000 por punto extra."}</p>
-    <div class="campo"><label for="mxCli">Cliente</label><input id="mxBus" type="search" placeholder="Buscar cliente…" autocomplete="off" style="margin-bottom:6px"><select id="mxCli"><option value="">Elige…</option>${cs.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("")}</select></div>
-    <div class="linea2"><div class="campo"><label for="mxVal">Valor</label><input id="mxVal" type="number" inputmode="numeric" min="0" step="100"></div>
+    <div class="campo"><label for="mxCli">Cliente</label><div style="display:flex;gap:6px;margin-bottom:6px"><input id="mxBus" type="search" placeholder="Buscar cliente…" autocomplete="off" style="flex:1"><button class="btn sec chico" id="mxNuevoCli" type="button">+ Cliente nuevo</button></div><select id="mxCli"><option value="">Elige…</option>${cs.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("")}</select></div>
+    <div class="linea2"><div class="campo"><label for="mxVal">Valor</label><input id="mxVal" type="number" inputmode="numeric" min="0" step="100" value="${Number(v0.val)||""}"></div>
     ${compra?`<div class="campo"><label for="mxMedio">Pagado con</label><select id="mxMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>`:""}</div>
-    <div class="linea2"><div class="campo"><label for="mxDia">Día</label><input id="mxDia" type="date" value="${hoy()}"></div>
-    <div class="campo"><label for="mxNota">Detalle</label><input id="mxNota" placeholder="${compra?"Ej: compra en almacén · guía JS-00120":"Ej: 3 puntos extra · guía JS-00120"}"></div></div>
-    <button class="btn ok" id="mxGuardar" style="width:100%">Registrar</button>`;
+    <div class="linea2"><div class="campo"><label for="mxDia">Día</label><input id="mxDia" type="date" value="${esc(v0.dia||hoy())}"></div>
+    <div class="campo"><label for="mxNota">Detalle</label><input id="mxNota" value="${esc(v0.nota||"")}" placeholder="${compra?"Ej: compra en almacén · guía JS-00120":"Ej: 3 puntos extra · guía JS-00120"}"></div></div>
+    <button class="btn ok" id="mxGuardar" style="width:100%">${mov?"Guardar cambios":"Registrar"}</button>`;
   abrirDlg();
+  if(v0.cid) $("#mxCli").value=v0.cid;
+  if(compra&&v0.medio) $("#mxMedio").value=v0.medio;
   $("#mxBus").oninput=e=>{ const q=sinTildes(e.target.value.trim()), sel=$("#mxCli"); const vis=cs.filter(c=>!q||sinTildes(c.nombre+" "+(c.telefono||"")).includes(q));
     sel.innerHTML=`<option value="">${vis.length?"Elige…":"Ningún cliente con ese nombre"}</option>`+vis.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join(""); if(vis.length===1&&q) sel.value=vis[0].id; };
+  const escrito=()=>({cid:$("#mxCli").value,val:$("#mxVal").value,medio:compra?$("#mxMedio").value:"",dia:$("#mxDia").value,nota:$("#mxNota").value});
+  if(mov) $("#mxTipo").onchange=e=>movClienteOficina(e.target.value,mov,escrito());
+  // Cliente que todavía no está registrado: se crea y se vuelve al formulario con lo que ya estaba escrito
+  $("#mxNuevoCli").onclick=()=>{
+    const antes=escrito(), nombre=$("#mxBus").value.trim();
+    formCliente(null,async cid=>{ for(let i=0;i<12&&!S.clientes[cid];i++) await sleep(250); movClienteOficina(tipo,mov,{...antes,cid}); });
+    if(nombre){ $("#cNom").value=nombre; $("#cTel").focus(); }
+  };
   $("#mxGuardar").onclick=async()=>{ const cid=$("#mxCli").value, val=Number($("#mxVal").value);
     if(!cid) return toast("Elige el cliente"); if(!(val>0)) return toast("Escribe un valor mayor a cero");
-    const b=$("#mxGuardar"); b.disabled=true; const id=nuevoId();
-    try{ await guardar("movimientos",id,{id,clienteId:cid,tipo,valor:val,medio:compra?$("#mxMedio").value:"",nota:$("#mxNota").value.trim(),fecha:fechaDia($("#mxDia").value||hoy())});
-      cerrarDlg(); toast(compra?"Compra registrada":"Ganancia registrada"); }
+    const b=$("#mxGuardar"); b.disabled=true;
+    const datos={clienteId:cid,valor:val,medio:compra?$("#mxMedio").value:"",nota:$("#mxNota").value.trim(),fecha:fechaDia($("#mxDia").value||hoy())};
+    try{ if(mov) await actualizar("movimientos",mov.id,{...datos,tipo});
+      else { const id=nuevoId(); await guardar("movimientos",id,{id,tipo,...datos}); }
+      cerrarDlg(); toast(mov?"Cambios guardados":compra?"Compra registrada":"Ganancia registrada"); }
     catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
 
