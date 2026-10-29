@@ -40,7 +40,7 @@ async function comprimir(file, max, q){
 /* ---------- datos (db compartida, o memoria si no hay) ---------- */
 let db=null, usuario=null, uid=null, esAdmin=true, esAsistente=false; // asistente: Pedidos, Clientes y Recibos, sin caja ni sueldos
 let esCliente=false, miCliente=""; // cliente: solo ve sus pedidos, pruebas y saldo
-const S={pedidos:{},clientes:{},mensajeros:{},movimientos:{},recaudos:{},liquidaciones:{},jornadas:{},cajamovs:{},vinculos:{},usuarios:{}};
+const S={pedidos:{},clientes:{},mensajeros:{},movimientos:{},recaudos:{},liquidaciones:{},jornadas:{},cajamovs:{},vinculos:{},usuarios:{},cuentas:{}};
 const memDocs={}; let memContador=0;
 let cargado=false;
 
@@ -159,10 +159,14 @@ const MOVS={
   cargo:{t:"Cargo al cliente (queda debiendo)", corto:"Cargo", s:-1},
   abono:{t:"Abono a favor del cliente", corto:"A favor", s:1},
   pago_a_cliente:{t:"JS le paga al cliente", corto:"Pago al cliente", s:-1, pago:true},
-  pago_de_cliente:{t:"El cliente le paga a JS", corto:"Pago del cliente", s:1, pago:true}
+  pago_de_cliente:{t:"El cliente le paga a JS", corto:"Pago del cliente", s:1, pago:true},
+  compra_cliente:{t:"Compra por encargo del cliente (sale de la caja)", corto:"Compra por encargo", s:-1, caja:true},
+  ganancia:{t:"Ganancia ocasional de JS (se le carga al cliente)", corto:"Servicio adicional", s:-1}
 };
+const MOVS_OFICINA=["compra_cliente","ganancia"]; // lo que también registra el asistente
 const signoMov = m => (MOVS[m.tipo]?.s||-1)*(Number(m.valor)||0);
 const esPago = m => !!MOVS[m.tipo]?.pago;
+const mueveCaja = m => esPago(m)||!!MOVS[m.tipo]?.caja; // pagos y compras por encargo entran o salen de la caja
 const fechaDia = f => f===hoy() ? Date.now() : new Date(f+"T12:00:00").getTime();
 const fechaLarga = d => new Date(d+"T12:00:00").toLocaleDateString("es-CO",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 function saldoCliente(cid){
@@ -436,7 +440,7 @@ function tablaEntregas(ps,conCliente){
 
 function pintarAdmin(){
   const sin=Object.values(S.pedidos).filter(p=>!p.clienteId).length;
-  const tabs=[["pedidos","Pedidos",sin],["clientes","Clientes"],["recibos","Recibos"],["caja","Caja"],["sueldos","Sueldos"],["mas","Más"]].filter(([k])=>esAdmin||["pedidos","clientes","recibos"].includes(k));
+  const tabs=[["pedidos","Pedidos",sin],["clientes","Clientes"],["recibos","Recibos"],["caja","Caja"],["cuentas","Cuentas"],["sueldos","Sueldos"],["mas","Más"]].filter(([k])=>esAdmin||["pedidos","clientes","recibos","cuentas"].includes(k));
   if(!tabs.some(([k])=>k===tabA)) tabA="pedidos";
   $("#pestanas").innerHTML=tabs
     .map(([k,t,n])=>`<button data-t="${k}" ${tabA===k?'aria-current="page"':''}>${t}${n?`<span class="num">${n}</span>`:""}</button>`).join("");
@@ -539,6 +543,7 @@ function pintarAdmin(){
     v.querySelectorAll("[data-delrec]").forEach(b=>b.onclick=async()=>{ b.disabled=true; try{ await borrar("recaudos",b.dataset.delrec); toast("Entrega de dinero quitada"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
   }
   else if(tabA==="recibos"){ pintarRecibos(v,aviso); }
+  else if(tabA==="cuentas"){ pintarCuentas(v,aviso); }
   else if(tabA==="sueldos"){ pintarSueldos(v,aviso); }
   else pintarMas(v,aviso);
 }
@@ -599,6 +604,86 @@ async function verPedidoCliente(guia){
     const items=[["Salida",f?.salida],[p.estado==="devuelto"?"Evidencia":"Entrega",e?.foto],["Firma de quien recibió",e?.firma]].map(([t,x])=>[t,fotoSegura(x)]).filter(([,x])=>x);
     const box=$("#pcFotos"); if(box) box.innerHTML=items.length?items.map(([t,x])=>`<figure><img src="${x}" alt="${t}"><figcaption>${t}</figcaption></figure>`).join(""):'<span class="sub">Sin fotos.</span>';
   }catch(err){ const box=$("#pcFotos"); if(box) box.innerHTML='<span class="sub">No se pudieron cargar las fotos.</span>'; }
+}
+
+/* ======================= CUENTAS INTERNAS ======================= */
+/* JS Envíos, MT, Base de JS…: entradas y salidas que mueven la caja, sin tocar clientes ni sueldos.
+   Socio: lo que sale hacia ellos es lo que deben. Base: total que la empresa tiene como base. */
+const TIPOS_CUENTA={socio:"Empresa o tienda (presta y devuelve)",base:"Base de la empresa"};
+const movsCuenta = id => Object.values(S.cajamovs).filter(c=>c.cat==="interna"&&c.cuentaId===id).sort((a,b)=>b.fecha-a.fecha);
+function saldoCuenta(id){ return movsCuenta(id).reduce((a,c)=>a+(c.tipo==="sale"?1:-1)*(Number(c.valor)||0),0); } // + = te debe
+function textoCuenta(cu){ const s=saldoCuenta(cu.id);
+  if(cu.tipo==="base") return {txt:"Base actual",val:pesos(-s),cls:""};
+  return s>0?{txt:"Te debe",val:pesos(s),cls:"neg"}:s<0?{txt:"Tiene a favor",val:pesos(-s),cls:"pos"}:{txt:"En cero",val:pesos(0),cls:""}; }
+function pintarCuentas(v,aviso){
+  const cs=listaOrdenada(S.cuentas,"nombre");
+  const movs=Object.values(S.cajamovs).filter(c=>c.cat==="interna").sort((a,b)=>b.fecha-a.fecha).slice(0,60);
+  const extra=Object.values(S.movimientos).filter(m=>MOVS_OFICINA.includes(m.tipo)).sort((a,b)=>b.fecha-a.fecha).slice(0,40);
+  v.innerHTML=aviso+`<h1>Cuentas</h1><p class="sub">Entradas y salidas de JS Envíos, MT y la base de JS. Mueven la caja; no tocan clientes ni sueldos.</p>
+    ${cs.length?`<div class="mgrid">${cs.map(cu=>{ const t=textoCuenta(cu); return `<div class="mcard"><div class="mcard-top"><b>${esc(cu.nombre)}</b><span class="acciones" style="margin:0;gap:6px"><button class="btn ok chico" data-ce="${esc(cu.id)}">Entrada</button><button class="btn sec chico" data-cs="${esc(cu.id)}">Salida</button></span></div>
+      <span class="sub" style="font-size:.85rem">${TIPOS_CUENTA[cu.tipo]||""}</span><dl class="datos"><dt>${t.txt}</dt><dd class="${t.cls}">${t.val}</dd></dl></div>`; }).join("")}</div>`
+      :`<div class="vacio">${esAdmin?'Todavía no hay cuentas. <button class="btn chico" id="cuSemilla">Crear JS Envíos, MT y Base de JS</button>':"El administrador todavía no ha creado las cuentas."}</div>`}
+    ${esAdmin?`<div class="acciones"><button class="btn sec chico" id="cuNueva">+ Nueva cuenta</button></div>`:""}
+    <h2>Movimientos de las cuentas</h2>
+    ${movs.length?`<div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Cuenta</th><th>Motivo</th><th>Medio</th><th class="n">Valor</th>${esAdmin?"<th></th>":""}</tr></thead><tbody>${movs.map(c=>`<tr><td>${hora(c.fecha)}</td><td>${esc(S.cuentas[c.cuentaId]?.nombre||"—")}</td><td>${esc(c.concepto||"")}</td><td>${MEDIOS[c.medio]||""}</td><td class="n ${c.tipo==="entra"?"pos":"neg"}">${c.tipo==="entra"?"+ ":"− "}${pesos(c.valor)}</td>${esAdmin?`<td><button class="btn peligro chico" data-cudel="${esc(c.id)}">Quitar</button></td>`:""}</tr>`).join("")}</tbody></table></div>`:'<div class="vacio">Sin movimientos.</div>'}
+    <h2>Compras por encargo y ganancias de clientes</h2>
+    <p class="sub">La compra sale de la caja y queda como deuda del cliente; al entregar se compensa con lo cobrado. La ganancia ocasional se le carga al cliente y suma al sueldo de JS.</p>
+    <div class="acciones"><button class="btn" id="cuCompra">Compra para un cliente</button><button class="btn sec" id="cuGanancia">Ganancia ocasional</button></div>
+    ${extra.length?`<div class="tabla-env" style="margin-top:10px"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Detalle</th><th class="n">Valor</th></tr></thead><tbody>${extra.map(m=>`<tr><td>${hora(m.fecha)}</td><td>${esc(nombreCliente(m.clienteId)||"—")}</td><td>${m.tipo==="ganancia"?"Ganancia JS":"Compra"}</td><td>${esc(m.nota||"")}</td><td class="n">${pesos(m.valor)}</td></tr>`).join("")}</tbody></table></div>`:""}`;
+  v.querySelectorAll("[data-ce]").forEach(b=>b.onclick=()=>movCuenta(b.dataset.ce,"entra"));
+  v.querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>movCuenta(b.dataset.cs,"sale"));
+  v.querySelectorAll("[data-cudel]").forEach(b=>b.onclick=async()=>{ if(!await confirmar("Quitar movimiento","Se borra de la cuenta y de la caja.","Quitar")) return; try{ await borrar("cajamovs",b.dataset.cudel); toast("Movimiento quitado"); }catch(e){ toast("No se pudo quitar"); } });
+  const se=$("#cuSemilla"); if(se) se.onclick=async()=>{ se.disabled=true; try{ for(const [nombre,tipo] of [["JS Envíos","socio"],["MT (tienda de ropa)","socio"],["Base de JS","base"]]){ const id=nuevoId(); await rawSet("cuentas",id,{id,nombre,tipo,creado:Date.now()}); } registrar("Creó las cuentas internas JS Envíos, MT y Base de JS"); toast("Cuentas creadas"); }catch(e){ se.disabled=false; toast("No se pudieron crear"); } };
+  const nu=$("#cuNueva"); if(nu) nu.onclick=()=>nuevaCuenta();
+  $("#cuCompra").onclick=()=>movClienteOficina("compra_cliente");
+  $("#cuGanancia").onclick=()=>movClienteOficina("ganancia");
+}
+function nuevaCuenta(){
+  $("#dlgCont").innerHTML=`<header><h2>Nueva cuenta</h2><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <div class="campo"><label for="ncNom">Nombre</label><input id="ncNom" placeholder="Ej: JS Envíos"></div>
+    <div class="campo"><label for="ncTipo">Tipo</label><select id="ncTipo">${Object.entries(TIPOS_CUENTA).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>
+    <button class="btn" id="ncGuardar" style="width:100%">Crear cuenta</button>`;
+  abrirDlg(); $("#ncNom").focus();
+  $("#ncGuardar").onclick=async()=>{ const nombre=$("#ncNom").value.trim(); if(!nombre) return toast("Escribe el nombre"); const id=nuevoId();
+    try{ await rawSet("cuentas",id,{id,nombre,tipo:$("#ncTipo").value,creado:Date.now()}); registrar("Creó la cuenta interna "+nombre); cerrarDlg(); toast("Cuenta creada"); }catch(e){ toast("No se pudo crear"); } };
+}
+function movCuenta(id,tipo){
+  const cu=S.cuentas[id]; if(!cu) return; const t=textoCuenta(cu);
+  $("#dlgCont").innerHTML=`<header><div><h2>${tipo==="entra"?"Entrada de":"Salida a"} ${esc(cu.nombre)}</h2><span class="sub">${t.txt}: ${t.val}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <p class="sub">${tipo==="entra"?"Dinero que entra a la caja desde esta cuenta.":"Dinero que sale de la caja hacia esta cuenta."}</p>
+    <div class="linea2"><div class="campo"><label for="mcVal">Valor</label><input id="mcVal" type="number" inputmode="numeric" min="0" step="1000"></div>
+    <div class="campo"><label for="mcMedio">Medio</label><select id="mcMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div></div>
+    <div class="linea2"><div class="campo"><label for="mcDia">Día</label><input id="mcDia" type="date" value="${hoy()}"></div>
+    <div class="campo"><label for="mcMot">Motivo</label><input id="mcMot" placeholder="${tipo==="entra"?"Ej: devolución del préstamo":"Ej: préstamo para nómina"}"></div></div>
+    <button class="btn ${tipo==="entra"?"ok":""}" id="mcGuardar" style="width:100%">Registrar ${tipo==="entra"?"entrada":"salida"}</button>`;
+  abrirDlg(); $("#mcVal").focus();
+  $("#mcGuardar").onclick=async()=>{ const val=Number($("#mcVal").value), mot=$("#mcMot").value.trim();
+    if(!(val>0)) return toast("Escribe un valor mayor a cero"); if(!mot) return toast("Escribe el motivo");
+    const b=$("#mcGuardar"); b.disabled=true; const nid=nuevoId();
+    try{ await rawSet("cajamovs",nid,{id:nid,tipo,cat:"interna",cuentaId:id,personaId:"",valor:val,medio:$("#mcMedio").value,concepto:mot,fecha:fechaDia($("#mcDia").value||hoy())});
+      registrar((tipo==="entra"?"Entrada de ":"Salida a ")+cu.nombre+": "+pesos(val)+" · "+mot); cerrarDlg(); toast((tipo==="entra"?"Entrada":"Salida")+" registrada"); }
+    catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
+}
+/* Compra por encargo o ganancia ocasional de un cliente, desde la pestaña Cuentas. */
+function movClienteOficina(tipo){
+  const cs=listaOrdenada(S.clientes,"nombre"), compra=tipo==="compra_cliente";
+  $("#dlgCont").innerHTML=`<header><h2>${compra?"Compra para un cliente":"Ganancia ocasional"}</h2><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <p class="sub">${compra?"Sale de la caja y queda como deuda del cliente. En el pedido pon el domicilio y en “a cobrar” lo que se le cobra al destinatario; al entregar se compensa.":"Se le carga al cliente (queda por cobrar) y suma 100% al sueldo de JS ese día. Ej: $4.000 por punto extra."}</p>
+    <div class="campo"><label for="mxCli">Cliente</label><input id="mxBus" type="search" placeholder="Buscar cliente…" autocomplete="off" style="margin-bottom:6px"><select id="mxCli"><option value="">Elige…</option>${cs.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("")}</select></div>
+    <div class="linea2"><div class="campo"><label for="mxVal">Valor</label><input id="mxVal" type="number" inputmode="numeric" min="0" step="100"></div>
+    ${compra?`<div class="campo"><label for="mxMedio">Pagado con</label><select id="mxMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>`:""}</div>
+    <div class="linea2"><div class="campo"><label for="mxDia">Día</label><input id="mxDia" type="date" value="${hoy()}"></div>
+    <div class="campo"><label for="mxNota">Detalle</label><input id="mxNota" placeholder="${compra?"Ej: compra en almacén · guía JS-00120":"Ej: 3 puntos extra · guía JS-00120"}"></div></div>
+    <button class="btn ok" id="mxGuardar" style="width:100%">Registrar</button>`;
+  abrirDlg();
+  $("#mxBus").oninput=e=>{ const q=sinTildes(e.target.value.trim()), sel=$("#mxCli"); const vis=cs.filter(c=>!q||sinTildes(c.nombre+" "+(c.telefono||"")).includes(q));
+    sel.innerHTML=`<option value="">${vis.length?"Elige…":"Ningún cliente con ese nombre"}</option>`+vis.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join(""); if(vis.length===1&&q) sel.value=vis[0].id; };
+  $("#mxGuardar").onclick=async()=>{ const cid=$("#mxCli").value, val=Number($("#mxVal").value);
+    if(!cid) return toast("Elige el cliente"); if(!(val>0)) return toast("Escribe un valor mayor a cero");
+    const b=$("#mxGuardar"); b.disabled=true; const id=nuevoId();
+    try{ await guardar("movimientos",id,{id,clienteId:cid,tipo,valor:val,medio:compra?$("#mxMedio").value:"",nota:$("#mxNota").value.trim(),fecha:fechaDia($("#mxDia").value||hoy())});
+      cerrarDlg(); toast(compra?"Compra registrada":"Ganancia registrada"); }
+    catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
 
 function pintarPersonal(v,aviso){
@@ -845,18 +930,19 @@ function abrirCuenta(cid){
     <div class="saldo-grande ${s<0?"neg":s>0?"pos":""}">${pesos(Math.abs(s))}</div>
     <p class="sub">${s>0?"Cuenta por pagar: JS le debe este valor al cliente.":s<0?"Cuenta por cobrar: el cliente le debe este valor a JS.":"Cuenta a paz y salvo."}</p>
     ${s?(telWhatsApp(c.telefono)?`<div class="acciones" style="margin:0 0 6px"><a class="btn ok" id="cWa" href="${linkSaldo(cid)}" target="_blank" rel="noopener">Enviar ${s<0?"cobro":"saldo a favor"} por WhatsApp</a><button class="btn sec" id="cWaCopiar" type="button">Copiar mensaje</button></div>`:'<div class="aviso">Agrega el celular del cliente para enviarle el saldo por WhatsApp.</div>'):""}
-    ${esAdmin?`<h2>Registrar pago o ajuste</h2>
-    <div class="campo"><label for="mTipo">Tipo</label><select id="mTipo">${Object.entries(MOVS).map(([k,x])=>`<option value="${k}">${x.t}</option>`).join("")}</select></div>
+    ${esAdmin||esAsistente?`<h2>${esAdmin?"Registrar pago o ajuste":"Registrar compra o ganancia"}</h2>
+    <div class="campo"><label for="mTipo">Tipo</label><select id="mTipo">${Object.entries(MOVS).filter(([k])=>esAdmin||MOVS_OFICINA.includes(k)).map(([k,x])=>`<option value="${k}">${x.t}</option>`).join("")}</select></div>
     <div class="linea2"><div class="campo"><label for="mFecha">Día</label><input id="mFecha" type="date" value="${hoy()}"></div>
     <div class="campo"><label for="mVal">Valor</label><input id="mVal" type="number" inputmode="numeric" min="0" step="100" value="${Math.abs(s)||""}"></div></div>
     <div class="linea2"><div class="campo"><label for="mMedio">Medio (para pagos)</label><select id="mMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>
     <div class="campo"><label for="mNota">Nota (opcional)</label><input id="mNota" placeholder="Ej: compra, transferencia Nequi"></div></div>
-    <div class="acciones"><button class="btn ok" id="mReg">Registrar</button><button class="btn sec" id="cEdit">Editar cliente</button>${descargas?'<button class="btn sec" id="cCsv">Descargar para Excel</button>':""}</div>`:'<div class="acciones"><button class="btn sec" id="cEdit">Editar cliente</button></div>'}
+    <div class="acciones"><button class="btn ok" id="mReg">Registrar</button><button class="btn sec" id="cEdit">Editar cliente</button>${descargas&&esAdmin?'<button class="btn sec" id="cCsv">Descargar para Excel</button>':""}</div>`:'<div class="acciones"><button class="btn sec" id="cEdit">Editar cliente</button></div>'}
     <h2>Movimientos</h2>
     ${rows.length?`<div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Detalle</th><th class="n">Valor</th><th></th></tr></thead><tbody>
     ${rows.map(r=>`<tr><td>${hora(r.fecha)}</td><td>${esc(r.det)}</td><td class="n ${r.v<0?"neg":"pos"}">${pesos(r.v)}</td><td>${r.mid?(esAdmin?`<button class="btn peligro chico" data-delmov="${esc(r.mid)}">Quitar</button>`:""):(r.pid&&(r.v<0||r.dp))?`<button class="btn sec chico" data-domi="${esc(r.pid)}">${r.dp?"Desmarcar pago":"Ya pagó domicilio"}</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:'<div class="vacio">Sin movimientos.</div>'}`;
   if(!$("#dlg").open) abrirDlg();
-  if($("#mTipo")) $("#mTipo").value = s<0 ? "pago_de_cliente" : "pago_a_cliente";
+  if($("#mTipo")&&esAdmin) $("#mTipo").value = s<0 ? "pago_de_cliente" : "pago_a_cliente";
+  if($("#mTipo")&&!esAdmin) $("#mVal").value="";
   $("#cEdit").onclick=()=>formCliente(cid);
   const wa=$("#cWa"); if(wa) wa.onclick=()=>marcarEnviado(cid);
   const wc=$("#cWaCopiar"); if(wc) wc.onclick=async()=>{ try{ await navigator.clipboard.writeText(textoSaldo(cid)); toast("Mensaje copiado. Pégalo en WhatsApp."); }catch(e){ toast("No se pudo copiar en este navegador"); } };
@@ -1184,7 +1270,7 @@ async function descargarCartera(btn){
 
 /* ======================= CAJA GENERAL ======================= */
 const MEDIOS_CAJA={...MEDIOS, cuentas:"Cuentas JS (transferencias)"};
-const CATS={inicial:"Caja inicial",otro_entra:"Otra entrada",gasto:"Gasto",base:"Base para vueltos",arriendo:"Arriendo",adelanto:"Adelanto",sueldo:"Pago de sueldo",otro:"Otra salida"};
+const CATS={interna:"Cuenta interna",inicial:"Caja inicial",otro_entra:"Otra entrada",gasto:"Gasto",base:"Base para vueltos",arriendo:"Arriendo",adelanto:"Adelanto",sueldo:"Pago de sueldo",otro:"Otra salida"};
 const CATS_TIPO={entra:["inicial","otro_entra"],sale:["gasto","base","arriendo","adelanto","sueldo","otro"]};
 const CATS_PERSONA=["adelanto","sueldo","base"]; // movimientos de caja que van a nombre de una persona
 let diaLibro=hoy();
@@ -1193,8 +1279,10 @@ function libroCaja(){
   for(const r of Object.values(S.recaudos)) L.push({fecha:r.fecha,concepto:"Entrega de "+nomM(r.mensajeroId)+(r.nota?" · "+r.nota:""),valor:Number(r.valor)||0,medio:r.medio||"efectivo",cat:"Mensajeros",ref:"recaudos|"+r.id});
   for(const p of Object.values(S.pedidos)) if(cerrado(p)&&p.metodo==="transf_js") L.push({fecha:p.entregado,concepto:"Transferencia a JS · "+p.guia+(p.destinatario?" · "+p.destinatario:""),valor:Number(p.valorCobrado)||0,medio:p.cuentaJs||"cuentas",cat:"Transferencias"});
   for(const p of Object.values(S.pedidos)) if(p.domiPagado&&p.domiPagoMedio) L.push({fecha:p.domiPagoFecha||p.entregado||p.creado,concepto:"Pago de domicilio · "+p.guia+(p.clienteId?" · "+nombreCliente(p.clienteId):""),valor:pagoDomi(p),medio:p.domiPagoMedio,cat:"Clientes"});
-  for(const m of Object.values(S.movimientos)) if(esPago(m)) L.push({fecha:m.fecha,concepto:(m.tipo==="pago_a_cliente"?"Pago a ":"Pago de ")+nombreCliente(m.clienteId)+(m.nota?" · "+m.nota:""),valor:signoMov(m),medio:m.medio||"efectivo",cat:"Clientes"});
-  for(const c of Object.values(S.cajamovs)) L.push({fecha:c.fecha,concepto:(CATS[c.cat]||"Movimiento")+(c.personaId?" · "+nomM(c.personaId):"")+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:CATS[c.cat]||"Otro",ref:"cajamovs|"+c.id});
+  for(const m of Object.values(S.movimientos)) if(mueveCaja(m)) L.push({fecha:m.fecha,concepto:(m.tipo==="pago_de_cliente"?"Pago de ":m.tipo==="compra_cliente"?"Compra por encargo de ":"Pago a ")+nombreCliente(m.clienteId)+(m.nota?" · "+m.nota:""),valor:signoMov(m),medio:m.medio||"efectivo",cat:"Clientes"});
+  for(const c of Object.values(S.cajamovs)) if(c.cat==="interna"){ const n=S.cuentas[c.cuentaId]?.nombre||"Cuenta interna";
+    L.push({fecha:c.fecha,concepto:(c.tipo==="entra"?"Entrada de ":"Salida a ")+n+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:n,ref:"cajamovs|"+c.id}); }
+  else L.push({fecha:c.fecha,concepto:(CATS[c.cat]||"Movimiento")+(c.personaId?" · "+nomM(c.personaId):"")+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:CATS[c.cat]||"Otro",ref:"cajamovs|"+c.id});
   return L.sort((a,b)=>a.fecha-b.fecha);
 }
 function resumenCaja(){
@@ -1301,10 +1389,11 @@ function sueldosDia(dia){
     if(["dueno","oficina"].includes(tipoDe(S.mensajeros[mid]))) propios+=dom; // 100% para JS
     else { res[mid]=sueldoDe(dom); dom30+=dom*(1-PCT_SUELDO); desc+=DESC_SUELDO; nMens++; } }
   for(const m of Object.values(S.mensajeros)) if(PAGO_FIJO.includes(tipoDe(m))){ const x=jornada(m.id,dia); if(x){ res[m.id]=x; fijos+=x; } }
-  const javier=dom30+propios+desc-fijos;
+  const ganancias=Object.values(S.movimientos).filter(m=>m.tipo==="ganancia"&&diaDe(m.fecha)===dia).reduce((a,m)=>a+(Number(m.valor)||0),0); // 100% para JS
+  const javier=dom30+propios+desc+ganancias-fijos;
   const dueno=Object.values(S.mensajeros).find(m=>tipoDe(m)==="dueno");
-  if(dueno&&(ent.length||fijos)) res[dueno.id]=javier;
-  return {res,dom30,propios,desc,fijos,nMens,javier};
+  if(dueno&&(ent.length||fijos||ganancias)) res[dueno.id]=javier;
+  return {res,dom30,propios,desc,ganancias,fijos,nMens,javier};
 }
 const ORDEN_TIPO=["mensajero","oficina","patinador","empresa","dueno"];
 function resumenSemana(sem){
@@ -1354,7 +1443,7 @@ function miSueldoHtml(mid){
     <h2>Día por día</h2>
     <div class="tabla-env"><table><thead><tr><th>Día</th><th class="n">Entregas</th><th class="n">Domicilios</th><th class="n">Sueldo</th></tr></thead><tbody>${filas}
       <tr><td><b>Total</b></td><td class="n">${ent.filter(p=>R.dias.includes(diaDe(p.entregado))).length}</td><td class="n"></td><td class="n"><b>${pesos(R.total)}</b></td></tr></tbody></table></div>
-    <p class="sub" style="margin-top:8px">${esDueno?"Tu sueldo diario: 30% de los domicilios de los mensajeros + tus domicilios y los de oficina + "+pesos(DESC_SUELDO)+" por mensajero − pagos fijos (patinadores, oficina y JS).":tipoDe(yo)==="oficina"?"Pago fijo por día trabajado. Los domicilios de tus pedidos son 100% de JS.":"Cada día: 70% de tus domicilios − "+pesos(DESC_SUELDO)+"."}</p>
+    <p class="sub" style="margin-top:8px">${esDueno?"Tu sueldo diario: 30% de los domicilios de los mensajeros + tus domicilios y los de oficina + ganancias ocasionales + "+pesos(DESC_SUELDO)+" por mensajero − pagos fijos (patinadores, oficina y JS).":tipoDe(yo)==="oficina"?"Pago fijo por día trabajado. Los domicilios de tus pedidos son 100% de JS.":"Cada día: 70% de tus domicilios − "+pesos(DESC_SUELDO)+"."}</p>
     <h2>Adelantos y pagos</h2>
     ${movs.length?`<div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Medio</th><th class="n">Valor</th></tr></thead><tbody>${movs.map(c=>`<tr><td>${hora(c.fecha)}</td><td>${c.t}${c.concepto?`<br><span class="sub" style="font-size:.8rem">${esc(c.concepto)}</span>`:""}</td><td>${MEDIOS[c.medio]||""}</td><td class="n">${pesos(c.valor)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Sin adelantos ni pagos esta semana.</div>`}`;
 }
@@ -1382,8 +1471,8 @@ function pintarSueldos(v,aviso){
     <tr><td><b>Total</b></td>${R.dias.map((d,i)=>`<td class="n">${pesos(R.filas.reduce((a,f)=>a+f.vals[i],0))}</td>`).join("")}<td class="n"><b>${pesos(tot.total)}</b></td><td class="n">${pesos(tot.adel)}</td><td class="n">${pesos(tot.pagado)}</td><td class="n"><b>${pesos(tot.neto)}</b></td><td></td></tr>
     </tbody></table></div>`:`<div class="vacio">Registra tu personal en la pestaña Personal.</div>`}
     <p class="sub" style="margin-top:10px">Mensajeros: 70% de sus domicilios del día − ${pesos(DESC_SUELDO)}. Patinadores, oficina y JS: escribe el valor de cada día. Los domicilios de pedidos a nombre de oficina son 100% de JS y suman al sueldo de Javier.</p>
-    ${dueno?`<h2>Cálculo del sueldo de ${esc(dueno.nombre)}</h2><div class="tabla-env"><table><thead><tr><th>Día</th><th class="n">30% domicilios mensajeros</th><th class="n">Domicilios propios y de oficina</th><th class="n">${pesos(DESC_SUELDO)} × mensajeros</th><th class="n">− Pagos fijos (patinadores, oficina, JS)</th><th class="n">Sueldo</th></tr></thead><tbody>
-    ${R.dias.map((d,i)=>{ const x=R.porDia[i]; if(!x.dom30&&!x.propios&&!x.fijos) return ""; return `<tr><td>${DIAS_SEM[i]} ${d.slice(8)}</td><td class="n">${pesos(x.dom30)}</td><td class="n">${pesos(x.propios)}</td><td class="n">${pesos(x.desc)} (${x.nMens})</td><td class="n neg">${pesos(-x.fijos)}</td><td class="n"><b>${pesos(x.javier)}</b></td></tr>`; }).join("")||`<tr><td colspan="6" class="sub">Sin movimiento esta semana.</td></tr>`}
+    ${dueno?`<h2>Cálculo del sueldo de ${esc(dueno.nombre)}</h2><div class="tabla-env"><table><thead><tr><th>Día</th><th class="n">30% domicilios mensajeros</th><th class="n">Domicilios propios y de oficina</th><th class="n">Ganancias ocasionales</th><th class="n">${pesos(DESC_SUELDO)} × mensajeros</th><th class="n">− Pagos fijos (patinadores, oficina, JS)</th><th class="n">Sueldo</th></tr></thead><tbody>
+    ${R.dias.map((d,i)=>{ const x=R.porDia[i]; if(!x.dom30&&!x.propios&&!x.fijos&&!x.ganancias) return ""; return `<tr><td>${DIAS_SEM[i]} ${d.slice(8)}</td><td class="n">${pesos(x.dom30)}</td><td class="n">${pesos(x.propios)}</td><td class="n">${pesos(x.ganancias)}</td><td class="n">${pesos(x.desc)} (${x.nMens})</td><td class="n neg">${pesos(-x.fijos)}</td><td class="n"><b>${pesos(x.javier)}</b></td></tr>`; }).join("")||`<tr><td colspan="7" class="sub">Sin movimiento esta semana.</td></tr>`}
     </tbody></table></div>`:""}
     <h2>Adelantos de la semana</h2>
     ${adelSem.length?`<div class="tabla-env"><table><thead><tr><th>Día</th><th>Persona</th><th>Medio</th><th>Detalle</th><th class="n">Valor</th><th></th></tr></thead><tbody>${adelSem.map(c=>`<tr><td>${hora(c.fecha)}</td><td>${esc(c.nom)}</td><td>${MEDIOS[c.medio]||""}</td><td>${esc(c.concepto||"")}</td><td class="n">${pesos(c.valor)}</td><td><button class="btn peligro chico" data-delref="cajamovs|${esc(c.id)}">Quitar</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Sin adelantos esta semana. Usa el botón “Adelanto” en cada persona.</div>`}`;
@@ -1671,10 +1760,10 @@ pintar();
 /* Cada rol descarga solo lo que le corresponde; las reglas de Firebase rechazan el resto. */
 function cargarDatos(){
   if(esCliente){ if(!miCliente){ cargado=true; return; } suscribir("pedidos",["clienteId","==",miCliente]); suscribir("clientes",["id","==",miCliente]); suscribir("movimientos",["clienteId","==",miCliente]); return; }
-  if(esAdmin){ setTimeout(completarNombres,8000); ["pedidos","clientes","mensajeros","movimientos","recaudos","liquidaciones","jornadas","cajamovs","vinculos","usuarios"].forEach(c=>suscribir(c)); return; }
+  if(esAdmin){ setTimeout(completarNombres,8000); ["pedidos","clientes","mensajeros","movimientos","recaudos","liquidaciones","jornadas","cajamovs","vinculos","usuarios","cuentas"].forEach(c=>suscribir(c)); return; }
   const mid=usuario.mensajeroId();
   suscribir("vinculos",["uid","==",uid]);
-  if(esAsistente){ ["pedidos","clientes","mensajeros","movimientos"].forEach(c=>suscribir(c)); setTimeout(completarNombres,8000); }
+  if(esAsistente){ ["pedidos","clientes","mensajeros","movimientos","cuentas"].forEach(c=>suscribir(c)); suscribir("cajamovs",["cat","==","interna"]); setTimeout(completarNombres,8000); }
   else if(mid){ suscribir("pedidos",["mensajeroId","==",mid]); suscribir("mensajeros",["id","==",mid]); }
   if(mid){ suscribir("jornadas",["personaId","==",mid]); suscribir("recaudos",["mensajeroId","==",mid]); suscribir("liquidaciones",["mensajeroId","==",mid]); suscribir("cajamovs",["personaId","==",mid]); }
   if(!mid&&!esAsistente) cargado=true;

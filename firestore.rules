@@ -114,7 +114,10 @@ service cloud.firestore {
     // Pagos y ajustes de clientes: oficina los ve (saldos); solo administración los registra
     match /movimientos/{id} {
       allow read: if esOficina() || esClienteDe(resource.data.clienteId);
-      allow write: if esAdmin();
+      // El asistente solo registra compras por encargo y ganancias ocasionales; no borra ni edita
+      allow create: if esAdmin() || (esAsistente() && request.resource.data.tipo in ["compra_cliente", "ganancia"]
+        && request.resource.data.valor is number && request.resource.data.valor > 0);
+      allow update, delete: if esAdmin();
     }
     // Personal: oficina ve la lista; cada mensajero solo su propia ficha
     match /mensajeros/{id} {
@@ -132,7 +135,16 @@ service cloud.firestore {
     }
     // Caja general: cada quien solo sus adelantos y pagos de sueldo
     match /cajamovs/{id} {
-      allow read: if esAdmin() || esMio(resource.data.personaId);
+      allow read: if esAdmin() || esMio(resource.data.personaId) || (esAsistente() && resource.data.cat == "interna");
+      // El asistente registra entradas y salidas de las cuentas internas (JS Envíos, MT, base); no borra ni edita
+      allow create: if esAdmin() || (esAsistente() && request.resource.data.cat == "interna"
+        && request.resource.data.tipo in ["entra", "sale"] && request.resource.data.valor is number
+        && request.resource.data.valor > 0 && exists(ruta("cuentas", request.resource.data.cuentaId)));
+      allow update, delete: if esAdmin();
+    }
+    // Cuentas internas (JS Envíos, MT, Base de JS): oficina las ve; solo administración las crea
+    match /cuentas/{id} {
+      allow read: if esOficina();
       allow write: if esAdmin();
     }
     // Solo administración
