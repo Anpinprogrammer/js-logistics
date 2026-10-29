@@ -44,7 +44,9 @@ const S={pedidos:{},clientes:{},mensajeros:{},movimientos:{},recaudos:{},liquida
 const memDocs={}; let memContador=0;
 let cargado=false;
 
-async function rawSet(col,id,data){ if(db) await db.collection(col).doc(id).set(data); else { S[col]?(S[col][id]=data):(memDocs[col+"/"+id]=data); pintar(); } }
+async function rawSet(col,id,data,unir){ // unir: conserva los campos que ya tenía el documento
+  if(db) await db.collection(col).doc(id).set(data,unir?{merge:true}:undefined);
+  else { const k=col+"/"+id, prev=unir?(S[col]?S[col][id]:memDocs[k]):null, d=prev?{...prev,...data}:data; S[col]?(S[col][id]=d):(memDocs[k]=d); pintar(); } }
 async function rawUpd(col,id,data){ if(db) await db.collection(col).doc(id).update(data); else { Object.assign(S[col]?S[col][id]:memDocs[col+"/"+id],data); pintar(); } }
 async function rawDel(col,id){ if(db) await db.collection(col).doc(id).delete(); else { if(S[col]) delete S[col][id]; else delete memDocs[col+"/"+id]; pintar(); } }
 async function listar(col,filtros=[],orden,lim){
@@ -94,7 +96,7 @@ function logCambio(op,col,id,data,antes){
   const det=Object.entries(data).filter(([k])=>CAMPOS[k]&&(!antes||antes[k]!==data[k])).map(([k,v])=>CAMPOS[k]+": "+fmtCampo(k,v)).join(", ");
   registrar("Editó "+nom+" "+resumenDoc(col,id,d)+(det?" ("+det+")":""));
 }
-async function guardar(col,id,data){ const nuevo=!(S[col]&&S[col][id]); const antes=S[col]?.[id]; await rawSet(col,id,data); logCambio(nuevo?"crear":"editar",col,id,data,antes); }
+async function guardar(col,id,data,unir){ const nuevo=!(S[col]&&S[col][id]); const antes=S[col]?.[id]; await rawSet(col,id,data,unir); logCambio(nuevo?"crear":"editar",col,id,data,antes); }
 async function actualizar(col,id,data){ const antes=S[col]?.[id]?{...S[col][id]}:null; await rawUpd(col,id,data); logCambio("editar",col,id,data,antes); }
 /* papelera: lo que se borra se puede recuperar */
 const PAPELERA_COLS=["pedidos","clientes","movimientos","recaudos","liquidaciones","cajamovs","mensajeros"];
@@ -111,7 +113,7 @@ const COLA_K="js_cola";
 function colaLeer(){ try{ return JSON.parse(lsGet(COLA_K)||"[]"); }catch(e){ return []; } }
 function colaGuardar(c){ try{ localStorage.setItem(COLA_K,JSON.stringify(c)); return true; }catch(e){ return false; } }
 const conTiempo=(pr,ms)=>Promise.race([pr,new Promise((_,r)=>setTimeout(()=>r(new Error("tiempo")),ms))]);
-async function ejecutarOps(ops){ for(const o of ops){ await conTiempo(o.op==="set"?guardar(o.col,o.id,o.data):actualizar(o.col,o.id,o.data),20000); } }
+async function ejecutarOps(ops){ for(const o of ops){ await conTiempo(o.op==="set"?guardar(o.col,o.id,o.data,o.unir):actualizar(o.col,o.id,o.data),20000); } }
 async function enviarOps(ops,guia){
   if(!db){ await ejecutarOps(ops); return "ok"; }
   try{ if(navigator.onLine===false) throw new Error("offline"); await ejecutarOps(ops); return "ok"; }
@@ -383,7 +385,7 @@ function abrirEntrega(guia){
     if(dif&&!aceptoDif){ aceptoDif=true; $("#eDif").innerHTML=`<div class="aviso alerta">Debías cobrar <b>${pesos(esperado)}</b> y escribiste <b>${pesos(v)}</b> (${dif>0?"sobran":"faltan"} ${pesos(Math.abs(dif))}). Revisa el valor. Si está bien, toca otra vez el botón.</div>`; $("#eGuardar").textContent="Sí, guardar con diferencia"; return; }
     const b=$("#eGuardar"); b.disabled=true; b.textContent="Guardando…";
     try{
-      const r=await enviarOps([{op:"set",col:"entregas",id:guia,data:{foto:fotoEnt,firma:firma.imagen()}},
+      const r=await enviarOps([{op:"set",col:"entregas",id:guia,data:{foto:fotoEnt,firma:firma.imagen()},unir:true},
         {op:"upd",col:"pedidos",id:guia,data:{estado:"entregado",entregado:Date.now(),destinatario:nom,valorCobrado:v,metodo:met,cuentaJs:cta,difCobro:dif,entregoUid:uid||"",...($("#eCambio").checked?{cambio:true}:{}),...(gasto>0?{gasto,gastoNota}:{})}}],guia);
       cerrarDlg(); toast(r==="ok"?"Entrega de "+guia+" registrada":"Sin señal: la entrega quedó guardada en el teléfono y se enviará sola");
     }catch(err){ console.error(err); b.disabled=false; b.textContent="Confirmar entrega"; toast("No se pudo guardar. Intenta de nuevo."); }
@@ -409,7 +411,7 @@ function abrirDevolucion(guia){
     if(motivo==="otro"&&!nota) return toast("Escribe qué pasó");
     const intentos=[...(p.intentos||[]),{fecha:Date.now(),motivo,nota,uid:uid||""}];
     const ops = motivo==="reprogramar" ? [{op:"upd",col:"pedidos",id:guia,data:{intentos}}]
-      : [...(foto?[{op:"set",col:"entregas",id:guia,data:{foto}}]:[]),{op:"upd",col:"pedidos",id:guia,data:{estado:"devuelto",entregado:Date.now(),motivoDev:motivo,notaDev:nota,valorCobrado:0,metodo:"devuelto",cuentaJs:"",difCobro:0,destinatario:"",cobrarDev:true,intentos}}];
+      : [...(foto?[{op:"set",col:"entregas",id:guia,data:{foto,firma:""},unir:true}]:[]),{op:"upd",col:"pedidos",id:guia,data:{estado:"devuelto",entregado:Date.now(),motivoDev:motivo,notaDev:nota,valorCobrado:0,metodo:"devuelto",cuentaJs:"",difCobro:0,destinatario:"",cobrarDev:true,intentos}}];
     const b=$("#dGuardar"); b.disabled=true; b.textContent="Guardando…";
     try{ const r=await enviarOps(ops,guia); cerrarDlg();
       toast(r!=="ok"?"Sin señal: quedó guardado en el teléfono y se enviará solo":motivo==="reprogramar"?"Intento registrado. "+guia+" sigue en tu lista":"Devolución de "+guia+" registrada"); }
@@ -814,6 +816,18 @@ function filaPedido(p){
     <span class="n" style="text-align:right;font-weight:700">${p.estado==="entregado"?pesos(p.valorCobrado):""}</span></button>`;
 }
 
+/* Al reabrir un pedido, su foto y firma pasan a "previas" (en el mismo documento de entregas) en vez de borrarse. */
+async function guardarPruebaAnterior(p){
+  const e=await leer("entregas",p.guia); if(!e||(!e.foto&&!e.firma)) return;
+  const previas=[...(e.previas||[]),{foto:e.foto||"",firma:e.firma||"",estado:p.estado,fecha:p.entregado||0,destinatario:p.destinatario||"",
+    valorCobrado:Number(p.valorCobrado)||0,metodo:p.metodo||"",motivoDev:p.motivoDev||"",notaDev:p.notaDev||"",reabierto:Date.now()}];
+  while(previas.length>1&&JSON.stringify(previas).length>850000) previas.shift(); // límite de tamaño de un documento
+  await rawSet("entregas",p.guia,{previas});
+  registrar("Reabrió "+p.guia+" (se guardaron las pruebas de la entrega anterior)");
+}
+const previasFotos = e => (e?.previas||[]).slice().reverse().flatMap(x=>{ const t=(x.estado==="devuelto"?"Devolución anterior":"Entrega anterior")+(x.fecha?" · "+hora(x.fecha):x.reabierto?" · reabierto "+hora(x.reabierto):"")+(x.destinatario?" · "+x.destinatario:"");
+  return [[t,x.foto],["Firma · "+t,x.firma]]; });
+
 async function abrirPedido(guia, cliElegido){
   const p=S.pedidos[guia]; if(!p) return;
   const cs=listaOrdenada(S.clientes,"nombre");
@@ -880,13 +894,15 @@ async function abrirPedido(guia, cliElegido){
   const pc=$("#pCambioOk"); if(pc) pc.onclick=async()=>{ if(!await confirmar("Cambio de "+guia+" entregado","Se marca que el cliente ya recibió la prenda de cambio.","Marcar entregado")) return abrirPedido(guia);
     try{ await actualizar("pedidos",guia,{cambioRecibido:Date.now(),cambioConfirmo:uid||""}); toast("Cambio marcado como entregado"); abrirPedido(guia); }catch(e){ toast("No se pudo guardar"); } };
   const dk=$("#pDifOk"); if(dk) dk.onclick=async()=>{ try{ await actualizar("pedidos",guia,{difRevisada:true}); abrirPedido(guia); }catch(e){ toast("No se pudo guardar"); } };
-  const rb=$("#pReabrir"); if(rb) rb.onclick=async()=>{ if(!await confirmar("Reabrir la guía "+guia,"La entrega se borrará y el pedido volverá a por entregar.","Reabrir")) return abrirPedido(guia);
-    await actualizar("pedidos",guia,{estado:"pendiente",entregado:null,destinatario:"",valorCobrado:0,metodo:"",cuentaJs:"",difCobro:0,difRevisada:false,motivoDev:"",notaDev:"",cobrarDev:false}); await borrar("entregas",guia,{grupo:nuevoId()}).catch(()=>{}); cerrarDlg(); };
+  const rb=$("#pReabrir"); if(rb) rb.onclick=async()=>{ if(!await confirmar("Reabrir la guía "+guia,"El pedido volverá a por entregar. La foto y la firma de esta entrega se guardan en el pedido como “entrega anterior”.","Reabrir")) return abrirPedido(guia);
+    try{ await guardarPruebaAnterior(p); }catch(e){ return toast("No se pudieron guardar las pruebas de entrega. No se reabrió."); }
+    try{ await actualizar("pedidos",guia,{estado:"pendiente",entregado:null,destinatario:"",valorCobrado:0,metodo:"",cuentaJs:"",difCobro:0,difRevisada:false,motivoDev:"",notaDev:"",cobrarDev:false}); toast("Guía "+guia+" reabierta"); cerrarDlg(); }
+    catch(e){ toast("No se pudo reabrir"); } };
   try{
-    const [f,e]=await Promise.all([leer("fotos",guia), cerrado(p)?leer("entregas",guia):null]);
+    const [f,e]=await Promise.all([leer("fotos",guia), leer("entregas",guia).catch(()=>null)]);
     const box=$("#pFotos"); if(!box) return;
-    const items=[["Salida",f?.salida],[p.estado==="devuelto"?"Evidencia":"Entrega",e?.foto],["Firma",e?.firma]].map(([t,x])=>[t,fotoSegura(x)]).filter(([,x])=>x);
-    box.innerHTML=items.length?items.map(([t,s])=>`<figure><img src="${s}" alt="${t}"><figcaption>${t}</figcaption></figure>`).join(""):'<span class="sub">Sin fotos.</span>';
+    const items=[["Salida",f?.salida],...(cerrado(p)?[[p.estado==="devuelto"?"Evidencia":"Entrega",e?.foto],["Firma",e?.firma]]:[]),...previasFotos(e)].map(([t,x])=>[t,fotoSegura(x)]).filter(([,x])=>x);
+    box.innerHTML=items.length?items.map(([t,s])=>`<figure><img src="${s}" alt="${esc(t)}"><figcaption>${esc(t)}</figcaption></figure>`).join(""):'<span class="sub">Sin fotos.</span>';
   }catch(err){ const box=$("#pFotos"); if(box) box.innerHTML='<span class="sub">No se pudieron cargar las fotos.</span>'; }
 }
 

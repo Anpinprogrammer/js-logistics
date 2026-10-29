@@ -40,7 +40,7 @@ async function iniciar(){
   /* --- adaptador de base de datos con la forma de la versión anterior --- */
   const snapDocs = s => ({ docs: s.docs.map(d => ({ id: d.id, data: () => d.data() })) });
   const refDoc = r => ({
-    set: d => F.setDoc(r, d),
+    set: (d, o) => o ? F.setDoc(r, d, o) : F.setDoc(r, d),
     update: d => F.updateDoc(r, d),
     delete: () => F.deleteDoc(r),
     get: async () => { const s = await F.getDoc(r); return { exists: s.exists(), data: () => s.data() }; }
