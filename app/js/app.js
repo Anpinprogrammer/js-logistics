@@ -186,7 +186,7 @@ let ultimaGuia=null;
 let fotoPara=""; // id en Personal de la oficina cuando la foto se toma desde Oficina → Pedidos
 
 /* Filtro por día de los paneles de pedidos: un pedido es del día si salió o se entregó (o devolvió) ese día. "" = todos los días. */
-let diaPedA="", diaPedC="", diaPedM="";
+let diaPedA="", diaPedC="", diaPedM="", mensPedA=""; // mensPedA: filtro por mensajero en Oficina → Pedidos
 const delDia = (p,d) => !d || diaDe(p.creado)===d || (!!p.entregado && diaDe(p.entregado)===d);
 function moverDia(d,n){ const x=new Date((d||hoy())+"T12:00:00"); x.setDate(x.getDate()+n); return diaDe(x.getTime()); }
 const filtroDiaHtml = d => `<div class="filtro-dia"><button class="btn sec chico" data-dia="-1" aria-label="Día anterior">‹</button><input type="date" id="diaPed" value="${d}" max="${hoy()}" aria-label="Filtrar por día"><button class="btn sec chico" data-dia="1" aria-label="Día siguiente" ${!d||d>=hoy()?"disabled":""}>›</button>${d?`<button class="btn sec chico" data-dia="0">Ver todos</button>`:`<button class="btn sec chico" data-dia="hoy">Hoy</button>`}</div>`;
@@ -468,8 +468,10 @@ function pintarAdmin(){
     else if(filtroA==="dev") ps=ps.filter(p=>p.estado==="devuelto");
     else if(filtroA==="dif") ps=ps.filter(p=>Number(p.difCobro));
     else if(filtroA==="cambio") ps=ps.filter(cambioPendiente);
-    if(buscarA) ps=ps.filter(p=>(p.guia+" "+nombreCliente(p.clienteId)+" "+(p.destinatario||"")).toLowerCase().includes(buscarA.toLowerCase()));
+    if(buscarA) ps=ps.filter(p=>(p.guia+" "+nombreCliente(p.clienteId)+" "+(p.destinatario||"")+" "+(S.mensajeros[p.mensajeroId]?.nombre||"")).toLowerCase().includes(buscarA.toLowerCase()));
+    if(mensPedA) ps=ps.filter(p=>p.mensajeroId===mensPedA);
     if(diaPedA) ps=ps.filter(p=>delDia(p,diaPedA));
+    const repartidores=listaOrdenada(S.mensajeros,"nombre").filter(m=>esRepartidor(m)||m.id===mensPedA);
     const ofis=listaOrdenada(S.mensajeros,"nombre").filter(m=>tipoDe(m)==="oficina");
     const fotoOfi=ofis.length?`<div class="acciones" style="margin:0 0 14px;align-items:center"><button class="btn" id="fotoOfi">${iconCam.replace('<svg','<svg width="22" height="22"')}<span>Tomar foto del pedido</span></button><button class="btn sec" id="galeriaOfi">Subir fotos (varias)</button>${ofis.length>1?`<select id="ofiSel" aria-label="Oficina encargada">${ofis.map(m=>`<option value="${esc(m.id)}">${esc(m.nombre)}</option>`).join("")}</select>`:""}<span class="sub">Queda a cargo de ${ofis.length>1?"la oficina elegida":esc(ofis[0].nombre)}; el domicilio es 100% de JS.</span></div>`
       :`<div class="aviso">${esAdmin?"Para registrar pedidos con foto desde aquí, agrega en Más → Personal una persona de tipo “Oficina (JS)”.":"Para registrar pedidos con foto, el administrador debe crear la Oficina en Personal."}</div>`;
@@ -477,14 +479,16 @@ function pintarAdmin(){
       ${(()=>{ const n=Object.values(S.pedidos).filter(cambioPendiente).length; return n&&filtroA!=="cambio"?`<div class="aviso">${n===1?"Hay 1 prenda de cambio":"Hay "+n+" prendas de cambio"} por entregar a los clientes. Míralas en “Cambios por entregar”.</div>`:""; })()}
       ${(()=>{ const n=Object.values(S.pedidos).filter(p=>Number(p.difCobro)&&!p.difRevisada).length; return n?`<div class="aviso alerta">${n===1?"1 entrega tiene":n+" entregas tienen"} un valor cobrado distinto al que debían cobrar. Revísalas en “Con diferencia”.</div>`:""; })()}
       <div class="filtros">${[["sin","Sin remitente"],["pend","Por entregar"],["ent","Entregados"],["dev","Devueltos"],["dif","Con diferencia"],["cambio","Cambios por entregar"],["todos","Todos"]].map(([k,t])=>`<button data-f="${k}" aria-pressed="${filtroA===k}">${t}</button>`).join("")}</div>
-      <div class="campo"><input id="buscar" type="search" placeholder="Buscar guía, remitente o destinatario" value="${esc(buscarA)}" aria-label="Buscar"></div>
-      ${filtroDiaHtml(diaPedA)}${diaPedA?`<p class="sub">${ps.length} pedido${ps.length===1?"":"s"} que salieron o se cerraron ese día</p>`:""}
+      <div class="linea2"><div class="campo" style="flex:2;min-width:220px"><input id="buscar" type="search" placeholder="Buscar guía, remitente, destinatario o mensajero" value="${esc(buscarA)}" aria-label="Buscar"></div>
+      <div class="campo"><select id="mensPed" aria-label="Filtrar por mensajero"><option value="">Todos los mensajeros</option>${repartidores.map(m=>`<option value="${esc(m.id)}" ${m.id===mensPedA?"selected":""}>${esc(m.nombre)}</option>`).join("")}</select></div></div>
+      ${filtroDiaHtml(diaPedA)}${diaPedA||mensPedA?`<p class="sub">${ps.length} pedido${ps.length===1?"":"s"}${mensPedA?" de "+esc(S.mensajeros[mensPedA]?.nombre||""):""}${diaPedA?" que salieron o se cerraron ese día":""}</p>`:""}
       ${ps.length?`<div class="lista">${ps.slice(0,limiteA).map(p=>filaPedido(p)).join("")}</div>${ps.length>limiteA?`<div class="acciones" style="justify-content:center"><button class="btn sec" id="masPed">Ver más (${ps.length-limiteA} restantes)</button></div>`:""}`:`<div class="vacio">${filtroA==="sin"?"Todos los pedidos tienen remitente asignado.":"No hay pedidos aquí."}</div>`}`;
     v.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{filtroA=b.dataset.f; limiteA=100; pintar();});
     const mp=$("#masPed"); if(mp) mp.onclick=()=>{limiteA+=200; pintar();};
     const bu=$("#buscar"); bu.oninput=()=>{buscarA=bu.value; clearTimeout(bu._t); bu._t=setTimeout(()=>{pintar(); const n=$("#buscar"); n.focus(); n.setSelectionRange(n.value.length,n.value.length);},300);};
     v.querySelectorAll("[data-ped]").forEach(b=>b.onclick=()=>abrirPedido(b.dataset.ped));
     enlazarFiltroDia(diaPedA,d=>{diaPedA=d; limiteA=100;});
+    $("#mensPed").onchange=e=>{mensPedA=e.target.value; limiteA=100; pintar();};
     const fo=$("#fotoOfi"); if(fo) fo.onclick=()=>{ fotoPara=$("#ofiSel")?.value||ofis[0].id; $("#inCamara").value=""; $("#inCamara").click(); };
     const go=$("#galeriaOfi"); if(go) go.onclick=()=>{ fotoPara=$("#ofiSel")?.value||ofis[0].id; $("#inGaleria").value=""; $("#inGaleria").click(); };
   }
