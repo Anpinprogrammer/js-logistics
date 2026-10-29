@@ -165,3 +165,13 @@ dialog::backdrop{background:rgba(10,25,28,.55)}
 .acceso-error{min-height:1.2em;color:var(--rojo);font-weight:600;font-size:.92rem;margin:0 0 10px}
 .acceso-links{display:flex;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap}
 .enlace{border:0;background:none;color:var(--marca2);font-weight:600;padding:4px 0;text-decoration:underline}
+
+/* ---------- foto del pedido al entregar y visor ---------- */
+.foto-pedido{margin:0 0 14px;text-align:center}
+.foto-pedido img{display:block;width:100%;max-height:52vh;object-fit:contain;border-radius:12px;background:var(--fondo);border:1px solid var(--linea);cursor:zoom-in}
+.foto-pedido .sub{display:block;font-size:.85rem;margin-top:4px}
+.fotos img{cursor:zoom-in}
+.visor{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:12px}
+.visor img{max-width:100%;max-height:100%;object-fit:contain}
+.visor .cerrar{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:12px;background:#fff;color:#111}
+#pCliBuscar{margin-bottom:6px}

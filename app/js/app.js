@@ -15,6 +15,13 @@ const METODOS = {
 };
 /* Solo se muestran imágenes que la app misma produce; cualquier otro texto en una foto se descarta. */
 const fotoSegura = s => typeof s==="string" && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(s) ? s : "";
+const sinTildes = s => String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+/* Visor: cualquier foto con data-ampliar se ve en pantalla completa al tocarla (dentro del diálogo abierto). */
+document.addEventListener("click",e=>{
+  const im=e.target.closest("img[data-ampliar], .fotos img"); if(!im||!fotoSegura(im.src)) return;
+  const v=document.createElement("div"); v.className="visor"; v.innerHTML=`<img src="${fotoSegura(im.src)}" alt=""><button class="cerrar" aria-label="Cerrar">×</button>`;
+  v.onclick=ev=>{ ev.stopPropagation(); v.remove(); }; ($("#dlg").open?$("#dlg"):document.body).appendChild(v);
+});
 function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.setAttribute("role","status"); t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
 function lsGet(k){ try{return localStorage.getItem(k)}catch(e){return null} }
 function lsSet(k,v){ try{localStorage.setItem(k,v)}catch(e){} }
@@ -317,13 +324,14 @@ function abrirEntrega(guia){
   const aC=Number(p.aCobrar)||0, ints=p.intentos||[];
   const c=$("#dlgCont");
   c.innerHTML=`<header><div><h2>Entregar <span class="guia">${esc(guia)}</span></h2><span class="sub">${esc(nombreCliente(p.clienteId)||"Remitente sin asignar")}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+  <div class="foto-pedido" id="eFotoPed">${fotoSegura(p.mini)?`<img src="${fotoSegura(p.mini)}" alt="Foto del pedido" data-ampliar>`:'<span class="sub">Cargando foto del pedido…</span>'}</div>
   ${aC?`<div class="cobrar-box"><span>Valor a cobrar</span><b>${pesos(aC)}</b></div>`:""}
   ${ints.length?`<div class="aviso">Intentos anteriores: ${ints.map(i=>hora(i.fecha)+" · "+esc(MOTIVOS[i.motivo]||"")+(i.nota?" ("+esc(i.nota)+")":"")).join("; ")}</div>`:""}
   <div class="campo"><label for="eNom">Nombre de quien recibe</label><input id="eNom" autocomplete="off"></div>
   <div class="campo"><span class="lbl">Firma</span><div class="firma-caja"><canvas id="firma"></canvas><button class="btn sec chico" id="limpiar" type="button">Borrar</button></div></div>
   <div class="campo"><span class="lbl">Foto de entrega</span>
-    <div class="foto-elegida"><img id="eFotoPrev" class="oculto" alt=""><button class="btn sec" id="eFotoBtn" type="button">${iconCam.replace('<svg','<svg width="22" height="22"')} Tomar foto</button></div>
-    <input type="file" id="eFoto" accept="image/*" capture="environment" class="oculto"></div>
+    <div class="foto-elegida"><img id="eFotoPrev" class="oculto" alt=""><button class="btn sec" id="eFotoBtn" type="button">${iconCam.replace('<svg','<svg width="22" height="22"')} Tomar foto</button><button class="btn sec" id="eFotoGalBtn" type="button">Desde galería</button></div>
+    <input type="file" id="eFoto" accept="image/*" capture="environment" class="oculto"><input type="file" id="eFotoGal" accept="image/*" class="oculto"></div>
   <div class="campo"><label for="eValor">Valor cobrado</label><input id="eValor" type="number" inputmode="numeric" min="0" step="100" placeholder="0" value="${aC||""}"></div>
   <div class="campo"><span class="lbl">Método de pago</span><div class="metodos">
     ${Object.entries(METODOS).map(([k,v],i)=>`<label><input type="radio" name="metodo" value="${k}" ${i===0?"checked":""}><span>${v.t}<small>${v.d}</small></span></label>`).join("")}
@@ -343,8 +351,10 @@ function abrirEntrega(guia){
   document.querySelectorAll('input[name="metodo"]').forEach(r=>r.onchange=()=>{ $("#eCtaC").classList.toggle("oculto",metodo()!=="transf_js"); if(metodo()==="transf_cliente") $("#eValor").value="0"; else if(aC&&$("#eValor").value==="0") $("#eValor").value=aC; reset(); });
   $("#eValor").oninput=reset;
   $("#eNoEnt").onclick=()=>abrirDevolucion(guia);
-  $("#eFotoBtn").onclick=()=>$("#eFoto").click();
-  $("#eFoto").onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return; fotoEnt=await comprimir(f,900,.6); const im=$("#eFotoPrev"); im.src=fotoEnt; im.classList.remove("oculto"); $("#eFotoBtn").lastChild.textContent=" Cambiar foto"; };
+  leer("fotos",guia).then(f=>{ const x=fotoSegura(f?.salida), box=$("#eFotoPed"); if(!box) return;
+    if(x) box.innerHTML=`<img src="${x}" alt="Foto del pedido" data-ampliar><span class="sub">Toca la foto para verla completa</span>`; else if(!fotoSegura(p.mini)) box.innerHTML='<span class="sub">Sin foto del pedido.</span>'; }).catch(()=>{});
+  $("#eFotoBtn").onclick=()=>$("#eFoto").click(); $("#eFotoGalBtn").onclick=()=>$("#eFotoGal").click();
+  $("#eFoto").onchange=$("#eFotoGal").onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return; fotoEnt=await comprimir(f,900,.6); const im=$("#eFotoPrev"); im.src=fotoEnt; im.classList.remove("oculto"); $("#eFotoBtn").lastChild.textContent=" Cambiar foto"; };
   $("#eGuardar").onclick=async()=>{
     const nom=$("#eNom").value.trim(), val=$("#eValor").value, met=metodo(), cta=met==="transf_js"?$("#eCta").value:"";
     if(!nom) return toast("Escribe el nombre de quien recibe");
@@ -369,15 +379,15 @@ function abrirDevolucion(guia){
   $("#dlgCont").innerHTML=`<header><div><h2>No se pudo entregar <span class="guia">${esc(guia)}</span></h2><span class="sub">${esc(nombreCliente(p.clienteId)||"Remitente sin asignar")}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     <div class="campo"><span class="lbl">¿Qué pasó?</span><div class="metodos">${Object.entries(MOTIVOS).map(([k,t],i)=>`<label><input type="radio" name="motivo" value="${k}" ${i===0?"checked":""}><span>${t}${k==="reprogramar"?"<small>El pedido sigue en tu lista para intentarlo después</small>":k==="otro"?"":"<small>El paquete vuelve al remitente</small>"}</span></label>`).join("")}</div></div>
     <div class="campo"><label for="dNota">Detalle (opcional)</label><input id="dNota" placeholder="Ej: llamé 3 veces, el portero no lo recibió"></div>
-    <div class="campo"><span class="lbl">Foto de evidencia (opcional)</span><div class="foto-elegida"><img id="dFotoPrev" class="oculto" alt=""><button class="btn sec" id="dFotoBtn" type="button">${iconCam.replace('<svg','<svg width="22" height="22"')} Tomar foto</button></div>
-    <input type="file" id="dFoto" accept="image/*" capture="environment" class="oculto"></div>
+    <div class="campo"><span class="lbl">Foto de evidencia (opcional)</span><div class="foto-elegida"><img id="dFotoPrev" class="oculto" alt=""><button class="btn sec" id="dFotoBtn" type="button">${iconCam.replace('<svg','<svg width="22" height="22"')} Tomar foto</button><button class="btn sec" id="dFotoGalBtn" type="button">Desde galería</button></div>
+    <input type="file" id="dFoto" accept="image/*" capture="environment" class="oculto"><input type="file" id="dFotoGal" accept="image/*" class="oculto"></div>
     <button class="btn" id="dGuardar" style="width:100%">Registrar</button>
     <button class="btn sec" id="dVolver" style="width:100%;margin-top:10px">Volver a la entrega</button>`;
   abrirDlg();
   let foto=null;
   $("#dVolver").onclick=()=>abrirEntrega(guia);
-  $("#dFotoBtn").onclick=()=>$("#dFoto").click();
-  $("#dFoto").onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return; foto=await comprimir(f,900,.6); const im=$("#dFotoPrev"); im.src=foto; im.classList.remove("oculto"); };
+  $("#dFotoBtn").onclick=()=>$("#dFoto").click(); $("#dFotoGalBtn").onclick=()=>$("#dFotoGal").click();
+  $("#dFoto").onchange=$("#dFotoGal").onchange=async ev=>{ const f=ev.target.files[0]; if(!f) return; foto=await comprimir(f,900,.6); const im=$("#dFotoPrev"); im.src=foto; im.classList.remove("oculto"); };
   $("#dGuardar").onclick=async()=>{
     const motivo=document.querySelector('input[name="motivo"]:checked').value, nota=$("#dNota").value.trim();
     if(motivo==="otro"&&!nota) return toast("Escribe qué pasó");
@@ -417,8 +427,10 @@ function totales(ps){
 }
 function tablaEntregas(ps,conCliente){
   if(!ps.length) return `<div class="vacio">No hay entregas.</div>`;
-  return `<div class="tabla-env"><table><thead><tr><th>Guía</th>${conCliente?"<th>Remitente</th>":""}<th>Recibió</th><th>Método</th><th class="n">Cobrado</th></tr></thead><tbody>
-  ${ps.sort((a,b)=>a.entregado-b.entregado).map(p=>`<tr><td class="guia">${esc(p.guia)}</td>${conCliente?`<td>${esc(nombreCliente(p.clienteId)||"—")}</td>`:""}<td>${esc(p.destinatario)}</td><td>${metodoTxt(p)}</td><td class="n">${pesos(p.valorCobrado)}</td></tr>`).join("")}
+  const conGasto=ps.some(p=>gastoDe(p)), suma=f=>ps.reduce((a,p)=>a+f(p),0);
+  return `<div class="tabla-env"><table><thead><tr><th>Guía</th>${conCliente?"<th>Remitente</th>":""}<th>Recibió</th><th>Método</th><th class="n">Servicio</th>${conGasto?'<th class="n">Flete</th>':""}<th class="n">Cobrado</th></tr></thead><tbody>
+  ${ps.sort((a,b)=>a.entregado-b.entregado).map(p=>`<tr><td class="guia">${esc(p.guia)}</td>${conCliente?`<td>${esc(nombreCliente(p.clienteId)||"—")}</td>`:""}<td>${esc(p.destinatario)}</td><td>${metodoTxt(p)}</td><td class="n">${pesos(servicio(p))}</td>${conGasto?`<td class="n">${gastoDe(p)?pesos(gastoDe(p)):"—"}</td>`:""}<td class="n">${pesos(p.valorCobrado)}</td></tr>`).join("")}
+  <tr><td colspan="${conCliente?4:3}"><b>Total</b></td><td class="n"><b>${pesos(suma(servicio))}</b></td>${conGasto?`<td class="n"><b>${pesos(suma(gastoDe))}</b></td>`:""}<td class="n"><b>${pesos(suma(p=>Number(p.valorCobrado)||0))}</b></td></tr>
   </tbody></table></div>`;
 }
 
@@ -680,7 +692,7 @@ async function abrirPedido(guia, cliElegido){
   const c=$("#dlgCont");
   c.innerHTML=`<header><div><h2 class="guia">${esc(guia)}</h2>${etqEstado(p)}</div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
   <div class="linea2">
-    <div class="campo"><label for="pCli">Remitente (cliente)</label><select id="pCli"><option value="">Elige…</option>${cs.map(x=>`<option value="${esc(x.id)}" ${x.id===(cliElegido||p.clienteId)?"selected":""}>${esc(x.nombre)}</option>`).join("")}</select><button class="btn sec chico" id="pNuevoCli" type="button" style="align-self:start">+ Crear cliente nuevo</button></div>
+    <div class="campo"><label for="pCli">Remitente (cliente)</label><input id="pCliBuscar" type="search" placeholder="Buscar cliente…" autocomplete="off" aria-label="Buscar cliente"><select id="pCli"><option value="">Elige…</option>${cs.map(x=>`<option value="${esc(x.id)}" ${x.id===(cliElegido||p.clienteId)?"selected":""}>${esc(x.nombre)}</option>`).join("")}</select><button class="btn sec chico" id="pNuevoCli" type="button" style="align-self:start">+ Crear cliente nuevo</button></div>
     <div class="campo"><label for="pServ">Valor del servicio</label><input id="pServ" type="number" inputmode="numeric" min="0" step="100" value="${Number(p.valorServicio)||S.clientes[cliElegido||p.clienteId]?.tarifa||""}"></div>
   </div>
   <div class="campo"><label for="pCob">Valor a cobrar al destinatario (opcional)</label><input id="pCob" type="number" inputmode="numeric" min="0" step="100" value="${Number(p.aCobrar)||""}" placeholder="Lo que el mensajero debe recoger"></div>
@@ -709,6 +721,11 @@ async function abrirPedido(guia, cliElegido){
   abrirDlg();
   $("#pNuevoCli").onclick=()=>{ const sv=$("#pServ").value; formCliente(null, cid=>{ abrirPedido(guia, cid).then(()=>{ if(sv) $("#pServ").value=sv; }); }); };
   $("#pCli").onchange=e=>{ const t=S.clientes[e.target.value]?.tarifa; if(t && !$("#pServ").value) $("#pServ").value=t; };
+  $("#pCliBuscar").oninput=e=>{ // filtra la lista; si queda un solo cliente, lo elige
+    const q=sinTildes(e.target.value.trim()), sel=$("#pCli"), actual=sel.value;
+    const vis=cs.filter(x=>!q||sinTildes(x.nombre+" "+(x.telefono||"")).includes(q));
+    sel.innerHTML=`<option value="">${vis.length?(q?vis.length+" encontrado"+(vis.length===1?"":"s")+"…":"Elige…"):"Ningún cliente con ese nombre"}</option>`+vis.map(x=>`<option value="${esc(x.id)}" ${x.id===actual?"selected":""}>${esc(x.nombre)}</option>`).join("");
+    if(vis.length===1&&q){ sel.value=vis[0].id; sel.onchange({target:sel}); } };
   $("#pDomi").onchange=e=>{ $("#pDomiBox").classList.toggle("oculto",!e.target.checked); if(e.target.checked&&!$("#pDomiVal").value) $("#pDomiVal").value=(Number($("#pServ").value)||0)+(Number($("#pGasto").value)||0)||""; };
   $("#pGuardar").onclick=async()=>{ const cid=$("#pCli").value; if(!cid) return toast("Elige el remitente");
     const datos={clienteId:cid,clienteNombre:S.clientes[cid]?.nombre||"",valorServicio:Number($("#pServ").value)||0,domiPagado:$("#pDomi").checked,aCobrar:Number($("#pCob").value)||0,
