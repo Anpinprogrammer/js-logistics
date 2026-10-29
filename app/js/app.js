@@ -1554,13 +1554,13 @@ function pintarSueldos(v,aviso){
     </div>
     ${R.filas.length?`<div class="tabla-env"><table><thead><tr><th>Persona</th>${R.dias.map((d,i)=>`<th class="n">${DIAS_SEM[i]} ${d.slice(8)}</th>`).join("")}<th class="n">Total</th><th class="n">Adelantos</th><th class="n">Pagado</th><th class="n">Neto</th><th></th></tr></thead><tbody>
     ${R.filas.map(f=>{ const t=tipoDe(f.m), editable=PAGO_FIJO.includes(t);
-      return `<tr><td><b>${esc(f.m.nombre)}</b><br><span class="sub" style="font-size:.8rem">${TIPOS[t]}</span>${["patinador","oficina"].includes(t)&&f.m.tarifa?`<br><button class="btn sec chico" data-tarifa="${esc(f.m.id)}" style="margin-top:4px">Llenar ${pesos(f.m.tarifa)}</button>`:""}</td>
-      ${R.dias.map((d,i)=>`<td class="n">${editable?`<input id="j_${esc(f.m.id)}_${d}" data-jor="${esc(f.m.id)}|${d}" type="number" inputmode="numeric" step="1000" min="0" value="${jornada(f.m.id,d)||""}" style="width:92px;text-align:right" aria-label="${esc(f.m.nombre)} ${DIAS_SEM[i]}">`:(f.vals[i]?`<span class="${f.vals[i]<0?"neg":""}">${pesos(f.vals[i])}</span>`:"—")}</td>`).join("")}
+      return `<tr><td><b>${esc(f.m.nombre)}</b><br><span class="sub" style="font-size:.8rem">${TIPOS[t]}</span>${editable?`<br><span class="sub" style="font-size:.8rem">${f.m.tarifa?`${pesos(f.m.tarifa)} por día · <a href="#" data-tarifa-ed="${esc(f.m.id)}">cambiar</a> · <a href="#" data-otro="${esc(f.m.id)}">otro valor</a>`:`<a href="#" data-tarifa-ed="${esc(f.m.id)}">Poner pago por día</a>`}</span>`:""}</td>
+      ${R.dias.map((d,i)=>{ const j=jornada(f.m.id,d); return `<td class="n">${editable?`<button class="dia-btn" data-jd="${esc(f.m.id)}|${d}" aria-pressed="${!!j}" ${d>hoyS&&!j?"disabled":""} aria-label="${esc(f.m.nombre)} ${DIAS_SEM[i]} ${d.slice(8)}: ${j?"trabajó":"no trabajó"}">${j?"✓ "+pesos(j):"—"}</button>`:(f.vals[i]?`<span class="${f.vals[i]<0?"neg":""}">${pesos(f.vals[i])}</span>`:"—")}</td>`; }).join("")}
       <td class="n"><b>${pesos(f.total)}</b></td><td class="n">${f.adel?pesos(f.adel):"—"}</td><td class="n">${f.pagado?pesos(f.pagado):"—"}</td><td class="n"><b class="${f.neto<0?"neg":""}">${pesos(f.neto)}</b></td>
       <td><div class="acciones" style="margin:0;flex-wrap:nowrap"><button class="btn sec chico" data-adel="${esc(f.m.id)}">Adelanto</button>${f.neto>0?`<button class="btn ok chico" data-pagar="${esc(f.m.id)}">Pagar</button>`:""}</div></td></tr>`; }).join("")}
     <tr><td><b>Total</b></td>${R.dias.map((d,i)=>`<td class="n">${pesos(R.filas.reduce((a,f)=>a+f.vals[i],0))}</td>`).join("")}<td class="n"><b>${pesos(tot.total)}</b></td><td class="n">${pesos(tot.adel)}</td><td class="n">${pesos(tot.pagado)}</td><td class="n"><b>${pesos(tot.neto)}</b></td><td></td></tr>
     </tbody></table></div>`:`<div class="vacio">Registra tu personal en la pestaña Personal.</div>`}
-    <p class="sub" style="margin-top:10px">Mensajeros: 70% de sus domicilios del día − ${pesos(DESC_SUELDO)}. Patinadores, oficina y JS: escribe el valor de cada día. Los domicilios de pedidos a nombre de oficina son 100% de JS y suman al sueldo de Javier.</p>
+    <p class="sub" style="margin-top:10px">Mensajeros: 70% de sus domicilios del día − ${pesos(DESC_SUELDO)}. Patinadores, oficina y JS: toca cada día que trabajó (se marca con su pago por día); toca otra vez para quitarlo. Para un valor distinto, usa “otro valor”. Los domicilios de pedidos a nombre de oficina son 100% de JS y suman al sueldo de Javier.</p>
     ${dueno?`<h2>Cálculo del sueldo de ${esc(dueno.nombre)}</h2><div class="tabla-env"><table><thead><tr><th>Día</th><th class="n">30% domicilios mensajeros</th><th class="n">Domicilios propios y de oficina</th><th class="n">Ganancias ocasionales</th><th class="n">${pesos(DESC_SUELDO)} × mensajeros</th><th class="n">− Pagos fijos (patinadores, oficina, JS)</th><th class="n">Sueldo</th></tr></thead><tbody>
     ${R.dias.map((d,i)=>{ const x=R.porDia[i]; if(!x.dom30&&!x.propios&&!x.fijos&&!x.ganancias) return ""; return `<tr><td>${DIAS_SEM[i]} ${d.slice(8)}</td><td class="n">${pesos(x.dom30)}</td><td class="n">${pesos(x.propios)}</td><td class="n">${pesos(x.ganancias)}</td><td class="n">${pesos(x.desc)} (${x.nMens})</td><td class="n neg">${pesos(-x.fijos)}</td><td class="n"><b>${pesos(x.javier)}</b></td></tr>`; }).join("")||`<tr><td colspan="7" class="sub">Sin movimiento esta semana.</td></tr>`}
     </tbody></table></div>`:""}
@@ -1570,14 +1570,43 @@ function pintarSueldos(v,aviso){
   $("#semSig").onclick=()=>{semSel=moverSemana(semSel,1); pintar();};
   $("#semHoy").onclick=()=>{semSel=semanaDe(hoy()); pintar();};
   const bx=$("#semXls"); if(bx) bx.onclick=()=>descargarPlanilla(R,bx);
-  v.querySelectorAll("[data-jor]").forEach(inp=>inp.onchange=async()=>{ const [pid,dia]=inp.dataset.jor.split("|"), val=Number(inp.value)||0, id=pid+"_"+dia;
-    try{ if(val>0) await guardar("jornadas",id,{id,personaId:pid,dia,valor:val}); else await borrar("jornadas",id); }catch(e){ toast("No se pudo guardar"); } });
-  v.querySelectorAll("[data-tarifa]").forEach(b=>b.onclick=async()=>{ const m=S.mensajeros[b.dataset.tarifa]; b.disabled=true;
-    try{ for(const d of R.dias){ if(new Date(d+"T12:00:00").getDay()===0||d>hoyS||jornada(m.id,d)) continue; const id=m.id+"_"+d; await guardar("jornadas",id,{id,personaId:m.id,dia:d,valor:Number(m.tarifa)}); } toast("Días llenados para "+m.nombre); }
-    catch(e){ toast("No se pudo guardar"); } finally{ b.disabled=false; } });
+  // Un toque marca el día con el pago por día de la persona; otro toque lo quita
+  v.querySelectorAll("[data-jd]").forEach(b=>b.onclick=async()=>{ const [pid,dia]=b.dataset.jd.split("|"), m=S.mensajeros[pid], id=pid+"_"+dia;
+    if(!m) return; if(!Number(m.tarifa)&&!jornada(pid,dia)) return pedirTarifa(m,()=>marcarDia(m,dia));
+    b.disabled=true;
+    try{ if(jornada(pid,dia)) await borrar("jornadas",id); else await marcarDia(m,dia); }catch(e){ b.disabled=false; toast("No se pudo guardar"); } });
+  v.querySelectorAll("[data-tarifa-ed]").forEach(a=>a.onclick=e=>{ e.preventDefault(); pedirTarifa(S.mensajeros[a.dataset.tarifaEd]); });
+  v.querySelectorAll("[data-otro]").forEach(a=>a.onclick=e=>{ e.preventDefault(); otroValorDias(S.mensajeros[a.dataset.otro],R.dias); });
   v.querySelectorAll("[data-adel]").forEach(b=>b.onclick=()=>movCaja("sale",{cat:"adelanto",personaId:b.dataset.adel,dia:hoyS<R.dias[0]||hoyS>R.dias[6]?R.dias[0]:hoyS}));
   v.querySelectorAll("[data-pagar]").forEach(b=>b.onclick=()=>{ const f=R.filas.find(x=>x.m.id===b.dataset.pagar); movCaja("sale",{cat:"sueldo",personaId:f.m.id,valor:f.neto,semana:R.sem}); });
   v.querySelectorAll("[data-delref]").forEach(b=>b.onclick=async()=>{ const [col,id]=b.dataset.delref.split("|"); b.disabled=true; try{ await borrar(col,id); toast("Adelanto quitado"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
+}
+/* Pago fijo por día (patinadores, oficina, JS): se guarda en Personal y se usa al marcar cada día en Sueldos. */
+const marcarDia = (m,dia) => guardar("jornadas",m.id+"_"+dia,{id:m.id+"_"+dia,personaId:m.id,dia,valor:Number(m.tarifa)});
+function pedirTarifa(m,despues){
+  if(!m) return; const ultimo=Object.values(S.jornadas).filter(j=>j.personaId===m.id).sort((a,b)=>b.dia.localeCompare(a.dia))[0];
+  $("#dlgCont").innerHTML=`<header><h2>Pago por día de ${esc(m.nombre)}</h2><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <p class="sub">Es lo que se marca cada vez que tocas un día en Sueldos. Cambiarlo no modifica los días ya marcados.</p>
+    <div class="campo"><label for="tfVal">Valor por día</label><input id="tfVal" type="number" inputmode="numeric" min="0" step="1000" value="${Number(m.tarifa)||Number(ultimo?.valor)||""}"></div>
+    <button class="btn" id="tfGuardar" style="width:100%">Guardar${despues?" y marcar el día":""}</button>`;
+  abrirDlg(); $("#tfVal").select();
+  $("#tfGuardar").onclick=async()=>{ const val=Number($("#tfVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero");
+    const b=$("#tfGuardar"); b.disabled=true;
+    try{ await actualizar("mensajeros",m.id,{tarifa:val}); m.tarifa=val; cerrarDlg(); toast("Pago por día de "+m.nombre+": "+pesos(val)); if(despues) await despues(); }
+    catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
+}
+/* Días con un valor distinto al de siempre (medio día, horas extra…). Vacío o 0 = no trabajó. */
+function otroValorDias(m,dias){
+  if(!m) return;
+  $("#dlgCont").innerHTML=`<header><div><h2>${esc(m.nombre)}</h2><span class="sub">Valor de cada día de la semana</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <div class="linea2">${dias.map((d,i)=>`<div class="campo" style="min-width:120px"><label for="ov_${d}">${DIAS_SEM[i]} ${d.slice(8)}</label><input id="ov_${d}" data-ov="${d}" type="number" inputmode="numeric" min="0" step="1000" value="${jornada(m.id,d)||""}" placeholder="No trabajó"></div>`).join("")}</div>
+    <button class="btn" id="ovGuardar" style="width:100%">Guardar</button>`;
+  abrirDlg();
+  $("#ovGuardar").onclick=async()=>{ const b=$("#ovGuardar"); b.disabled=true;
+    try{ for(const inp of document.querySelectorAll("[data-ov]")){ const dia=inp.dataset.ov, val=Number(inp.value)||0, id=m.id+"_"+dia;
+        if(val===jornada(m.id,dia)) continue; if(val>0) await guardar("jornadas",id,{id,personaId:m.id,dia,valor:val}); else await borrar("jornadas",id); }
+      cerrarDlg(); toast("Días de "+m.nombre+" guardados"); }
+    catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
 async function descargarPlanilla(R,btn){
   if(!window.ExcelJS) return toast("El generador de Excel no ha cargado. Espera unos segundos e intenta de nuevo.");
