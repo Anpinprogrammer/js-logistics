@@ -799,6 +799,7 @@ function textoSaldo(cid){
     abiertas.slice(-MAX).forEach(r=>L.push(`• ${new Date(r.fecha).toLocaleDateString("es-CO",{day:"2-digit",month:"short"})} · ${r.det} → ${r.v<0?"− ":"+ "}${pesos(Math.abs(r.v))}`));
     if(abiertas.length>MAX) L.push(`(y ${abiertas.length-MAX} movimientos anteriores)`);
     L.push("",s<0?`*Total a pagar: ${pesos(-s)}*`:`*Total a tu favor: ${pesos(s)}*`); }
+  if(s<0) L.push("",...PAGOS_TEXTO);
   L.push("",s<0?"Quedamos atentos a tu pago. Si ya lo hiciste, por favor envíanos el comprobante.":s>0?"Cuéntanos cómo prefieres recibirlo.":"","",EMPRESA.lema,EMPRESA.tel);
   return L.filter((x,i,a)=>!(x===""&&a[i-1]==="")).join("\n");
 }
@@ -875,6 +876,10 @@ function abrirCuenta(cid){
 
 /* ======================= RECIBOS DE CUADRE ======================= */
 const LOGO=document.querySelector(".marca img").src;
+/* Datos de pago que van en los mensajes de cobro por WhatsApp. */
+const PAGOS_TEXTO=["💳 *Opciones de pago – Transferencias*","","Para tu comodidad, puedes realizar tu pago a cualquiera de nuestras cuentas:","",
+  "📱 *NEQUI*","Número: 316 493 3854","Titular: Javier Salazar","",
+  "🇨🇴 *Bancolombia – Cuenta de Ahorros*","Número: 815 13203390","Titular: Javier Salazar"];
 const EMPRESA={nombre:"JS LOGISTICS CALI", lema:"¡SERVIR ES NUESTRA LABOR!", tel:"TEL: 316 493 3854", ig:"IG: @JS.LOGISTICS.CALI"};
 const PCT_SUELDO=0.7, DESC_SUELDO=25000;
 const sueldoDe = domicilios => domicilios*PCT_SUELDO - DESC_SUELDO;
