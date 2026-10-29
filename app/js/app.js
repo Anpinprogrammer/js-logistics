@@ -185,6 +185,17 @@ let miMensajero = lsGet("js_mensajero") || "";
 let ultimaGuia=null;
 let fotoPara=""; // id en Personal de la oficina cuando la foto se toma desde Oficina → Pedidos
 
+/* Filtro por día de los paneles de pedidos: un pedido es del día si salió o se entregó (o devolvió) ese día. "" = todos los días. */
+let diaPedA="", diaPedC="", diaPedM="";
+const delDia = (p,d) => !d || diaDe(p.creado)===d || (!!p.entregado && diaDe(p.entregado)===d);
+function moverDia(d,n){ const x=new Date((d||hoy())+"T12:00:00"); x.setDate(x.getDate()+n); return diaDe(x.getTime()); }
+const filtroDiaHtml = d => `<div class="filtro-dia"><button class="btn sec chico" data-dia="-1" aria-label="Día anterior">‹</button><input type="date" id="diaPed" value="${d}" max="${hoy()}" aria-label="Filtrar por día"><button class="btn sec chico" data-dia="1" aria-label="Día siguiente" ${!d||d>=hoy()?"disabled":""}>›</button>${d?`<button class="btn sec chico" data-dia="0">Ver todos</button>`:`<button class="btn sec chico" data-dia="hoy">Hoy</button>`}</div>`;
+function enlazarFiltroDia(d,poner){
+  const i=$("#diaPed"); if(!i) return;
+  i.onchange=()=>{ poner(i.value); pintar(); };
+  document.querySelectorAll("[data-dia]").forEach(b=>b.onclick=()=>{ const k=b.dataset.dia; poner(k==="0"?"":k==="hoy"?hoy():moverDia(d,Number(k))); pintar(); });
+}
+
 const iconCam='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>';
 
 function pintar(){
@@ -252,13 +263,13 @@ function pintarMensajero(){
       <button class="btn sec" id="btnGaleria" style="width:100%;margin-top:10px">Subir fotos de la galería (puedes elegir varias)</button>
       ${ultimaGuia?`<div class="recien"><div><div class="guia">${esc(ultimaGuia)}</div><span>Guardado en por entregar. Escribe ${ultimaGuia.includes(" a ")?"cada número en su paquete":"este número en el paquete"}.</span></div></div>`:""}`;
   } else if(tabM==="pend"){
-    const ps=pendientesMios();
-    h=`<h1>Por entregar</h1><p class="sub">${ps.length} pedido${ps.length===1?"":"s"} en ruta</p>`+
+    const ps=pendientesMios().filter(p=>delDia(p,diaPedM));
+    h=`<h1>Por entregar</h1><p class="sub">${ps.length} pedido${ps.length===1?"":"s"} en ruta${diaPedM?" que salieron ese día":""}</p>${filtroDiaHtml(diaPedM)}`+
       (ps.length?`<div class="lista">${ps.map(p=>`<button class="fila" data-entregar="${esc(p.guia)}">
         ${fotoSegura(p.mini)?`<img src="${fotoSegura(p.mini)}" alt="">`:'<span class="sinfoto"></span>'}
         <span class="info"><span class="guia">${esc(p.guia)}</span>${Number(p.aCobrar)?` <b>Cobrar ${pesos(p.aCobrar)}</b>`:""}${(p.intentos||[]).length?` <span class="etq sin">${p.intentos.length} intento${p.intentos.length===1?"":"s"}</span>`:""}<p>${esc(nombreCliente(p.clienteId)||"Remitente sin asignar")} · salió ${hora(p.creado)}</p></span>
         <span class="btn chico ok">Entregar</span></button>`).join("")}</div>`
-      :`<div class="vacio">No tienes pedidos pendientes. Toma la foto en “Nuevo pedido” al salir.</div>`);
+      :`<div class="vacio">${diaPedM?"No tienes pedidos pendientes de ese día.":"No tienes pedidos pendientes. Toma la foto en “Nuevo pedido” al salir."}</div>`);
   } else if(tabM==="sueldo"){
     h=miSueldoHtml(miMensajero);
   } else {
@@ -287,6 +298,7 @@ function pintarMensajero(){
   const bf=$("#btnFoto"); if(bf) bf.onclick=()=>{fotoPara=""; $("#inCamara").value=""; $("#inCamara").click();};
   const bg=$("#btnGaleria"); if(bg) bg.onclick=()=>{fotoPara=""; $("#inGaleria").value=""; $("#inGaleria").click();};
   document.querySelectorAll("[data-entregar]").forEach(b=>b.onclick=()=>abrirEntrega(b.dataset.entregar));
+  if(tabM==="pend") enlazarFiltroDia(diaPedM,d=>diaPedM=d);
   const sa=$("#msAnt"), ss=$("#msSig"), sh=$("#msHoy");
   if(sa) sa.onclick=()=>{semM=moverSemana(semM,-1); pintar();};
   if(ss) ss.onclick=()=>{semM=moverSemana(semM,1); pintar();};
@@ -457,6 +469,7 @@ function pintarAdmin(){
     else if(filtroA==="dif") ps=ps.filter(p=>Number(p.difCobro));
     else if(filtroA==="cambio") ps=ps.filter(cambioPendiente);
     if(buscarA) ps=ps.filter(p=>(p.guia+" "+nombreCliente(p.clienteId)+" "+(p.destinatario||"")).toLowerCase().includes(buscarA.toLowerCase()));
+    if(diaPedA) ps=ps.filter(p=>delDia(p,diaPedA));
     const ofis=listaOrdenada(S.mensajeros,"nombre").filter(m=>tipoDe(m)==="oficina");
     const fotoOfi=ofis.length?`<div class="acciones" style="margin:0 0 14px;align-items:center"><button class="btn" id="fotoOfi">${iconCam.replace('<svg','<svg width="22" height="22"')}<span>Tomar foto del pedido</span></button><button class="btn sec" id="galeriaOfi">Subir fotos (varias)</button>${ofis.length>1?`<select id="ofiSel" aria-label="Oficina encargada">${ofis.map(m=>`<option value="${esc(m.id)}">${esc(m.nombre)}</option>`).join("")}</select>`:""}<span class="sub">Queda a cargo de ${ofis.length>1?"la oficina elegida":esc(ofis[0].nombre)}; el domicilio es 100% de JS.</span></div>`
       :`<div class="aviso">${esAdmin?"Para registrar pedidos con foto desde aquí, agrega en Más → Personal una persona de tipo “Oficina (JS)”.":"Para registrar pedidos con foto, el administrador debe crear la Oficina en Personal."}</div>`;
@@ -465,11 +478,13 @@ function pintarAdmin(){
       ${(()=>{ const n=Object.values(S.pedidos).filter(p=>Number(p.difCobro)&&!p.difRevisada).length; return n?`<div class="aviso alerta">${n===1?"1 entrega tiene":n+" entregas tienen"} un valor cobrado distinto al que debían cobrar. Revísalas en “Con diferencia”.</div>`:""; })()}
       <div class="filtros">${[["sin","Sin remitente"],["pend","Por entregar"],["ent","Entregados"],["dev","Devueltos"],["dif","Con diferencia"],["cambio","Cambios por entregar"],["todos","Todos"]].map(([k,t])=>`<button data-f="${k}" aria-pressed="${filtroA===k}">${t}</button>`).join("")}</div>
       <div class="campo"><input id="buscar" type="search" placeholder="Buscar guía, remitente o destinatario" value="${esc(buscarA)}" aria-label="Buscar"></div>
+      ${filtroDiaHtml(diaPedA)}${diaPedA?`<p class="sub">${ps.length} pedido${ps.length===1?"":"s"} que salieron o se cerraron ese día</p>`:""}
       ${ps.length?`<div class="lista">${ps.slice(0,limiteA).map(p=>filaPedido(p)).join("")}</div>${ps.length>limiteA?`<div class="acciones" style="justify-content:center"><button class="btn sec" id="masPed">Ver más (${ps.length-limiteA} restantes)</button></div>`:""}`:`<div class="vacio">${filtroA==="sin"?"Todos los pedidos tienen remitente asignado.":"No hay pedidos aquí."}</div>`}`;
     v.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{filtroA=b.dataset.f; limiteA=100; pintar();});
     const mp=$("#masPed"); if(mp) mp.onclick=()=>{limiteA+=200; pintar();};
     const bu=$("#buscar"); bu.oninput=()=>{buscarA=bu.value; clearTimeout(bu._t); bu._t=setTimeout(()=>{pintar(); const n=$("#buscar"); n.focus(); n.setSelectionRange(n.value.length,n.value.length);},300);};
     v.querySelectorAll("[data-ped]").forEach(b=>b.onclick=()=>abrirPedido(b.dataset.ped));
+    enlazarFiltroDia(diaPedA,d=>{diaPedA=d; limiteA=100;});
     const fo=$("#fotoOfi"); if(fo) fo.onclick=()=>{ fotoPara=$("#ofiSel")?.value||ofis[0].id; $("#inCamara").value=""; $("#inCamara").click(); };
     const go=$("#galeriaOfi"); if(go) go.onclick=()=>{ fotoPara=$("#ofiSel")?.value||ofis[0].id; $("#inGaleria").value=""; $("#inGaleria").click(); };
   }
@@ -560,16 +575,19 @@ function pintarCliente(){
     let ps=Object.values(S.pedidos).sort((a,b)=>b.creado-a.creado);
     if(filtroC==="cambio") ps=ps.filter(cambioPendiente); else if(filtroC==="ruta") ps=ps.filter(p=>p.estado==="pendiente"); else if(filtroC==="ent") ps=ps.filter(p=>p.estado==="entregado"); else if(filtroC==="dev") ps=ps.filter(p=>p.estado==="devuelto");
     if(buscarC) ps=ps.filter(p=>(p.guia+" "+(p.destinatario||"")).toLowerCase().includes(buscarC.toLowerCase()));
+    if(diaPedC) ps=ps.filter(p=>delDia(p,diaPedC));
     v.innerHTML=`<h1>Hola, ${esc(c.nombre)}</h1><p class="sub">Tus envíos con JS Logistics y sus pruebas de entrega.</p>
       ${cambios.length?`<div class="aviso alerta">Tienes ${cambios.length===1?"1 prenda de cambio":cambios.length+" prendas de cambio"} por recibir (${cambios.map(p=>esc(p.guia)).join(", ")}). Cuando te la entreguen, ábrela y confirma que la recibiste.</div>`:""}
       <div class="filtros">${[["todos","Todos"],["ruta","En ruta"],["ent","Entregados"],["dev","Devueltos"],["cambio","Cambios por recibir"]].map(([k,t])=>`<button data-fc="${k}" aria-pressed="${filtroC===k}">${t}</button>`).join("")}</div>
       <div class="campo"><input id="buscarC" type="search" placeholder="Buscar guía o quien recibió" value="${esc(buscarC)}" aria-label="Buscar"></div>
+      ${filtroDiaHtml(diaPedC)}${diaPedC?`<p class="sub">${ps.length} envío${ps.length===1?"":"s"} de ese día</p>`:""}
       ${ps.length?`<div class="lista">${ps.slice(0,300).map(p=>`<button class="fila" data-pc="${esc(p.guia)}">${fotoSegura(p.mini)?`<img src="${fotoSegura(p.mini)}" alt="">`:'<span class="sinfoto"></span>'}
         <span class="info"><span class="guia">${esc(p.guia)}</span> ${etqEstado(p)}${etqCambio(p)}<p>${p.estado==="entregado"?"Recibió "+esc(p.destinatario||"")+" · "+hora(p.entregado):p.estado==="devuelto"?esc(MOTIVOS[p.motivoDev]||"Devuelto")+" · "+hora(p.entregado):"Salió "+hora(p.creado)}</p></span>
         <span class="n" style="text-align:right;font-weight:700">${p.estado==="entregado"?pesos(p.valorCobrado):""}</span></button>`).join("")}</div>`:`<div class="vacio">No hay envíos aquí.</div>`}`;
     v.querySelectorAll("[data-fc]").forEach(b=>b.onclick=()=>{filtroC=b.dataset.fc; pintar();});
     const bu=$("#buscarC"); bu.oninput=()=>{buscarC=bu.value; clearTimeout(bu._t); bu._t=setTimeout(()=>{pintar(); const n=$("#buscarC"); n.focus(); n.setSelectionRange(n.value.length,n.value.length);},300);};
     v.querySelectorAll("[data-pc]").forEach(b=>b.onclick=()=>verPedidoCliente(b.dataset.pc));
+    enlazarFiltroDia(diaPedC,d=>diaPedC=d);
   } else {
     const s=saldoCliente(miCliente), rows=filasCuenta(miCliente);
     v.innerHTML=`<h1>Mi cuenta</h1><p class="sub">${esc(c.nombre)}</p>
