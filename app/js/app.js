@@ -546,7 +546,7 @@ function pintarAdmin(){
       <h2>Dinero recibido de mensajeros</h2>
       <div class="campo" style="max-width:220px"><label for="diaC">Día</label><input type="date" id="diaC" value="${diaCaja}"></div>
       <div class="cifras" style="margin-bottom:12px"><div class="cifra fuerte"><span>Dinero recibido</span><b>${pesos(cajaDia)}</b><span>${Object.entries(porMedio).map(([m,x])=>`${MEDIOS[m]||m}: ${pesos(x)}`).join(" · ")||"Sin entregas de dinero este día"}</span></div></div>
-      ${recsDia.length?`<div class="tabla-env"><table><thead><tr><th>Hora</th><th>Mensajero</th><th>Medio</th><th>Nota</th><th class="n">Valor</th><th></th></tr></thead><tbody>${recsDia.map(r=>`<tr><td>${hora(r.fecha)}</td><td>${esc(S.mensajeros[r.mensajeroId]?.nombre||"")}</td><td>${MEDIOS[r.medio]||""}</td><td>${esc(r.nota||"")}</td><td class="n"><b>${pesos(r.valor)}</b></td><td><button class="btn peligro chico" data-delrec="${esc(r.id)}">Quitar</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Toca “Recibir dinero” en un mensajero cada vez que te entregue plata.</div>`}
+      ${recsDia.length?`<div class="tabla-env"><table><thead><tr><th>Hora</th><th>Mensajero</th><th>Medio</th><th>Nota</th><th class="n">Valor</th><th></th></tr></thead><tbody>${recsDia.map(r=>`<tr><td>${hora(r.fecha)}</td><td>${esc(S.mensajeros[r.mensajeroId]?.nombre||"")}</td><td>${MEDIOS[r.medio]||""}</td><td>${esc(r.nota||"")}</td><td class="n"><b>${pesos(r.valor)}</b></td><td style="white-space:nowrap"><button class="btn sec chico" data-edrec="${esc(r.id)}">Editar</button> <button class="btn peligro chico" data-delrec="${esc(r.id)}">Quitar</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Toca “Recibir dinero” en un mensajero cada vez que te entregue plata.</div>`}
       <h2>Liquidaciones recientes</h2>
       ${liqs.length?`<div class="tabla-env"><table><thead><tr><th>Liquidado</th><th>Mensajero</th><th class="n">Entregas</th><th class="n">Entregó</th><th>Resultado</th><th></th></tr></thead><tbody>${liqs.map(l=>`<tr><td>${hora(l.fecha)}</td><td>${esc(S.mensajeros[l.mensajeroId]?.nombre||"")}</td><td class="n">${l.entregas||0}</td><td class="n">${pesos(l.recibido)}</td><td class="${l.debe>0?"neg":"pos"}">${textoLiq(l.debe)}</td><td><button class="btn sec chico" data-verliq="${esc(l.id)}">Ver</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Aún no has liquidado a ningún mensajero.</div>`}`;
     $("#diaC").onchange=e=>{diaCaja=e.target.value||hoy(); pintar();};
@@ -555,6 +555,7 @@ function pintarAdmin(){
     v.querySelectorAll("[data-base]").forEach(b=>b.onclick=()=>movCaja("sale",{cat:"base",personaId:b.dataset.base}));
     v.querySelectorAll("[data-liquidar]").forEach(b=>b.onclick=()=>liquidar(b.dataset.liquidar));
     v.querySelectorAll("[data-verliq]").forEach(b=>b.onclick=()=>verLiquidacion(b.dataset.verliq));
+    v.querySelectorAll("[data-edrec]").forEach(b=>b.onclick=()=>editarRecaudo(b.dataset.edrec));
     v.querySelectorAll("[data-delrec]").forEach(b=>b.onclick=async()=>{ b.disabled=true; try{ await borrar("recaudos",b.dataset.delrec); toast("Entrega de dinero quitada"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
   }
   else if(tabA==="recibos"){ pintarRecibos(v,aviso); }
@@ -820,7 +821,10 @@ async function abrirPedido(guia, cliElegido){
   </div>
   <div class="campo"><label for="pCob">Valor a cobrar al destinatario (opcional)</label><input id="pCob" type="number" inputmode="numeric" min="0" step="100" value="${Number(p.aCobrar)||""}" placeholder="Lo que el mensajero debe recoger"></div>
   ${p.estado==="devuelto"?`<label class="check"><input type="checkbox" id="pDev" ${p.cobrarDev?"checked":""}> Cobrarle al cliente el domicilio de esta devolución</label>`:""}
-  ${p.metodo==="transf_js"&&p.estado==="entregado"?`<div class="campo"><label for="pCta">Cuenta de JS donde llegó la transferencia</label><select id="pCta"><option value="">Sin especificar</option>${Object.entries(CUENTAS_JS).map(([k,t])=>`<option value="${k}" ${p.cuentaJs===k?"selected":""}>${t}</option>`).join("")}</select></div>`:""}
+  ${p.estado==="entregado"&&esAdmin?`<div class="linea2"><div class="campo"><label for="pValCob">Valor que cobró el mensajero</label><input id="pValCob" type="number" inputmode="numeric" min="0" step="100" value="${Number(p.valorCobrado)||0}"></div>
+    <div class="campo"><label for="pMet">Cómo se lo pagaron</label><select id="pMet">${Object.entries(METODOS).map(([k,x])=>`<option value="${k}" ${p.metodo===k?"selected":""}>${x.t}</option>`).join("")}</select></div></div>
+    ${pedidoLiquidado(p)?`<p class="sub" style="margin-top:-6px">Esta entrega ya está en una liquidación cerrada de ${esc(S.mensajeros[p.mensajeroId]?.nombre||"el mensajero")}: corregirla cambia el saldo del cliente, pero no lo que quedó en esa liquidación.</p>`:""}`:""}
+  ${p.estado==="entregado"&&(p.metodo==="transf_js"||esAdmin)?`<div class="campo ${p.metodo==="transf_js"?"":"oculto"}" id="pCtaBox"><label for="pCta">Cuenta de JS donde llegó la transferencia</label><select id="pCta"><option value="">Sin especificar</option>${Object.entries(CUENTAS_JS).map(([k,t])=>`<option value="${k}" ${p.cuentaJs===k?"selected":""}>${t}</option>`).join("")}</select></div>`:""}
   <div class="linea2"><div class="campo"><label for="pGasto">Flete / gasto pagado por el mensajero (se le cobra al cliente)</label><input id="pGasto" type="number" inputmode="numeric" min="0" step="1000" value="${gastoDe(p)||""}" placeholder="0"></div>
   <div class="campo"><label for="pGastoNota">Detalle del gasto</label><input id="pGastoNota" value="${esc(p.gastoNota||"")}" placeholder="Ej: bus a Pasto"></div></div>
   <label class="check"><input type="checkbox" id="pDomi" ${p.domiPagado?"checked":""}> El cliente ya pagó el domicilio</label>
@@ -843,6 +847,7 @@ async function abrirPedido(guia, cliElegido){
   <div class="acciones">${!cerrado(p)&&tipoDe(S.mensajeros[p.mensajeroId])==="oficina"?'<button class="btn ok chico" id="pEntregar">Marcar entregado</button>':""}${cerrado(p)?(esAdmin?'<button class="btn sec chico" id="pReabrir">Devolver a por entregar</button>':""):'<button class="btn sec chico" id="pNoEnt">Registrar que no se pudo entregar</button>'}${Number(p.difCobro)&&!p.difRevisada?'<button class="btn sec chico" id="pDifOk">Marcar diferencia como revisada</button>':""}${cambioPendiente(p)?'<button class="btn sec chico" id="pCambioOk">Cambio entregado al cliente</button>':""}${esAdmin?'<button class="btn peligro chico" id="pBorrar">Eliminar pedido</button>':""}</div>`;
   abrirDlg();
   $("#pNuevoCli").onclick=()=>{ const sv=$("#pServ").value; formCliente(null, cid=>{ abrirPedido(guia, cid).then(()=>{ if(sv) $("#pServ").value=sv; }); }); };
+  const pm=$("#pMet"); if(pm) pm.onchange=()=>$("#pCtaBox").classList.toggle("oculto",pm.value!=="transf_js");
   $("#pCli").onchange=e=>{ const t=S.clientes[e.target.value]?.tarifa; if(t && !$("#pServ").value) $("#pServ").value=t; };
   $("#pCliBuscar").oninput=e=>{ // filtra la lista; si queda un solo cliente, lo elige
     const q=sinTildes(e.target.value.trim()), sel=$("#pCli"), actual=sel.value;
@@ -858,6 +863,11 @@ async function abrirPedido(guia, cliElegido){
       Object.assign(datos,{domiPagoMedio:medio,domiPagoValor:val,domiPagoFecha:p.domiPagado&&p.domiPagoFecha?p.domiPagoFecha:Date.now()}); }
     else Object.assign(datos,{domiPagoMedio:"",domiPagoValor:"",domiPagoFecha:0});
     if($("#pDev")) datos.cobrarDev=$("#pDev").checked; if($("#pCta")) datos.cuentaJs=$("#pCta").value;
+    if($("#pValCob")){ // corrección de lo que cobró el mensajero (solo administración); la diferencia se recalcula igual que al entregar
+      const v=Number($("#pValCob").value), met=$("#pMet").value; if($("#pValCob").value===""||v<0) return toast("Escribe el valor cobrado (0 si no cobró)");
+      const dif=datos.aCobrar?v-(met==="transf_cliente"?0:datos.aCobrar):0;
+      Object.assign(datos,{valorCobrado:v,metodo:met,cuentaJs:met==="transf_js"?datos.cuentaJs||"":"",difCobro:dif});
+      if(dif!==(Number(p.difCobro)||0)) datos.difRevisada=false; }
     try{ await actualizar("pedidos",guia,datos); toast("Guía "+guia+" actualizada"); cerrarDlg(); }catch(e){toast("No se pudo guardar");} };
   if($("#pBorrar")) $("#pBorrar").onclick=async()=>{ if(!await confirmar("Eliminar la guía "+guia,"Se borran el pedido y sus fotos. No se puede deshacer.","Eliminar")) return abrirPedido(guia);
     const grupo=nuevoId(); try{ await borrar("pedidos",guia,{grupo}); await borrar("fotos",guia,{grupo}).catch(()=>{}); await borrar("entregas",guia,{grupo}).catch(()=>{}); cerrarDlg(); toast("Guía enviada a la papelera"); }catch(e){ toast("No se pudo eliminar"); } };
@@ -1016,6 +1026,8 @@ const esRepartidor = m => ["mensajero","dueno","oficina"].includes(tipoDe(m));
 const ganaPorcentaje = m => tipoDe(m)==="mensajero";
 const sueldoTexto = (mid,ps) => tipoDe(S.mensajeros[mid])==="dueno" ? "Ver “Mi sueldo”" : tipoDe(S.mensajeros[mid])==="oficina" ? "Pago por día" : pesos(sueldoPedidos(ps));
 function liquidacionesDe(mid){ return Object.values(S.liquidaciones).filter(l=>l.mensajeroId===mid).sort((a,b)=>b.fecha-a.fecha); }
+const yaLiquidado = (mid,fecha) => { const ul=liquidacionesDe(mid)[0]; return !!ul && fecha<=ul.fecha; };
+const pedidoLiquidado = p => cerrado(p) && yaLiquidado(p.mensajeroId,p.entregado);
 function periodoMensajero(mid){
   const ul=liquidacionesDe(mid)[0]||null, desde=ul?ul.fecha:0, anterior=ul?(Number(ul.debe)||0):0;
   const ps=Object.values(S.pedidos).filter(p=>cerrado(p)&&p.mensajeroId===mid&&p.entregado>desde).sort((a,b)=>a.entregado-b.entregado);
@@ -1103,6 +1115,21 @@ function recibirDinero(mid){
     const b=$("#rGuardar"); b.disabled=true; const id=nuevoId();
     try{ await guardar("recaudos",id,{id,mensajeroId:mid,valor:val,medio:$("#rMedio").value,nota:$("#rNota").value.trim(),fecha:Date.now()});
       const falta=pm.debe-val; cerrarDlg(); toast(`Recibido ${pesos(val)} de ${m.nombre}. ${falta>0?"Le falta "+pesos(falta):falta<0?"Entregó "+pesos(-falta)+" de más":"Quedó a paz y salvo"}`); }
+    catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
+}
+/* Corregir una entrega de dinero ya registrada (valor, medio o nota). */
+function editarRecaudo(id){
+  const r=S.recaudos[id]; if(!r) return; const m=S.mensajeros[r.mensajeroId];
+  $("#dlgCont").innerHTML=`<header><div><h2>Editar dinero recibido</h2><span class="sub">${esc(m?.nombre||"")} · ${hora(r.fecha)}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    ${yaLiquidado(r.mensajeroId,r.fecha)?`<div class="aviso">Esta entrega de dinero ya está en una liquidación cerrada: corregirla cambia la caja, pero no lo que quedó debiendo en esa liquidación.</div>`:""}
+    <div class="linea2"><div class="campo"><label for="erVal">Valor que entregó</label><input id="erVal" type="number" inputmode="numeric" min="0" step="1000" value="${Number(r.valor)||""}"></div>
+    <div class="campo"><label for="erMedio">Medio</label><select id="erMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}" ${r.medio===k?"selected":""}>${t}</option>`).join("")}</select></div></div>
+    <div class="campo"><label for="erNota">Nota (opcional)</label><input id="erNota" value="${esc(r.nota||"")}"></div>
+    <button class="btn ok" id="erGuardar" style="width:100%">Guardar cambios</button>`;
+  abrirDlg(); $("#erVal").select();
+  $("#erGuardar").onclick=async()=>{ const val=Number($("#erVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero");
+    const b=$("#erGuardar"); b.disabled=true;
+    try{ await actualizar("recaudos",id,{valor:val,medio:$("#erMedio").value,nota:$("#erNota").value.trim()}); cerrarDlg(); toast("Entrega de dinero corregida"); }
     catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
 let diaRec=hoy();
