@@ -79,6 +79,8 @@ h2{font-size:1.15rem;margin:22px 0 10px}
 .filtros{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .filtros button{border:1.5px solid var(--linea);background:var(--papel);border-radius:999px;padding:6px 14px;font-weight:600;font-size:.9rem}
 .filtros button[aria-pressed="true"]{background:var(--marca);color:#fff;border-color:var(--marca)}
+.filtros .num{display:inline-block;min-width:20px;padding:0 6px;border-radius:999px;background:var(--rojo);color:#fff;font-size:.75rem;text-align:center}
+.filtros button[aria-pressed="true"] .num{background:#fff;color:var(--marca)}
 .filtro-dia{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .filtro-dia input{border:1.5px solid var(--linea);background:var(--fondo);border-radius:10px;padding:8px 8px;min-width:0;flex:0 1 150px}
 .filtro-dia button[data-dia="-1"],.filtro-dia button[data-dia="1"]{font-size:1.1rem;padding-inline:12px}
