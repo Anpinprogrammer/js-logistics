@@ -531,7 +531,7 @@ function pintarAdmin(){
   else if(tabA==="caja"){
     const pendM={}; Object.values(S.pedidos).filter(p=>p.estado==="pendiente").forEach(p=>pendM[p.mensajeroId]=(pendM[p.mensajeroId]||0)+1);
     const pms={}; Object.keys(S.mensajeros).forEach(id=>pms[id]=periodoMensajero(id));
-    const ids=listaOrdenada(S.mensajeros,"nombre").filter(esRepartidor).map(m=>m.id).filter(id=>{const pm=pms[id]; return pm.ps.length||pm.recs.length||pm.debe||pendM[id];});
+    const ids=listaOrdenada(S.mensajeros,"nombre").filter(esRepartidor).map(m=>m.id).filter(id=>{const pm=pms[id]; return tipoDe(S.mensajeros[id])==="mensajero"||pm.ps.length||pm.recs.length||pm.debe||pendM[id];}); // los mensajeros siempre, para poder darles base al empezar el día
     const tot={debe:0,ef:0,tj:0,tc:0}; ids.forEach(id=>{const pm=pms[id], tt=totales(pm.ps); tot.debe+=pm.debe; tot.ef+=tt.efectivo; tot.tj+=tt.transfJs; tot.tc+=tt.transfCli;});
     const recsDia=Object.values(S.recaudos).filter(r=>diaDe(r.fecha)===diaCaja).sort((a,b)=>a.fecha-b.fecha);
     const cajaDia=recsDia.reduce((a,r)=>a+(Number(r.valor)||0),0);
@@ -548,7 +548,7 @@ function pintarAdmin(){
       </div>
       <div style="height:14px"></div>
       ${ids.length?`<div class="mgrid">${ids.map(id=>{const pm=pms[id], tt=totales(pm.ps); return `<div class="mcard">
-        <div class="mcard-top"><b>${esc(S.mensajeros[id].nombre)}</b><span class="acciones" style="margin:0;gap:6px">${esAdmin?`<button class="btn sec chico" data-base="${esc(id)}">Dar base</button>`:""}<button class="btn ok chico" data-recibir="${esc(id)}">Recibir dinero</button></span></div>
+        <div class="mcard-top"><b>${esc(S.mensajeros[id].nombre)}</b><span class="acciones" style="margin:0;gap:6px"><button class="btn sec chico" data-base="${esc(id)}">Dar base</button><button class="btn ok chico" data-recibir="${esc(id)}">Recibir dinero</button></span></div>
         <span class="sub" style="font-size:.85rem">Período desde ${pm.ul?hora(pm.ul.fecha):"el inicio"}</span>
         <dl class="datos">
           <dt>Entregas / en ruta</dt><dd>${pm.ps.length} / ${pendM[id]||0}</dd>
@@ -574,7 +574,7 @@ function pintarAdmin(){
     if(esAdmin) conectarCajaGeneral(v);
     conectarCajaOficina(v);
     v.querySelectorAll("[data-recibir]").forEach(b=>b.onclick=()=>recibirDinero(b.dataset.recibir));
-    v.querySelectorAll("[data-base]").forEach(b=>b.onclick=()=>movCaja("sale",{cat:"base",personaId:b.dataset.base}));
+    v.querySelectorAll("[data-base]").forEach(b=>b.onclick=()=>esAdmin?movCaja("sale",{cat:"base",personaId:b.dataset.base}):baseDesdeOficina(b.dataset.base));
     v.querySelectorAll("[data-liquidar]").forEach(b=>b.onclick=()=>liquidar(b.dataset.liquidar));
     v.querySelectorAll("[data-verliq]").forEach(b=>b.onclick=()=>verLiquidacion(b.dataset.verliq));
     v.querySelectorAll("[data-edrec]").forEach(b=>b.onclick=()=>editarRecaudo(b.dataset.edrec));
@@ -706,7 +706,7 @@ function movCuenta(id,tipo){
   $("#mcGuardar").onclick=async()=>{ const val=Number($("#mcVal").value), mot=$("#mcMot").value.trim();
     if(!(val>0)) return toast("Escribe un valor mayor a cero"); if(!mot) return toast("Escribe el motivo");
     const b=$("#mcGuardar"); b.disabled=true; const nid=nuevoId();
-    try{ await rawSet("cajamovs",nid,{id:nid,tipo,cat:"interna",cuentaId:id,personaId:"",valor:val,medio:$("#mcMedio").value,concepto:mot,fecha:fechaDia($("#mcDia").value||hoy())});
+    try{ await rawSet("cajamovs",nid,{id:nid,tipo,cat:"interna",cuentaId:id,personaId:"",valor:val,medio:$("#mcMedio").value,concepto:mot,fecha:fechaDia($("#mcDia").value||hoy()),porUid:uid||"",porNombre:miNombre()});
       registrar((tipo==="entra"?"Entrada de ":"Salida a ")+cu.nombre+": "+pesos(val)+" · "+mot); cerrarDlg(); toast((tipo==="entra"?"Entrada":"Salida")+" registrada"); }
     catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
@@ -1147,49 +1147,71 @@ function verLiquidacion(id){
   abrirDlg();
   const rb=$("#lReabrir"); if(rb) rb.onclick=async()=>{ try{ await borrar("liquidaciones",id); toast("Período reabierto"); cerrarDlg(); }catch(e){ toast("No se pudo reabrir"); } };
 }
-/* Caja de oficina: la plata en efectivo que tiene en la mano cada asistente.
-   Base que le da administración + efectivo que recibe (mensajeros, pagos de clientes, domicilios) − compras que paga − lo que entrega al cierre.
+/* Caja de oficina: la plata que maneja cada asistente, por medio (efectivo, Nequi, Bancolombia).
+   + base que le da administración, + lo que recibe (mensajeros, pagos de clientes, domicilios),
+   − bases que entrega a mensajeros, − compras que paga, − lo que entrega a administración al cierre.
    Es parte de la caja general: dar la base o recibir el cierre no cambia el total, solo quién tiene la plata. */
 const asistentes = () => Object.values(S.usuarios||{}).filter(u=>u.rol==="asistente").sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),"es"));
 function cajaOficina(auid){
-  const L=[], nomM=id=>S.mensajeros[id]?.nombre||"";
-  for(const c of Object.values(S.cajamovs)) if(c.cat==="oficina"&&c.personaUid===auid)
-    L.push({fecha:c.fecha,concepto:(c.tipo==="base"?"Base de caja que entregó administración":"Entregado a administración (cierre)")+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="base"?1:-1)*(Number(c.valor)||0),ref:c.id});
-  for(const r of Object.values(S.recaudos)) if(r.porUid===auid&&r.medio==="efectivo") L.push({fecha:r.fecha,concepto:"Entrega de "+nomM(r.mensajeroId),valor:Number(r.valor)||0});
-  for(const m of Object.values(S.movimientos)) if(m.porUid===auid&&m.medio==="efectivo"&&["pago_de_cliente","compra_cliente"].includes(m.tipo))
-    L.push({fecha:m.fecha,concepto:(m.tipo==="pago_de_cliente"?"Pago de ":"Compra para ")+nombreCliente(m.clienteId),valor:(m.tipo==="pago_de_cliente"?1:-1)*(Number(m.valor)||0)});
-  for(const p of Object.values(S.pedidos)) if(p.domiPagado&&p.domiPagoUid===auid&&p.domiPagoMedio==="efectivo") L.push({fecha:p.domiPagoFecha,concepto:"Pago de domicilio · "+p.guia,valor:pagoDomi(p)});
+  const L=[], nomM=id=>S.mensajeros[id]?.nombre||"", add=(fecha,concepto,valor,medio,ref)=>L.push({fecha,concepto,valor,medio:MEDIOS[medio]?medio:"efectivo",ref});
+  for(const c of Object.values(S.cajamovs)){
+    if(c.cat==="oficina"&&c.personaUid===auid) add(c.fecha,(c.tipo==="base"?"Base de caja que entregó administración":"Entregado a administración (cierre)")+(c.concepto?" · "+c.concepto:""),(c.tipo==="base"?1:-1)*(Number(c.valor)||0),c.medio,c.id);
+    else if(c.cat==="base"&&c.porUid===auid) add(c.fecha,"Base para vueltos a "+nomM(c.personaId),-(Number(c.valor)||0),c.medio);
+    else if(c.cat==="interna"&&!c.inicial&&c.porUid===auid) add(c.fecha,(c.tipo==="entra"?"Entrada de ":"Salida a ")+(S.cuentas[c.cuentaId]?.nombre||"cuenta interna"),(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),c.medio); }
+  for(const r of Object.values(S.recaudos)) if(r.porUid===auid) add(r.fecha,"Entrega de "+nomM(r.mensajeroId),Number(r.valor)||0,r.medio);
+  for(const m of Object.values(S.movimientos)) if(m.porUid===auid&&["pago_de_cliente","compra_cliente"].includes(m.tipo))
+    add(m.fecha,(m.tipo==="pago_de_cliente"?"Pago de ":"Compra para ")+nombreCliente(m.clienteId),(m.tipo==="pago_de_cliente"?1:-1)*(Number(m.valor)||0),m.medio);
+  for(const p of Object.values(S.pedidos)) if(p.domiPagado&&p.domiPagoUid===auid&&p.domiPagoMedio) add(p.domiPagoFecha,"Pago de domicilio · "+p.guia,pagoDomi(p),p.domiPagoMedio);
   L.sort((a,b)=>a.fecha-b.fecha);
-  return {L,saldo:L.reduce((a,x)=>a+x.valor,0)};
+  const saldo={efectivo:0,nequi:0,bancolombia:0}; L.forEach(x=>saldo[x.medio]+=x.valor);
+  return {L,saldo,total:L.reduce((a,x)=>a+x.valor,0)};
 }
+const sumaMedios = L => { const o={efectivo:0,nequi:0,bancolombia:0}; L.forEach(x=>o[x.medio]+=x.valor); return o; };
 function tarjetaCajaOficina(u,dia){
-  const C=cajaOficina(u.uid), delDia=C.L.filter(x=>diaDe(x.fecha)===dia), antes=C.L.filter(x=>diaDe(x.fecha)<dia).reduce((a,x)=>a+x.valor,0);
-  const enDia=delDia.reduce((a,x)=>a+x.valor,0), alCierre=antes+enDia;
+  const C=cajaOficina(u.uid), hasta=sumaMedios(C.L.filter(x=>diaDe(x.fecha)<=dia)), delDia=C.L.filter(x=>diaDe(x.fecha)===dia), ahora=dia===hoy();
   return `<div class="mcard"><div class="mcard-top"><b>${esc(esAdmin?(u.nombre||u.email):"Mi caja de oficina")}</b>${esAdmin?`<span class="acciones" style="margin:0;gap:6px"><button class="btn sec chico" data-ofbase="${esc(u.uid)}">Dar base</button><button class="btn ok chico" data-ofcierre="${esc(u.uid)}">Recibir cierre</button></span>`:""}</div>
-    <dl class="datos"><dt>Traía de antes</dt><dd>${pesos(antes)}</dd><dt>Movimiento del día</dt><dd>${enDia<0?"− ":"+ "}${pesos(Math.abs(enDia))}</dd>
-    <div class="debe" style="display:contents"><dt>${dia===hoy()?"Debe tener ahora en efectivo":"Debía tener al cierre"}</dt><dd>${pesos(alCierre)}</dd></div></dl>
-    ${delDia.length?`<div class="tabla-env" style="margin-top:8px"><table><tbody>${delDia.map(x=>`<tr><td>${new Date(x.fecha).toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"})}</td><td>${esc(x.concepto)}</td><td class="n ${x.valor<0?"neg":"pos"}">${x.valor<0?"− ":"+ "}${pesos(Math.abs(x.valor))}</td>${esAdmin&&x.ref?`<td><button class="btn peligro chico" data-ofdel="${esc(x.ref)}">Quitar</button></td>`:esAdmin?"<td></td>":""}</tr>`).join("")}</tbody></table></div>`:'<p class="sub">Sin movimientos en efectivo este día.</p>'}</div>`;
+    <span class="sub" style="font-size:.85rem">${ahora?"Lo que tiene ahora y debe entregar al cierre":"Lo que tenía al final de ese día"}</span>
+    <dl class="datos">${Object.entries(MEDIOS).map(([k,t])=>`<dt>${t}</dt><dd class="${hasta[k]<0?"neg":""}">${pesos(hasta[k])}</dd>`).join("")}
+    <div class="debe" style="display:contents"><dt>Total</dt><dd>${pesos(hasta.efectivo+hasta.nequi+hasta.bancolombia)}</dd></div></dl>
+    ${delDia.length?`<div class="tabla-env" style="margin-top:8px"><table><tbody>${delDia.map(x=>`<tr><td>${new Date(x.fecha).toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"})}</td><td>${esc(x.concepto)}</td><td>${MEDIOS[x.medio]}</td><td class="n ${x.valor<0?"neg":"pos"}">${x.valor<0?"− ":"+ "}${pesos(Math.abs(x.valor))}</td>${esAdmin&&x.ref?`<td><button class="btn peligro chico" data-ofdel="${esc(x.ref)}">Quitar</button></td>`:esAdmin?"<td></td>":""}</tr>`).join("")}</tbody></table></div>`:'<p class="sub">Sin movimientos este día.</p>'}</div>`;
 }
 function bloqueCajaOficina(){
   if(esAdmin){ const as=asistentes(); if(!as.length) return "";
-    return `<h2>Caja de oficina</h2><p class="sub">La plata en efectivo que tiene cada asistente: la base que le das, más lo que recibe en efectivo (mensajeros, pagos de clientes, domicilios), menos lo que te entrega al cierre. Nequi y Bancolombia no pasan por su mano.</p>
+    return `<h2>Caja de oficina</h2><p class="sub">Lo que maneja cada asistente en efectivo, Nequi y Bancolombia: la base que le das, más lo que recibe (mensajeros, pagos de clientes, domicilios), menos las bases que da a los mensajeros y las compras que paga, menos lo que te entrega al cierre.</p>
       <div class="mgrid">${as.map(u=>tarjetaCajaOficina(u,diaCaja)).join("")}</div>`; }
-  if(esAsistente&&uid) return `<h2>Mi caja de oficina</h2><p class="sub">Tu base más el efectivo que recibes, menos lo que entregas a administración. Al final del día, entrega y que administración registre el cierre.</p>
+  if(esAsistente&&uid) return `<h2>Mi caja de oficina</h2><p class="sub">Tu base más lo que recibes, menos las bases que das a los mensajeros. Al final del día entrega a administración lo que dice cada medio.</p>
     <div class="mgrid">${tarjetaCajaOficina({uid},diaCaja)}</div>`;
   return "";
 }
 function movOficina(auid,tipo){
   const u=(S.usuarios||{})[auid], C=cajaOficina(auid), base=tipo==="base";
-  $("#dlgCont").innerHTML=`<header><div><h2>${base?"Dar base de caja":"Recibir cierre de caja"}</h2><span class="sub">${esc(u?.nombre||u?.email||"")} · tiene ${pesos(C.saldo)} en efectivo</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
-    <p class="sub">${base?"Efectivo que le entregas para dar vueltos y trabajar.":"Lo que te entrega en efectivo. Si le dejas la base para mañana, recibe solo el resto."}</p>
-    <div class="linea2"><div class="campo"><label for="ofVal">Valor</label><input id="ofVal" type="number" inputmode="numeric" min="0" step="1000" value="${base?"":(C.saldo>0?C.saldo:"")}"></div>
-    <div class="campo"><label for="ofNota">Nota (opcional)</label><input id="ofNota" placeholder="${base?"Ej: base del día":"Ej: cierre del día"}"></div></div>
+  $("#dlgCont").innerHTML=`<header><div><h2>${base?"Dar base de caja":"Recibir cierre de caja"}</h2><span class="sub">${esc(u?.nombre||u?.email||"")} · tiene ${Object.entries(MEDIOS).map(([k,t])=>t+" "+pesos(C.saldo[k])).join(" · ")}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <p class="sub">${base?"Efectivo que le entregas para trabajar y dar base a los mensajeros.":"Lo que te entrega en cada medio. Viene lleno con lo que debe tener; cámbialo si te entrega otra cosa (por ejemplo, si le dejas base para mañana)."}</p>
+    ${base?`<div class="campo"><label for="of_efectivo">Valor (efectivo)</label><input id="of_efectivo" data-ofm="efectivo" type="number" inputmode="numeric" min="0" step="1000"></div>`
+      :`<div class="linea2">${Object.entries(MEDIOS).map(([k,t])=>`<div class="campo" style="min-width:120px"><label for="of_${k}">${t}</label><input id="of_${k}" data-ofm="${k}" type="number" inputmode="numeric" min="0" step="1000" value="${C.saldo[k]>0?C.saldo[k]:""}"></div>`).join("")}</div>`}
+    <div class="campo"><label for="ofNota">Nota (opcional)</label><input id="ofNota" placeholder="${base?"Ej: base del día":"Ej: cierre del día"}"></div>
     <button class="btn ${base?"":"ok"}" id="ofGuardar" style="width:100%">${base?"Entregar base":"Registrar cierre"}</button>`;
-  abrirDlg(); $("#ofVal").focus();
-  $("#ofGuardar").onclick=async()=>{ const val=Number($("#ofVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero");
-    const b=$("#ofGuardar"); b.disabled=true; const id=nuevoId();
-    try{ await guardar("cajamovs",id,{id,tipo,cat:"oficina",personaUid:auid,personaId:"",valor:val,medio:"efectivo",concepto:$("#ofNota").value.trim(),fecha:Date.now()});
-      cerrarDlg(); const queda=C.saldo+(base?val:-val); toast((base?"Base entregada":"Cierre recibido")+`. Queda con ${pesos(queda)} en efectivo`); }
+  abrirDlg(); $("#of_efectivo").focus();
+  $("#ofGuardar").onclick=async()=>{ const vals=[...document.querySelectorAll("[data-ofm]")].map(i=>[i.dataset.ofm,Number(i.value)||0]).filter(([,v])=>v>0);
+    if(!vals.length) return toast("Escribe un valor mayor a cero");
+    const b=$("#ofGuardar"); b.disabled=true;
+    try{ for(const [medio,val] of vals){ const id=nuevoId(); await guardar("cajamovs",id,{id,tipo,cat:"oficina",personaUid:auid,personaId:"",valor:val,medio,concepto:$("#ofNota").value.trim(),fecha:Date.now()}); }
+      cerrarDlg(); toast((base?"Base entregada: ":"Cierre recibido: ")+vals.map(([m,v])=>MEDIOS[m]+" "+pesos(v)).join(" · ")); }
+    catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
+}
+/* Base para vueltos que el asistente le da a un mensajero desde su caja de oficina (siempre en efectivo y con la hora del momento). */
+function baseDesdeOficina(mid){
+  const m=S.mensajeros[mid]; if(!m) return; const C=cajaOficina(uid);
+  $("#dlgCont").innerHTML=`<header><div><h2>Dar base a ${esc(m.nombre)}</h2><span class="sub">Tienes ${pesos(C.saldo.efectivo)} en efectivo</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <p class="sub">Sale de tu caja en efectivo y se le suma a lo que el mensajero debe entregar.</p>
+    <div class="linea2"><div class="campo"><label for="bmVal">Valor</label><input id="bmVal" type="number" inputmode="numeric" min="0" step="1000"></div>
+    <div class="campo"><label for="bmNota">Nota (opcional)</label><input id="bmNota" placeholder="Ej: base del día"></div></div>
+    <button class="btn" id="bmGuardar" style="width:100%">Dar base</button>`;
+  abrirDlg(); $("#bmVal").focus();
+  $("#bmGuardar").onclick=async()=>{ const val=Number($("#bmVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero");
+    const b=$("#bmGuardar"); b.disabled=true; const id=nuevoId();
+    try{ await guardar("cajamovs",id,{id,tipo:"sale",cat:"base",personaId:mid,valor:val,medio:"efectivo",concepto:$("#bmNota").value.trim(),fecha:Date.now(),semana:"",porUid:uid||"",porNombre:miNombre()});
+      cerrarDlg(); toast(`Base de ${pesos(val)} para ${m.nombre}. Te quedan ${pesos(C.saldo.efectivo-val)} en efectivo`); }
     catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
 function conectarCajaOficina(v){

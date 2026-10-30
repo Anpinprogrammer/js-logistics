@@ -177,7 +177,16 @@ service cloud.firestore {
       // El asistente registra entradas y salidas de las cuentas internas (JS Envíos, MT, base); no borra ni edita
       allow create: if esAdmin() || (esAsistente() && request.resource.data.cat == "interna"
         && request.resource.data.tipo in ["entra", "sale"] && request.resource.data.valor is number
-        && request.resource.data.valor > 0 && exists(ruta("cuentas", request.resource.data.cuentaId)));
+        && request.resource.data.valor > 0 && exists(ruta("cuentas", request.resource.data.cuentaId)))
+        // o la base para vueltos que le da a un mensajero desde su caja de oficina (efectivo, a su nombre, en el momento)
+        || (esAsistente() && request.resource.data.cat == "base" && request.resource.data.tipo == "sale"
+          && request.resource.data.valor is number && request.resource.data.valor > 0
+          && request.resource.data.medio == "efectivo"
+          && exists(ruta("mensajeros", request.resource.data.personaId))
+          && request.resource.data.porUid == request.auth.uid
+          && request.resource.data.fecha is int
+          && request.resource.data.fecha > request.time.toMillis() - 600000
+          && request.resource.data.fecha < request.time.toMillis() + 600000);
       allow update, delete: if esAdmin();
     }
     // Cuentas internas (JS Envíos, MT, Base de JS): oficina las ve; solo administración las crea
