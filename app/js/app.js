@@ -63,6 +63,7 @@ const COL_NOM={pedidos:"pedido",clientes:"cliente",movimientos:"movimiento de cl
 const ESTADOS={pendiente:"por entregar",entregado:"entregado",devuelto:"devuelto"};
 const CAMPOS={cambioRecibido:"cambio",gasto:"flete/gasto",domiPagoValor:"pago de domicilio",domiPagoMedio:"medio del pago",estado:"estado",valorServicio:"servicio",clienteId:"remitente",valorCobrado:"cobrado",metodo:"método",domiPagado:"domicilio pagado",aCobrar:"a cobrar",cobrarDev:"cobrar devolución",cuentaJs:"cuenta",tipo:"tipo",tarifa:"pago por día",nombre:"nombre",telefono:"teléfono",motivoDev:"motivo"};
 const memHist=[]; let histCadena=Promise.resolve();
+const miNombre = () => { try{ return usuario?.nombre?.() || ""; }catch(e){ return ""; } }; // quien está usando la app
 function registrar(txt){
   const e={t:Date.now(),a:txt,u:uid||"",m:miMensajero||"",r:rol};
   if(!db){ memHist.push(e); return; }
@@ -131,8 +132,11 @@ async function procesarCola(manual){
 addEventListener("online",()=>procesarCola());
 setInterval(()=>procesarCola(),30000);
 async function leer(col,id){ if(db){ const s=await db.collection(col).doc(id).get(); return s.exists?s.data():null; } return memDocs[col+"/"+id]||null; }
+const partes={}; // varias suscripciones filtradas a la misma colección se juntan en S[col]
 function suscribir(col,filtro){ // filtro [campo,"==",valor]: solo los documentos propios (ver firestore.rules)
-  (filtro?db.collection(col).where(...filtro):db.collection(col)).onSnapshot(q=>{ const m={}; q.docs.forEach(d=>m[d.id]=d.data()); S[col]=m; cargado=true; pintar(); },
+  const k=col+"|"+JSON.stringify(filtro||null);
+  (filtro?db.collection(col).where(...filtro):db.collection(col)).onSnapshot(q=>{ const m={}; q.docs.forEach(d=>m[d.id]=d.data()); partes[k]=m;
+    S[col]=Object.assign({},...Object.keys(partes).filter(x=>x.startsWith(col+"|")).map(x=>partes[x])); cargado=true; pintar(); },
     e=>{ console.warn(col,e); if(e.code==="permission-denied"){ toast("Se perdió el acceso a los datos"); } });
 }
 async function siguienteGuia(){
@@ -456,7 +460,7 @@ function tablaEntregas(ps,conCliente){
 
 function pintarAdmin(){
   const sin=Object.values(S.pedidos).filter(p=>!p.clienteId).length;
-  const tabs=[["pedidos","Pedidos",sin],["clientes","Clientes"],["recibos","Recibos"],["caja","Caja"],["cuentas","Cuentas"],["sueldos","Sueldos"],["mas","Más"]].filter(([k])=>esAdmin||["pedidos","clientes","recibos","cuentas"].includes(k));
+  const tabs=[["pedidos","Pedidos",sin],["clientes","Clientes"],["recibos","Recibos"],["caja","Caja"],["cuentas","Cuentas"],["sueldos","Sueldos"],["mas","Más"]].filter(([k])=>esAdmin||["pedidos","clientes","recibos","caja","cuentas"].includes(k));
   if(!tabs.some(([k])=>k===tabA)) tabA="pedidos";
   $("#pestanas").innerHTML=tabs
     .map(([k,t,n])=>`<button data-t="${k}" ${tabA===k?'aria-current="page"':''}>${t}${n?`<span class="num">${n}</span>`:""}</button>`).join("");
@@ -529,8 +533,9 @@ function pintarAdmin(){
     const cajaDia=recsDia.reduce((a,r)=>a+(Number(r.valor)||0),0);
     const porMedio={}; recsDia.forEach(r=>porMedio[r.medio]=(porMedio[r.medio]||0)+(Number(r.valor)||0));
     const liqs=Object.values(S.liquidaciones).sort((a,b)=>b.fecha-a.fecha).slice(0,25);
-    v.innerHTML=aviso+`<h1>Caja</h1>${bloqueCajaGeneral()}
-      <h2>Mensajeros</h2><p class="sub">Cada mensajero lleva un período abierto que se cierra cuando lo liquidas. Lo que entregue después cuenta para el siguiente período.</p>
+    // El asistente solo ve lo de los mensajeros y registra lo que le entregan; la caja de la empresa, los sueldos y las liquidaciones son de administración
+    v.innerHTML=aviso+`<h1>Caja</h1>${esAdmin?bloqueCajaGeneral():""}
+      <h2>Mensajeros</h2><p class="sub">${esAdmin?"Cada mensajero lleva un período abierto que se cierra cuando lo liquidas. Lo que entregue después cuenta para el siguiente período.":"Lo que cada mensajero debe entregar. Toca “Recibir dinero” cada vez que te entregue plata."}</p>
       <div class="cifras">
         <div class="cifra fuerte"><span>Pendiente por entregar (todos)</span><b>${pesos(tot.debe)}</b></div>
         <div class="cifra"><span>Efectivo cobrado en períodos abiertos</span><b>${pesos(tot.ef)}</b></div>
@@ -539,7 +544,7 @@ function pintarAdmin(){
       </div>
       <div style="height:14px"></div>
       ${ids.length?`<div class="mgrid">${ids.map(id=>{const pm=pms[id], tt=totales(pm.ps); return `<div class="mcard">
-        <div class="mcard-top"><b>${esc(S.mensajeros[id].nombre)}</b><span class="acciones" style="margin:0;gap:6px"><button class="btn sec chico" data-base="${esc(id)}">Dar base</button><button class="btn ok chico" data-recibir="${esc(id)}">Recibir dinero</button></span></div>
+        <div class="mcard-top"><b>${esc(S.mensajeros[id].nombre)}</b><span class="acciones" style="margin:0;gap:6px">${esAdmin?`<button class="btn sec chico" data-base="${esc(id)}">Dar base</button>`:""}<button class="btn ok chico" data-recibir="${esc(id)}">Recibir dinero</button></span></div>
         <span class="sub" style="font-size:.85rem">Período desde ${pm.ul?hora(pm.ul.fecha):"el inicio"}</span>
         <dl class="datos">
           <dt>Entregas / en ruta</dt><dd>${pm.ps.length} / ${pendM[id]||0}</dd>
@@ -550,18 +555,18 @@ function pintarAdmin(){
           <div class="debe" style="display:contents"><dt>Debe</dt><dd>${pesos(pm.debe)}</dd></div>
           <dt>Transf. a JS</dt><dd>${pesos(tt.transfJs)}</dd>
           <dt>Directo al cliente</dt><dd>${pesos(tt.transfCli)}</dd>
-          <dt>Sueldo del período</dt><dd>${sueldoTexto(id,pm.ps)}</dd>
+          ${esAdmin?`<dt>Sueldo del período</dt><dd>${sueldoTexto(id,pm.ps)}</dd>`:""}
         </dl>
-        <div class="liq"><span class="liq-est ${pm.ul&&pm.ul.debe>0?"neg":""}">${pm.ul?"Última: "+textoLiq(pm.ul.debe):"Sin liquidaciones"}</span><button class="btn chico" data-liquidar="${esc(id)}">Liquidar</button></div>
+        <div class="liq"><span class="liq-est ${pm.ul&&pm.ul.debe>0?"neg":""}">${pm.ul?"Última: "+textoLiq(pm.ul.debe):"Sin liquidaciones"}</span>${esAdmin?`<button class="btn chico" data-liquidar="${esc(id)}">Liquidar</button>`:""}</div>
         </div>`}).join("")}</div>`:`<div class="vacio">No hay mensajeros con movimiento pendiente.</div>`}
       <h2>Dinero recibido de mensajeros</h2>
       <div class="campo" style="max-width:220px"><label for="diaC">Día</label><input type="date" id="diaC" value="${diaCaja}"></div>
       <div class="cifras" style="margin-bottom:12px"><div class="cifra fuerte"><span>Dinero recibido</span><b>${pesos(cajaDia)}</b><span>${Object.entries(porMedio).map(([m,x])=>`${MEDIOS[m]||m}: ${pesos(x)}`).join(" · ")||"Sin entregas de dinero este día"}</span></div></div>
-      ${recsDia.length?`<div class="tabla-env"><table><thead><tr><th>Hora</th><th>Mensajero</th><th>Medio</th><th>Nota</th><th class="n">Valor</th><th></th></tr></thead><tbody>${recsDia.map(r=>`<tr><td>${hora(r.fecha)}</td><td>${esc(S.mensajeros[r.mensajeroId]?.nombre||"")}</td><td>${MEDIOS[r.medio]||""}</td><td>${esc(r.nota||"")}</td><td class="n"><b>${pesos(r.valor)}</b></td><td style="white-space:nowrap"><button class="btn sec chico" data-edrec="${esc(r.id)}">Editar</button> <button class="btn peligro chico" data-delrec="${esc(r.id)}">Quitar</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Toca “Recibir dinero” en un mensajero cada vez que te entregue plata.</div>`}
-      <h2>Liquidaciones recientes</h2>
-      ${liqs.length?`<div class="tabla-env"><table><thead><tr><th>Liquidado</th><th>Mensajero</th><th class="n">Entregas</th><th class="n">Entregó</th><th>Resultado</th><th></th></tr></thead><tbody>${liqs.map(l=>`<tr><td>${hora(l.fecha)}</td><td>${esc(S.mensajeros[l.mensajeroId]?.nombre||"")}</td><td class="n">${l.entregas||0}</td><td class="n">${pesos(l.recibido)}</td><td class="${l.debe>0?"neg":"pos"}">${textoLiq(l.debe)}</td><td><button class="btn sec chico" data-verliq="${esc(l.id)}">Ver</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Aún no has liquidado a ningún mensajero.</div>`}`;
+      ${recsDia.length?`<div class="tabla-env"><table><thead><tr><th>Hora</th><th>Mensajero</th><th>Medio</th><th>Nota</th><th class="n">Valor</th>${esAdmin?"<th></th>":"<th>Recibió</th>"}</tr></thead><tbody>${recsDia.map(r=>`<tr><td>${hora(r.fecha)}</td><td>${esc(S.mensajeros[r.mensajeroId]?.nombre||"")}</td><td>${MEDIOS[r.medio]||""}</td><td>${esc(r.nota||"")}</td><td class="n"><b>${pesos(r.valor)}</b></td>${esAdmin?`<td style="white-space:nowrap"><button class="btn sec chico" data-edrec="${esc(r.id)}">Editar</button> <button class="btn peligro chico" data-delrec="${esc(r.id)}">Quitar</button></td>`:`<td>${esc(r.porNombre||"")}</td>`}</tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Toca “Recibir dinero” en un mensajero cada vez que te entregue plata.</div>`}
+      ${esAdmin?`<h2>Liquidaciones recientes</h2>`:""}
+      ${!esAdmin?(recsDia.length?'<p class="sub" style="margin-top:8px">Si algo quedó mal registrado, avísale al administrador para que lo corrija.</p>':""):liqs.length?`<div class="tabla-env"><table><thead><tr><th>Liquidado</th><th>Mensajero</th><th class="n">Entregas</th><th class="n">Entregó</th><th>Resultado</th><th></th></tr></thead><tbody>${liqs.map(l=>`<tr><td>${hora(l.fecha)}</td><td>${esc(S.mensajeros[l.mensajeroId]?.nombre||"")}</td><td class="n">${l.entregas||0}</td><td class="n">${pesos(l.recibido)}</td><td class="${l.debe>0?"neg":"pos"}">${textoLiq(l.debe)}</td><td><button class="btn sec chico" data-verliq="${esc(l.id)}">Ver</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Aún no has liquidado a ningún mensajero.</div>`}`;
     $("#diaC").onchange=e=>{diaCaja=e.target.value||hoy(); pintar();};
-    conectarCajaGeneral(v);
+    if(esAdmin) conectarCajaGeneral(v);
     v.querySelectorAll("[data-recibir]").forEach(b=>b.onclick=()=>recibirDinero(b.dataset.recibir));
     v.querySelectorAll("[data-base]").forEach(b=>b.onclick=()=>movCaja("sale",{cat:"base",personaId:b.dataset.base}));
     v.querySelectorAll("[data-liquidar]").forEach(b=>b.onclick=()=>liquidar(b.dataset.liquidar));
@@ -1139,7 +1144,7 @@ function recibirDinero(mid){
   abrirDlg(); $("#rVal").select();
   $("#rGuardar").onclick=async()=>{ const val=Number($("#rVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero");
     const b=$("#rGuardar"); b.disabled=true; const id=nuevoId();
-    try{ await guardar("recaudos",id,{id,mensajeroId:mid,valor:val,medio:$("#rMedio").value,nota:$("#rNota").value.trim(),fecha:Date.now()});
+    try{ await guardar("recaudos",id,{id,mensajeroId:mid,valor:val,medio:$("#rMedio").value,nota:$("#rNota").value.trim(),fecha:Date.now(),porUid:uid||"",porNombre:miNombre()});
       const falta=pm.debe-val; cerrarDlg(); toast(`Recibido ${pesos(val)} de ${m.nombre}. ${falta>0?"Le falta "+pesos(falta):falta<0?"Entregó "+pesos(-falta)+" de más":"Quedó a paz y salvo"}`); }
     catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
@@ -1896,7 +1901,7 @@ function cargarDatos(){
   if(esAdmin){ setTimeout(completarNombres,8000); ["pedidos","clientes","mensajeros","movimientos","recaudos","liquidaciones","jornadas","cajamovs","vinculos","usuarios","cuentas"].forEach(c=>suscribir(c)); return; }
   const mid=usuario.mensajeroId();
   suscribir("vinculos",["uid","==",uid]);
-  if(esAsistente){ ["pedidos","clientes","mensajeros","movimientos","cuentas"].forEach(c=>suscribir(c)); suscribir("cajamovs",["cat","==","interna"]); setTimeout(completarNombres,8000); }
+  if(esAsistente){ ["pedidos","clientes","mensajeros","movimientos","cuentas"].forEach(c=>suscribir(c)); suscribir("cajamovs",["cat","==","interna"]); suscribir("cajamovs",["cat","==","base"]); ["recaudos","liquidaciones"].forEach(c=>suscribir(c)); setTimeout(completarNombres,8000); }
   else if(mid){ suscribir("pedidos",["mensajeroId","==",mid]); suscribir("mensajeros",["id","==",mid]); }
   if(mid){ suscribir("jornadas",["personaId","==",mid]); suscribir("recaudos",["mensajeroId","==",mid]); suscribir("liquidaciones",["mensajeroId","==",mid]); suscribir("cajamovs",["personaId","==",mid]); }
   if(!mid&&!esAsistente) cargado=true;

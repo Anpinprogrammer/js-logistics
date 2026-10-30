@@ -138,18 +138,32 @@ service cloud.firestore {
       allow read: if esOficina() || esMio(resource.data.id);
       allow write: if esAdmin();
     }
-    // Dinero entregado y liquidaciones: cada quien lo suyo
+    // Dinero entregado y liquidaciones: cada mensajero lo suyo; la oficina ve todo.
+    // El asistente registra lo que le entrega un mensajero (con la hora del momento, a su nombre);
+    // no edita, no borra ni liquida.
+    function recaudoDeAsistente() {
+      let d = request.resource.data;
+      return esAsistente()
+        && d.keys().hasOnly(["id", "mensajeroId", "valor", "medio", "nota", "fecha", "porUid", "porNombre"])
+        && d.valor is number && d.valor > 0
+        && d.medio in ["efectivo", "nequi", "bancolombia"]
+        && exists(ruta("mensajeros", d.mensajeroId))
+        && d.porUid == request.auth.uid
+        && d.fecha is int && d.fecha > request.time.toMillis() - 600000 && d.fecha < request.time.toMillis() + 600000;
+    }
     match /recaudos/{id} {
-      allow read: if esAdmin() || esMio(resource.data.mensajeroId);
-      allow write: if esAdmin();
+      allow read: if esOficina() || esMio(resource.data.mensajeroId);
+      allow create: if esAdmin() || recaudoDeAsistente();
+      allow update, delete: if esAdmin();
     }
     match /liquidaciones/{id} {
-      allow read: if esAdmin() || esMio(resource.data.mensajeroId);
+      allow read: if esOficina() || esMio(resource.data.mensajeroId);
       allow write: if esAdmin();
     }
     // Caja general: cada quien solo sus adelantos y pagos de sueldo
     match /cajamovs/{id} {
-      allow read: if esAdmin() || esMio(resource.data.personaId) || (esAsistente() && resource.data.cat == "interna");
+      // El asistente ve las cuentas internas y las bases de los mensajeros (para calcular lo que deben)
+      allow read: if esAdmin() || esMio(resource.data.personaId) || (esAsistente() && resource.data.cat in ["interna", "base"]);
       // El asistente registra entradas y salidas de las cuentas internas (JS Envíos, MT, base); no borra ni edita
       allow create: if esAdmin() || (esAsistente() && request.resource.data.cat == "interna"
         && request.resource.data.tipo in ["entra", "sale"] && request.resource.data.valor is number

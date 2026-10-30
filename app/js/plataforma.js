@@ -147,6 +147,7 @@ async function iniciar(){
         mensajeroId: () => usuarioActual.mensajeroId,
         clienteId: () => usuarioActual.datos.clienteId || "",
         email: () => usuarioActual.email,
+        nombre: () => usuarioActual.datos.nombre || usuarioActual.email || "",
         profiles: async ids => {
           const out = {};
           await Promise.all(ids.map(async id => { try{ const s = await F.getDoc(F.doc(fs, "usuarios", id)); if(s.exists()) out[id] = { name: s.data().nombre || s.data().email }; }catch(e){} }));

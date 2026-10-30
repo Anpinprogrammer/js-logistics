@@ -73,7 +73,7 @@ pantalla de inicio". Queda como una app con su ícono.
 | Rol | Qué puede hacer |
 |---|---|
 | Mensajero | Sus pedidos (crear, entregar, devolver), su caja y su sueldo. No ve clientes ni datos de otros. |
-| Asistente | Solo "Oficina": Pedidos (asignar remitente y valores, también de pedidos entregados; tomar la foto de pedidos que quedan a cargo de la Oficina y marcarlos entregados), registrar y editar clientes, ver saldos y enviar recibos por WhatsApp. No ve Caja, Sueldos, Personal, Historial ni Respaldo; no borra nada ni registra pagos. |
+| Asistente | Solo "Oficina": Pedidos (asignar remitente y valores, también de pedidos entregados; tomar la foto de pedidos que quedan a cargo de la Oficina y marcarlos entregados), registrar y editar clientes, ver saldos y enviar cobros y recibos por WhatsApp, compras y ganancias en Cuentas. En Caja ve lo que debe cada mensajero y registra el dinero que le entregan (queda a su nombre). No ve la caja de la empresa, Sueldos, Personal, Historial ni Respaldo; no liquida, no da base, no borra ni corrige lo recibido. |
 | Cliente | Solo lectura: sus pedidos (en ruta, entregados y devueltos) con sus pruebas de entrega, su saldo, sus movimientos y el recibo de cuadre del día. No ve el nombre del mensajero ni datos de otros clientes. |
 | Administración | Todo. |
 
