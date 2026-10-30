@@ -1476,6 +1476,10 @@ function diasSemana(sem){ return [...Array(7)].map((_,i)=>{ const d=new Date(sem
 function moverSemana(sem,n){ const d=new Date(sem+"T12:00:00"); d.setDate(d.getDate()+7*n); return diaDe(d.getTime()); }
 let semSel=semanaDe(hoy());
 const jornada=(pid,dia)=>Number(S.jornadas[pid+"_"+dia]?.valor)||0;
+/* Sueldo anterior: lo que alguien ya llevaba ganado esa semana antes de usar la app (empalme).
+   Se suma al total de la semana, pero no a ningún día, así no cambia el cálculo diario ni el de Javier. */
+const previoId=(pid,sem)=>pid+"_previo_"+sem;
+const sueldoPrevio=(pid,sem)=>Number(S.jornadas[previoId(pid,sem)]?.valor)||0;
 function sueldosDia(dia){
   const ent=Object.values(S.pedidos).filter(p=>cerrado(p)&&diaDe(p.entregado)===dia);
   const res={}, porM={}; ent.forEach(p=>(porM[p.mensajeroId]=porM[p.mensajeroId]||[]).push(p));
@@ -1494,24 +1498,24 @@ const ORDEN_TIPO=["mensajero","oficina","patinador","empresa","dueno"];
 function resumenSemana(sem){
   const dias=diasSemana(sem), porDia=dias.map(sueldosDia);
   const personas=listaOrdenada(S.mensajeros,"nombre").sort((a,b)=>ORDEN_TIPO.indexOf(tipoDe(a))-ORDEN_TIPO.indexOf(tipoDe(b)));
-  const filas=personas.map(m=>{ const vals=porDia.map(x=>x.res[m.id]||0), total=vals.reduce((a,x)=>a+x,0);
+  const filas=personas.map(m=>{ const vals=porDia.map(x=>x.res[m.id]||0), previo=sueldoPrevio(m.id,sem), total=vals.reduce((a,x)=>a+x,0)+previo;
     const movs=Object.values(S.cajamovs).filter(c=>c.personaId===m.id);
     const adelantos=movs.filter(c=>c.cat==="adelanto"&&dias.includes(diaDe(c.fecha)));
     const adel=adelantos.reduce((a,c)=>a+(Number(c.valor)||0),0);
     const pagado=movs.filter(c=>c.cat==="sueldo"&&c.semana===sem).reduce((a,c)=>a+(Number(c.valor)||0),0);
-    return {m,vals,total,adel,adelantos,pagado,neto:total-adel-pagado}; })
-    .filter(f=>f.total||f.adel||f.pagado||tipoDe(f.m)!=="mensajero");
+    return {m,vals,previo,total,adel,adelantos,pagado,neto:total-adel-pagado}; })
+    ; // todo el personal aparece, aunque no tenga movimiento, para poder marcarle días o sueldo anterior
   return {sem,dias,porDia,filas};
 }
 /* ---- sueldo visto por el propio mensajero ---- */
 let semM=semanaDe(hoy());
 function sueldoPersonaSemana(mid,sem){
-  const dias=diasSemana(sem), porDia=dias.map(sueldosDia), vals=porDia.map(x=>x.res[mid]||0), total=vals.reduce((a,x)=>a+x,0);
+  const dias=diasSemana(sem), porDia=dias.map(sueldosDia), vals=porDia.map(x=>x.res[mid]||0), previo=sueldoPrevio(mid,sem), total=vals.reduce((a,x)=>a+x,0)+previo;
   const movs=Object.values(S.cajamovs).filter(c=>c.personaId===mid);
   const adelantos=movs.filter(c=>c.cat==="adelanto"&&dias.includes(diaDe(c.fecha)));
   const pagos=movs.filter(c=>c.cat==="sueldo"&&c.semana===sem);
   const adel=adelantos.reduce((a,c)=>a+(Number(c.valor)||0),0), pagado=pagos.reduce((a,c)=>a+(Number(c.valor)||0),0);
-  return {sem,dias,vals,total,adelantos,pagos,adel,pagado,neto:total-adel-pagado};
+  return {sem,dias,vals,previo,total,adelantos,pagos,adel,pagado,neto:total-adel-pagado};
 }
 function pendienteAnterior(mid,sem){ // semanas anteriores con saldo sin pagar (hasta 12 semanas atrás)
   const out=[]; for(let i=1;i<=12;i++){ const w=moverSemana(sem,-i), r=sueldoPersonaSemana(mid,w); if(Math.round(r.neto)>0) out.push(r); } return out;
@@ -1529,7 +1533,7 @@ function miSueldoHtml(mid){
     <div class="acciones" style="margin-bottom:14px"><button class="btn sec chico" id="msAnt">← Anterior</button><button class="btn sec chico" id="msHoy">Esta semana</button><button class="btn sec chico" id="msSig">Siguiente →</button></div>
     <div class="cifras">
       <div class="cifra fuerte"><span>${pagadoTodo?"Pagado ✓ · te deben":"Te deben esta semana"}</span><b class="${neto<0?"neg":""}">${pesos(neto)}</b></div>
-      <div class="cifra"><span>Sueldo de la semana</span><b>${pesos(R.total)}</b></div>
+      <div class="cifra"><span>Sueldo de la semana</span><b>${pesos(R.total)}</b>${R.previo?`<span>Incluye ${pesos(R.previo)} que llevabas antes de la app</span>`:""}</div>
       <div class="cifra"><span>Adelantos</span><b>${R.adel?"− "+pesos(R.adel):pesos(0)}</b></div>
       <div class="cifra"><span>Ya te pagaron</span><b>${R.pagado?"− "+pesos(R.pagado):pesos(0)}</b></div>
     </div>
@@ -1557,13 +1561,14 @@ function pintarSueldos(v,aviso){
       <div class="cifra"><span>Ya pagado</span><b>${pesos(tot.pagado)}</b></div>
       <div class="cifra fuerte"><span>Neto por pagar</span><b>${pesos(tot.neto)}</b></div>
     </div>
-    ${R.filas.length?`<div class="tabla-env"><table><thead><tr><th>Persona</th>${R.dias.map((d,i)=>`<th class="n">${DIAS_SEM[i]} ${d.slice(8)}</th>`).join("")}<th class="n">Total</th><th class="n">Adelantos</th><th class="n">Pagado</th><th class="n">Neto</th><th></th></tr></thead><tbody>
+    ${R.filas.length?`<div class="tabla-env"><table><thead><tr><th>Persona</th>${R.dias.map((d,i)=>`<th class="n">${DIAS_SEM[i]} ${d.slice(8)}</th>`).join("")}<th class="n">Anterior</th><th class="n">Total</th><th class="n">Adelantos</th><th class="n">Pagado</th><th class="n">Neto</th><th></th></tr></thead><tbody>
     ${R.filas.map(f=>{ const t=tipoDe(f.m), editable=PAGO_FIJO.includes(t);
       return `<tr><td><b>${esc(f.m.nombre)}</b><br><span class="sub" style="font-size:.8rem">${TIPOS[t]}</span>${editable?`<br><span class="sub" style="font-size:.8rem">${f.m.tarifa?`${pesos(f.m.tarifa)} por día · <a href="#" data-tarifa-ed="${esc(f.m.id)}">cambiar</a> · <a href="#" data-otro="${esc(f.m.id)}">otro valor</a>`:`<a href="#" data-tarifa-ed="${esc(f.m.id)}">Poner pago por día</a>`}</span>`:""}</td>
       ${R.dias.map((d,i)=>{ const j=jornada(f.m.id,d); return `<td class="n">${editable?`<button class="dia-btn" data-jd="${esc(f.m.id)}|${d}" aria-pressed="${!!j}" ${d>hoyS&&!j?"disabled":""} aria-label="${esc(f.m.nombre)} ${DIAS_SEM[i]} ${d.slice(8)}: ${j?"trabajó":"no trabajó"}">${j?"✓ "+pesos(j):"—"}</button>`:(f.vals[i]?`<span class="${f.vals[i]<0?"neg":""}">${pesos(f.vals[i])}</span>`:"—")}</td>`; }).join("")}
+      <td class="n"><a href="#" data-previo="${esc(f.m.id)}" title="Sueldo que llevaba antes de la app">${f.previo?pesos(f.previo):"+"}</a></td>
       <td class="n"><b>${pesos(f.total)}</b></td><td class="n">${f.adel?pesos(f.adel):"—"}</td><td class="n">${f.pagado?pesos(f.pagado):"—"}</td><td class="n"><b class="${f.neto<0?"neg":""}">${pesos(f.neto)}</b></td>
       <td><div class="acciones" style="margin:0;flex-wrap:nowrap"><button class="btn sec chico" data-adel="${esc(f.m.id)}">Adelanto</button>${f.neto>0?`<button class="btn ok chico" data-pagar="${esc(f.m.id)}">Pagar</button>`:""}</div></td></tr>`; }).join("")}
-    <tr><td><b>Total</b></td>${R.dias.map((d,i)=>`<td class="n">${pesos(R.filas.reduce((a,f)=>a+f.vals[i],0))}</td>`).join("")}<td class="n"><b>${pesos(tot.total)}</b></td><td class="n">${pesos(tot.adel)}</td><td class="n">${pesos(tot.pagado)}</td><td class="n"><b>${pesos(tot.neto)}</b></td><td></td></tr>
+    <tr><td><b>Total</b></td>${R.dias.map((d,i)=>`<td class="n">${pesos(R.filas.reduce((a,f)=>a+f.vals[i],0))}</td>`).join("")}<td class="n">${pesos(R.filas.reduce((a,f)=>a+f.previo,0))}</td><td class="n"><b>${pesos(tot.total)}</b></td><td class="n">${pesos(tot.adel)}</td><td class="n">${pesos(tot.pagado)}</td><td class="n"><b>${pesos(tot.neto)}</b></td><td></td></tr>
     </tbody></table></div>`:`<div class="vacio">Registra tu personal en la pestaña Personal.</div>`}
     <p class="sub" style="margin-top:10px">Mensajeros: 70% de sus domicilios del día − ${pesos(DESC_SUELDO)}. Patinadores, oficina y JS: toca cada día que trabajó (se marca con su pago por día); toca otra vez para quitarlo. Para un valor distinto, usa “otro valor”. Los domicilios de pedidos a nombre de oficina son 100% de JS y suman al sueldo de Javier.</p>
     ${dueno?`<h2>Cálculo del sueldo de ${esc(dueno.nombre)}</h2><div class="tabla-env"><table><thead><tr><th>Día</th><th class="n">30% domicilios mensajeros</th><th class="n">Domicilios propios y de oficina</th><th class="n">Ganancias ocasionales</th><th class="n">${pesos(DESC_SUELDO)} × mensajeros</th><th class="n">− Pagos fijos (patinadores, oficina, JS)</th><th class="n">Sueldo</th></tr></thead><tbody>
@@ -1582,6 +1587,7 @@ function pintarSueldos(v,aviso){
     try{ if(jornada(pid,dia)) await borrar("jornadas",id); else await marcarDia(m,dia); }catch(e){ b.disabled=false; toast("No se pudo guardar"); } });
   v.querySelectorAll("[data-tarifa-ed]").forEach(a=>a.onclick=e=>{ e.preventDefault(); pedirTarifa(S.mensajeros[a.dataset.tarifaEd]); });
   v.querySelectorAll("[data-otro]").forEach(a=>a.onclick=e=>{ e.preventDefault(); otroValorDias(S.mensajeros[a.dataset.otro],R.dias); });
+  v.querySelectorAll("[data-previo]").forEach(a=>a.onclick=e=>{ e.preventDefault(); editarPrevio(S.mensajeros[a.dataset.previo],R.sem); });
   v.querySelectorAll("[data-adel]").forEach(b=>b.onclick=()=>movCaja("sale",{cat:"adelanto",personaId:b.dataset.adel,dia:hoyS<R.dias[0]||hoyS>R.dias[6]?R.dias[0]:hoyS}));
   v.querySelectorAll("[data-pagar]").forEach(b=>b.onclick=()=>{ const f=R.filas.find(x=>x.m.id===b.dataset.pagar); movCaja("sale",{cat:"sueldo",personaId:f.m.id,valor:f.neto,semana:R.sem}); });
   v.querySelectorAll("[data-delref]").forEach(b=>b.onclick=async()=>{ const [col,id]=b.dataset.delref.split("|"); b.disabled=true; try{ await borrar(col,id); toast("Adelanto quitado"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
@@ -1599,6 +1605,17 @@ function pedirTarifa(m,despues){
     const b=$("#tfGuardar"); b.disabled=true;
     try{ await actualizar("mensajeros",m.id,{tarifa:val}); m.tarifa=val; cerrarDlg(); toast("Pago por día de "+m.nombre+": "+pesos(val)); if(despues) await despues(); }
     catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
+}
+function editarPrevio(m,sem){
+  if(!m) return; const id=previoId(m.id,sem), actual=sueldoPrevio(m.id,sem);
+  $("#dlgCont").innerHTML=`<header><div><h2>Sueldo anterior de ${esc(m.nombre)}</h2><span class="sub">Semana del ${fechaLarga(sem)}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <p class="sub">Lo que ya llevaba ganado esta semana antes de registrarlo en la app. Se suma al total de la semana. Déjalo en 0 para quitarlo.</p>
+    <div class="campo"><label for="prVal">Valor</label><input id="prVal" type="number" inputmode="numeric" min="0" step="1000" value="${actual||""}"></div>
+    <button class="btn" id="prGuardar" style="width:100%">Guardar</button>`;
+  abrirDlg(); $("#prVal").select();
+  $("#prGuardar").onclick=async()=>{ const val=Number($("#prVal").value)||0; const b=$("#prGuardar"); b.disabled=true;
+    try{ if(val>0) await guardar("jornadas",id,{id,personaId:m.id,dia:sem,valor:val,previo:true,nota:"Sueldo anterior"}); else if(actual) await borrar("jornadas",id);
+      cerrarDlg(); toast("Sueldo anterior de "+m.nombre+": "+pesos(val)); }catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
 /* Días con un valor distinto al de siempre (medio día, horas extra…). Vacío o 0 = no trabajó. */
 function otroValorDias(m,dias){
@@ -1625,7 +1642,7 @@ async function descargarPlanilla(R,btn){
     cab(ws.getRow(1));
     R.filas.forEach((f,i)=>{ const k=i+2;
       ws.addRow([f.m.nombre,...f.vals.map(x=>x?Math.round(x):null),null,null,f.pagado||null,null]);
-      ws.getCell("I"+k).value={formula:`SUM(B${k}:H${k})`,result:f.total};
+      ws.getCell("I"+k).value={formula:`SUM(B${k}:H${k})${f.previo?"+"+Math.round(f.previo):""}`,result:f.total}; // + sueldo anterior
       ws.getCell("J"+k).value={formula:`Adelantos!I${k}`,result:f.adel};
       ws.getCell("L"+k).value={formula:`I${k}-J${k}-K${k}`,result:f.neto}; });
     const t=R.filas.length+2; ws.getCell("A"+t).value="TOTAL SUELDOS"; ws.getRow(t).font={bold:true};
