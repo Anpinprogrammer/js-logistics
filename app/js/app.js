@@ -1375,7 +1375,8 @@ function libroCaja(){
   for(const p of Object.values(S.pedidos)) if(cerrado(p)&&p.metodo==="transf_js") L.push({fecha:p.entregado,concepto:"Transferencia a JS · "+p.guia+(p.destinatario?" · "+p.destinatario:""),valor:Number(p.valorCobrado)||0,medio:p.cuentaJs||"cuentas",cat:"Transferencias"});
   for(const p of Object.values(S.pedidos)) if(p.domiPagado&&p.domiPagoMedio) L.push({fecha:p.domiPagoFecha||p.entregado||p.creado,concepto:"Pago de domicilio · "+p.guia+(p.clienteId?" · "+nombreCliente(p.clienteId):""),valor:pagoDomi(p),medio:p.domiPagoMedio,cat:"Clientes"});
   for(const m of Object.values(S.movimientos)) if(mueveCaja(m)) L.push({fecha:m.fecha,concepto:(m.tipo==="pago_de_cliente"?"Pago de ":m.tipo==="compra_cliente"?"Compra por encargo de ":"Pago a ")+nombreCliente(m.clienteId)+(m.nota?" · "+m.nota:""),valor:signoMov(m),medio:m.medio||"efectivo",cat:"Clientes"});
-  for(const c of Object.values(S.cajamovs)) if(c.cat==="interna"){ const n=S.cuentas[c.cuentaId]?.nombre||"Cuenta interna";
+  for(const c of Object.values(S.cajamovs)) if(c.cat==="interna"&&c.inicial) continue; // saldo inicial de la cuenta: la plata salió antes del empalme
+  else if(c.cat==="interna"){ const n=S.cuentas[c.cuentaId]?.nombre||"Cuenta interna";
     L.push({fecha:c.fecha,concepto:(c.tipo==="entra"?"Entrada de ":"Salida a ")+n+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:n,ref:"cajamovs|"+c.id}); }
   else L.push({fecha:c.fecha,concepto:(CATS[c.cat]||"Movimiento")+(c.personaId?" · "+nomM(c.personaId):"")+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:CATS[c.cat]||"Otro",ref:"cajamovs|"+c.id});
   return L.sort((a,b)=>a.fecha-b.fecha);
