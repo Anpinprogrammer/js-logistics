@@ -1169,7 +1169,7 @@ function cajaOficina(auid){
 const sumaMedios = L => { const o={efectivo:0,nequi:0,bancolombia:0}; L.forEach(x=>o[x.medio]+=x.valor); return o; };
 function tarjetaCajaOficina(u,dia){
   const C=cajaOficina(u.uid), hasta=sumaMedios(C.L.filter(x=>diaDe(x.fecha)<=dia)), delDia=C.L.filter(x=>diaDe(x.fecha)===dia), ahora=dia===hoy();
-  return `<div class="mcard"><div class="mcard-top"><b>${esc(esAdmin?(u.nombre||u.email):"Mi caja de oficina")}</b>${esAdmin?`<span class="acciones" style="margin:0;gap:6px"><button class="btn sec chico" data-ofbase="${esc(u.uid)}">Dar base</button><button class="btn ok chico" data-ofcierre="${esc(u.uid)}">Recibir cierre</button></span>`:""}</div>
+  return `<div class="mcard"><div class="mcard-top"><b>${esc(esAdmin?(u.nombre||u.email):"Mi caja de oficina")}</b>${esAdmin?`<span class="acciones" style="margin:0;gap:6px"><button class="btn sec chico" data-ofbase="${esc(u.uid)}">Dar base</button><button class="btn ok chico" data-ofcierre="${esc(u.uid)}">Recibir cierre</button></span>`:`<span class="acciones" style="margin:0"><button class="btn sec chico" data-ofbasem>Dar base a un mensajero</button></span>`}</div>
     <span class="sub" style="font-size:.85rem">${ahora?"Lo que tiene ahora y debe entregar al cierre":"Lo que tenía al final de ese día"}</span>
     <dl class="datos">${Object.entries(MEDIOS).map(([k,t])=>`<dt>${t}</dt><dd class="${hasta[k]<0?"neg":""}">${pesos(hasta[k])}</dd>`).join("")}
     <div class="debe" style="display:contents"><dt>Total</dt><dd>${pesos(hasta.efectivo+hasta.nequi+hasta.bancolombia)}</dd></div></dl>
@@ -1201,14 +1201,17 @@ function movOficina(auid,tipo){
 }
 /* Base para vueltos que el asistente le da a un mensajero desde su caja de oficina (siempre en efectivo y con la hora del momento). */
 function baseDesdeOficina(mid){
-  const m=S.mensajeros[mid]; if(!m) return; const C=cajaOficina(uid);
-  $("#dlgCont").innerHTML=`<header><div><h2>Dar base a ${esc(m.nombre)}</h2><span class="sub">Tienes ${pesos(C.saldo.efectivo)} en efectivo</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+  const elegir=!mid, ms=listaOrdenada(S.mensajeros,"nombre").filter(x=>esRepartidor(x)&&tipoDe(x)==="mensajero"); // desde "Mi caja de oficina" se elige el mensajero
+  if(!elegir&&!S.mensajeros[mid]) return; const C=cajaOficina(uid);
+  $("#dlgCont").innerHTML=`<header><div><h2>${elegir?"Dar base a un mensajero":"Dar base a "+esc(S.mensajeros[mid].nombre)}</h2><span class="sub">Tienes ${pesos(C.saldo.efectivo)} en efectivo</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     <p class="sub">Sale de tu caja en efectivo y se le suma a lo que el mensajero debe entregar.</p>
+    ${elegir?`<div class="campo"><label for="bmMen">Mensajero</label><select id="bmMen"><option value="">Elige…</option>${ms.map(x=>`<option value="${esc(x.id)}">${esc(x.nombre)}</option>`).join("")}</select></div>`:""}
     <div class="linea2"><div class="campo"><label for="bmVal">Valor</label><input id="bmVal" type="number" inputmode="numeric" min="0" step="1000"></div>
     <div class="campo"><label for="bmNota">Nota (opcional)</label><input id="bmNota" placeholder="Ej: base del día"></div></div>
     <button class="btn" id="bmGuardar" style="width:100%">Dar base</button>`;
-  abrirDlg(); $("#bmVal").focus();
-  $("#bmGuardar").onclick=async()=>{ const val=Number($("#bmVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero");
+  abrirDlg(); (elegir?$("#bmMen"):$("#bmVal")).focus();
+  $("#bmGuardar").onclick=async()=>{ if(elegir) mid=$("#bmMen").value; const m=S.mensajeros[mid]; if(!m) return toast("Elige el mensajero");
+    const val=Number($("#bmVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero");
     const b=$("#bmGuardar"); b.disabled=true; const id=nuevoId();
     try{ await guardar("cajamovs",id,{id,tipo:"sale",cat:"base",personaId:mid,valor:val,medio:"efectivo",concepto:$("#bmNota").value.trim(),fecha:Date.now(),semana:"",porUid:uid||"",porNombre:miNombre()});
       cerrarDlg(); toast(`Base de ${pesos(val)} para ${m.nombre}. Te quedan ${pesos(C.saldo.efectivo-val)} en efectivo`); }
@@ -1216,6 +1219,7 @@ function baseDesdeOficina(mid){
 }
 function conectarCajaOficina(v){
   v.querySelectorAll("[data-ofbase]").forEach(b=>b.onclick=()=>movOficina(b.dataset.ofbase,"base"));
+  v.querySelectorAll("[data-ofbasem]").forEach(b=>b.onclick=()=>baseDesdeOficina());
   v.querySelectorAll("[data-ofcierre]").forEach(b=>b.onclick=()=>movOficina(b.dataset.ofcierre,"entrega"));
   v.querySelectorAll("[data-ofdel]").forEach(b=>b.onclick=async()=>{ if(!await confirmar("Quitar movimiento de la caja de oficina","Se quita la base o el cierre registrado.","Quitar")) return;
     try{ await borrar("cajamovs",b.dataset.ofdel); toast("Movimiento quitado"); }catch(e){ toast("No se pudo quitar"); } });
