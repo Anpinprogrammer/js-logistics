@@ -128,9 +128,17 @@ service cloud.firestore {
     // Pagos y ajustes de clientes: oficina los ve (saldos); solo administración los registra
     match /movimientos/{id} {
       allow read: if esOficina() || esClienteDe(resource.data.clienteId);
-      // El asistente solo registra compras por encargo y ganancias ocasionales; no borra ni edita
-      allow create: if esAdmin() || (esAsistente() && request.resource.data.tipo in ["compra_cliente", "ganancia"]
-        && request.resource.data.valor is number && request.resource.data.valor > 0);
+      // El asistente registra pagos de clientes (con la hora del momento y a su nombre), compras por encargo
+      // y ganancias ocasionales; no borra ni edita
+      allow create: if esAdmin() || (esAsistente()
+        && request.resource.data.valor is number && request.resource.data.valor > 0
+        && (request.resource.data.tipo in ["compra_cliente", "ganancia"]
+          || (request.resource.data.tipo == "pago_de_cliente"
+            && request.resource.data.medio in ["efectivo", "nequi", "bancolombia"]
+            && request.resource.data.porUid == request.auth.uid
+            && request.resource.data.fecha is int
+            && request.resource.data.fecha > request.time.toMillis() - 600000
+            && request.resource.data.fecha < request.time.toMillis() + 600000)));
       allow update, delete: if esAdmin();
     }
     // Personal: oficina ve la lista; cada mensajero solo su propia ficha
@@ -163,7 +171,9 @@ service cloud.firestore {
     // Caja general: cada quien solo sus adelantos y pagos de sueldo
     match /cajamovs/{id} {
       // El asistente ve las cuentas internas y las bases de los mensajeros (para calcular lo que deben)
-      allow read: if esAdmin() || esMio(resource.data.personaId) || (esAsistente() && resource.data.cat in ["interna", "base"]);
+      // y su propia caja de oficina (la base que le das y los cierres que le recibes)
+      allow read: if esAdmin() || esMio(resource.data.personaId) || (esAsistente() && resource.data.cat in ["interna", "base"])
+        || (esAsistente() && resource.data.get("personaUid", "") == request.auth.uid);
       // El asistente registra entradas y salidas de las cuentas internas (JS Envíos, MT, base); no borra ni edita
       allow create: if esAdmin() || (esAsistente() && request.resource.data.cat == "interna"
         && request.resource.data.tipo in ["entra", "sale"] && request.resource.data.valor is number

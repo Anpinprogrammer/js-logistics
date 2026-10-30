@@ -171,7 +171,7 @@ const MOVS={
   compra_cliente:{t:"Compra por encargo del cliente (sale de la caja)", corto:"Compra por encargo", s:-1, caja:true},
   ganancia:{t:"Ganancia ocasional de JS (se le carga al cliente)", corto:"Servicio adicional", s:-1}
 };
-const MOVS_OFICINA=["compra_cliente","ganancia"]; // lo que también registra el asistente
+const MOVS_OFICINA=["pago_de_cliente","compra_cliente","ganancia"]; // lo que también registra el asistente
 const signoMov = m => (MOVS[m.tipo]?.s||-1)*(Number(m.valor)||0);
 const esPago = m => !!MOVS[m.tipo]?.pago;
 const mueveCaja = m => esPago(m)||!!MOVS[m.tipo]?.caja; // pagos y compras por encargo entran o salen de la caja
@@ -194,7 +194,7 @@ let ultimaGuia=null;
 let fotoPara=""; // id en Personal de la oficina cuando la foto se toma desde Oficina → Pedidos
 
 /* Filtro por día de los paneles de pedidos: un pedido es del día si salió o se entregó (o devolvió) ese día. "" = todos los días. */
-let diaPedA="", diaPedC="", diaPedM="", mensPedA=""; // mensPedA: filtro por mensajero en Oficina → Pedidos
+let diaPedA="", diaPedC="", diaPedM="", mensPedA="", diaCliF=""; // diaCliF: filtro por día en Clientes // mensPedA: filtro por mensajero en Oficina → Pedidos
 const delDia = (p,d) => !d || diaDe(p.creado)===d || (!!p.entregado && diaDe(p.entregado)===d);
 function moverDia(d,n){ const x=new Date((d||hoy())+"T12:00:00"); x.setDate(x.getDate()+n); return diaDe(x.getTime()); }
 const filtroDiaHtml = d => `<div class="filtro-dia"><button class="btn sec chico" data-dia="-1" aria-label="Día anterior">‹</button><input type="date" id="diaPed" value="${d}" max="${hoy()}" aria-label="Filtrar por día"><button class="btn sec chico" data-dia="1" aria-label="Día siguiente" ${!d||d>=hoy()?"disabled":""}>›</button>${d?`<button class="btn sec chico" data-dia="0">Ver todos</button>`:`<button class="btn sec chico" data-dia="hoy">Hoy</button>`}</div>`;
@@ -504,25 +504,29 @@ function pintarAdmin(){
     const go=$("#galeriaOfi"); if(go) go.onclick=()=>{ fotoPara=$("#ofiSel")?.value||ofis[0].id; $("#inGaleria").value=""; $("#inGaleria").click(); };
   }
   else if(tabA==="clientes"){
-    const cs=listaOrdenada(S.clientes,"nombre").map(c=>({...c,s:saldoCliente(c.id)}));
-    const cobrar=cs.filter(c=>c.s<0), pagar=cs.filter(c=>c.s>0);
-    const totC=cobrar.reduce((a,c)=>a-c.s,0), totP=pagar.reduce((a,c)=>a+c.s,0);
-    const vis = filtroCli==="cobrar" ? cobrar : filtroCli==="pagar" ? pagar : cs;
+    // Con un día elegido, cada cliente se mide por lo que se movió ese día (pedidos cerrados, pagos y ajustes)
+    const cs=listaOrdenada(S.clientes,"nombre").map(c=>({...c,s:saldoCliente(c.id),d:diaCliF?filasCuenta(c.id).filter(r=>diaDe(r.fecha)===diaCliF).reduce((a,r)=>a+r.v,0):0}));
+    const k=c=>diaCliF?c.d:c.s;
+    const cobrar=cs.filter(c=>k(c)<0), pagar=cs.filter(c=>k(c)>0);
+    const totC=cobrar.reduce((a,c)=>a-k(c),0), totP=pagar.reduce((a,c)=>a+k(c),0);
+    const vis = filtroCli==="cobrar" ? cobrar : filtroCli==="pagar" ? pagar : diaCliF ? cs.filter(c=>c.d) : cs;
     v.innerHTML=aviso+`<h1>Clientes</h1><p class="sub">Saldo de cada cliente = lo cobrado menos el valor del servicio.</p>
       <div class="cifras" style="margin-bottom:14px">
-        <div class="cifra"><span>Cuentas por cobrar (te deben)</span><b class="neg">${pesos(totC)}</b><span>${cobrar.length} cliente${cobrar.length===1?"":"s"}</span></div>
-        <div class="cifra"><span>Cuentas por pagar (les debes)</span><b class="pos">${pesos(totP)}</b><span>${pagar.length} cliente${pagar.length===1?"":"s"}</span></div>
+        <div class="cifra"><span>${diaCliF?"Ese día te quedaron debiendo":"Cuentas por cobrar (te deben)"}</span><b class="neg">${pesos(totC)}</b><span>${cobrar.length} cliente${cobrar.length===1?"":"s"}</span></div>
+        <div class="cifra"><span>${diaCliF?"Ese día les quedaste debiendo":"Cuentas por pagar (les debes)"}</span><b class="pos">${pesos(totP)}</b><span>${pagar.length} cliente${pagar.length===1?"":"s"}</span></div>
       </div>
       <div class="acciones" style="margin-bottom:16px"><button class="btn" id="nuevoCli">Registrar cliente</button><button class="btn ok" id="waMasivo">Enviar saldos por WhatsApp</button>${descargas&&esAdmin?'<button class="btn sec" id="xlsCartera">Descargar cartera en Excel</button>':""}</div>
       <div class="filtros">${[["todos","Todos"],["cobrar","Por cobrar"],["pagar","Por pagar"]].map(([k,t])=>`<button data-fc="${k}" aria-pressed="${filtroCli===k}">${t}</button>`).join("")}</div>
-      ${vis.length?`<div class="tabla-env"><table><thead><tr><th>Cliente</th><th>Número</th><th>Cuenta</th><th class="n">Saldo</th><th></th></tr></thead><tbody>
-      ${vis.map(c=>`<tr><td><b>${esc(c.nombre)}</b>${Number(c.tarifa)?`<br><span class="sub" style="font-size:.8rem">Domicilio ${pesos(c.tarifa)}</span>`:""}</td><td>${esc(c.telefono||"")}</td><td>${c.s<0?'<span class="etq sin">Por cobrar</span>':c.s>0?'<span class="etq ent">Por pagar</span>':'<span class="sub">Paz y salvo</span>'}</td><td class="n ${c.s<0?"neg":c.s>0?"pos":""}">${pesos(Math.abs(c.s))}</td><td><button class="btn sec chico" data-cli="${esc(c.id)}">Ver cuenta</button></td></tr>`).join("")}
+      ${filtroDiaHtml(diaCliF)}${diaCliF?`<p class="sub">Clientes con movimiento ese día: lo que les quedó de ese día y, al lado, su saldo total de hoy.</p>`:""}
+      ${vis.length?`<div class="tabla-env"><table><thead><tr><th>Cliente</th><th>Número</th><th>Cuenta</th>${diaCliF?'<th class="n">Ese día</th>':""}<th class="n">Saldo</th><th></th></tr></thead><tbody>
+      ${vis.map(c=>`<tr><td><b>${esc(c.nombre)}</b>${Number(c.tarifa)?`<br><span class="sub" style="font-size:.8rem">Domicilio ${pesos(c.tarifa)}</span>`:""}</td><td>${esc(c.telefono||"")}</td><td>${c.s<0?'<span class="etq sin">Por cobrar</span>':c.s>0?'<span class="etq ent">Por pagar</span>':'<span class="sub">Paz y salvo</span>'}</td>${diaCliF?`<td class="n ${c.d<0?"neg":"pos"}">${c.d<0?"Debe ":"A favor "}${pesos(Math.abs(c.d))}</td>`:""}<td class="n ${c.s<0?"neg":c.s>0?"pos":""}">${pesos(Math.abs(c.s))}</td><td><button class="btn sec chico" data-cli="${esc(c.id)}">Ver cuenta</button></td></tr>`).join("")}
       </tbody></table></div>`:`<div class="vacio">${cs.length?"No hay clientes en esta lista.":"Registra tus clientes (los remitentes) para llevar su saldo."}</div>`}`;
     $("#nuevoCli").onclick=()=>formCliente();
     $("#waMasivo").onclick=()=>envioMasivo(filtroCli==="pagar"?"pagar":"cobrar");
     const xc=$("#xlsCartera"); if(xc) xc.onclick=()=>descargarCartera(xc);
     v.querySelectorAll("[data-fc]").forEach(b=>b.onclick=()=>{filtroCli=b.dataset.fc; pintar();});
     v.querySelectorAll("[data-cli]").forEach(b=>b.onclick=()=>abrirCuenta(b.dataset.cli));
+    enlazarFiltroDia(diaCliF,d=>diaCliF=d);
   }
   else if(tabA==="caja"){
     const pendM={}; Object.values(S.pedidos).filter(p=>p.estado==="pendiente").forEach(p=>pendM[p.mensajeroId]=(pendM[p.mensajeroId]||0)+1);
@@ -559,6 +563,7 @@ function pintarAdmin(){
         </dl>
         <div class="liq"><span class="liq-est ${pm.ul&&pm.ul.debe>0?"neg":""}">${pm.ul?"Última: "+textoLiq(pm.ul.debe):"Sin liquidaciones"}</span>${esAdmin?`<button class="btn chico" data-liquidar="${esc(id)}">Liquidar</button>`:""}</div>
         </div>`}).join("")}</div>`:`<div class="vacio">No hay mensajeros con movimiento pendiente.</div>`}
+      ${bloqueCajaOficina()}
       <h2>Dinero recibido de mensajeros</h2>
       <div class="campo" style="max-width:220px"><label for="diaC">Día</label><input type="date" id="diaC" value="${diaCaja}"></div>
       <div class="cifras" style="margin-bottom:12px"><div class="cifra fuerte"><span>Dinero recibido</span><b>${pesos(cajaDia)}</b><span>${Object.entries(porMedio).map(([m,x])=>`${MEDIOS[m]||m}: ${pesos(x)}`).join(" · ")||"Sin entregas de dinero este día"}</span></div></div>
@@ -567,6 +572,7 @@ function pintarAdmin(){
       ${!esAdmin?(recsDia.length?'<p class="sub" style="margin-top:8px">Si algo quedó mal registrado, avísale al administrador para que lo corrija.</p>':""):liqs.length?`<div class="tabla-env"><table><thead><tr><th>Liquidado</th><th>Mensajero</th><th class="n">Entregas</th><th class="n">Entregó</th><th>Resultado</th><th></th></tr></thead><tbody>${liqs.map(l=>`<tr><td>${hora(l.fecha)}</td><td>${esc(S.mensajeros[l.mensajeroId]?.nombre||"")}</td><td class="n">${l.entregas||0}</td><td class="n">${pesos(l.recibido)}</td><td class="${l.debe>0?"neg":"pos"}">${textoLiq(l.debe)}</td><td><button class="btn sec chico" data-verliq="${esc(l.id)}">Ver</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Aún no has liquidado a ningún mensajero.</div>`}`;
     $("#diaC").onchange=e=>{diaCaja=e.target.value||hoy(); pintar();};
     if(esAdmin) conectarCajaGeneral(v);
+    conectarCajaOficina(v);
     v.querySelectorAll("[data-recibir]").forEach(b=>b.onclick=()=>recibirDinero(b.dataset.recibir));
     v.querySelectorAll("[data-base]").forEach(b=>b.onclick=()=>movCaja("sale",{cat:"base",personaId:b.dataset.base}));
     v.querySelectorAll("[data-liquidar]").forEach(b=>b.onclick=()=>liquidar(b.dataset.liquidar));
@@ -661,20 +667,21 @@ function pintarCuentas(v,aviso){
     ${esAdmin?`<div class="acciones"><button class="btn sec chico" id="cuNueva">+ Nueva cuenta</button></div>`:""}
     <h2>Movimientos de las cuentas</h2>
     ${movs.length?`<div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Cuenta</th><th>Motivo</th><th>Medio</th><th class="n">Valor</th>${esAdmin?"<th></th>":""}</tr></thead><tbody>${movs.map(c=>`<tr><td>${hora(c.fecha)}</td><td>${esc(S.cuentas[c.cuentaId]?.nombre||"—")}</td><td>${esc(c.concepto||"")}</td><td>${MEDIOS[c.medio]||""}</td><td class="n ${c.tipo==="entra"?"pos":"neg"}">${c.tipo==="entra"?"+ ":"− "}${pesos(c.valor)}</td>${esAdmin?`<td><button class="btn peligro chico" data-cudel="${esc(c.id)}">Quitar</button></td>`:""}</tr>`).join("")}</tbody></table></div>`:'<div class="vacio">Sin movimientos.</div>'}
-    <h2>Compras por encargo y ganancias de clientes</h2>
-    <p class="sub">La compra sale de la caja y queda como deuda del cliente; al entregar se compensa con lo cobrado. La ganancia ocasional se le carga al cliente y suma al sueldo de JS.</p>
-    <div class="acciones"><button class="btn" id="cuCompra">Compra para un cliente</button><button class="btn sec" id="cuGanancia">Ganancia ocasional</button></div>
-    ${extra.length?`<div class="tabla-env" style="margin-top:10px"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Detalle</th><th class="n">Valor</th>${esAdmin?"<th></th>":""}</tr></thead><tbody>${extra.map(m=>`<tr><td>${hora(m.fecha)}</td><td>${esc(nombreCliente(m.clienteId)||"—")}</td><td>${m.tipo==="ganancia"?"Ganancia JS":"Compra"}</td><td>${esc(m.nota||"")}</td><td class="n">${pesos(m.valor)}</td>${esAdmin?`<td style="white-space:nowrap"><button class="btn sec chico" data-mxed="${esc(m.id)}">Editar</button> <button class="btn peligro chico" data-mxdel="${esc(m.id)}">Quitar</button></td>`:""}</tr>`).join("")}</tbody></table></div>`:""}`;
+    <h2>Pagos, compras y ganancias de clientes</h2>
+    <p class="sub">El pago de un cliente entra a la caja (efectivo, Nequi o Bancolombia) y se descuenta de lo que debe. La compra sale de la caja y queda como deuda del cliente; al entregar se compensa con lo cobrado. La ganancia ocasional se le carga al cliente y suma al sueldo de JS.</p>
+    <div class="acciones"><button class="btn ok" id="cuPago">Pago de un cliente</button><button class="btn" id="cuCompra">Compra para un cliente</button><button class="btn sec" id="cuGanancia">Ganancia ocasional</button></div>
+    ${extra.length?`<div class="tabla-env" style="margin-top:10px"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Detalle</th><th>Registró</th><th class="n">Valor</th>${esAdmin?"<th></th>":""}</tr></thead><tbody>${extra.map(m=>`<tr><td>${hora(m.fecha)}</td><td>${esc(nombreCliente(m.clienteId)||"—")}</td><td>${m.tipo==="pago_de_cliente"?`Pago · ${MEDIOS[m.medio]||""}`:m.tipo==="ganancia"?"Ganancia JS":"Compra"}</td><td>${esc(m.nota||"")}</td><td>${esc(m.porNombre||"")}</td><td class="n">${pesos(m.valor)}</td>${esAdmin?`<td style="white-space:nowrap"><button class="btn sec chico" data-mxed="${esc(m.id)}">Editar</button> <button class="btn peligro chico" data-mxdel="${esc(m.id)}">Quitar</button></td>`:""}</tr>`).join("")}</tbody></table></div>`:""}`;
   v.querySelectorAll("[data-ce]").forEach(b=>b.onclick=()=>movCuenta(b.dataset.ce,"entra"));
   v.querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>movCuenta(b.dataset.cs,"sale"));
   v.querySelectorAll("[data-cudel]").forEach(b=>b.onclick=async()=>{ if(!await confirmar("Quitar movimiento","Se borra de la cuenta y de la caja.","Quitar")) return; try{ await borrar("cajamovs",b.dataset.cudel); toast("Movimiento quitado"); }catch(e){ toast("No se pudo quitar"); } });
   const se=$("#cuSemilla"); if(se) se.onclick=async()=>{ se.disabled=true; try{ for(const [nombre,tipo] of [["JS Envíos","socio"],["MT (tienda de ropa)","socio"],["Base de JS","base"]]){ const id=nuevoId(); await rawSet("cuentas",id,{id,nombre,tipo,creado:Date.now()}); } registrar("Creó las cuentas internas JS Envíos, MT y Base de JS"); toast("Cuentas creadas"); }catch(e){ se.disabled=false; toast("No se pudieron crear"); } };
   const nu=$("#cuNueva"); if(nu) nu.onclick=()=>nuevaCuenta();
+  $("#cuPago").onclick=()=>movClienteOficina("pago_de_cliente");
   $("#cuCompra").onclick=()=>movClienteOficina("compra_cliente");
   $("#cuGanancia").onclick=()=>movClienteOficina("ganancia");
   v.querySelectorAll("[data-mxed]").forEach(b=>b.onclick=()=>{ const m=S.movimientos[b.dataset.mxed]; if(m) movClienteOficina(m.tipo,m); });
   v.querySelectorAll("[data-mxdel]").forEach(b=>b.onclick=async()=>{ const m=S.movimientos[b.dataset.mxdel]; if(!m) return;
-    if(!await confirmar("Quitar "+(m.tipo==="ganancia"?"ganancia":"compra"),`${nombreCliente(m.clienteId)||"Cliente"} · ${pesos(m.valor)}. Se quita de la cuenta del cliente${m.tipo==="ganancia"?" y del sueldo de JS":" y de la caja"}.`,"Quitar")) return;
+    if(!await confirmar("Quitar "+(m.tipo==="ganancia"?"ganancia":m.tipo==="pago_de_cliente"?"pago":"compra"),`${nombreCliente(m.clienteId)||"Cliente"} · ${pesos(m.valor)}. Se quita de la cuenta del cliente${m.tipo==="ganancia"?" y del sueldo de JS":" y de la caja"}.`,"Quitar")) return;
     try{ await borrar("movimientos",m.id); toast("Movimiento quitado"); }catch(e){ toast("No se pudo quitar"); } });
 }
 function nuevaCuenta(){
@@ -706,23 +713,30 @@ function movCuenta(id,tipo){
 /* Compra por encargo o ganancia ocasional de un cliente, desde la pestaña Cuentas.
    mov: el movimiento a editar (solo administración). pre: lo que ya estaba escrito al volver de crear un cliente. */
 function movClienteOficina(tipo,mov,pre){
-  const cs=listaOrdenada(S.clientes,"nombre"), compra=tipo==="compra_cliente";
+  const cs=listaOrdenada(S.clientes,"nombre"), compra=tipo==="compra_cliente", pago=tipo==="pago_de_cliente";
+  const conMedio=compra||pago, soloHoy=pago&&!esAdmin; // el pago que registra el asistente queda con la hora del momento
   const v0=pre||(mov?{cid:mov.clienteId,val:mov.valor,medio:mov.medio,dia:diaDe(mov.fecha),nota:mov.nota}:{});
-  $("#dlgCont").innerHTML=`<header><h2>${mov?"Editar ":""}${compra?(mov?"compra":"Compra para un cliente"):(mov?"ganancia ocasional":"Ganancia ocasional")}</h2><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+  const titulo=pago?(mov?"Editar pago":"Pago de un cliente"):compra?(mov?"Editar compra":"Compra para un cliente"):(mov?"Editar ganancia ocasional":"Ganancia ocasional");
+  $("#dlgCont").innerHTML=`<header><h2>${titulo}</h2><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     ${mov?`<div class="campo"><label for="mxTipo">Tipo</label><select id="mxTipo">${MOVS_OFICINA.map(k=>`<option value="${k}"${k===tipo?" selected":""}>${MOVS[k].t}</option>`).join("")}</select></div>`:""}
-    <p class="sub">${compra?"Sale de la caja y queda como deuda del cliente. En el pedido pon el domicilio y en “a cobrar” lo que se le cobra al destinatario; al entregar se compensa.":"Se le carga al cliente (queda por cobrar) y suma 100% al sueldo de JS ese día. Ej: $4.000 por punto extra."}</p>
-    <div class="campo"><label for="mxCli">Cliente</label><div style="display:flex;gap:6px;margin-bottom:6px"><input id="mxBus" type="search" placeholder="Buscar cliente…" autocomplete="off" style="flex:1"><button class="btn sec chico" id="mxNuevoCli" type="button">+ Cliente nuevo</button></div><select id="mxCli"><option value="">Elige…</option>${cs.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("")}</select></div>
-    <div class="linea2"><div class="campo"><label for="mxVal">Valor</label><input id="mxVal" type="number" inputmode="numeric" min="0" step="100" value="${Number(v0.val)||""}"></div>
-    ${compra?`<div class="campo"><label for="mxMedio">Pagado con</label><select id="mxMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>`:""}</div>
-    <div class="linea2"><div class="campo"><label for="mxDia">Día</label><input id="mxDia" type="date" value="${esc(v0.dia||hoy())}"></div>
-    <div class="campo"><label for="mxNota">Detalle</label><input id="mxNota" value="${esc(v0.nota||"")}" placeholder="${compra?"Ej: compra en almacén · guía JS-00120":"Ej: 3 puntos extra · guía JS-00120"}"></div></div>
-    <button class="btn ok" id="mxGuardar" style="width:100%">${mov?"Guardar cambios":"Registrar"}</button>`;
+    <p class="sub">${pago?"El dinero entra a la caja en el medio que elijas y se descuenta de lo que el cliente debe.":compra?"Sale de la caja y queda como deuda del cliente. En el pedido pon el domicilio y en “a cobrar” lo que se le cobra al destinatario; al entregar se compensa.":"Se le carga al cliente (queda por cobrar) y suma 100% al sueldo de JS ese día. Ej: $4.000 por punto extra."}</p>
+    <div class="campo"><label for="mxCli">Cliente</label><div style="display:flex;gap:6px;margin-bottom:6px"><input id="mxBus" type="search" placeholder="Buscar cliente…" autocomplete="off" style="flex:1"><button class="btn sec chico" id="mxNuevoCli" type="button">+ Cliente nuevo</button></div><select id="mxCli"><option value="">Elige…</option>${cs.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("")}</select>
+    <span class="sub" id="mxSaldo" style="display:block;margin-top:4px"></span></div>
+    <div class="linea2"><div class="campo"><label for="mxVal">${pago?"Valor que pagó":"Valor"}</label><input id="mxVal" type="number" inputmode="numeric" min="0" step="100" value="${Number(v0.val)||""}"></div>
+    ${conMedio?`<div class="campo"><label for="mxMedio">${pago?"¿Cómo pagó?":"Pagado con"}</label><select id="mxMedio">${pago?'<option value="">Elige…</option>':""}${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>`:""}</div>
+    <div class="linea2">${soloHoy?"":`<div class="campo"><label for="mxDia">Día</label><input id="mxDia" type="date" value="${esc(v0.dia||hoy())}"></div>`}
+    <div class="campo"><label for="mxNota">Detalle</label><input id="mxNota" value="${esc(v0.nota||"")}" placeholder="${pago?"Ej: comprobante Nequi 4521":compra?"Ej: compra en almacén · guía JS-00120":"Ej: 3 puntos extra · guía JS-00120"}"></div></div>
+    <button class="btn ok" id="mxGuardar" style="width:100%">${mov?"Guardar cambios":pago?"Registrar pago":"Registrar"}</button>`;
   abrirDlg();
+  const verSaldo=()=>{ const cid=$("#mxCli").value, s=cid?saldoCliente(cid):0, box=$("#mxSaldo");
+    box.innerHTML=!cid?"":s<0?`<b class="neg">Debe ${pesos(-s)}</b>`:s>0?`<b class="pos">Tiene ${pesos(s)} a favor</b>`:"Está a paz y salvo";
+    if(pago&&!mov&&cid&&s<0&&!$("#mxVal").value) $("#mxVal").value=-s; };
   if(v0.cid) $("#mxCli").value=v0.cid;
-  if(compra&&v0.medio) $("#mxMedio").value=v0.medio;
+  if(conMedio&&v0.medio) $("#mxMedio").value=v0.medio;
+  verSaldo(); $("#mxCli").onchange=verSaldo;
   $("#mxBus").oninput=e=>{ const q=sinTildes(e.target.value.trim()), sel=$("#mxCli"); const vis=cs.filter(c=>!q||sinTildes(c.nombre+" "+(c.telefono||"")).includes(q));
-    sel.innerHTML=`<option value="">${vis.length?"Elige…":"Ningún cliente con ese nombre"}</option>`+vis.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join(""); if(vis.length===1&&q) sel.value=vis[0].id; };
-  const escrito=()=>({cid:$("#mxCli").value,val:$("#mxVal").value,medio:compra?$("#mxMedio").value:"",dia:$("#mxDia").value,nota:$("#mxNota").value});
+    sel.innerHTML=`<option value="">${vis.length?"Elige…":"Ningún cliente con ese nombre"}</option>`+vis.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join(""); if(vis.length===1&&q) sel.value=vis[0].id; verSaldo(); };
+  const escrito=()=>({cid:$("#mxCli").value,val:$("#mxVal").value,medio:conMedio?$("#mxMedio").value:"",dia:$("#mxDia")?.value||"",nota:$("#mxNota").value});
   if(mov) $("#mxTipo").onchange=e=>movClienteOficina(e.target.value,mov,escrito());
   // Cliente que todavía no está registrado: se crea y se vuelve al formulario con lo que ya estaba escrito
   $("#mxNuevoCli").onclick=()=>{
@@ -730,13 +744,13 @@ function movClienteOficina(tipo,mov,pre){
     formCliente(null,async cid=>{ for(let i=0;i<12&&!S.clientes[cid];i++) await sleep(250); movClienteOficina(tipo,mov,{...antes,cid}); });
     if(nombre){ $("#cNom").value=nombre; $("#cTel").focus(); }
   };
-  $("#mxGuardar").onclick=async()=>{ const cid=$("#mxCli").value, val=Number($("#mxVal").value);
-    if(!cid) return toast("Elige el cliente"); if(!(val>0)) return toast("Escribe un valor mayor a cero");
+  $("#mxGuardar").onclick=async()=>{ const cid=$("#mxCli").value, val=Number($("#mxVal").value), medio=conMedio?$("#mxMedio").value:"";
+    if(!cid) return toast("Elige el cliente"); if(!(val>0)) return toast("Escribe un valor mayor a cero"); if(pago&&!medio) return toast("Elige cómo pagó");
     const b=$("#mxGuardar"); b.disabled=true;
-    const datos={clienteId:cid,valor:val,medio:compra?$("#mxMedio").value:"",nota:$("#mxNota").value.trim(),fecha:fechaDia($("#mxDia").value||hoy())};
+    const datos={clienteId:cid,valor:val,medio,nota:$("#mxNota").value.trim(),fecha:soloHoy?Date.now():fechaDia($("#mxDia")?.value||hoy())};
     try{ if(mov) await actualizar("movimientos",mov.id,{...datos,tipo});
-      else { const id=nuevoId(); await guardar("movimientos",id,{id,tipo,...datos}); }
-      cerrarDlg(); toast(mov?"Cambios guardados":compra?"Compra registrada":"Ganancia registrada"); }
+      else { const id=nuevoId(); await guardar("movimientos",id,{id,tipo,...datos,porUid:uid||"",porNombre:miNombre()}); }
+      cerrarDlg(); toast(mov?"Cambios guardados":pago?`Pago de ${pesos(val)} de ${nombreCliente(cid)} registrado`:compra?"Compra registrada":"Ganancia registrada"); }
     catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
 
@@ -889,7 +903,7 @@ async function abrirPedido(guia, cliElegido){
       gasto:Math.max(0,Number($("#pGasto").value)||0),gastoNota:$("#pGastoNota").value.trim()};
     if(datos.domiPagado){ const medio=$("#pDomiMedio").value, val=Number($("#pDomiVal").value)||0, antiguo=p.domiPagado&&!p.domiPagoMedio;
       if(!medio&&!antiguo) return toast("Elige cómo pagó el domicilio"); if(!(val>0)) return toast("Escribe el valor que pagó");
-      Object.assign(datos,{domiPagoMedio:medio,domiPagoValor:val,domiPagoFecha:p.domiPagado&&p.domiPagoFecha?p.domiPagoFecha:Date.now()}); }
+      Object.assign(datos,{domiPagoMedio:medio,domiPagoValor:val,domiPagoFecha:p.domiPagado&&p.domiPagoFecha?p.domiPagoFecha:Date.now(),domiPagoUid:p.domiPagado?(p.domiPagoUid||""):(uid||"")}); }
     else Object.assign(datos,{domiPagoMedio:"",domiPagoValor:"",domiPagoFecha:0});
     if($("#pDev")) datos.cobrarDev=$("#pDev").checked; if($("#pCta")) datos.cuentaJs=$("#pCta").value;
     if($("#pValCob")){ // corrección de lo que cobró el mensajero (solo administración); la diferencia se recalcula igual que al entregar
@@ -945,7 +959,7 @@ function pagoDomicilio(guia,despues){
   $("#dpGuardar").onclick=async()=>{ const medio=$("#dpMedio").value, val=Number($("#dpVal").value)||0;
     if(!medio) return toast("Elige cómo pagó"); if(!(val>0)) return toast("Escribe el valor que pagó");
     const b=$("#dpGuardar"); b.disabled=true;
-    try{ await actualizar("pedidos",guia,{domiPagado:true,domiPagoMedio:medio,domiPagoValor:val,domiPagoFecha:Date.now()}); toast("Pago de "+pesos(val)+" registrado"); setTimeout(despues,200); }
+    try{ await actualizar("pedidos",guia,{domiPagado:true,domiPagoMedio:medio,domiPagoValor:val,domiPagoFecha:Date.now(),domiPagoUid:uid||""}); toast("Pago de "+pesos(val)+" registrado"); setTimeout(despues,200); }
     catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
 /* Mensaje de WhatsApp con el saldo del cliente y lo que lo forma desde la última vez que quedó en cero. */
@@ -1008,7 +1022,7 @@ function abrirCuenta(cid){
     <div class="saldo-grande ${s<0?"neg":s>0?"pos":""}">${pesos(Math.abs(s))}</div>
     <p class="sub">${s>0?"Cuenta por pagar: JS le debe este valor al cliente.":s<0?"Cuenta por cobrar: el cliente le debe este valor a JS.":"Cuenta a paz y salvo."}</p>
     ${s?(telWhatsApp(c.telefono)?`<div class="acciones" style="margin:0 0 6px"><a class="btn ok" id="cWa" href="${linkSaldo(cid)}" target="_blank" rel="noopener">Enviar ${s<0?"cobro":"saldo a favor"} por WhatsApp</a><button class="btn sec" id="cWaCopiar" type="button">Copiar mensaje</button></div>`:'<div class="aviso">Agrega el celular del cliente para enviarle el saldo por WhatsApp.</div>'):""}
-    ${esAdmin||esAsistente?`<h2>${esAdmin?"Registrar pago o ajuste":"Registrar compra o ganancia"}</h2>
+    ${esAdmin||esAsistente?`<h2>${esAdmin?"Registrar pago o ajuste":"Registrar pago, compra o ganancia"}</h2>
     <div class="campo"><label for="mTipo">Tipo</label><select id="mTipo">${Object.entries(MOVS).filter(([k])=>esAdmin||MOVS_OFICINA.includes(k)).map(([k,x])=>`<option value="${k}">${x.t}</option>`).join("")}</select></div>
     <div class="linea2"><div class="campo"><label for="mFecha">Día</label><input id="mFecha" type="date" value="${hoy()}"></div>
     <div class="campo"><label for="mVal">Valor</label><input id="mVal" type="number" inputmode="numeric" min="0" step="100" value="${Math.abs(s)||""}"></div></div>
@@ -1020,12 +1034,13 @@ function abrirCuenta(cid){
     ${rows.map(r=>`<tr><td>${hora(r.fecha)}</td><td>${esc(r.det)}</td><td class="n ${r.v<0?"neg":"pos"}">${pesos(r.v)}</td><td>${r.mid?(esAdmin?`<button class="btn peligro chico" data-delmov="${esc(r.mid)}">Quitar</button>`:""):(r.pid&&(r.v<0||r.dp))?`<button class="btn sec chico" data-domi="${esc(r.pid)}">${r.dp?"Desmarcar pago":"Ya pagó domicilio"}</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:'<div class="vacio">Sin movimientos.</div>'}`;
   if(!$("#dlg").open) abrirDlg();
   if($("#mTipo")&&esAdmin) $("#mTipo").value = s<0 ? "pago_de_cliente" : "pago_a_cliente";
-  if($("#mTipo")&&!esAdmin) $("#mVal").value="";
+  if($("#mTipo")&&!esAdmin&&s>=0) $("#mVal").value=""; // el asistente arranca en "pago del cliente": si debe, se sugiere lo que debe
   $("#cEdit").onclick=()=>formCliente(cid);
   const wa=$("#cWa"); if(wa) wa.onclick=()=>marcarEnviado(cid);
   const wc=$("#cWaCopiar"); if(wc) wc.onclick=async()=>{ try{ await navigator.clipboard.writeText(textoSaldo(cid)); toast("Mensaje copiado. Pégalo en WhatsApp."); }catch(e){ toast("No se pudo copiar en este navegador"); } };
   if($("#mReg")) $("#mReg").onclick=async()=>{ const val=Number($("#mVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero"); const id=nuevoId();
-    try{ await guardar("movimientos",id,{id,clienteId:cid,tipo:$("#mTipo").value,valor:val,medio:$("#mMedio").value,nota:$("#mNota").value.trim(),fecha:fechaDia($("#mFecha").value||hoy())}); toast("Movimiento registrado"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){toast("No se pudo guardar");} };
+    const tipo=$("#mTipo").value, fecha=!esAdmin&&tipo==="pago_de_cliente"?Date.now():fechaDia($("#mFecha").value||hoy()); // el pago que registra el asistente queda con la hora del momento
+    try{ await guardar("movimientos",id,{id,clienteId:cid,tipo,valor:val,medio:$("#mMedio").value,nota:$("#mNota").value.trim(),fecha,porUid:uid||"",porNombre:miNombre()}); toast("Movimiento registrado"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){toast("No se pudo guardar");} };
   document.querySelectorAll("[data-domi]").forEach(b=>b.onclick=async()=>{ const g=b.dataset.domi, ped=S.pedidos[g];
     if(ped?.domiPagado){ if(!await confirmar("Desmarcar el pago de "+g,"El pago del domicilio se quita de la caja y vuelve a sumarse al saldo del cliente.","Desmarcar")) return abrirCuenta(cid);
       try{ await actualizar("pedidos",g,{domiPagado:false,domiPagoMedio:"",domiPagoValor:"",domiPagoFecha:0}); toast("Guía "+g+" actualizada"); }catch(e){ toast("No se pudo guardar"); } return setTimeout(()=>abrirCuenta(cid),200); }
@@ -1131,6 +1146,57 @@ function verLiquidacion(id){
     ${esUltima?`<div class="acciones" style="margin-top:14px"><button class="btn peligro chico" id="lReabrir">Reabrir período</button></div><p class="sub" style="margin-top:8px;font-size:.85rem">Reabrir borra esta liquidación y junta sus entregas con el período actual. El dinero recibido se conserva en la caja.</p>`:""}`;
   abrirDlg();
   const rb=$("#lReabrir"); if(rb) rb.onclick=async()=>{ try{ await borrar("liquidaciones",id); toast("Período reabierto"); cerrarDlg(); }catch(e){ toast("No se pudo reabrir"); } };
+}
+/* Caja de oficina: la plata en efectivo que tiene en la mano cada asistente.
+   Base que le da administración + efectivo que recibe (mensajeros, pagos de clientes, domicilios) − compras que paga − lo que entrega al cierre.
+   Es parte de la caja general: dar la base o recibir el cierre no cambia el total, solo quién tiene la plata. */
+const asistentes = () => Object.values(S.usuarios||{}).filter(u=>u.rol==="asistente").sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre),"es"));
+function cajaOficina(auid){
+  const L=[], nomM=id=>S.mensajeros[id]?.nombre||"";
+  for(const c of Object.values(S.cajamovs)) if(c.cat==="oficina"&&c.personaUid===auid)
+    L.push({fecha:c.fecha,concepto:(c.tipo==="base"?"Base de caja que entregó administración":"Entregado a administración (cierre)")+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="base"?1:-1)*(Number(c.valor)||0),ref:c.id});
+  for(const r of Object.values(S.recaudos)) if(r.porUid===auid&&r.medio==="efectivo") L.push({fecha:r.fecha,concepto:"Entrega de "+nomM(r.mensajeroId),valor:Number(r.valor)||0});
+  for(const m of Object.values(S.movimientos)) if(m.porUid===auid&&m.medio==="efectivo"&&["pago_de_cliente","compra_cliente"].includes(m.tipo))
+    L.push({fecha:m.fecha,concepto:(m.tipo==="pago_de_cliente"?"Pago de ":"Compra para ")+nombreCliente(m.clienteId),valor:(m.tipo==="pago_de_cliente"?1:-1)*(Number(m.valor)||0)});
+  for(const p of Object.values(S.pedidos)) if(p.domiPagado&&p.domiPagoUid===auid&&p.domiPagoMedio==="efectivo") L.push({fecha:p.domiPagoFecha,concepto:"Pago de domicilio · "+p.guia,valor:pagoDomi(p)});
+  L.sort((a,b)=>a.fecha-b.fecha);
+  return {L,saldo:L.reduce((a,x)=>a+x.valor,0)};
+}
+function tarjetaCajaOficina(u,dia){
+  const C=cajaOficina(u.uid), delDia=C.L.filter(x=>diaDe(x.fecha)===dia), antes=C.L.filter(x=>diaDe(x.fecha)<dia).reduce((a,x)=>a+x.valor,0);
+  const enDia=delDia.reduce((a,x)=>a+x.valor,0), alCierre=antes+enDia;
+  return `<div class="mcard"><div class="mcard-top"><b>${esc(esAdmin?(u.nombre||u.email):"Mi caja de oficina")}</b>${esAdmin?`<span class="acciones" style="margin:0;gap:6px"><button class="btn sec chico" data-ofbase="${esc(u.uid)}">Dar base</button><button class="btn ok chico" data-ofcierre="${esc(u.uid)}">Recibir cierre</button></span>`:""}</div>
+    <dl class="datos"><dt>Traía de antes</dt><dd>${pesos(antes)}</dd><dt>Movimiento del día</dt><dd>${enDia<0?"− ":"+ "}${pesos(Math.abs(enDia))}</dd>
+    <div class="debe" style="display:contents"><dt>${dia===hoy()?"Debe tener ahora en efectivo":"Debía tener al cierre"}</dt><dd>${pesos(alCierre)}</dd></div></dl>
+    ${delDia.length?`<div class="tabla-env" style="margin-top:8px"><table><tbody>${delDia.map(x=>`<tr><td>${new Date(x.fecha).toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"})}</td><td>${esc(x.concepto)}</td><td class="n ${x.valor<0?"neg":"pos"}">${x.valor<0?"− ":"+ "}${pesos(Math.abs(x.valor))}</td>${esAdmin&&x.ref?`<td><button class="btn peligro chico" data-ofdel="${esc(x.ref)}">Quitar</button></td>`:esAdmin?"<td></td>":""}</tr>`).join("")}</tbody></table></div>`:'<p class="sub">Sin movimientos en efectivo este día.</p>'}</div>`;
+}
+function bloqueCajaOficina(){
+  if(esAdmin){ const as=asistentes(); if(!as.length) return "";
+    return `<h2>Caja de oficina</h2><p class="sub">La plata en efectivo que tiene cada asistente: la base que le das, más lo que recibe en efectivo (mensajeros, pagos de clientes, domicilios), menos lo que te entrega al cierre. Nequi y Bancolombia no pasan por su mano.</p>
+      <div class="mgrid">${as.map(u=>tarjetaCajaOficina(u,diaCaja)).join("")}</div>`; }
+  if(esAsistente&&uid) return `<h2>Mi caja de oficina</h2><p class="sub">Tu base más el efectivo que recibes, menos lo que entregas a administración. Al final del día, entrega y que administración registre el cierre.</p>
+    <div class="mgrid">${tarjetaCajaOficina({uid},diaCaja)}</div>`;
+  return "";
+}
+function movOficina(auid,tipo){
+  const u=(S.usuarios||{})[auid], C=cajaOficina(auid), base=tipo==="base";
+  $("#dlgCont").innerHTML=`<header><div><h2>${base?"Dar base de caja":"Recibir cierre de caja"}</h2><span class="sub">${esc(u?.nombre||u?.email||"")} · tiene ${pesos(C.saldo)} en efectivo</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <p class="sub">${base?"Efectivo que le entregas para dar vueltos y trabajar.":"Lo que te entrega en efectivo. Si le dejas la base para mañana, recibe solo el resto."}</p>
+    <div class="linea2"><div class="campo"><label for="ofVal">Valor</label><input id="ofVal" type="number" inputmode="numeric" min="0" step="1000" value="${base?"":(C.saldo>0?C.saldo:"")}"></div>
+    <div class="campo"><label for="ofNota">Nota (opcional)</label><input id="ofNota" placeholder="${base?"Ej: base del día":"Ej: cierre del día"}"></div></div>
+    <button class="btn ${base?"":"ok"}" id="ofGuardar" style="width:100%">${base?"Entregar base":"Registrar cierre"}</button>`;
+  abrirDlg(); $("#ofVal").focus();
+  $("#ofGuardar").onclick=async()=>{ const val=Number($("#ofVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero");
+    const b=$("#ofGuardar"); b.disabled=true; const id=nuevoId();
+    try{ await guardar("cajamovs",id,{id,tipo,cat:"oficina",personaUid:auid,personaId:"",valor:val,medio:"efectivo",concepto:$("#ofNota").value.trim(),fecha:Date.now()});
+      cerrarDlg(); const queda=C.saldo+(base?val:-val); toast((base?"Base entregada":"Cierre recibido")+`. Queda con ${pesos(queda)} en efectivo`); }
+    catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
+}
+function conectarCajaOficina(v){
+  v.querySelectorAll("[data-ofbase]").forEach(b=>b.onclick=()=>movOficina(b.dataset.ofbase,"base"));
+  v.querySelectorAll("[data-ofcierre]").forEach(b=>b.onclick=()=>movOficina(b.dataset.ofcierre,"entrega"));
+  v.querySelectorAll("[data-ofdel]").forEach(b=>b.onclick=async()=>{ if(!await confirmar("Quitar movimiento de la caja de oficina","Se quita la base o el cierre registrado.","Quitar")) return;
+    try{ await borrar("cajamovs",b.dataset.ofdel); toast("Movimiento quitado"); }catch(e){ toast("No se pudo quitar"); } });
 }
 function recibirDinero(mid){
   const m=S.mensajeros[mid]; if(!m) return;
@@ -1375,7 +1441,7 @@ function libroCaja(){
   for(const p of Object.values(S.pedidos)) if(cerrado(p)&&p.metodo==="transf_js") L.push({fecha:p.entregado,concepto:"Transferencia a JS · "+p.guia+(p.destinatario?" · "+p.destinatario:""),valor:Number(p.valorCobrado)||0,medio:p.cuentaJs||"cuentas",cat:"Transferencias"});
   for(const p of Object.values(S.pedidos)) if(p.domiPagado&&p.domiPagoMedio) L.push({fecha:p.domiPagoFecha||p.entregado||p.creado,concepto:"Pago de domicilio · "+p.guia+(p.clienteId?" · "+nombreCliente(p.clienteId):""),valor:pagoDomi(p),medio:p.domiPagoMedio,cat:"Clientes"});
   for(const m of Object.values(S.movimientos)) if(mueveCaja(m)) L.push({fecha:m.fecha,concepto:(m.tipo==="pago_de_cliente"?"Pago de ":m.tipo==="compra_cliente"?"Compra por encargo de ":"Pago a ")+nombreCliente(m.clienteId)+(m.nota?" · "+m.nota:""),valor:signoMov(m),medio:m.medio||"efectivo",cat:"Clientes"});
-  for(const c of Object.values(S.cajamovs)) if(c.cat==="interna"&&c.inicial) continue; // saldo inicial de la cuenta: la plata salió antes del empalme
+  for(const c of Object.values(S.cajamovs)) if((c.cat==="interna"&&c.inicial)||c.cat==="oficina") continue; // oficina: la plata pasa de tus manos a las del asistente // saldo inicial de la cuenta: la plata salió antes del empalme
   else if(c.cat==="interna"){ const n=S.cuentas[c.cuentaId]?.nombre||"Cuenta interna";
     L.push({fecha:c.fecha,concepto:(c.tipo==="entra"?"Entrada de ":"Salida a ")+n+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:n,ref:"cajamovs|"+c.id}); }
   else L.push({fecha:c.fecha,concepto:(CATS[c.cat]||"Movimiento")+(c.personaId?" · "+nomM(c.personaId):"")+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:CATS[c.cat]||"Otro",ref:"cajamovs|"+c.id});
@@ -1919,7 +1985,7 @@ function cargarDatos(){
   if(esAdmin){ setTimeout(completarNombres,8000); ["pedidos","clientes","mensajeros","movimientos","recaudos","liquidaciones","jornadas","cajamovs","vinculos","usuarios","cuentas"].forEach(c=>suscribir(c)); return; }
   const mid=usuario.mensajeroId();
   suscribir("vinculos",["uid","==",uid]);
-  if(esAsistente){ ["pedidos","clientes","mensajeros","movimientos","cuentas"].forEach(c=>suscribir(c)); suscribir("cajamovs",["cat","==","interna"]); suscribir("cajamovs",["cat","==","base"]); ["recaudos","liquidaciones"].forEach(c=>suscribir(c)); setTimeout(completarNombres,8000); }
+  if(esAsistente){ ["pedidos","clientes","mensajeros","movimientos","cuentas"].forEach(c=>suscribir(c)); suscribir("cajamovs",["cat","==","interna"]); suscribir("cajamovs",["cat","==","base"]); if(uid) suscribir("cajamovs",["personaUid","==",uid]); ["recaudos","liquidaciones"].forEach(c=>suscribir(c)); setTimeout(completarNombres,8000); }
   else if(mid){ suscribir("pedidos",["mensajeroId","==",mid]); suscribir("mensajeros",["id","==",mid]); }
   if(mid){ suscribir("jornadas",["personaId","==",mid]); suscribir("recaudos",["mensajeroId","==",mid]); suscribir("liquidaciones",["mensajeroId","==",mid]); suscribir("cajamovs",["personaId","==",mid]); }
   if(!mid&&!esAsistente) cargado=true;
