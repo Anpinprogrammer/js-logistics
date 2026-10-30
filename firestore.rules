@@ -126,6 +126,16 @@ service cloud.firestore {
       allow delete: if esAdmin();
     }
     // Pagos y ajustes de clientes: oficina los ve (saldos); solo administración los registra
+    // El asistente cambia el medio (efectivo, Nequi, Bancolombia) de algo que registró él en las últimas 24 horas.
+    // Queda el medio original en medioAntes para que administración lo revise.
+    function cambioDeMedio() {
+      return esAsistente() && resource.data.get("porUid", "") == request.auth.uid
+        && request.time.toMillis() - resource.data.fecha < 86400000
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["medio", "medioAntes", "medioCambio"])
+        && request.resource.data.medio in ["efectivo", "nequi", "bancolombia"]
+        && request.resource.data.medioAntes == resource.data.get("medioAntes", resource.data.get("medio", ""))
+        && request.resource.data.medioCambio is int;
+    }
     match /movimientos/{id} {
       allow read: if esOficina() || esClienteDe(resource.data.clienteId);
       // El asistente registra pagos de clientes (con la hora del momento y a su nombre), compras por encargo
@@ -139,7 +149,9 @@ service cloud.firestore {
             && request.resource.data.fecha is int
             && request.resource.data.fecha > request.time.toMillis() - 600000
             && request.resource.data.fecha < request.time.toMillis() + 600000)));
-      allow update, delete: if esAdmin();
+      // El asistente solo corrige el medio de un pago o una compra que registró él, hasta 24 horas después
+      allow update: if esAdmin() || (resource.data.tipo in ["pago_de_cliente", "compra_cliente"] && cambioDeMedio());
+      allow delete: if esAdmin();
     }
     // Personal: oficina ve la lista; cada mensajero solo su propia ficha
     match /mensajeros/{id} {
@@ -162,7 +174,8 @@ service cloud.firestore {
     match /recaudos/{id} {
       allow read: if esOficina() || esMio(resource.data.mensajeroId);
       allow create: if esAdmin() || recaudoDeAsistente();
-      allow update, delete: if esAdmin();
+      allow update: if esAdmin() || cambioDeMedio();
+      allow delete: if esAdmin();
     }
     match /liquidaciones/{id} {
       allow read: if esOficina() || esMio(resource.data.mensajeroId);
