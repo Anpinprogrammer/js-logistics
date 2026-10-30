@@ -138,19 +138,19 @@ service cloud.firestore {
     }
     match /movimientos/{id} {
       allow read: if esOficina() || esClienteDe(resource.data.clienteId);
-      // El asistente registra pagos de clientes (con la hora del momento y a su nombre), compras por encargo
-      // y ganancias ocasionales; no borra ni edita
+      // El asistente registra pagos de clientes y pagos a clientes de su saldo a favor (con la hora del momento
+      // y a su nombre), compras por encargo y ganancias ocasionales; no borra ni edita
       allow create: if esAdmin() || (esAsistente()
         && request.resource.data.valor is number && request.resource.data.valor > 0
         && (request.resource.data.tipo in ["compra_cliente", "ganancia"]
-          || (request.resource.data.tipo == "pago_de_cliente"
+          || (request.resource.data.tipo in ["pago_de_cliente", "pago_a_cliente"]
             && request.resource.data.medio in ["efectivo", "nequi", "bancolombia"]
             && request.resource.data.porUid == request.auth.uid
             && request.resource.data.fecha is int
             && request.resource.data.fecha > request.time.toMillis() - 600000
             && request.resource.data.fecha < request.time.toMillis() + 600000)));
       // El asistente solo corrige el medio de un pago o una compra que registró él, hasta 24 horas después
-      allow update: if esAdmin() || (resource.data.tipo in ["pago_de_cliente", "compra_cliente"] && cambioDeMedio());
+      allow update: if esAdmin() || (resource.data.tipo in ["pago_de_cliente", "pago_a_cliente", "compra_cliente"] && cambioDeMedio());
       allow delete: if esAdmin();
     }
     // Personal: oficina ve la lista; cada mensajero solo su propia ficha
