@@ -1015,8 +1015,8 @@ function envioMasivo(tipo){
 }
 
 function filasCuenta(cid){
-  const ps=Object.values(S.pedidos).filter(p=>p.clienteId===cid&&cerrado(p)).map(p=>({fecha:p.entregado,det:`${p.guia} · ${p.destinatario||""} · ${metodoTxt(p)} · cobró ${pesos(p.valorCobrado)} · ${textoDomi(p)}`,v:saldoPedido(p),pid:p.guia,dp:!!p.domiPagado}));
-  const ms=Object.values(S.movimientos).filter(m=>m.clienteId===cid).map(m=>({fecha:m.fecha,det:(MOVS[m.tipo]?.corto||"Movimiento")+(m.nota?" · "+m.nota:""),v:signoMov(m),mid:m.id}));
+  const ps=Object.values(S.pedidos).filter(p=>p.clienteId===cid&&cerrado(p)).map(p=>({fecha:p.entregado,det:`${p.guia} · ${p.destinatario||""} · ${metodoTxt(p)} · cobró ${pesos(p.valorCobrado)} · ${textoDomi(p)}`,v:saldoPedido(p),pid:p.guia,dp:!!p.domiPagado,nom:p.destinatario||(p.estado==="devuelto"?"Devolucion":"")}));
+  const ms=Object.values(S.movimientos).filter(m=>m.clienteId===cid).map(m=>({fecha:m.fecha,det:(MOVS[m.tipo]?.corto||"Movimiento")+(m.nota?" · "+m.nota:""),v:signoMov(m),mid:m.id,nom:(MOVS[m.tipo]?.corto||"Movimiento")+(m.nota?" "+m.nota:"")}));
   return [...ps,...ms].sort((a,b)=>b.fecha-a.fecha);
 }
 function abrirCuenta(cid){
@@ -1061,45 +1061,62 @@ function abrirCuenta(cid){
 }
 
 /* Tickets para la impresora térmica de la oficina (SAT-16TU): lista de clientes y recibo de un cliente.
-   El ancho del papel (80 o 58 mm) se elige en la vista previa y queda guardado en este equipo. */
-const CSS_TICKET=`.t{font:12px/1.3 Arial,Helvetica,sans-serif;color:#000}.c{text-align:center}.b{font-weight:700}.g{font-size:15px}.r{border-top:1px dashed #000;margin:6px 0}
-  .f{display:flex;justify-content:space-between;gap:6px;padding:2px 0;border-bottom:1px dotted #999}.f span{min-width:0;overflow-wrap:anywhere}.f b{white-space:nowrap}.tot{border-bottom:0;border-top:1px solid #000;margin-top:2px}small{font-size:10px}`;
-function imprimirTicket(titulo,cuerpo){
+   La impresora imprime como texto: el ticket se arma en líneas de ancho fijo, sin tildes ni símbolos
+   (salen como caracteres raros). El ancho del papel (80 o 58 mm) se elige en la vista previa y queda guardado en este equipo. */
+const tkTxt = x => String(x??"").replace(/[\u00a0\u202f]/g," ").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\x20-\x7E]/g,"").replace(/\s+/g," ").trim();
+const tkPesos = v => (Math.round(v)<0?"-":"")+"$"+Math.abs(Math.round(v)).toLocaleString("es-CO").replace(/[^\d]/g,".");
+function tkLineas(cols){
+  const L=[];
+  return { L, cols,
+    centro:t=>{ t=tkTxt(t).slice(0,cols); L.push(" ".repeat(Math.floor((cols-t.length)/2))+t); },
+    raya:(c="-")=>L.push(c.repeat(cols)),
+    fila:(izq,der="")=>{ der=tkTxt(der); izq=tkTxt(izq).slice(0,Math.max(1,cols-der.length-1)); L.push(izq+" ".repeat(Math.max(1,cols-izq.length-der.length))+der); },
+    texto:t=>{ let x=tkTxt(t); while(x.length>cols){ let k=x.lastIndexOf(" ",cols); if(k<1) k=cols; L.push(x.slice(0,k)); x=x.slice(k).trim(); } if(x) L.push(x); },
+    vacio:()=>L.push("") };
+}
+function imprimirTicket(titulo,armar){
   let mm=lsGet("js_papel")==="58"?58:80;
-  const ticket=()=>`<div class="t" style="width:${mm===80?72:48}mm">
-    <div class="c b g">${esc(EMPRESA.nombre)}</div><div class="c">${new Date().toLocaleString("es-CO",{dateStyle:"medium",timeStyle:"short"})}</div>
-    ${cuerpo()}<div class="r"></div><div class="c">${esc(EMPRESA.lema)}</div><div class="c">${esc(EMPRESA.tel)}</div></div>`;
+  const lineas=()=>{ const cols=mm===80?40:32, t=tkLineas(cols);
+    t.centro(EMPRESA.nombre); t.centro(new Date().toLocaleString("es-CO",{dateStyle:"short",timeStyle:"short"})); t.raya("=");
+    armar(t); t.raya("="); t.centro(EMPRESA.lema); t.centro(EMPRESA.tel); for(let i=0;i<5;i++) t.vacio(); // espacio para cortar el papel sin perder el final
+    return {txt:t.L.join("\n"), cols}; };
+  const pre=(x,ancho)=>`<pre style="margin:0;font:700 ${(ancho/x.cols/0.6).toFixed(2)}mm/1.25 'Courier New',Courier,monospace;color:#000;white-space:pre">${esc(x.txt)}</pre>`;
   $("#dlgCont").innerHTML=`<header><div><h2>${esc(titulo)}</h2><span class="sub">Impresora de tickets SAT-16TU</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     <div class="filtros">${[[80,"Papel de 80 mm"],[58,"Papel de 58 mm"]].map(([x,t])=>`<button data-mm="${x}" aria-pressed="${mm===x}">${t}</button>`).join("")}</div>
     <p class="sub">En la ventana de impresión elige la SAT-16TU, márgenes “Ninguno” y escala 100 %.</p>
     <div id="tkPrev" style="background:#fff;color:#000;padding:8px;border:1px solid var(--borde,#ccc);overflow:auto;max-height:50vh"></div>
     <button class="btn" id="tkImprimir" style="width:100%;margin-top:10px">Imprimir</button>`;
-  const ver=()=>{ $("#tkPrev").innerHTML=`<style>${CSS_TICKET}</style>${ticket()}`; $("#dlgCont").querySelectorAll("[data-mm]").forEach(b=>b.setAttribute("aria-pressed",String(Number(b.dataset.mm)===mm))); };
+  const ver=()=>{ $("#tkPrev").innerHTML=pre(lineas(),mm===80?72:48); $("#dlgCont").querySelectorAll("[data-mm]").forEach(b=>b.setAttribute("aria-pressed",String(Number(b.dataset.mm)===mm))); };
   if(!$("#dlg").open) abrirDlg(); ver();
   $("#dlgCont").querySelectorAll("[data-mm]").forEach(b=>b.onclick=()=>{ mm=Number(b.dataset.mm); lsSet("js_papel",String(mm)); ver(); });
   $("#tkImprimir").onclick=()=>{ // se imprime desde un marco aparte para que salga solo el ticket
     const fr=document.createElement("iframe"); fr.style.cssText="position:fixed;width:0;height:0;border:0;right:0;bottom:0"; document.body.appendChild(fr);
-    const d=fr.contentWindow.document; d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(titulo)} ${hoy()}</title><style>@page{margin:0}html,body{margin:0;background:#fff}.t{padding:2mm 4mm 8mm}${CSS_TICKET}</style></head><body>${ticket()}</body></html>`); d.close();
+    const d=fr.contentWindow.document; d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(tkTxt(titulo))}</title><style>@page{margin:0}html,body{margin:0;background:#fff}body{padding:2mm 4mm}</style></head><body>${pre(lineas(),mm===80?72:48)}</body></html>`); d.close();
     setTimeout(()=>{ fr.contentWindow.focus(); fr.contentWindow.print(); setTimeout(()=>fr.remove(),60000); },200); };
 }
 function imprimirClientes(secciones,k){
-  imprimirTicket("Imprimir lista",()=>`${diaCliF?`<div class="c">Movimiento del ${esc(fechaLarga(diaCliF))}</div>`:""}
-    ${secciones.map(([tit,txt,cs,tot])=>`<div class="r"></div><div class="c b">${tit.toUpperCase()}</div>
-      ${cs.length?cs.map(c=>`<div class="f"><span>${esc(c.nombre)}${c.telefono?`<br><small>${esc(c.telefono)}</small>`:""}</span><b>${pesos(Math.abs(k(c)))}</b></div>`).join(""):'<div class="c">Ninguno</div>'}
-      <div class="f b tot"><span>${txt} (${cs.length})</span><span>${pesos(tot)}</span></div>`).join("")}`);
+  imprimirTicket("Imprimir lista",t=>{
+    if(diaCliF) t.centro("Movimiento del "+diaCliF);
+    secciones.forEach(([tit,txt,cs,tot],i)=>{ if(i) t.vacio(); t.centro(tit.toUpperCase()); t.raya();
+      if(cs.length) cs.forEach(c=>t.fila(c.nombre,tkPesos(Math.abs(k(c))))); else t.centro("Ninguno");
+      t.raya(); t.fila(`${txt} (${cs.length})`,tkPesos(tot)); });
+  });
 }
-/* Recibo de un cliente: su saldo y los movimientos desde la última vez que quedó a paz y salvo (los más viejos se juntan en "saldo anterior"). */
+/* Recibo de un cliente: una línea por pedido (guía, quien recibió y lo que suma o resta) desde la última vez que quedó
+   a paz y salvo; los más viejos se juntan en "saldo anterior". */
 function imprimirReciboCliente(cid){
   const c=S.clientes[cid]; if(!c) return;
   const asc=filasCuenta(cid).slice().reverse(); let corte=0, acc=0;
   asc.forEach((r,i)=>{ acc+=r.v; if(Math.round(acc)===0) corte=i+1; });
-  let rows=asc.slice(corte); const MAX=40, viejas=rows.length>MAX?rows.slice(0,rows.length-MAX):[]; rows=rows.slice(viejas.length);
+  let rows=asc.slice(corte); const MAX=60, viejas=rows.length>MAX?rows.slice(0,rows.length-MAX):[]; rows=rows.slice(viejas.length);
   const anterior=viejas.reduce((a,r)=>a+r.v,0), s=saldoCliente(cid);
-  imprimirTicket("Recibo de "+c.nombre,()=>`<div class="r"></div><div class="c b">RECIBO DE CUENTA</div><div class="c b g">${esc(c.nombre)}</div>${c.telefono?`<div class="c">${esc(c.telefono)}</div>`:""}
-    <div class="r"></div>${anterior?`<div class="f"><span>Saldo anterior</span><b>${pesos(anterior)}</b></div>`:""}
-    ${rows.length?rows.map(r=>`<div class="f"><span><small>${esc(new Date(r.fecha).toLocaleDateString("es-CO",{day:"numeric",month:"short"}))}</small> ${esc(r.det)}</span><b>${pesos(r.v)}</b></div>`).join(""):'<div class="c">Sin movimientos pendientes</div>'}
-    <div class="f b tot g"><span>${s>0?"JS LE DEBE":s<0?"DEBE A JS":"PAZ Y SALVO"}</span><span>${pesos(Math.abs(s))}</span></div>
-    ${s<0?`<div class="c"><small>Nequi 316 493 3854 · Bancolombia ahorros 815 13203390 · Javier Salazar</small></div>`:""}`);
+  imprimirTicket("Recibo de "+c.nombre,t=>{
+    t.centro("RECIBO DE CUENTA"); t.centro(c.nombre); if(c.telefono) t.centro(c.telefono); t.raya();
+    if(anterior) t.fila("Saldo anterior",tkPesos(anterior));
+    if(rows.length) rows.forEach(r=>t.fila((r.pid?r.pid+" ":"")+r.nom,tkPesos(r.v))); else t.centro("Sin movimientos pendientes");
+    t.raya(); t.fila(s>0?"JS LE DEBE":s<0?"DEBE A JS":"PAZ Y SALVO",tkPesos(Math.abs(s)));
+    if(s<0){ t.vacio(); t.texto("Nequi 316 493 3854 - Bancolombia ahorros 815 13203390 - Javier Salazar"); }
+  });
 }
 
 /* ======================= RECIBOS DE CUADRE ======================= */
