@@ -1075,7 +1075,8 @@ function tkLineas(cols){
     texto:t=>{ let x=tkTxt(t); while(x.length>cols){ let k=x.lastIndexOf(" ",cols); if(k<1) k=cols; L.push(x.slice(0,k)); x=x.slice(k).trim(); } if(x) L.push(x); },
     vacio:()=>L.push("") };
 }
-function imprimirTicket(titulo,armar){ // armar: una función que llena el ticket, o una lista para imprimir varios seguidos
+function imprimirTicket(titulo,armar,antes){ // armar: una función que llena el ticket, o una lista para imprimir varios seguidos
+  // antes: {texto, fn} — algo que se guarda una sola vez al tocar Imprimir (por ejemplo, pagar los saldos); si falla, no se imprime
   let mm=lsGet("js_papel")==="58"?58:80;
   const lista=Array.isArray(armar)?armar:[armar];
   const lineas=()=>lista.map(fn=>{ const cols=mm===80?40:32, t=tkLineas(cols);
@@ -1087,11 +1088,15 @@ function imprimirTicket(titulo,armar){ // armar: una función que llena el ticke
     <div class="filtros">${[[80,"Papel de 80 mm"],[58,"Papel de 58 mm"]].map(([x,t])=>`<button data-mm="${x}" aria-pressed="${mm===x}">${t}</button>`).join("")}</div>
     <p class="sub">En la ventana de impresión elige la SAT-16TU, márgenes “Ninguno” y escala 100 %.${lista.length>1?` Son ${lista.length} recibos, uno detrás de otro.`:""}</p>
     <div id="tkPrev" style="background:#fff;color:#000;padding:8px;border:1px solid var(--borde,#ccc);overflow:auto;max-height:50vh"></div>
-    <button class="btn" id="tkImprimir" style="width:100%;margin-top:10px">Imprimir${lista.length>1?" "+lista.length+" recibos":""}</button>`;
+    ${antes?`<div class="aviso" style="margin-top:10px">${antes.texto}</div>`:""}
+    <button class="btn" id="tkImprimir" style="width:100%;margin-top:10px">${antes?"Pagar e imprimir":"Imprimir"}${lista.length>1?" "+lista.length+" recibos":""}</button>`;
   const ver=()=>{ $("#tkPrev").innerHTML=pre(lineas(),mm===80?72:48); $("#dlgCont").querySelectorAll("[data-mm]").forEach(b=>b.setAttribute("aria-pressed",String(Number(b.dataset.mm)===mm))); };
   if(!$("#dlg").open) abrirDlg(); ver();
   $("#dlgCont").querySelectorAll("[data-mm]").forEach(b=>b.onclick=()=>{ mm=Number(b.dataset.mm); lsSet("js_papel",String(mm)); ver(); });
-  $("#tkImprimir").onclick=()=>{ // se imprime desde un marco aparte para que salga solo el ticket
+  $("#tkImprimir").onclick=async()=>{ // se imprime desde un marco aparte para que salga solo el ticket
+    if(antes){ const b=$("#tkImprimir"); b.disabled=true; b.textContent="Guardando…";
+      try{ await antes.fn(); }catch(e){ b.disabled=false; b.textContent="Pagar e imprimir"; return toast("No se pudo guardar el pago. No se imprimió."); }
+      antes=null; b.disabled=false; b.textContent="Imprimir otra vez"; $("#dlgCont").querySelector(".aviso")?.remove(); }
     const fr=document.createElement("iframe"); fr.style.cssText="position:fixed;width:0;height:0;border:0;right:0;bottom:0"; document.body.appendChild(fr);
     const d=fr.contentWindow.document; d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(tkTxt(titulo))}</title><style>@page{margin:0}html,body{margin:0;background:#fff}body{padding:2mm 4mm}</style></head><body>${pre(lineas(),mm===80?72:48)}</body></html>`); d.close();
     setTimeout(()=>{ fr.contentWindow.focus(); fr.contentWindow.print(); setTimeout(()=>fr.remove(),60000); },200); };
@@ -1107,7 +1112,7 @@ function imprimirClientes(secciones,k){
 /* Recibo de un cliente: una línea por pedido (guía, quien recibió y lo que suma o resta) desde la última vez que quedó
    a paz y salvo; los más viejos se juntan en "saldo anterior". */
 const imprimirReciboCliente = cid => { const fn=armarRecibo(cid); if(fn) imprimirTicket("Recibo de "+S.clientes[cid].nombre,fn); };
-function armarRecibo(cid){
+function armarRecibo(cid,pago){ // pago: {medio} cuando en ese momento se le paga el saldo a favor
   const c=S.clientes[cid]; if(!c) return null;
   const asc=filasCuenta(cid).slice().reverse(); let corte=0, acc=0;
   asc.forEach((r,i)=>{ acc+=r.v; if(Math.round(acc)===0) corte=i+1; });
@@ -1118,6 +1123,7 @@ function armarRecibo(cid){
     if(anterior) t.fila("Saldo anterior",tkPesos(anterior));
     if(rows.length) rows.forEach(r=>t.fila((r.pid?r.pid+" ":"")+r.nom,tkPesos(r.v))); else t.centro("Sin movimientos pendientes");
     t.raya(); t.fila(s>0?"JS LE DEBE":s<0?"DEBE A JS":"PAZ Y SALVO",tkPesos(Math.abs(s)));
+    if(pago&&s>0){ t.fila("PAGADO EN "+MEDIOS[pago.medio].toUpperCase(),tkPesos(-s)); t.fila("SALDO","$0"); t.vacio(); t.vacio(); t.fila("Recibido: ______________________"); }
     if(s<0){ t.vacio(); t.texto("Nequi 316 493 3854 - Bancolombia ahorros 815 13203390 - Javier Salazar"); }
   };
 }
@@ -1127,11 +1133,19 @@ function recibosVarios(cs,k){
   $("#dlgCont").innerHTML=`<header><div><h2>Imprimir recibos</h2><span class="sub">Elige los clientes</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     <div class="campo"><input id="rvBus" type="search" placeholder="Buscar cliente…" autocomplete="off"></div>
     <div class="acciones" style="margin:0 0 8px"><button class="btn sec chico" id="rvTodos">Marcar todos</button><button class="btn sec chico" id="rvNinguno">Ninguno</button></div>
-    <div id="rvLista" style="max-height:50vh;overflow:auto"></div>
-    <button class="btn" id="rvImprimir" style="width:100%;margin-top:10px" disabled>Imprimir</button>`;
+    <div id="rvLista" style="max-height:45vh;overflow:auto"></div>
+    <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px"><input type="checkbox" id="rvPagar" checked style="width:auto;margin-top:3px"><span>Pagarles su saldo a favor y dejarlos en $ 0 (sale de la caja)</span></label>
+    <div class="campo" id="rvMedioC" style="margin-top:6px"><label for="rvMedio">Les pagas en</label><select id="rvMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>
+    <p class="sub" id="rvRes"></p>
+    <button class="btn" id="rvImprimir" style="width:100%;margin-top:6px" disabled>Imprimir</button>`;
   abrirDlg();
   const vis=()=>{ const q=sinTildes($("#rvBus").value.trim()); return cs.filter(c=>!q||sinTildes(c.nombre+" "+(c.telefono||"")).includes(q)); };
-  const boton=()=>{ const b=$("#rvImprimir"); b.disabled=!sel.size; b.textContent=sel.size?`Imprimir ${sel.size} recibo${sel.size===1?"":"s"}`:"Imprimir"; };
+  const aPagar=()=>$("#rvPagar").checked?[...sel].map(id=>[id,Math.round(saldoCliente(id))]).filter(([,v])=>v>0):[];
+  const boton=()=>{ const b=$("#rvImprimir"); b.disabled=!sel.size; b.textContent=sel.size?`Imprimir ${sel.size} recibo${sel.size===1?"":"s"}`:"Imprimir";
+    const ps=aPagar(), tot=ps.reduce((a,[,v])=>a+v,0), deben=[...sel].filter(id=>saldoCliente(id)<0).length;
+    $("#rvMedioC").classList.toggle("oculto",!$("#rvPagar").checked);
+    $("#rvRes").textContent=$("#rvPagar").checked&&sel.size?(ps.length?`Se les pagan ${pesos(tot)} a ${ps.length} cliente${ps.length===1?"":"s"}.`:"Ninguno de los elegidos tiene saldo a favor.")+(deben?` ${deben} que te debe${deben===1?"":"n"} no cambia${deben===1?"":"n"}.`:""):""; };
+  $("#rvPagar").onchange=boton;
   const ver=()=>{ const l=vis(); $("#rvLista").innerHTML=l.length?`<table><tbody>${l.map(c=>`<tr><td style="width:32px"><input type="checkbox" data-rv="${esc(c.id)}" ${sel.has(c.id)?"checked":""} aria-label="${esc(c.nombre)}" style="width:auto"></td><td><span data-rvl="${esc(c.id)}" style="cursor:pointer"><b>${esc(c.nombre)}</b></span></td><td class="n ${k(c)<0?"neg":k(c)>0?"pos":""}">${pesos(Math.abs(k(c)))}</td></tr>`).join("")}</tbody></table>`:'<div class="vacio">Ningún cliente con ese nombre.</div>';
     $("#rvLista").querySelectorAll("[data-rv]").forEach(x=>x.onchange=()=>{ x.checked?sel.add(x.dataset.rv):sel.delete(x.dataset.rv); boton(); });
     $("#rvLista").querySelectorAll("[data-rvl]").forEach(x=>x.onclick=()=>{ const cb=$("#rvLista").querySelector(`[data-rv="${x.dataset.rvl}"]`); cb.checked=!cb.checked; cb.onchange(); });
@@ -1139,7 +1153,14 @@ function recibosVarios(cs,k){
   $("#rvBus").oninput=ver;
   $("#rvTodos").onclick=()=>{ vis().forEach(c=>sel.add(c.id)); ver(); };
   $("#rvNinguno").onclick=()=>{ sel.clear(); ver(); };
-  $("#rvImprimir").onclick=()=>{ const ids=cs.map(c=>c.id).filter(id=>sel.has(id)); imprimirTicket(`${ids.length} recibos`,ids.map(armarRecibo).filter(Boolean)); };
+  $("#rvImprimir").onclick=()=>{ const ids=cs.map(c=>c.id).filter(id=>sel.has(id)), medio=$("#rvMedio").value, ps=aPagar(), pagar=new Map(ps), tot=ps.reduce((a,[,v])=>a+v,0);
+    const fns=ids.map(id=>armarRecibo(id,pagar.has(id)?{medio}:null)).filter(Boolean);
+    // el pago se guarda al tocar "Pagar e imprimir", con el saldo de ese momento (si ya quedó en 0, no se paga dos veces)
+    const antes=ps.length?{texto:`Al imprimir se registra el pago de <b>${pesos(tot)}</b> en ${MEDIOS[medio]} a ${ps.length} cliente${ps.length===1?"":"s"} y quedan en $ 0.`,
+      fn:async()=>{ let n=0, total=0; for(const [cid] of ps){ const v=Math.round(saldoCliente(cid)); if(!(v>0)) continue; const id=nuevoId();
+          await guardar("movimientos",id,{id,clienteId:cid,tipo:"pago_a_cliente",valor:v,medio,nota:"Pago con recibo impreso",fecha:Date.now(),porUid:uid||"",porNombre:miNombre()}); n++; total+=v; }
+        toast(`Pagados ${pesos(total)} a ${n} cliente${n===1?"":"s"}`); }}:null;
+    imprimirTicket(`${ids.length} recibo${ids.length===1?"":"s"}`,fns,antes); };
   ver();
 }
 
