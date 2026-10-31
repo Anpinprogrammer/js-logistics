@@ -515,7 +515,7 @@ function pintarAdmin(){
         <div class="cifra"><span>${diaCliF?"Ese día te quedaron debiendo":"Cuentas por cobrar (te deben)"}</span><b class="neg">${pesos(totC)}</b><span>${cobrar.length} cliente${cobrar.length===1?"":"s"}</span></div>
         <div class="cifra"><span>${diaCliF?"Ese día les quedaste debiendo":"Cuentas por pagar (les debes)"}</span><b class="pos">${pesos(totP)}</b><span>${pagar.length} cliente${pagar.length===1?"":"s"}</span></div>
       </div>
-      <div class="acciones" style="margin-bottom:16px"><button class="btn" id="nuevoCli">Registrar cliente</button><button class="btn ok" id="waMasivo">Enviar saldos por WhatsApp</button>${descargas&&esAdmin?'<button class="btn sec" id="xlsCartera">Descargar cartera en Excel</button>':""}</div>
+      <div class="acciones" style="margin-bottom:16px"><button class="btn" id="nuevoCli">Registrar cliente</button><button class="btn ok" id="waMasivo">Enviar saldos por WhatsApp</button>${descargas&&esAdmin?'<button class="btn sec" id="xlsCartera">Descargar cartera en Excel</button>':""}<button class="btn sec" id="imprCli">Imprimir ${filtroCli==="cobrar"?"por cobrar":filtroCli==="pagar"?"por pagar":"por cobrar y por pagar"}</button></div>
       <div class="filtros">${[["todos","Todos"],["cobrar","Por cobrar"],["pagar","Por pagar"]].map(([k,t])=>`<button data-fc="${k}" aria-pressed="${filtroCli===k}">${t}</button>`).join("")}</div>
       ${filtroDiaHtml(diaCliF)}${diaCliF?`<p class="sub">Clientes con movimiento ese día: lo que les quedó de ese día y, al lado, su saldo total de hoy.</p>`:""}
       ${vis.length?`<div class="tabla-env"><table><thead><tr><th>Cliente</th><th>Número</th><th>Cuenta</th>${diaCliF?'<th class="n">Ese día</th>':""}<th class="n">Saldo</th><th></th></tr></thead><tbody>
@@ -524,6 +524,7 @@ function pintarAdmin(){
     $("#nuevoCli").onclick=()=>formCliente();
     $("#waMasivo").onclick=()=>envioMasivo(filtroCli==="pagar"?"pagar":"cobrar");
     const xc=$("#xlsCartera"); if(xc) xc.onclick=()=>descargarCartera(xc);
+    $("#imprCli").onclick=()=>imprimirClientes([filtroCli!=="pagar"&&["Cuentas por cobrar","Te deben",cobrar,totC],filtroCli!=="cobrar"&&["Cuentas por pagar","Les debes",pagar,totP]].filter(Boolean),k);
     v.querySelectorAll("[data-fc]").forEach(b=>b.onclick=()=>{filtroCli=b.dataset.fc; pintar();});
     v.querySelectorAll("[data-cli]").forEach(b=>b.onclick=()=>abrirCuenta(b.dataset.cli));
     enlazarFiltroDia(diaCliF,d=>diaCliF=d);
@@ -1056,6 +1057,33 @@ function abrirCuenta(cid){
     const csv="\uFEFF"+lin.map(l=>l.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(";")).join("\r\n");
     try{ await descargas.save({filename:`cuenta-${c.nombre.replace(/[^\w]+/g,"-")}-${hoy()}.csv`, data:csv}); }catch(e){ toast("No se descargó el archivo"); }
   };
+}
+
+/* Lista de clientes por cobrar / por pagar para la impresora térmica de la oficina (SAT-16TU).
+   El ancho del papel (80 o 58 mm) se elige en la vista previa y queda guardado en este equipo. */
+function imprimirClientes(secciones,k){
+  let mm=lsGet("js_papel")==="58"?58:80;
+  const ticket=()=>`<div class="t" style="width:${mm===80?72:48}mm">
+    <div class="c b g">${esc(EMPRESA.nombre)}</div><div class="c">${new Date().toLocaleString("es-CO",{dateStyle:"medium",timeStyle:"short"})}</div>
+    ${diaCliF?`<div class="c">Movimiento del ${esc(fechaLarga(diaCliF))}</div>`:""}
+    ${secciones.map(([tit,txt,cs,tot])=>`<div class="r"></div><div class="c b">${tit.toUpperCase()}</div>
+      ${cs.length?cs.map(c=>`<div class="f"><span>${esc(c.nombre)}${c.telefono?`<br><small>${esc(c.telefono)}</small>`:""}</span><b>${pesos(Math.abs(k(c)))}</b></div>`).join(""):'<div class="c">Ninguno</div>'}
+      <div class="f b tot"><span>${txt} (${cs.length})</span><span>${pesos(tot)}</span></div>`).join("")}
+    <div class="r"></div><div class="c">${esc(EMPRESA.lema)}</div><div class="c">${esc(EMPRESA.tel)}</div></div>`;
+  $("#dlgCont").innerHTML=`<header><div><h2>Imprimir lista</h2><span class="sub">Impresora de tickets SAT-16TU</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <div class="filtros">${[[80,"Papel de 80 mm"],[58,"Papel de 58 mm"]].map(([x,t])=>`<button data-mm="${x}" aria-pressed="${mm===x}">${t}</button>`).join("")}</div>
+    <p class="sub">En la ventana de impresión elige la SAT-16TU, márgenes “Ninguno” y escala 100 %.</p>
+    <div id="tkPrev" style="background:#fff;color:#000;padding:8px;border:1px solid var(--borde,#ccc);overflow:auto;max-height:50vh"></div>
+    <button class="btn" id="tkImprimir" style="width:100%;margin-top:10px">Imprimir</button>`;
+  const css=`.t{font:12px/1.3 Arial,Helvetica,sans-serif;color:#000}.c{text-align:center}.b{font-weight:700}.g{font-size:15px}.r{border-top:1px dashed #000;margin:6px 0}
+    .f{display:flex;justify-content:space-between;gap:6px;padding:2px 0;border-bottom:1px dotted #999}.f span{min-width:0;overflow-wrap:anywhere}.f b{white-space:nowrap}.tot{border-bottom:0;border-top:1px solid #000;margin-top:2px}small{font-size:10px}`;
+  const ver=()=>{ $("#tkPrev").innerHTML=`<style>${css}</style>${ticket()}`; $("#dlgCont").querySelectorAll("[data-mm]").forEach(b=>b.setAttribute("aria-pressed",String(Number(b.dataset.mm)===mm))); };
+  abrirDlg(); ver();
+  $("#dlgCont").querySelectorAll("[data-mm]").forEach(b=>b.onclick=()=>{ mm=Number(b.dataset.mm); lsSet("js_papel",String(mm)); ver(); });
+  $("#tkImprimir").onclick=()=>{ // se imprime desde un marco aparte para que salga solo el ticket
+    const fr=document.createElement("iframe"); fr.style.cssText="position:fixed;width:0;height:0;border:0;right:0;bottom:0"; document.body.appendChild(fr);
+    const d=fr.contentWindow.document; d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>Clientes ${hoy()}</title><style>@page{margin:0}html,body{margin:0;background:#fff}.t{padding:2mm 4mm 8mm}${css}</style></head><body>${ticket()}</body></html>`); d.close();
+    setTimeout(()=>{ fr.contentWindow.focus(); fr.contentWindow.print(); setTimeout(()=>fr.remove(),60000); },200); };
 }
 
 /* ======================= RECIBOS DE CUADRE ======================= */
