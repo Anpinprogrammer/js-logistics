@@ -1034,7 +1034,7 @@ function abrirCuenta(cid){
     <div class="campo"><label for="mVal">Valor</label><input id="mVal" type="number" inputmode="numeric" min="0" step="100" value="${Math.abs(s)||""}"></div></div>
     <div class="linea2"><div class="campo"><label for="mMedio">Medio (para pagos)</label><select id="mMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>
     <div class="campo"><label for="mNota">Nota (opcional)</label><input id="mNota" placeholder="Ej: compra, transferencia Nequi"></div></div>
-    <div class="acciones"><button class="btn ok" id="mReg">Registrar</button><button class="btn sec" id="cEdit">Editar cliente</button>${descargas&&esAdmin?'<button class="btn sec" id="cCsv">Descargar para Excel</button>':""}</div>`:'<div class="acciones"><button class="btn sec" id="cEdit">Editar cliente</button></div>'}
+    <div class="acciones"><button class="btn ok" id="mReg">Registrar</button><button class="btn sec" id="cEdit">Editar cliente</button><button class="btn sec" id="cImpr">Imprimir recibo</button>${descargas&&esAdmin?'<button class="btn sec" id="cCsv">Descargar para Excel</button>':""}</div>`:'<div class="acciones"><button class="btn sec" id="cEdit">Editar cliente</button></div>'}
     <h2>Movimientos</h2>
     ${rows.length?`<div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Detalle</th><th class="n">Valor</th><th></th></tr></thead><tbody>
     ${rows.map(r=>`<tr><td>${hora(r.fecha)}</td><td>${esc(r.det)}</td><td class="n ${r.v<0?"neg":"pos"}">${pesos(r.v)}</td><td>${r.mid?(esAdmin?`<button class="btn peligro chico" data-delmov="${esc(r.mid)}">Quitar</button>`:""):(r.pid&&(r.v<0||r.dp))?`<button class="btn sec chico" data-domi="${esc(r.pid)}">${r.dp?"Desmarcar pago":"Ya pagó domicilio"}</button>`:""}</td></tr>`).join("")}</tbody></table></div>`:'<div class="vacio">Sin movimientos.</div>'}`;
@@ -1042,6 +1042,7 @@ function abrirCuenta(cid){
   if($("#mTipo")&&esAdmin) $("#mTipo").value = s<0 ? "pago_de_cliente" : "pago_a_cliente";
   if($("#mTipo")&&!esAdmin){ if(s>0) $("#mTipo").value="pago_a_cliente"; else if(s===0) $("#mVal").value=""; } // el asistente arranca en "pagarle" si el cliente tiene saldo a favor, o en "pago del cliente" si debe
   $("#cEdit").onclick=()=>formCliente(cid);
+  const ci=$("#cImpr"); if(ci) ci.onclick=()=>imprimirReciboCliente(cid);
   const wa=$("#cWa"); if(wa) wa.onclick=()=>marcarEnviado(cid);
   const wc=$("#cWaCopiar"); if(wc) wc.onclick=async()=>{ try{ await navigator.clipboard.writeText(textoSaldo(cid)); toast("Mensaje copiado. Pégalo en WhatsApp."); }catch(e){ toast("No se pudo copiar en este navegador"); } };
   if($("#mReg")) $("#mReg").onclick=async()=>{ const val=Number($("#mVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero"); const id=nuevoId();
@@ -1059,31 +1060,46 @@ function abrirCuenta(cid){
   };
 }
 
-/* Lista de clientes por cobrar / por pagar para la impresora térmica de la oficina (SAT-16TU).
+/* Tickets para la impresora térmica de la oficina (SAT-16TU): lista de clientes y recibo de un cliente.
    El ancho del papel (80 o 58 mm) se elige en la vista previa y queda guardado en este equipo. */
-function imprimirClientes(secciones,k){
+const CSS_TICKET=`.t{font:12px/1.3 Arial,Helvetica,sans-serif;color:#000}.c{text-align:center}.b{font-weight:700}.g{font-size:15px}.r{border-top:1px dashed #000;margin:6px 0}
+  .f{display:flex;justify-content:space-between;gap:6px;padding:2px 0;border-bottom:1px dotted #999}.f span{min-width:0;overflow-wrap:anywhere}.f b{white-space:nowrap}.tot{border-bottom:0;border-top:1px solid #000;margin-top:2px}small{font-size:10px}`;
+function imprimirTicket(titulo,cuerpo){
   let mm=lsGet("js_papel")==="58"?58:80;
   const ticket=()=>`<div class="t" style="width:${mm===80?72:48}mm">
     <div class="c b g">${esc(EMPRESA.nombre)}</div><div class="c">${new Date().toLocaleString("es-CO",{dateStyle:"medium",timeStyle:"short"})}</div>
-    ${diaCliF?`<div class="c">Movimiento del ${esc(fechaLarga(diaCliF))}</div>`:""}
-    ${secciones.map(([tit,txt,cs,tot])=>`<div class="r"></div><div class="c b">${tit.toUpperCase()}</div>
-      ${cs.length?cs.map(c=>`<div class="f"><span>${esc(c.nombre)}${c.telefono?`<br><small>${esc(c.telefono)}</small>`:""}</span><b>${pesos(Math.abs(k(c)))}</b></div>`).join(""):'<div class="c">Ninguno</div>'}
-      <div class="f b tot"><span>${txt} (${cs.length})</span><span>${pesos(tot)}</span></div>`).join("")}
-    <div class="r"></div><div class="c">${esc(EMPRESA.lema)}</div><div class="c">${esc(EMPRESA.tel)}</div></div>`;
-  $("#dlgCont").innerHTML=`<header><div><h2>Imprimir lista</h2><span class="sub">Impresora de tickets SAT-16TU</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    ${cuerpo()}<div class="r"></div><div class="c">${esc(EMPRESA.lema)}</div><div class="c">${esc(EMPRESA.tel)}</div></div>`;
+  $("#dlgCont").innerHTML=`<header><div><h2>${esc(titulo)}</h2><span class="sub">Impresora de tickets SAT-16TU</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     <div class="filtros">${[[80,"Papel de 80 mm"],[58,"Papel de 58 mm"]].map(([x,t])=>`<button data-mm="${x}" aria-pressed="${mm===x}">${t}</button>`).join("")}</div>
     <p class="sub">En la ventana de impresión elige la SAT-16TU, márgenes “Ninguno” y escala 100 %.</p>
     <div id="tkPrev" style="background:#fff;color:#000;padding:8px;border:1px solid var(--borde,#ccc);overflow:auto;max-height:50vh"></div>
     <button class="btn" id="tkImprimir" style="width:100%;margin-top:10px">Imprimir</button>`;
-  const css=`.t{font:12px/1.3 Arial,Helvetica,sans-serif;color:#000}.c{text-align:center}.b{font-weight:700}.g{font-size:15px}.r{border-top:1px dashed #000;margin:6px 0}
-    .f{display:flex;justify-content:space-between;gap:6px;padding:2px 0;border-bottom:1px dotted #999}.f span{min-width:0;overflow-wrap:anywhere}.f b{white-space:nowrap}.tot{border-bottom:0;border-top:1px solid #000;margin-top:2px}small{font-size:10px}`;
-  const ver=()=>{ $("#tkPrev").innerHTML=`<style>${css}</style>${ticket()}`; $("#dlgCont").querySelectorAll("[data-mm]").forEach(b=>b.setAttribute("aria-pressed",String(Number(b.dataset.mm)===mm))); };
-  abrirDlg(); ver();
+  const ver=()=>{ $("#tkPrev").innerHTML=`<style>${CSS_TICKET}</style>${ticket()}`; $("#dlgCont").querySelectorAll("[data-mm]").forEach(b=>b.setAttribute("aria-pressed",String(Number(b.dataset.mm)===mm))); };
+  if(!$("#dlg").open) abrirDlg(); ver();
   $("#dlgCont").querySelectorAll("[data-mm]").forEach(b=>b.onclick=()=>{ mm=Number(b.dataset.mm); lsSet("js_papel",String(mm)); ver(); });
   $("#tkImprimir").onclick=()=>{ // se imprime desde un marco aparte para que salga solo el ticket
     const fr=document.createElement("iframe"); fr.style.cssText="position:fixed;width:0;height:0;border:0;right:0;bottom:0"; document.body.appendChild(fr);
-    const d=fr.contentWindow.document; d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>Clientes ${hoy()}</title><style>@page{margin:0}html,body{margin:0;background:#fff}.t{padding:2mm 4mm 8mm}${css}</style></head><body>${ticket()}</body></html>`); d.close();
+    const d=fr.contentWindow.document; d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(titulo)} ${hoy()}</title><style>@page{margin:0}html,body{margin:0;background:#fff}.t{padding:2mm 4mm 8mm}${CSS_TICKET}</style></head><body>${ticket()}</body></html>`); d.close();
     setTimeout(()=>{ fr.contentWindow.focus(); fr.contentWindow.print(); setTimeout(()=>fr.remove(),60000); },200); };
+}
+function imprimirClientes(secciones,k){
+  imprimirTicket("Imprimir lista",()=>`${diaCliF?`<div class="c">Movimiento del ${esc(fechaLarga(diaCliF))}</div>`:""}
+    ${secciones.map(([tit,txt,cs,tot])=>`<div class="r"></div><div class="c b">${tit.toUpperCase()}</div>
+      ${cs.length?cs.map(c=>`<div class="f"><span>${esc(c.nombre)}${c.telefono?`<br><small>${esc(c.telefono)}</small>`:""}</span><b>${pesos(Math.abs(k(c)))}</b></div>`).join(""):'<div class="c">Ninguno</div>'}
+      <div class="f b tot"><span>${txt} (${cs.length})</span><span>${pesos(tot)}</span></div>`).join("")}`);
+}
+/* Recibo de un cliente: su saldo y los movimientos desde la última vez que quedó a paz y salvo (los más viejos se juntan en "saldo anterior"). */
+function imprimirReciboCliente(cid){
+  const c=S.clientes[cid]; if(!c) return;
+  const asc=filasCuenta(cid).slice().reverse(); let corte=0, acc=0;
+  asc.forEach((r,i)=>{ acc+=r.v; if(Math.round(acc)===0) corte=i+1; });
+  let rows=asc.slice(corte); const MAX=40, viejas=rows.length>MAX?rows.slice(0,rows.length-MAX):[]; rows=rows.slice(viejas.length);
+  const anterior=viejas.reduce((a,r)=>a+r.v,0), s=saldoCliente(cid);
+  imprimirTicket("Recibo de "+c.nombre,()=>`<div class="r"></div><div class="c b">RECIBO DE CUENTA</div><div class="c b g">${esc(c.nombre)}</div>${c.telefono?`<div class="c">${esc(c.telefono)}</div>`:""}
+    <div class="r"></div>${anterior?`<div class="f"><span>Saldo anterior</span><b>${pesos(anterior)}</b></div>`:""}
+    ${rows.length?rows.map(r=>`<div class="f"><span><small>${esc(new Date(r.fecha).toLocaleDateString("es-CO",{day:"numeric",month:"short"}))}</small> ${esc(r.det)}</span><b>${pesos(r.v)}</b></div>`).join(""):'<div class="c">Sin movimientos pendientes</div>'}
+    <div class="f b tot g"><span>${s>0?"JS LE DEBE":s<0?"DEBE A JS":"PAZ Y SALVO"}</span><span>${pesos(Math.abs(s))}</span></div>
+    ${s<0?`<div class="c"><small>Nequi 316 493 3854 · Bancolombia ahorros 815 13203390 · Javier Salazar</small></div>`:""}`);
 }
 
 /* ======================= RECIBOS DE CUADRE ======================= */
@@ -1118,6 +1134,12 @@ function periodoMensajero(mid){
 const recibidoDia=(mid,dia)=>Object.values(S.recaudos).filter(r=>r.mensajeroId===mid&&diaDe(r.fecha)===dia).reduce((a,r)=>a+(Number(r.valor)||0),0);
 const textoLiq = d => d>0 ? "Debe "+pesos(d) : d<0 ? "Sobró "+pesos(-d) : "Quedó en $ 0";
 
+/* Semanas a las que se puede cargar el adelanto: la actual y la anterior (el sábado se paga la semana que terminó el viernes). */
+function semanasAdelanto(){
+  const act=semanaDe(hoy()), ant=moverSemana(act,-1), txt=w=>{ const d=diasSemana(w); return new Date(d[0]+"T12:00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short"})+" al "+new Date(d[6]+"T12:00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short"}); };
+  const sab=new Date().getDay()===6, l=[[ant,"Semana del "+txt(ant)+(sab?" (la que se paga hoy)":"")],[act,"Semana del "+txt(act)+(sab?"":" (esta semana)")]];
+  return sab?l:l.reverse();
+}
 function liquidar(mid){
   const m=S.mensajeros[mid]; if(!m) return;
   const pm=periodoMensajero(mid), t=totales(pm.ps), sueldo=ganaPorcentaje(m)?sueldoPedidos(pm.ps):0;
@@ -1140,19 +1162,29 @@ function liquidar(mid){
     <div class="linea2"><div class="campo"><label for="lVal">Entrega final (lo que te da ahora)</label><input id="lVal" type="number" inputmode="numeric" min="0" step="1000" value="${pm.debe>0?pm.debe:0}"></div>
     <div class="campo"><label for="lMedio">Medio</label><select id="lMedio">${Object.entries(MEDIOS).map(([k,x])=>`<option value="${k}">${x}</option>`).join("")}</select></div></div>
     <div class="res-liq cero" id="lRes"></div>
+    <div id="lAdelC" class="oculto" style="margin:10px 0"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="lAdel" checked style="width:auto;margin-top:3px"><span>Pasar lo que queda debiendo a <b>adelanto de sueldo</b>, hasta lo que tiene por cobrar de sueldo esa semana. Si debe más, el resto queda pendiente para el próximo período.</span></label>
+      <div class="campo" style="margin-top:6px"><label for="lSem">Descontar del sueldo de la semana</label><select id="lSem">${semanasAdelanto().map(([w,t])=>`<option value="${w}">${t}</option>`).join("")}</select></div></div>
     <button class="btn ok" id="lGuardar" style="width:100%">Liquidar y cerrar período</button>`;
   abrirDlg();
-  const calc=()=>{ const val=Number($("#lVal").value)||0, d=pm.debe-val, r=$("#lRes");
-    r.className="res-liq "+(d>0?"debe":d<0?"sobra":"cero"); r.innerHTML=`<span>Resultado</span><b>${textoLiq(d)}</b>`; };
+  // adelanto = lo que queda debiendo, sin pasar del sueldo que le falta por cobrar esa semana (el sueldo no puede quedar negativo)
+  const adelanto=d=>d>0&&$("#lAdel").checked?Math.max(0,Math.min(d,Math.round(sueldoPersonaSemana(mid,$("#lSem").value).neto))):0;
+  const calc=()=>{ const val=Number($("#lVal").value)||0, d=pm.debe-val, r=$("#lRes"), adel=adelanto(d), resto=d-adel;
+    $("#lAdelC").classList.toggle("oculto",!(d>0)); $("#lSem").disabled=!$("#lAdel").checked;
+    r.className="res-liq "+(resto>0?"debe":d<0?"sobra":"cero");
+    r.innerHTML=`<span>Resultado</span><b>${adel?(resto>0?"Adelanto de "+pesos(adel)+" · sigue debiendo "+pesos(resto):"Quedó en $ 0 · adelanto de "+pesos(adel)):d>0&&$("#lAdel").checked?textoLiq(d)+" (no tiene sueldo por cobrar esa semana)":textoLiq(d)}</b>`; };
+  $("#lAdel").onchange=calc; $("#lSem").onchange=calc;
   $("#lVal").oninput=calc; calc(); $("#lVal").select();
   $("#lGuardar").onclick=async()=>{ const val=Number($("#lVal").value)||0; if(val<0) return toast("El valor no puede ser negativo");
     const b=$("#lGuardar"); b.disabled=true;
     try{
       const t0=Date.now();
       if(val>0){ const rid=nuevoId(); await guardar("recaudos",rid,{id:rid,mensajeroId:mid,valor:val,medio:$("#lMedio").value,nota:"Liquidación",fecha:t0}); }
-      const fecha=Math.max(Date.now(),t0+1), id=mid+"_"+fecha;
-      await guardar("liquidaciones",id,{id,mensajeroId:mid,desde:pm.desde,fecha,dia:diaDe(fecha),entregas:pm.ps.length,guias:pm.ps.map(p=>p.guia),efectivo:t.efectivo,base:pm.base,gastos:pm.gastos,anterior:pm.anterior,recibidoAntes:pm.recibido,entregaFinal:val,recibido:pm.recibido+val,debe:pm.debe-val,transfJs:t.transfJs,transfCli:t.transfCli,sueldo,enRuta});
-      toast(`${m.nombre}: ${textoLiq(pm.debe-val).toLowerCase()}`); setTimeout(()=>verLiquidacion(id),200);
+      const fecha=Math.max(Date.now(),t0+1), id=mid+"_"+fecha, queda=pm.debe-val, adel=adelanto(queda);
+      await guardar("liquidaciones",id,{id,mensajeroId:mid,desde:pm.desde,fecha,dia:diaDe(fecha),entregas:pm.ps.length,guias:pm.ps.map(p=>p.guia),efectivo:t.efectivo,base:pm.base,gastos:pm.gastos,anterior:pm.anterior,recibidoAntes:pm.recibido,entregaFinal:val,recibido:pm.recibido+val,debe:queda-adel,adelanto:adel,transfJs:t.transfJs,transfCli:t.transfCli,sueldo,enRuta});
+      if(adel){ // la plata ya la tiene el mensajero: es un adelanto que no sale de la caja (ver libroCaja) y se descuenta del sueldo de esa semana
+        const sem=$("#lSem").value, dias=diasSemana(sem), dia=dias.includes(hoy())?hoy():dias[6], aid=nuevoId();
+        await guardar("cajamovs",aid,{id:aid,tipo:"sale",cat:"adelanto",personaId:mid,valor:adel,medio:"efectivo",concepto:"Lo que quedó debiendo en la liquidación del "+hora(fecha),fecha:dia===hoy()?fecha:fechaDia(dia),semana:"",deLiquidacion:id}); }
+      toast(`${m.nombre}: ${adel?"adelanto de "+pesos(adel)+" en su sueldo":textoLiq(queda).toLowerCase()}`); setTimeout(()=>verLiquidacion(id),200);
     }catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
 function verLiquidacion(id){
@@ -1161,7 +1193,7 @@ function verLiquidacion(id){
   const esUltima=liquidacionesDe(l.mensajeroId)[0]?.id===id;
   const ps=(l.guias||[]).map(g=>S.pedidos[g]).filter(Boolean);
   $("#dlgCont").innerHTML=`<header><div><h2>Liquidación</h2><span class="sub">${esc(nom)} · ${l.desde?"desde "+hora(l.desde)+" ":""}hasta ${hora(l.fecha)}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
-    <div class="res-liq ${l.debe>0?"debe":l.debe<0?"sobra":"cero"}"><span>Resultado</span><b>${textoLiq(l.debe)}</b></div>
+    <div class="res-liq ${l.debe>0?"debe":l.debe<0?"sobra":"cero"}"><span>Resultado</span><b>${textoLiq(l.debe)}${l.adelanto?" · adelanto de "+pesos(l.adelanto):""}</b></div>
     <dl class="datos">
       <dt>Entregas</dt><dd>${l.entregas}</dd>
       <dt>Efectivo cobrado</dt><dd>${pesos(l.efectivo)}</dd>
@@ -1171,14 +1203,16 @@ function verLiquidacion(id){
       <dt>Entregó durante el período</dt><dd>${pesos(l.recibidoAntes)}</dd>
       <dt>Entrega final</dt><dd>${pesos(l.entregaFinal)}</dd>
       <dt>Total entregado</dt><dd>${pesos(l.recibido)}</dd>
+      ${l.adelanto?`<dt>Pasado a adelanto de sueldo</dt><dd class="neg">${pesos(l.adelanto)}</dd>`:""}
       <dt>Transferencias a JS</dt><dd>${pesos(l.transfJs)}</dd>
       <dt>Pagado directo al cliente</dt><dd>${pesos(l.transfCli)}</dd>
       <dt>Sueldo del período</dt><dd>${pesos(l.sueldo)}</dd>
     </dl>
     ${ps.length?`<h2>Entregas incluidas</h2>${tablaEntregas(ps,true)}`:""}
-    ${esUltima?`<div class="acciones" style="margin-top:14px"><button class="btn peligro chico" id="lReabrir">Reabrir período</button></div><p class="sub" style="margin-top:8px;font-size:.85rem">Reabrir borra esta liquidación y junta sus entregas con el período actual. El dinero recibido se conserva en la caja.</p>`:""}`;
+    ${esUltima?`<div class="acciones" style="margin-top:14px"><button class="btn peligro chico" id="lReabrir">Reabrir período</button></div><p class="sub" style="margin-top:8px;font-size:.85rem">Reabrir borra esta liquidación y junta sus entregas con el período actual. El dinero recibido se conserva en la caja.${l.adelanto?" El adelanto que salió de esta liquidación se quita del sueldo.":""}</p>`:""}`;
   abrirDlg();
-  const rb=$("#lReabrir"); if(rb) rb.onclick=async()=>{ try{ await borrar("liquidaciones",id); toast("Período reabierto"); cerrarDlg(); }catch(e){ toast("No se pudo reabrir"); } };
+  const rb=$("#lReabrir"); if(rb) rb.onclick=async()=>{ try{ for(const c of Object.values(S.cajamovs).filter(c=>c.deLiquidacion===id)) await borrar("cajamovs",c.id); // el adelanto que salió de esta liquidación
+    await borrar("liquidaciones",id); toast("Período reabierto"); cerrarDlg(); }catch(e){ toast("No se pudo reabrir"); } };
 }
 /* Caja de oficina: la plata que maneja cada asistente, por medio (efectivo, Nequi, Bancolombia).
    + base que le da administración, + lo que recibe (mensajeros, pagos de clientes, domicilios),
@@ -1518,7 +1552,7 @@ function libroCaja(){
   for(const p of Object.values(S.pedidos)) if(cerrado(p)&&p.metodo==="transf_js") L.push({fecha:p.entregado,concepto:"Transferencia a JS · "+p.guia+(p.destinatario?" · "+p.destinatario:""),valor:Number(p.valorCobrado)||0,medio:p.cuentaJs||"cuentas",cat:"Transferencias"});
   for(const p of Object.values(S.pedidos)) if(p.domiPagado&&p.domiPagoMedio) L.push({fecha:p.domiPagoFecha||p.entregado||p.creado,concepto:"Pago de domicilio · "+p.guia+(p.clienteId?" · "+nombreCliente(p.clienteId):""),valor:pagoDomi(p),medio:p.domiPagoMedio,cat:"Clientes"});
   for(const m of Object.values(S.movimientos)) if(mueveCaja(m)) L.push({fecha:m.fecha,concepto:(m.tipo==="pago_de_cliente"?"Pago de ":m.tipo==="compra_cliente"?"Compra por encargo de ":"Pago a ")+nombreCliente(m.clienteId)+(m.nota?" · "+m.nota:""),valor:signoMov(m),medio:m.medio||"efectivo",cat:"Clientes"});
-  for(const c of Object.values(S.cajamovs)) if((c.cat==="interna"&&c.inicial)||c.cat==="oficina") continue; // oficina: la plata pasa de tus manos a las del asistente // saldo inicial de la cuenta: la plata salió antes del empalme
+  for(const c of Object.values(S.cajamovs)) if((c.cat==="interna"&&c.inicial)||c.cat==="oficina"||c.deLiquidacion) continue; // oficina: la plata pasa de tus manos a las del asistente // saldo inicial de la cuenta: la plata salió antes del empalme // adelanto de una liquidación: el mensajero ya tenía esa plata, no sale de la caja
   else if(c.cat==="interna"){ const n=S.cuentas[c.cuentaId]?.nombre||"Cuenta interna";
     L.push({fecha:c.fecha,concepto:(c.tipo==="entra"?"Entrada de ":"Salida a ")+n+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:n,ref:"cajamovs|"+c.id}); }
   else L.push({fecha:c.fecha,concepto:(CATS[c.cat]||"Movimiento")+(c.personaId?" · "+nomM(c.personaId):"")+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:CATS[c.cat]||"Otro",ref:"cajamovs|"+c.id});
