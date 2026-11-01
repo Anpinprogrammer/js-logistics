@@ -355,3 +355,19 @@ button.kpi:hover{box-shadow:var(--sombra),0 0 0 1.5px var(--mango-claro)}
   .cifra b{font-size:1.2rem;overflow-wrap:anywhere}
   .cifra.fuerte{grid-column:1/-1}
 }
+
+/* ---------- recomendaciones del mensajero ---------- */
+.recos{display:grid;gap:10px}
+.reco{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:14px;background:var(--hueco)}
+.reco b{display:block;font-weight:600;font-size:.95rem}
+.reco p{margin:3px 0 0;color:var(--suave);font-size:.86rem;line-height:1.45}
+.reco .btn{margin-top:8px}
+.reco-ic{flex:none;width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--mango-claro);color:var(--marca)}
+.reco-ic svg{width:20px;height:20px}
+.reco.sin .reco-ic{background:var(--rojo-claro);color:var(--rojo)}
+.reco.pend .reco-ic{background:var(--amarillo-claro);color:var(--amarillo)}
+.reco.ent .reco-ic{background:var(--verde-claro);color:var(--verde)}
+.reco.sin{box-shadow:inset 3px 0 0 var(--rojo)}
+.reco.pend{box-shadow:inset 3px 0 0 var(--amarillo)}
+.reco.ent{box-shadow:inset 3px 0 0 var(--verde)}
+.btn>svg{width:20px;height:20px}

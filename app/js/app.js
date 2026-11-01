@@ -188,7 +188,7 @@ const listaOrdenada = (obj,campo,desc) => Object.values(obj).sort((a,b)=> desc ?
 
 /* ---------- estado de interfaz ---------- */
 let limiteA=100, subMas="panel";
-let rol="mensajero", tabM="nuevo", tabA="inicio", filtroA="sin", buscarA="", diaCaja=hoy(), diaMiCaja=hoy();
+let rol="mensajero", tabM="inicio", tabA="inicio", filtroA="sin", buscarA="", diaCaja=hoy(), diaMiCaja=hoy();
 let miMensajero = lsGet("js_mensajero") || "";
 let ultimaGuia=null;
 let fotoPara=""; // id en Personal de la oficina cuando la foto se toma desde Oficina → Pedidos
@@ -285,7 +285,7 @@ async function elegirMensajero(id){
 
 function pintarMensajero(){
   const pend=pendientesMios().length;
-  ponerNav([["nuevo","Nuevo"],["pend","Por entregar",pend],["caja","Mi caja"],["sueldo","Mi sueldo"]],tabM,k=>tabM=k);
+  ponerNav([["inicio","Inicio"],["nuevo","Nuevo"],["pend","Por entregar",pend],["caja","Mi caja"],["sueldo","Mi sueldo"]],tabM,k=>tabM=k);
 
   const mens=listaOrdenada(S.mensajeros,"nombre").filter(esRepartidor);
   const selector=`<div class="campo"><label for="selMens">¿Quién eres?</label>
@@ -302,6 +302,8 @@ function pintarMensajero(){
     h=`<h1>Hola</h1><div class="vacio">Tu cuenta todavía no está vinculada a tu nombre. Pídele al administrador que la vincule en Más → Personal → Accesos a la app.</div>`;
   } else if(!S.mensajeros[miMensajero]){
     h=`<h1>Hola</h1><p class="sub">${db&&uid?"Elige tu nombre una sola vez. Quedará vinculado a tu cuenta y solo el administrador lo puede cambiar.":"Elige tu nombre una sola vez; este teléfono lo recordará."}</p>${selector}`;
+  } else if(tabM==="inicio"){
+    h=inicioMensajeroHtml(miMensajero,puedeCambiar);
   } else if(tabM==="nuevo"){
     const yo=S.mensajeros[miMensajero];
     h=`<h1>Salida de pedidos</h1><p class="sub">${esc(yo.nombre)}${puedeCambiar?` · <a href="#" id="cambiarYo">${actuarComo?"volver a mi nombre":"cambiar"}</a>`:""}</p>
@@ -345,6 +347,7 @@ function pintarMensajero(){
   const bf=$("#btnFoto"); if(bf) bf.onclick=()=>{fotoPara=""; $("#inCamara").value=""; $("#inCamara").click();};
   const bg=$("#btnGaleria"); if(bg) bg.onclick=()=>{fotoPara=""; $("#inGaleria").value=""; $("#inGaleria").click();};
   document.querySelectorAll("[data-entregar]").forEach(b=>b.onclick=()=>abrirEntrega(b.dataset.entregar));
+  document.querySelectorAll("#vista [data-irm]").forEach(b=>b.onclick=()=>{ tabM=b.dataset.irm; if(tabM==="pend") diaPedM=""; pintar(); scrollTo(0,0); });
   if(tabM==="pend") enlazarFiltroDia(diaPedM,d=>diaPedM=d);
   const sa=$("#msAnt"), ss=$("#msSig"), sh=$("#msHoy");
   if(sa) sa.onclick=()=>{semM=moverSemana(semM,-1); pintar();};
@@ -714,7 +717,7 @@ function entregasPorDia(ps,n){
   ps.forEach(p=>{ if(p.estado==="entregado"){ const d=diaDe(p.entregado); porDia[d]=(porDia[d]||0)+1; } });
   return [...Array(n)].map((_,i)=>{ const d=moverDia(h,i-n+1), k=porDia[d]||0; return {l:String(Number(d.slice(8))),n:k,tip:`${diaCorto(d)}: ${k} entrega${k===1?"":"s"}`,hoy:d===h}; });
 }
-const kpiHtml = (ico,lbl,val,pie,ir,cls) => `<${ir?`button data-ir="${ir}"`:"div"} class="kpi ${cls||""}"><span class="lbl">${ICONOS[ico]||""}${lbl}</span><b>${val}</b>${pie||""}</${ir?"button":"div"}>`;
+const kpiHtml = (ico,lbl,val,pie,ir,cls,attr="data-ir") => `<${ir?`button ${attr}="${ir}"`:"div"} class="kpi ${cls||""}"><span class="lbl">${ICONOS[ico]||""}${lbl}</span><b>${val}</b>${pie||""}</${ir?"button":"div"}>`;
 const ultimaActividad = p => Math.max(p.creado||0,p.entregado||0);
 const etqDash = p => p.estado==="pendiente" ? '<span class="etq ruta">En ruta</span>' : etqEstado(p);
 
@@ -777,6 +780,79 @@ function pintarInicioEmpresa(v,aviso){
     pintar(); scrollTo(0,0); });
   v.querySelectorAll("[data-ped]").forEach(b=>b.onclick=()=>abrirPedido(b.dataset.ped));
   v.querySelectorAll("[data-cli]").forEach(b=>b.onclick=()=>abrirCuenta(b.dataset.cli));
+}
+
+/* ---- Panel del mensajero: su rendimiento y recomendaciones para mejorar ----
+   Solo con sus propios pedidos (no ve los de los demás): se compara consigo mismo. */
+const CONSEJOS_MOTIVO={
+  no_contesta:["Llama antes de llegar","Llama o escribe por WhatsApp al destinatario antes de salir hacia la dirección y otra vez cuando estés a 5 minutos. Si no contesta, avísale a la oficina antes de irte: muchas veces el remitente consigue otro número."],
+  direccion:["Confirma la dirección antes de salir","Pide la ubicación por WhatsApp y un punto de referencia (color de la casa, tienda cercana). Si la dirección está incompleta en la guía, pregúntale a la oficina antes de salir."],
+  rechazo:["Confirma el pedido antes de llegar","Al llamar, confirma que el destinatario sí espera el paquete y el valor a cobrar. Si dice que no lo pidió, avisa a la oficina para que hable con el remitente antes de que hagas el viaje."],
+  reprogramar:["Acuerda la hora de entrega","Cuando llames, pregunta a qué hora va a estar y organiza la ruta con esas horas. Así evitas volver dos veces a la misma dirección."],
+  otro:["Escribe bien el motivo","Cuando no puedas entregar, explica qué pasó en la nota. Con eso la oficina puede resolverlo con el remitente."]
+};
+function nivelEfectividad(e,n){ if(n<10) return ["Pocos pedidos todavía","gris"]; if(e>=95) return ["Excelente","ent"]; if(e>=90) return ["Muy bien","ruta"]; if(e>=80) return ["Puede mejorar","pend"]; return ["Hay que mejorar","sin"]; }
+function inicioMensajeroHtml(mid,puedeCambiar){
+  const yo=S.mensajeros[mid], h=hoy(), H=36e5, desde=moverDia(h,-29), mis=Object.values(S.pedidos).filter(p=>p.mensajeroId===mid);
+  const enRuta=mis.filter(p=>p.estado==="pendiente").sort((a,b)=>a.creado-b.creado), viejos=enRuta.filter(p=>Date.now()-p.creado>24*H);
+  const entHoy=mis.filter(p=>p.estado==="entregado"&&diaDe(p.entregado)===h).length, devHoy=mis.filter(p=>p.estado==="devuelto"&&diaDe(p.entregado)===h).length;
+  const mes=mis.filter(p=>cerrado(p)&&diaDe(p.entregado)>=desde), ent=mes.filter(p=>p.estado==="entregado"), dev=mes.filter(p=>p.estado==="devuelto");
+  const efec=pct(ent.length,mes.length), [nivel,clsNivel]=nivelEfectividad(efec,mes.length);
+  // por qué no se entregó: devoluciones y visitas fallidas (reprogramadas) de los últimos 30 días
+  const fallos={}; dev.forEach(p=>{ const k=p.motivoDev||"otro"; fallos[k]=(fallos[k]||0)+1; });
+  mis.forEach(p=>(p.intentos||[]).forEach(i=>{ if(diaDe(i.fecha)>=desde){ const k=i.motivo||"otro"; fallos[k]=(fallos[k]||0)+1; } }));
+  const motivos=Object.entries(fallos).sort((a,b)=>b[1]-a[1]), totFallos=motivos.reduce((a,[,n])=>a+n,0);
+  const conDif=ent.filter(p=>Number(p.difCobro)).length;
+  const tiempos=ent.map(p=>(p.entregado-p.creado)/H).filter(x=>x>=0).sort((a,b)=>a-b), mediana=tiempos.length?tiempos[Math.floor(tiempos.length/2)]:0;
+  const diasTrab=new Set(ent.map(p=>diaDe(p.entregado))).size, porDia=diasTrab?ent.length/diasTrab:0;
+  const sem=semanaDe(h), entSem=ent.filter(p=>diaDe(p.entregado)>=sem), diasSem=new Set(entSem.map(p=>diaDe(p.entregado))).size, porDiaSem=diasSem?entSem.length/diasSem:0;
+  const pm=periodoMensajero(mid), esMens=tipoDe(yo)==="mensajero", su=sueldoPersonaSemana(mid,sem);
+  const tiempoTxt=x=>x<1?Math.round(x*60)+" min":x.toFixed(1).replace(".",",")+" h";
+  // recomendaciones: primero lo urgente, luego cómo mejorar, y siempre reconocer lo que va bien
+  const R=[];
+  if(viejos.length) R.push(["sin","pend",`Tienes ${viejos.length} pedido${viejos.length===1?"":"s"} con más de un día en ruta`,"Entrégalos hoy o márcalos como “No se pudo entregar” con el motivo, para que la oficina le avise al remitente.","pend"]);
+  // plata sin entregar: solo si lleva más de un día sin pasarle nada a la oficina (es normal acumular durante el día)
+  const ultimaEntregaPlata=Math.max(pm.ul?.fecha||0,...pm.recs.map(r=>r.fecha)), desdeCuando=ultimaEntregaPlata||pm.ps[0]?.entregado||Date.now(), diasSinEntregar=Math.floor((Date.now()-desdeCuando)/(24*H));
+  if(pm.debe>=100000&&diasSinEntregar>=1) R.push(["sin","plata",`Llevas ${pesos(pm.debe)} sin entregar a la oficina`,`Hace ${diasSinEntregar===1?"más de un día":diasSinEntregar+" días"} que no le pasas plata a la oficina. Entrégala hoy: andar con mucha plata es un riesgo para ti, y la caja de la empresa no cuadra hasta que la recibe.`,"caja"]);
+  if(mes.length>=10&&efec<90&&motivos.length){ const [k,n]=motivos[0], c=CONSEJOS_MOTIVO[k]||CONSEJOS_MOTIVO.otro;
+    R.push(["pend","dev",`Devuelves ${100-efec} de cada 100 pedidos`,`La causa que más se repite es “${MOTIVOS[k]||"Otro motivo"}” (${n} ${n===1?"vez":"veces"} en 30 días). Consejo: ${c[1]}`]); }
+  else if(motivos.length&&motivos[0][1]>=3){ const [k,n]=motivos[0], c=CONSEJOS_MOTIVO[k]||CONSEJOS_MOTIVO.otro;
+    R.push(["ruta","dev",c[0],`“${MOTIVOS[k]||"Otro motivo"}” se repitió ${n} veces en 30 días. ${c[1]}`]); }
+  if(conDif) R.push(["pend","plata",`${conDif} entrega${conDif===1?"":"s"} con un valor cobrado distinto al de la guía`,"Antes de entregar, mira en la app cuánto hay que cobrar y cuenta la plata delante del cliente. Si el cliente paga otro valor, escribe en la nota por qué."]);
+  if(tiempos.length>=10&&mediana>5) R.push(["ruta","ruta",`Tus pedidos tardan ${tiempoTxt(mediana)} desde que salen`,"Organiza la ruta por barrios antes de salir y llama primero a los que más lejos están. Entregar más rápido te deja hacer más domicilios en el día."]);
+  if(diasSem>=2&&diasTrab>=5&&porDiaSem<porDia*0.8) R.push(["ruta","pedidos",`Esta semana vas en ${porDiaSem.toFixed(1).replace(".",",")} entregas por día`,`Tu promedio del último mes es ${porDia.toFixed(1).replace(".",",")}. Pide en la oficina más pedidos de tu zona o arranca un poco más temprano.`]);
+  if(mes.length>=10&&efec>=95) R.unshift(["ent","ok","¡Vas excelente!",`Entregaste ${efec}% de tus pedidos en los últimos 30 días. Sigue llamando antes de llegar y confirmando direcciones: eso es lo que hace la diferencia.`]);
+  else if(!R.length&&mes.length) R.push(["ent","ok","Vas bien","No hay nada urgente. Sigue confirmando direcciones y llamando antes de llegar para mantener tus entregas al día."]);
+  if(!mes.length&&!enRuta.length) R.push(["ruta","nuevo","Empieza tu día","Toma la foto de cada pedido al salir. Aquí vas a ver cómo te va y consejos para mejorar."]);
+  const orden={sin:0,ent:1,pend:2,ruta:3}; R.sort((a,b)=>orden[a[0]]-orden[b[0]]); // primero lo urgente, luego lo que va bien, luego los consejos
+  const dias=entregasPorDia(mis,14), tot14=dias.reduce((a,d)=>a+d.n,0);
+  return `<div class="dash-cab"><div><h1>Hola, ${esc(yo.nombre)}</h1><p class="sub">Así va tu trabajo${puedeCambiar?` · <a href="#" id="cambiarYo">${actuarComo?"volver a mi nombre":"cambiar"}</a>`:""}</p></div></div>
+    <div class="acciones" style="margin:0 0 16px"><button class="btn" id="btnFoto">${ICONOS.nuevo} Tomar foto del pedido</button><button class="btn sec" id="btnGaleria">Subir de la galería</button></div>
+    <div class="kpis">
+      ${kpiHtml("ruta","En ruta",enRuta.length,`<small>${viejos.length?`<span class="neg">${viejos.length} con más de un día</span>`:"Por entregar ahora"}</small>`,"pend","","data-irm")}
+      ${kpiHtml("ok","Entregados hoy",entHoy,`<small>${devHoy?devHoy+" devuelto"+(devHoy===1?"":"s")+" hoy":"Sin devoluciones hoy"}</small>`)}
+      ${esMens?kpiHtml("sueldos","Sueldo de la semana",pesos(su.neto),`<small>${su.adel?"Ya descontados "+pesos(su.adel)+" de adelantos":"Lo que te deben esta semana"}</small>`):kpiHtml("pedidos","Entregas del mes",ent.length,`<small>${porDia.toFixed(1).replace(".",",")} por día trabajado</small>`)}
+      ${kpiHtml("plata","Te falta entregar",pesos(pm.debe),`<small>${pm.debe>0?"Plata que debes llevar a la oficina":"Estás al día con la oficina"}</small>`,"caja","oscuro","data-irm")}
+    </div>
+    <section class="tarjeta" style="margin-bottom:16px"><h3>Recomendaciones para ti</h3>
+      <div class="recos">${R.slice(0,4).map(([cls,ic,t,txt,ir])=>`<div class="reco ${cls}"><span class="reco-ic">${ICONOS[ic]||ICONOS.ok}</span><div><b>${t}</b><p>${txt}</p>${ir?`<button class="btn sec chico" data-irm="${ir}">${ir==="pend"?"Ver por entregar":"Ver mi caja"}</button>`:""}</div></div>`).join("")}</div></section>
+    <div class="dash">
+      <section class="tarjeta c4"><h3>Efectividad <span class="etq ${clsNivel}">${nivel}</span></h3>
+        ${donaHtml([{t:"Entregados",n:ent.length,c:COLOR_ESTADO.entregado},{t:"Devueltos",n:dev.length,c:COLOR_ESTADO.devuelto}],mes.length?efec+"%":"—","últimos 30 días")}</section>
+      <section class="tarjeta c8"><h3>Tus entregas por día <small>Últimos 14 días · ${tot14} en total</small></h3>${columnasHtml(dias,"Entregas por día")}</section>
+    </div>
+    <div class="dash">
+      <section class="tarjeta c6"><h3>Por qué no se entregó <small>Últimos 30 días</small></h3>
+        ${motivos.length?`<div class="hbarras">${motivos.map(([k,n])=>`<button tabindex="-1" style="--w:${Math.round(n*100/motivos[0][1])}%;cursor:default"><span>${esc(MOTIVOS[k]||"Otro motivo")}</span><small>${n} · ${pct(n,totFallos)}%</small><i></i></button>`).join("")}</div>`:`<div class="vacio">Ninguna devolución ni visita fallida. ¡Muy bien!</div>`}</section>
+      <section class="tarjeta c6"><h3>Tus números <small>Últimos 30 días</small></h3><div class="plata">
+        <div><span>Entregas</span><b>${ent.length}</b></div>
+        <div><span>Días trabajados</span><b>${diasTrab}</b></div>
+        <div><span>Entregas por día</span><b>${porDia.toFixed(1).replace(".",",")}</b></div>
+        <div><span>Esta semana, por día</span><b>${diasSem?porDiaSem.toFixed(1).replace(".",","):"—"}</b></div>
+        <div><span>Tiempo de entrega (normal)</span><b>${tiempos.length?tiempoTxt(mediana):"—"}</b></div>
+        <div><span>Cobros con diferencia</span><b class="${conDif?"neg":""}">${conDif}</b></div>
+      </div></section>
+    </div>`;
 }
 
 function pintarInicioCliente(v,c,cambios){

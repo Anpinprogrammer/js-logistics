@@ -1,6 +1,6 @@
 /* Guarda los archivos de la app para que abra aunque no haya señal.
    Primero intenta la red (para recibir siempre la versión nueva) y, si no hay, usa la copia guardada. */
-const CACHE = "js-logistics-v4";
+const CACHE = "js-logistics-v5";
 const ARCHIVOS = ["./", "index.html", "css/estilos.css", "js/app.js", "js/plataforma.js", "js/firebase-config.js",
   "img/logo.png", "img/logo-splash.png", "img/icono-96.png", "img/icono-180.png", "img/icono-192.png", "img/icono-512.png", "manifest.webmanifest"];
 
