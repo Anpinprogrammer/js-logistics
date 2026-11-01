@@ -1341,7 +1341,11 @@ const PAGOS_TEXTO=["💳 *Opciones de pago – Transferencias*","","Para tu como
 const EMPRESA={nombre:"JS LOGISTICS CALI", lema:"¡SERVIR ES NUESTRA LABOR!", tel:"TEL: 316 493 3854", ig:"IG: @JS.LOGISTICS.CALI"};
 const PCT_SUELDO=0.7, DESC_SUELDO=25000;
 const sueldoDe = domicilios => domicilios*PCT_SUELDO - DESC_SUELDO;
-const sueldoPedidos = ps => { const g={}; ps.forEach(p=>{ const d=diaDe(p.entregado); g[d]=(g[d]||0)+servicio(p); }); return Object.values(g).reduce((a,x)=>a+sueldoDe(x),0); };
+/* El domicilio va al sueldo del día en que salió el pedido, aunque se entregue al otro día (los domingos no se trabaja).
+   Rige desde la semana del 31-oct-2026; las semanas anteriores ya se pagaron contando el día de entrega. */
+const SUELDO_POR_SALIDA="2026-10-31";
+const diaSueldo = p => { const s=diaDe(p.creado||p.entregado); return s>=SUELDO_POR_SALIDA ? s : diaDe(p.entregado); };
+const sueldoPedidos = ps => { const g={}; ps.forEach(p=>{ const d=diaSueldo(p); g[d]=(g[d]||0)+servicio(p); }); return Object.values(g).reduce((a,x)=>a+sueldoDe(x),0); };
 const MEDIOS={efectivo:"Efectivo",nequi:"Nequi",bancolombia:"Bancolombia"};
 const TIPOS={mensajero:"Mensajero",dueno:"Dueño (Javier)",oficina:"Oficina (JS)",patinador:"Patinador",empresa:"Empresa (JS)"};
 /* Oficina: sus pedidos son 100% de JS (suman al sueldo del dueño); a la persona se le paga fijo por día. */
@@ -1996,7 +2000,7 @@ const jornada=(pid,dia)=>Number(S.jornadas[pid+"_"+dia]?.valor)||0;
 const previoId=(pid,sem)=>pid+"_previo_"+sem;
 const sueldoPrevio=(pid,sem)=>Number(S.jornadas[previoId(pid,sem)]?.valor)||0;
 function sueldosDia(dia){
-  const ent=Object.values(S.pedidos).filter(p=>cerrado(p)&&diaDe(p.entregado)===dia);
+  const ent=Object.values(S.pedidos).filter(p=>cerrado(p)&&diaSueldo(p)===dia);
   const res={}, porM={}; ent.forEach(p=>(porM[p.mensajeroId]=porM[p.mensajeroId]||[]).push(p));
   let dom30=0, propios=0, desc=0, fijos=0, nMens=0;
   for(const [mid,ps] of Object.entries(porM)){ const dom=ps.reduce((a,p)=>a+servicio(p),0);
@@ -2039,7 +2043,7 @@ function pendienteAnterior(mid,sem){ // semanas anteriores con saldo sin pagar (
 function miSueldoHtml(mid){
   const yo=S.mensajeros[mid], R=sueldoPersonaSemana(mid,semM), hoyS=hoy(), esDueno=tipoDe(yo)==="dueno";
   const ent=Object.values(S.pedidos).filter(p=>cerrado(p)&&p.mensajeroId===mid);
-  const filas=R.dias.map((d,i)=>{ const ps=ent.filter(p=>diaDe(p.entregado)===d), dom=ps.reduce((a,p)=>a+servicio(p),0);
+  const filas=R.dias.map((d,i)=>{ const ps=ent.filter(p=>diaSueldo(p)===d), dom=ps.reduce((a,p)=>a+servicio(p),0);
     if(!ps.length&&!R.vals[i]) return `<tr><td>${DIAS_SEM[i]} ${d.slice(8)}</td><td class="n sub" colspan="3">${d>hoyS?"":"No trabajó"}</td></tr>`;
     return `<tr><td><b>${DIAS_SEM[i]} ${d.slice(8)}</b></td><td class="n">${ps.length}</td><td class="n">${pesos(dom)}</td><td class="n"><b class="${R.vals[i]<0?"neg":""}">${pesos(R.vals[i])}</b></td></tr>`; }).join("");
   const movs=[...R.adelantos.map(c=>({...c,t:"Adelanto"})),...R.pagos.map(c=>({...c,t:"Pago de sueldo"}))].sort((a,b)=>a.fecha-b.fecha);
@@ -2055,9 +2059,9 @@ function miSueldoHtml(mid){
     </div>
     ${neto<0?`<p class="sub" style="margin-top:10px">Los adelantos superan lo ganado esta semana: quedas debiendo ${pesos(-neto)}.</p>`:""}
     ${antTot?`<div class="aviso" style="margin-top:12px">De semanas anteriores te deben ${pesos(antTot)} (${ant.map(r=>"semana del "+r.sem.slice(8)+"/"+r.sem.slice(5,7)+": "+pesos(r.neto)).join(" · ")}).</div>`:""}
-    <h2>Día por día</h2>
+    <h2>Día por día</h2><p class="sub">Cada domicilio cuenta el día en que salió el pedido, aunque lo entregues al otro día.</p>
     <div class="tabla-env"><table><thead><tr><th>Día</th><th class="n">Entregas</th><th class="n">Domicilios</th><th class="n">Sueldo</th></tr></thead><tbody>${filas}
-      <tr><td><b>Total</b></td><td class="n">${ent.filter(p=>R.dias.includes(diaDe(p.entregado))).length}</td><td class="n"></td><td class="n"><b>${pesos(R.total)}</b></td></tr></tbody></table></div>
+      <tr><td><b>Total</b></td><td class="n">${ent.filter(p=>R.dias.includes(diaSueldo(p))).length}</td><td class="n"></td><td class="n"><b>${pesos(R.total)}</b></td></tr></tbody></table></div>
     <p class="sub" style="margin-top:8px">${esDueno?"Tu sueldo diario: 30% de los domicilios de los mensajeros + tus domicilios y los de oficina + ganancias ocasionales + "+pesos(DESC_SUELDO)+" por mensajero − pagos fijos (patinadores, oficina y JS).":tipoDe(yo)==="oficina"?"Pago fijo por día trabajado. Los domicilios de tus pedidos son 100% de JS.":"Cada día: 70% de tus domicilios − "+pesos(DESC_SUELDO)+"."}</p>
     <h2>Adelantos y pagos</h2>
     ${movs.length?`<div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Medio</th><th class="n">Valor</th></tr></thead><tbody>${movs.map(c=>`<tr><td>${hora(c.fecha)}</td><td>${c.t}${c.concepto?`<br><span class="sub" style="font-size:.8rem">${esc(c.concepto)}</span>`:""}</td><td>${MEDIOS[c.medio]||""}</td><td class="n">${pesos(c.valor)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Sin adelantos ni pagos esta semana.</div>`}`;
