@@ -188,7 +188,7 @@ const listaOrdenada = (obj,campo,desc) => Object.values(obj).sort((a,b)=> desc ?
 
 /* ---------- estado de interfaz ---------- */
 let limiteA=100, subMas="panel";
-let rol="mensajero", tabM="nuevo", tabA="pedidos", filtroA="sin", buscarA="", diaCaja=hoy(), diaMiCaja=hoy();
+let rol="mensajero", tabM="nuevo", tabA="inicio", filtroA="sin", buscarA="", diaCaja=hoy(), diaMiCaja=hoy();
 let miMensajero = lsGet("js_mensajero") || "";
 let ultimaGuia=null;
 let fotoPara=""; // id en Personal de la oficina cuando la foto se toma desde Oficina → Pedidos
@@ -206,7 +206,50 @@ function enlazarFiltroDia(d,poner){
 
 const iconCam='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>';
 
+/* ---------- navegación: menú lateral en computador, barra de abajo en el celular ---------- */
+const ico = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICONOS={
+  inicio:ico('<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>'),
+  pedidos:ico('<path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/>'),
+  clientes:ico('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.5 3.3-5.5 6.5-5.5s5.9 2 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.5 3.5 5.2"/>'),
+  recibos:ico('<path d="M6 2.5h12v19l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>'),
+  caja:ico('<path d="M3 7a2 2 0 0 1 2-2h13v2"/><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M16 13.5h2"/>'),
+  cuentas:ico('<path d="M3 10l9-6 9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 21h18"/>'),
+  sueldos:ico('<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9.5v5M18 9.5v5"/>'),
+  mas:ico('<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>'),
+  menu:ico('<circle cx="5" cy="12" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/><circle cx="19" cy="12" r="1.3" fill="currentColor"/>'),
+  nuevo:ico('<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>'),
+  pend:ico('<path d="M2 6h11v10H2zM13 9.5h4l4 3.5v3h-8"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/>'),
+  ruta:ico('<path d="M2 6h11v10H2zM13 9.5h4l4 3.5v3h-8"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/>'),
+  ok:ico('<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/>'),
+  dev:ico('<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
+  plata:ico('<circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.6.8-2.6 2s1.1 1.7 2.6 2 2.6.8 2.6 2-1.1 2-2.6 2c-1.1 0-2.1-.5-2.6-1.3M12 6.5V8M12 16v1.5"/>')
+};
+ICONOS.sueldo=ICONOS.sueldos; ICONOS.cuenta=ICONOS.caja;
+/* items: [clave, nombre, número]. En el celular caben 5 abajo; si hay más, el quinto es "Menú" con el resto. */
+function ponerNav(items,actual,elegir){
+  const ir=k=>{ elegir(k); pintar(); scrollTo(0,0); };
+  const btn=([k,t,n])=>`<button data-t="${k}" ${actual===k?'aria-current="page"':''}>${ICONOS[k]||ICONOS.mas}<span class="t">${t}</span>${n?`<span class="num">${n}</span>`:""}</button>`;
+  $("#navLateral").innerHTML=items.map(btn).join("");
+  const cabe=items.length<=5, vis=cabe?items:items.slice(0,4), resto=cabe?[]:items.slice(4);
+  const enResto=resto.find(([k])=>k===actual), nResto=resto.reduce((a,[,,n])=>a+(n||0),0);
+  $("#pestanas").innerHTML=vis.map(btn).join("")+(resto.length?`<button data-menu ${enResto?'aria-current="page"':''}>${enResto?ICONOS[enResto[0]]||ICONOS.menu:ICONOS.menu}<span class="t">${enResto?enResto[1]:"Menú"}</span>${nResto?`<span class="num">${nResto}</span>`:""}</button>`:"");
+  document.querySelectorAll("#navLateral [data-t], #pestanas [data-t]").forEach(b=>b.onclick=()=>ir(b.dataset.t));
+  const bm=$("#pestanas [data-menu]"); if(bm) bm.onclick=()=>{
+    $("#dlgCont").innerHTML=`<header><h2>Menú</h2><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+      <div class="menu-grid">${items.map(([k,t,n])=>`<button data-ir="${k}" ${actual===k?'aria-current="page"':''}>${ICONOS[k]||ICONOS.mas}<span>${t}${n?` <span class="etq sin">${n}</span>`:""}</span></button>`).join("")}</div>`;
+    $("#dlgCont").querySelectorAll("[data-ir]").forEach(b=>b.onclick=()=>{ cerrarDlg(); ir(b.dataset.ir); });
+    abrirDlg(); };
+}
+function pintarSaludo(){
+  const nom=(()=>{ try{ return usuario?.nombre?.()||""; }catch(e){ return ""; } })(), h=new Date().getHours();
+  const corto=nom.includes("@")?nom.split("@")[0]:nom.split(" ")[0];
+  $("#saludo").innerHTML=`<b>${h<12?"Buenos días":h<19?"Buenas tardes":"Buenas noches"}${corto?", "+esc(corto):""}</b><span>${fechaLarga(hoy())}</span>`;
+  const av=$("#avatar"); av.textContent=nom?nom.replace(/@.*/,"").split(/\s+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("").toUpperCase():""; av.classList.toggle("oculto",!nom);
+}
+
 function pintar(){
+  pintarSaludo();
   document.querySelectorAll("#rol button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.rol===rol)));
   $("#btnAdmin").classList.toggle("oculto", !esAdmin&&!esAsistente);
   $("#btnAdmin").textContent = esAdmin ? "Administración" : "Oficina";
@@ -242,12 +285,7 @@ async function elegirMensajero(id){
 
 function pintarMensajero(){
   const pend=pendientesMios().length;
-  $("#pestanas").innerHTML=`
-    <button data-t="nuevo" ${tabM==="nuevo"?'aria-current="page"':''}>Nuevo</button>
-    <button data-t="pend" ${tabM==="pend"?'aria-current="page"':''}>Por entregar${pend?`<span class="num">${pend}</span>`:""}</button>
-    <button data-t="caja" ${tabM==="caja"?'aria-current="page"':''}>Mi caja</button>
-    <button data-t="sueldo" ${tabM==="sueldo"?'aria-current="page"':''}>Mi sueldo</button>`;
-  $("#pestanas").querySelectorAll("button").forEach(b=>b.onclick=()=>{tabM=b.dataset.t; pintar(); scrollTo(0,0);});
+  ponerNav([["nuevo","Nuevo"],["pend","Por entregar",pend],["caja","Mi caja"],["sueldo","Mi sueldo"]],tabM,k=>tabM=k);
 
   const mens=listaOrdenada(S.mensajeros,"nombre").filter(esRepartidor);
   const selector=`<div class="campo"><label for="selMens">¿Quién eres?</label>
@@ -460,15 +498,14 @@ function tablaEntregas(ps,conCliente){
 
 function pintarAdmin(){
   const sin=Object.values(S.pedidos).filter(p=>!p.clienteId).length;
-  const tabs=[["pedidos","Pedidos",sin],["clientes","Clientes"],["recibos","Recibos"],["caja","Caja"],["cuentas","Cuentas"],["sueldos","Sueldos"],["mas","Más"]].filter(([k])=>esAdmin||["pedidos","clientes","recibos","caja","cuentas"].includes(k));
-  if(!tabs.some(([k])=>k===tabA)) tabA="pedidos";
-  $("#pestanas").innerHTML=tabs
-    .map(([k,t,n])=>`<button data-t="${k}" ${tabA===k?'aria-current="page"':''}>${t}${n?`<span class="num">${n}</span>`:""}</button>`).join("");
-  $("#pestanas").querySelectorAll("button").forEach(b=>b.onclick=()=>{tabA=b.dataset.t; pintar(); scrollTo(0,0);});
+  const tabs=[["inicio","Inicio"],["pedidos","Pedidos",sin],["clientes","Clientes"],["caja","Caja"],["recibos","Recibos"],["cuentas","Cuentas"],["sueldos","Sueldos"],["mas","Más"]].filter(([k])=>esAdmin||["inicio","pedidos","clientes","recibos","caja","cuentas"].includes(k));
+  if(!tabs.some(([k])=>k===tabA)) tabA="inicio";
+  ponerNav(tabs,tabA,k=>tabA=k);
   const v=$("#vista");
   const aviso = db ? "" : `<div class="aviso">Modo de prueba: los datos se borran al cerrar. Configura Firebase (ver LEEME.md) para que todo quede guardado y compartido entre mensajeros y administración.</div>`;
 
-  if(tabA==="pedidos"){
+  if(tabA==="inicio"){ pintarInicioEmpresa(v,aviso); }
+  else if(tabA==="pedidos"){
     let ps=Object.values(S.pedidos).sort((a,b)=>b.creado-a.creado);
     if(filtroA==="sin") ps=ps.filter(p=>!p.clienteId);
     else if(filtroA==="pend") ps=ps.filter(p=>p.estado==="pendiente");
@@ -590,14 +627,14 @@ function pintarAdmin(){
 }
 
 /* ======================= CLIENTE (solo lectura) ======================= */
-let tabC="pedidos", filtroC="todos", buscarC="";
+let tabC="inicio", filtroC="todos", buscarC="";
 function pintarCliente(){
   const c=S.clientes[miCliente], v=$("#vista");
   const enRuta=Object.values(S.pedidos).filter(p=>p.estado==="pendiente").length, cambios=Object.values(S.pedidos).filter(cambioPendiente);
-  $("#pestanas").innerHTML=[["pedidos","Mis pedidos",enRuta+cambios.length],["cuenta","Mi cuenta"]].map(([k,t,n])=>`<button data-t="${k}" ${tabC===k?'aria-current="page"':''}>${t}${n?`<span class="num">${n}</span>`:""}</button>`).join("");
-  $("#pestanas").querySelectorAll("button").forEach(b=>b.onclick=()=>{tabC=b.dataset.t; pintar(); scrollTo(0,0);});
+  ponerNav([["inicio","Inicio"],["pedidos","Mis pedidos",enRuta+cambios.length],["cuenta","Mi cuenta"]],tabC,k=>tabC=k);
   if(!c){ v.innerHTML=`<h1>Hola</h1><div class="vacio">${cargado?"Tu cuenta todavía no está asociada a un cliente. Escríbele a JS Logistics.":"Cargando…"}</div>`; return; }
-  if(tabC==="pedidos"){
+  if(tabC==="inicio"){ pintarInicioCliente(v,c,cambios); }
+  else if(tabC==="pedidos"){
     let ps=Object.values(S.pedidos).sort((a,b)=>b.creado-a.creado);
     if(filtroC==="cambio") ps=ps.filter(cambioPendiente); else if(filtroC==="ruta") ps=ps.filter(p=>p.estado==="pendiente"); else if(filtroC==="ent") ps=ps.filter(p=>p.estado==="entregado"); else if(filtroC==="dev") ps=ps.filter(p=>p.estado==="devuelto");
     if(buscarC) ps=ps.filter(p=>(p.guia+" "+(p.destinatario||"")).toLowerCase().includes(buscarC.toLowerCase()));
@@ -648,6 +685,127 @@ async function verPedidoCliente(guia){
     const items=[["Salida",f?.salida],[p.estado==="devuelto"?"Evidencia":"Entrega",e?.foto],["Firma de quien recibió",e?.firma]].map(([t,x])=>[t,fotoSegura(x)]).filter(([,x])=>x);
     const box=$("#pcFotos"); if(box) box.innerHTML=items.length?items.map(([t,x])=>`<figure><img src="${x}" alt="${t}"><figcaption>${t}</figcaption></figure>`).join(""):'<span class="sub">Sin fotos.</span>';
   }catch(err){ const box=$("#pcFotos"); if(box) box.innerHTML='<span class="sub">No se pudieron cargar las fotos.</span>'; }
+}
+
+/* ======================= PANELES DE INICIO (empresa y cliente) ======================= */
+const pct = (a,b) => b ? Math.round(a*100/b) : 0;
+const diaCorto = d => new Date(d+"T12:00:00").toLocaleDateString("es-CO",{weekday:"short",day:"numeric",month:"short"});
+const COLOR_ESTADO={entregado:"var(--verde)",ruta:"var(--mango)",devuelto:"var(--rojo)"};
+/* Dona por estado: cada color va con su nombre y su número al lado. */
+function donaHtml(segs,centro,sub){
+  const tot=segs.reduce((a,x)=>a+x.n,0), r=15.915, gap=segs.filter(x=>x.n).length>1?1.2:0;
+  let acum=0;
+  const arcos=segs.filter(x=>x.n).map(x=>{ const p=x.n*100/tot, l=Math.max(.5,p-gap), o=-acum; acum+=p;
+    return `<circle cx="21" cy="21" r="${r}" fill="none" stroke="${x.c}" stroke-width="6" stroke-dasharray="${l} ${100-l}" stroke-dashoffset="${o}" data-tip><title>${esc(x.t)}: ${x.n}</title></circle>`; }).join("");
+  return `<div class="dona"><div class="dona-svg"><svg viewBox="0 0 42 42" role="img" aria-label="${esc(segs.map(x=>x.t+": "+x.n).join(", "))}"><circle cx="21" cy="21" r="${r}" fill="none" stroke="var(--hueco)" stroke-width="6"/>${arcos}</svg><div class="dona-centro"><b>${centro}</b><span>${sub}</span></div></div>
+    <ul class="leyenda">${segs.map(x=>`<li><i style="background:${x.c}"></i>${esc(x.t)}<b>${x.n}</b></li>`).join("")}</ul></div>`;
+}
+/* Columnas por día (una sola serie). El valor de cada día aparece al pasar el dedo o el mouse. */
+function columnasHtml(datos,nombre){
+  const max=Math.max(4,Math.ceil(Math.max(...datos.map(d=>d.n))/4)*4), cada=Math.ceil(datos.length/8);
+  return `<div class="colbar" role="img" aria-label="${esc(nombre)}: ${esc(datos.map(d=>d.tip).join(", "))}"><span class="colbar-max">${max}</span>${datos.map(d=>`<div class="cb${d.hoy?" hoy":""}" tabindex="0" data-tip="${esc(d.tip)}"><i style="height:${d.n*100/max}%"></i></div>`).join("")}</div>
+    <div class="colbar-ejes" aria-hidden="true">${datos.map((d,i)=>`<span>${(datos.length-1-i)%cada===0?esc(d.l):""}</span>`).join("")}</div>`;
+}
+function entregasPorDia(ps,n){
+  const h=hoy(), porDia={};
+  ps.forEach(p=>{ if(p.estado==="entregado"){ const d=diaDe(p.entregado); porDia[d]=(porDia[d]||0)+1; } });
+  return [...Array(n)].map((_,i)=>{ const d=moverDia(h,i-n+1), k=porDia[d]||0; return {l:String(Number(d.slice(8))),n:k,tip:`${diaCorto(d)}: ${k} entrega${k===1?"":"s"}`,hoy:d===h}; });
+}
+const kpiHtml = (ico,lbl,val,pie,ir,cls) => `<${ir?`button data-ir="${ir}"`:"div"} class="kpi ${cls||""}"><span class="lbl">${ICONOS[ico]||""}${lbl}</span><b>${val}</b>${pie||""}</${ir?"button":"div"}>`;
+const ultimaActividad = p => Math.max(p.creado||0,p.entregado||0);
+const etqDash = p => p.estado==="pendiente" ? '<span class="etq ruta">En ruta</span>' : etqEstado(p);
+
+function pintarInicioEmpresa(v,aviso){
+  const h=hoy(), ayer=moverDia(h,-1), todos=Object.values(S.pedidos);
+  const delDiaE=(p,d,e)=>p.estado===e&&diaDe(p.entregado)===d;
+  const entHoy=todos.filter(p=>delDiaE(p,h,"entregado")), devHoy=todos.filter(p=>delDiaE(p,h,"devuelto"));
+  const enRuta=todos.filter(p=>p.estado==="pendiente"), salieron=todos.filter(p=>diaDe(p.creado)===h).length, sinRem=todos.filter(p=>!p.clienteId).length;
+  const domDe=d=>todos.filter(p=>cerrado(p)&&diaDe(p.entregado)===d).reduce((a,p)=>a+servicio(p),0), domHoy=domDe(h), domAyer=domDe(ayer);
+  const efec=pct(entHoy.length,entHoy.length+devHoy.length), cambio=domAyer?Math.round((domHoy-domAyer)*100/domAyer):null;
+  const reps=listaOrdenada(S.mensajeros,"nombre").filter(esRepartidor).map(m=>({m,ruta:enRuta.filter(p=>p.mensajeroId===m.id).length,ent:entHoy.filter(p=>p.mensajeroId===m.id).length,debe:periodoMensajero(m.id).debe}))
+    .filter(x=>x.ruta||x.ent||x.debe>0).sort((a,b)=>b.ruta-a.ruta||b.ent-a.ent);
+  // la caja de la empresa solo la ve administración; el asistente ve lo de mensajeros y clientes
+  let R=null, porCobrar=0, porPagar=0, enMens=reps.reduce((a,x)=>a+Math.max(0,x.debe),0);
+  if(esAdmin){ R=resumenCaja(); porCobrar=R.porCobrar; porPagar=R.porPagar; enMens=R.enMens; }
+  else Object.keys(S.clientes).forEach(id=>{ const s=saldoCliente(id); if(s>0) porPagar+=s; else porCobrar-=s; });
+  const dias=entregasPorDia(todos,14), tot14=dias.reduce((a,d)=>a+d.n,0);
+  const ultimos=todos.slice().sort((a,b)=>ultimaActividad(b)-ultimaActividad(a)).slice(0,7);
+  const desde=moverDia(h,-29), porC={};
+  todos.forEach(p=>{ if(p.clienteId&&p.estado==="entregado"&&diaDe(p.entregado)>=desde){ const c=porC[p.clienteId]=porC[p.clienteId]||{n:0,dom:0}; c.n++; c.dom+=servicio(p); } });
+  const top=Object.entries(porC).sort((a,b)=>b[1].n-a[1].n).slice(0,6), maxTop=top.length?top[0][1].n:1;
+  const COL_MEDIO={efectivo:"var(--verde)",nequi:"#8E44AD",bancolombia:"#E0A100",cuentas:"var(--marca2)"};
+  const fila=(t,x,cls)=>`<div class="${cls||""}"><span>${t}</span><b class="${x<0?"neg":""}">${pesos(x)}</b></div>`;
+  const plata=esAdmin
+    ? Object.entries(R.porMedio).filter(([,x])=>Math.round(x)).map(([m,x])=>`<div><span class="medio" style="--c:${COL_MEDIO[m]||"var(--suave)"}">${esc(MEDIOS_CAJA[m]||m)}</span><b>${pesos(x)}</b></div>`).join("")
+      +fila("<b>Total en caja</b>",R.total)+fila("En manos de mensajeros",enMens)+fila("Te deben los clientes",porCobrar)+fila("Les debes a clientes",porPagar)+fila("Sueldos por pagar (semana)",R.sueldosPend)+fila("Disponible de JS",R.disponible,"total")
+    : fila("Deben los mensajeros",enMens)+fila("Te deben los clientes",porCobrar)+fila("Les debes a clientes",porPagar,"total");
+
+  v.innerHTML=aviso+`<div class="dash-cab"><div><h1>Panel de control</h1><p class="sub">Así va JS Logistics hoy</p></div>${esAdmin?`<button class="btn sec chico" data-ir="mas|panel">Ver resultados del mes</button>`:""}</div>
+    <div class="kpis">
+      ${kpiHtml("ok","Entregados hoy",entHoy.length,`<div class="prog" aria-hidden="true"><i style="width:${efec}%"></i></div><small>${entHoy.length+devHoy.length?efec+"% efectividad · "+devHoy.length+" devuelto"+(devHoy.length===1?"":"s"):"Todavía sin entregas hoy"}</small>`,"pedidos|ent|hoy")}
+      ${kpiHtml("ruta","En ruta ahora",enRuta.length,`<small>${salieron} salieron hoy${sinRem?` · <span class="neg">${sinRem} sin remitente</span>`:""}</small>`,"pedidos|pend")}
+      ${kpiHtml("pedidos","Domicilios de hoy",pesos(domHoy),`<small>${cambio===null?"Ayer: "+pesos(domAyer):`<span class="tend ${cambio>=0?"sube":"baja"}">${cambio>=0?"↑":"↓"} ${Math.abs(cambio)}%</span> frente a ayer`}</small>`)}
+      ${esAdmin?kpiHtml("plata","Total en caja",pesos(R.total),`<small>Disponible de JS: ${pesos(R.disponible)}</small>`,"caja","oscuro")
+        :kpiHtml("plata","Deben los mensajeros",pesos(enMens),`<small>Lo que falta por recibir</small>`,"caja","oscuro")}
+    </div>
+    <div class="dash">
+      <section class="tarjeta c5"><h3>Pedidos de hoy <small>${diaCorto(h)}</small></h3>
+        ${donaHtml([{t:"Entregados",n:entHoy.length,c:COLOR_ESTADO.entregado},{t:"En ruta",n:enRuta.length,c:COLOR_ESTADO.ruta},{t:"Devueltos",n:devHoy.length,c:COLOR_ESTADO.devuelto}],entHoy.length+enRuta.length+devHoy.length,"pedidos")}</section>
+      <section class="tarjeta c7"><h3>Mensajeros en ruta <button class="btn sec chico" data-ir="caja">Ir a Caja</button></h3>
+        ${reps.length?`<div class="tabla-env"><table><thead><tr><th>Mensajero</th><th class="n">En ruta</th><th class="n">Hoy</th><th class="n">Debe</th><th class="solo-ancho">Estado</th></tr></thead><tbody>
+        ${reps.map(x=>`<tr data-ir="caja"><td><b>${esc(x.m.nombre)}</b></td><td class="n">${x.ruta}</td><td class="n">${x.ent}</td><td class="n ${x.debe>0?"neg":""}">${pesos(x.debe)}</td><td class="solo-ancho">${x.ruta?'<span class="etq ruta">En ruta</span>':x.ent?'<span class="etq ent">Terminó</span>':'<span class="etq gris">Sin salir</span>'}</td></tr>`).join("")}
+        </tbody></table></div>`:`<div class="vacio">Ningún mensajero en ruta ahora.</div>`}</section>
+    </div>
+    <div class="dash">
+      <section class="tarjeta c7"><h3>Entregas · últimos 14 días <small>${tot14} en total · ${(tot14/14).toFixed(1)} por día</small></h3>${columnasHtml(dias,"Entregas por día")}</section>
+      <section class="tarjeta c5"><h3>Plata ${esAdmin?"":"<small>Mensajeros y clientes</small>"}</h3><div class="plata">${plata}</div></section>
+    </div>
+    <div class="dash">
+      <section class="tarjeta c7"><h3>Últimos pedidos <button class="btn sec chico" data-ir="pedidos|todos">Ver todos</button></h3>
+        ${ultimos.length?`<div class="tabla-env"><table><thead><tr><th>Guía</th><th>Cliente</th><th class="solo-ancho">Mensajero</th><th>Estado</th><th class="n solo-ancho">Cobrado</th></tr></thead><tbody>
+        ${ultimos.map(p=>`<tr data-ped="${esc(p.guia)}"><td class="guia">${esc(p.guia)}</td><td>${p.clienteId?esc(nombreCliente(p.clienteId)):'<span class="etq sin">Sin remitente</span>'}</td><td class="solo-ancho">${esc(S.mensajeros[p.mensajeroId]?.nombre||"")}</td><td>${etqDash(p)}</td><td class="n solo-ancho">${p.estado==="entregado"?pesos(p.valorCobrado):"—"}</td></tr>`).join("")}
+        </tbody></table></div>`:`<div class="vacio">Todavía no hay pedidos.</div>`}</section>
+      <section class="tarjeta c5"><h3>Clientes que más envían <small>Últimos 30 días</small></h3>
+        ${top.length?`<div class="hbarras">${top.map(([id,c])=>`<button data-cli="${esc(id)}" style="--w:${Math.round(c.n*100/maxTop)}%"><span>${esc(nombreCliente(id)||"(eliminado)")}</span><small>${c.n} entrega${c.n===1?"":"s"} · ${pesos(c.dom)}</small><i></i></button>`).join("")}</div>`:`<div class="vacio">Sin entregas en los últimos 30 días.</div>`}</section>
+    </div>`;
+  v.querySelectorAll("[data-ir]").forEach(b=>b.onclick=()=>{ const [t,f,d]=b.dataset.ir.split("|"); tabA=t;
+    if(t==="pedidos"){ filtroA=f||"todos"; diaPedA=d==="hoy"?h:""; mensPedA=""; buscarA=""; limiteA=100; }
+    if(t==="mas") subMas=f||"panel";
+    pintar(); scrollTo(0,0); });
+  v.querySelectorAll("[data-ped]").forEach(b=>b.onclick=()=>abrirPedido(b.dataset.ped));
+  v.querySelectorAll("[data-cli]").forEach(b=>b.onclick=()=>abrirCuenta(b.dataset.cli));
+}
+
+function pintarInicioCliente(v,c,cambios){
+  const h=hoy(), todos=Object.values(S.pedidos), desde=moverDia(h,-29);
+  const n=(e,d)=>todos.filter(p=>p.estado===e&&(d?diaDe(p.entregado)===d:diaDe(p.entregado)>=desde)).length;
+  const enRuta=todos.filter(p=>p.estado==="pendiente").length, salieron=todos.filter(p=>diaDe(p.creado)===h).length;
+  const entHoy=n("entregado",h), devHoy=n("devuelto",h), entMes=n("entregado"), devMes=n("devuelto"), efec=pct(entMes,entMes+devMes);
+  const s=saldoCliente(miCliente), dias=entregasPorDia(todos,30), tot30=dias.reduce((a,d)=>a+d.n,0);
+  const ultimos=todos.slice().sort((a,b)=>ultimaActividad(b)-ultimaActividad(a)).slice(0,6), movs=filasCuenta(miCliente).slice(0,6);
+  v.innerHTML=`<div class="dash-cab"><div><h1>Hola, ${esc(c.nombre)}</h1><p class="sub">Así van tus envíos con JS Logistics</p></div></div>
+    ${cambios.length?`<div class="aviso alerta">Tienes ${cambios.length===1?"1 prenda de cambio":cambios.length+" prendas de cambio"} por recibir (${cambios.map(p=>esc(p.guia)).join(", ")}). Cuando te la entreguen, ábrela y confirma que la recibiste.</div>`:""}
+    <div class="kpis">
+      ${kpiHtml("ruta","En ruta ahora",enRuta,`<small>${salieron} salieron hoy</small>`,"pedidos|ruta")}
+      ${kpiHtml("ok","Entregados hoy",entHoy,`<small>${entMes} en 30 días</small>`,"pedidos|ent")}
+      ${kpiHtml("dev","Devueltos hoy",devHoy,`<small>${devMes} en 30 días</small>`,"pedidos|dev")}
+      ${kpiHtml("plata","Tu saldo",pesos(Math.abs(s)),`<small>${s>0?"JS Logistics te debe este valor":s<0?"Pendiente por pagar a JS Logistics":"Cuenta a paz y salvo"}</small>`,"cuenta","oscuro")}
+    </div>
+    <div class="dash">
+      <section class="tarjeta c4"><h3>Efectividad <small>Últimos 30 días</small></h3>
+        ${donaHtml([{t:"Entregados",n:entMes,c:COLOR_ESTADO.entregado},{t:"Devueltos",n:devMes,c:COLOR_ESTADO.devuelto}],entMes+devMes?efec+"%":"—","entregado")}</section>
+      <section class="tarjeta c8"><h3>Tus envíos entregados <small>Últimos 30 días · ${tot30} en total</small></h3>${columnasHtml(dias,"Entregas por día")}</section>
+    </div>
+    <div class="dash">
+      <section class="tarjeta c7"><h3>Últimos pedidos <button class="btn sec chico" data-ir="pedidos|todos">Ver todos</button></h3>
+        ${ultimos.length?`<div class="mini-lista">${ultimos.map(p=>`<button data-pc="${esc(p.guia)}">${fotoSegura(p.mini)?`<img src="${fotoSegura(p.mini)}" alt="">`:'<span class="sinfoto"></span>'}
+          <span class="info"><span class="guia">${esc(p.guia)}</span> ${etqDash(p)}<p>${p.estado==="entregado"?"Recibió "+esc(p.destinatario||"")+" · "+hora(p.entregado):p.estado==="devuelto"?esc(MOTIVOS[p.motivoDev]||"Devuelto")+" · "+hora(p.entregado):"Salió "+hora(p.creado)}</p></span>
+          <span class="val">${p.estado==="entregado"?pesos(p.valorCobrado):""}</span></button>`).join("")}</div>`:`<div class="vacio">Todavía no tienes envíos.</div>`}</section>
+      <section class="tarjeta c5"><h3>Últimos movimientos <button class="btn sec chico" data-ir="cuenta">Mi cuenta</button></h3>
+        ${movs.length?`<div class="mini-lista">${movs.map(r=>`<div><span class="info"><b style="font-weight:600;font-size:.88rem">${esc(r.pid?r.pid+(r.nom?" · "+r.nom:""):r.nom||r.det)}</b><p>${hora(r.fecha)}</p></span><span class="val ${r.v<0?"neg":"pos"}">${pesos(r.v)}</span></div>`).join("")}</div>`:`<div class="vacio">Sin movimientos.</div>`}</section>
+    </div>`;
+  v.querySelectorAll("[data-ir]").forEach(b=>b.onclick=()=>{ const [t,f]=b.dataset.ir.split("|"); tabC=t; if(f){ filtroC=f; diaPedC=""; buscarC=""; } pintar(); scrollTo(0,0); });
+  v.querySelectorAll("[data-pc]").forEach(b=>b.onclick=()=>verPedidoCliente(b.dataset.pc));
 }
 
 /* ======================= CUENTAS INTERNAS ======================= */

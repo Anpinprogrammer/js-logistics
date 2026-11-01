@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#042A3A">
+<meta name="theme-color" content="#0B0F14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="JS Logistics">
@@ -15,17 +15,24 @@
 <script defer src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/estilos.css">
 </head>
 <body>
+<aside class="lateral" id="lateral">
+  <div class="marca-lat"><img src="img/logo.png" alt=""><span>JS Logistics<small>Servir es nuestra labor</small></span></div>
+  <nav id="navLateral" aria-label="Menú principal"></nav>
+  <div class="lat-pie">JS Logistics · Cali</div>
+</aside>
 <header class="barra">
   <div class="marca"><img src="img/logo.png" alt=""><span>JS Logistics<small>Servir es nuestra labor</small></span></div>
+  <div class="saludo" id="saludo"></div>
   <div class="rol" id="rol" role="group" aria-label="Modo">
     <button data-rol="mensajero" aria-pressed="true">Mensajero</button>
     <button data-rol="admin" aria-pressed="false" id="btnAdmin">Administración</button>
   </div>
-  <button class="salir oculto" id="btnSalir" aria-label="Cerrar sesión">Salir</button>
+  <span class="avatar oculto" id="avatar" aria-hidden="true"></span>
+  <button class="salir oculto" id="btnSalir" aria-label="Cerrar sesión"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg><span>Salir</span></button>
 </header>
 <div class="splash" id="splash" aria-hidden="true"><img src="img/logo-splash.png" alt=""><b>JS Logistics</b><span>Servir es nuestra labor</span></div>
 <main id="vista"></main>

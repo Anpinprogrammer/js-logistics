@@ -74,8 +74,8 @@ pantalla de inicio". Queda como una app con su ícono.
 |---|---|
 | Mensajero | Sus pedidos (crear, entregar, devolver), su caja y su sueldo. No ve clientes ni datos de otros. |
 | Asistente | Solo "Oficina": Pedidos (asignar remitente y valores, también de pedidos entregados; tomar la foto de pedidos que quedan a cargo de la Oficina y marcarlos entregados), registrar y editar clientes, ver saldos y enviar cobros y recibos por WhatsApp, compras y ganancias en Cuentas. En Caja ve lo que debe cada mensajero y registra el dinero que le entregan (queda a su nombre). No ve la caja de la empresa, Sueldos, Personal, Historial ni Respaldo; no liquida, no da base, no borra ni corrige lo recibido. |
-| Cliente | Solo lectura: sus pedidos (en ruta, entregados y devueltos) con sus pruebas de entrega, su saldo, sus movimientos y el recibo de cuadre del día. No ve el nombre del mensajero ni datos de otros clientes. |
-| Administración | Todo. |
+| Cliente | Solo lectura: un panel de inicio (en ruta, entregados y devueltos de hoy, efectividad y envíos de los últimos 30 días, su saldo), sus pedidos (en ruta, entregados y devueltos) con sus pruebas de entrega, su saldo, sus movimientos y el recibo de cuadre del día. No ve el nombre del mensajero ni datos de otros clientes. |
+| Administración | Todo. Abre en **Inicio**, el panel de control: pedidos de hoy, mensajeros en ruta, plata (caja, mensajeros, clientes, sueldos), entregas de 14 días, últimos pedidos y los clientes que más envían. El asistente ve el mismo panel sin la caja de la empresa. |
 
 En Personal, el **tipo** define cómo se paga a cada persona:
 mensajero (70% de sus domicilios − 25.000 al día), dueño, **oficina** (sus pedidos son 100% de JS y
