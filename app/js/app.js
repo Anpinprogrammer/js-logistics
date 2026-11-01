@@ -329,6 +329,7 @@ function pintarMensajero(){
         ${pm.gastos?`<div class="cifra"><span>Fletes / gastos que pagaste</span><b>− ${pesos(pm.gastos)}</b></div>`:""}
         <div class="cifra"><span>Ya entregaste</span><b>${pesos(pm.recibido)}</b></div>
         ${pm.anterior?`<div class="cifra"><span>Pendiente de la liquidación anterior</span><b>${pesos(pm.anterior)}</b></div>`:""}
+        ${pm.ajuste?`<div class="cifra"><span>Correcciones a liquidaciones cerradas</span><b>${ajusteTxt(pm.ajuste)}</b></div>`:""}
         <div class="cifra"><span>Transferencias a JS</span><b>${pesos(t.transfJs)}</b></div>
         <div class="cifra"><span>Pagado directo al cliente</span><b>${pesos(t.transfCli)}</b></div>
         <div class="cifra"><span>Entregas</span><b>${pm.ps.length}</b></div>
@@ -593,7 +594,7 @@ function pintarAdmin(){
           <dt>Entregas / en ruta</dt><dd>${pm.ps.length} / ${pendM[id]||0}</dd>
           <dt>Efectivo cobrado</dt><dd>${pesos(tt.efectivo)}</dd>
           ${pm.base?`<dt>Base para vueltos</dt><dd>${pesos(pm.base)}</dd>`:""}${pm.gastos?`<dt>Fletes / gastos pagados</dt><dd>− ${pesos(pm.gastos)}</dd>`:""}
-          ${pm.anterior?`<dt>Pendiente anterior</dt><dd>${pesos(pm.anterior)}</dd>`:""}
+          ${pm.anterior?`<dt>Pendiente anterior</dt><dd>${pesos(pm.anterior)}</dd>`:""}${filaAjuste(pm)}
           <dt>Ya entregó</dt><dd>${pesos(pm.recibido)}</dd>
           <div class="debe" style="display:contents"><dt>Debe</dt><dd>${pesos(pm.debe)}</dd></div>
           <dt>Transf. a JS</dt><dd>${pesos(tt.transfJs)}</dd>
@@ -618,7 +619,9 @@ function pintarAdmin(){
     v.querySelectorAll("[data-liquidar]").forEach(b=>b.onclick=()=>liquidar(b.dataset.liquidar));
     v.querySelectorAll("[data-verliq]").forEach(b=>b.onclick=()=>verLiquidacion(b.dataset.verliq));
     v.querySelectorAll("[data-edrec]").forEach(b=>b.onclick=()=>editarRecaudo(b.dataset.edrec));
-    v.querySelectorAll("[data-delrec]").forEach(b=>b.onclick=async()=>{ b.disabled=true; try{ await borrar("recaudos",b.dataset.delrec); toast("Entrega de dinero quitada"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
+    v.querySelectorAll("[data-delrec]").forEach(b=>b.onclick=async()=>{ const r=S.recaudos[b.dataset.delrec]; if(!r) return; if(yaContado(r.fecha)) return avisoContado();
+      if(!await confirmar("Quitar dinero recibido",`${S.mensajeros[r.mensajeroId]?.nombre||""} · ${pesos(r.valor)} · ${hora(r.fecha)}. Se quita de la caja y vuelve a sumarse a lo que debe.`,"Quitar")) return;
+      b.disabled=true; try{ await borrar("recaudos",b.dataset.delrec); toast("Entrega de dinero quitada"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
   }
   else if(tabA==="recibos"){ pintarRecibos(v,aviso); }
   else if(tabA==="cuentas"){ pintarCuentas(v,aviso); }
@@ -737,7 +740,7 @@ function pintarInicioEmpresa(v,aviso){
   const fila=(t,x,cls)=>`<div class="${cls||""}"><span>${t}</span><b class="${x<0?"neg":""}">${pesos(x)}</b></div>`;
   const plata=esAdmin
     ? Object.entries(R.porMedio).filter(([,x])=>Math.round(x)).map(([m,x])=>`<div><span class="medio" style="--c:${COL_MEDIO[m]||"var(--suave)"}">${esc(MEDIOS_CAJA[m]||m)}</span><b>${pesos(x)}</b></div>`).join("")
-      +fila("<b>Total en caja</b>",R.total)+fila("En manos de mensajeros",enMens)+fila("Te deben los clientes",porCobrar)+fila("Les debes a clientes",porPagar)+fila("Sueldos por pagar (semana)",R.sueldosPend)+fila("Disponible de JS",R.disponible,"total")
+      +fila("<b>Total en caja</b>",R.total)+fila("En manos de mensajeros",enMens)+fila("Te deben los clientes",porCobrar)+fila("Les debes a clientes",porPagar)+fila("Sueldos por pagar (semana)",R.sueldosPend)+(()=>{ const a=arqueosCaja()[0]; return `<div><span>Último arqueo</span><b>${a?hora(a.fecha)+" · "+resultadoArqueo(a):"Nunca"}</b></div>`; })()+fila("Disponible de JS",R.disponible,"total")
     : fila("Deben los mensajeros",enMens)+fila("Te deben los clientes",porCobrar)+fila("Les debes a clientes",porPagar,"total");
 
   v.innerHTML=aviso+`<div class="dash-cab"><div><h1>Panel de control</h1><p class="sub">Así va JS Logistics hoy</p></div>${esAdmin?`<button class="btn sec chico" data-ir="mas|panel">Ver resultados del mes</button>`:""}</div>
@@ -834,7 +837,7 @@ function pintarCuentas(v,aviso){
     ${extra.length?`<div class="tabla-env" style="margin-top:10px"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Detalle</th><th>Registró</th><th class="n">Valor</th><th></th></tr></thead><tbody>${extra.map(m=>`<tr><td>${hora(m.fecha)}</td><td>${esc(nombreCliente(m.clienteId)||"—")}</td><td>${m.tipo==="pago_de_cliente"?`Pago · ${MEDIOS[m.medio]||""}`:m.tipo==="pago_a_cliente"?`Le pagó · ${MEDIOS[m.medio]||""}`:m.tipo==="ganancia"?"Ganancia JS":"Compra"+(m.medio?` · ${MEDIOS[m.medio]||""}`:"")}${medioAntesTxt(m)}</td><td>${esc(m.nota||"")}</td><td>${esc(m.porNombre||"")}</td><td class="n">${pesos(m.valor)}</td>${esAdmin?`<td style="white-space:nowrap"><button class="btn sec chico" data-mxed="${esc(m.id)}">Editar</button> <button class="btn peligro chico" data-mxdel="${esc(m.id)}">Quitar</button></td>`:`<td>${m.tipo!=="ganancia"&&puedoCambiarMedio(m)?`<button class="btn sec chico" data-cmmov="${esc(m.id)}">Cambiar medio</button>`:""}</td>`}</tr>`).join("")}</tbody></table></div>`:""}`;
   v.querySelectorAll("[data-ce]").forEach(b=>b.onclick=()=>movCuenta(b.dataset.ce,"entra"));
   v.querySelectorAll("[data-cs]").forEach(b=>b.onclick=()=>movCuenta(b.dataset.cs,"sale"));
-  v.querySelectorAll("[data-cudel]").forEach(b=>b.onclick=async()=>{ if(!await confirmar("Quitar movimiento","Se borra de la cuenta y de la caja.","Quitar")) return; try{ await borrar("cajamovs",b.dataset.cudel); toast("Movimiento quitado"); }catch(e){ toast("No se pudo quitar"); } });
+  v.querySelectorAll("[data-cudel]").forEach(b=>b.onclick=async()=>{ if(yaContado(S.cajamovs[b.dataset.cudel]?.fecha)) return avisoContado(); if(!await confirmar("Quitar movimiento","Se borra de la cuenta y de la caja.","Quitar")) return; try{ await borrar("cajamovs",b.dataset.cudel); toast("Movimiento quitado"); }catch(e){ toast("No se pudo quitar"); } });
   const se=$("#cuSemilla"); if(se) se.onclick=async()=>{ se.disabled=true; try{ for(const [nombre,tipo] of [["JS Envíos","socio"],["MT (tienda de ropa)","socio"],["Base de JS","base"]]){ const id=nuevoId(); await rawSet("cuentas",id,{id,nombre,tipo,creado:Date.now()}); } registrar("Creó las cuentas internas JS Envíos, MT y Base de JS"); toast("Cuentas creadas"); }catch(e){ se.disabled=false; toast("No se pudieron crear"); } };
   const nu=$("#cuNueva"); if(nu) nu.onclick=()=>nuevaCuenta();
   $("#cuPago").onclick=()=>movClienteOficina("pago_de_cliente");
@@ -843,7 +846,7 @@ function pintarCuentas(v,aviso){
   $("#cuGanancia").onclick=()=>movClienteOficina("ganancia");
   v.querySelectorAll("[data-cmmov]").forEach(b=>b.onclick=()=>cambiarMedio("movimientos",b.dataset.cmmov));
   v.querySelectorAll("[data-mxed]").forEach(b=>b.onclick=()=>{ const m=S.movimientos[b.dataset.mxed]; if(m) movClienteOficina(m.tipo,m); });
-  v.querySelectorAll("[data-mxdel]").forEach(b=>b.onclick=async()=>{ const m=S.movimientos[b.dataset.mxdel]; if(!m) return;
+  v.querySelectorAll("[data-mxdel]").forEach(b=>b.onclick=async()=>{ const m=S.movimientos[b.dataset.mxdel]; if(!m) return; if(mueveCaja(m)&&yaContado(m.fecha)) return avisoContado();
     if(!await confirmar("Quitar "+(m.tipo==="ganancia"?"ganancia":esPago(m)?"pago":"compra"),`${nombreCliente(m.clienteId)||"Cliente"} · ${pesos(m.valor)}. Se quita de la cuenta del cliente${m.tipo==="ganancia"?" y del sueldo de JS":" y de la caja"}.`,"Quitar")) return;
     try{ await borrar("movimientos",m.id); toast("Movimiento quitado"); }catch(e){ toast("No se pudo quitar"); } });
 }
@@ -862,20 +865,22 @@ function movCuenta(id,tipo){
     <p class="sub">${tipo==="entra"?"Dinero que entra a la caja desde esta cuenta.":"Dinero que sale de la caja hacia esta cuenta."}</p>
     <div class="linea2"><div class="campo"><label for="mcVal">Valor</label><input id="mcVal" type="number" inputmode="numeric" min="0" step="1000"></div>
     <div class="campo"><label for="mcMedio">Medio</label><select id="mcMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div></div>
-    <div class="linea2"><div class="campo"><label for="mcDia">Día</label><input id="mcDia" type="date" value="${hoy()}"></div>
+    <div class="linea2"><div class="campo"><label for="mcDia">Día</label><input id="mcDia" type="date" value="${hoy()}" min="${diaMinCaja()}" max="${hoy()}"></div>
     <div class="campo"><label for="mcMot">Motivo</label><input id="mcMot" placeholder="${tipo==="entra"?"Ej: devolución del préstamo":"Ej: préstamo para nómina"}"></div></div>
     <button class="btn ${tipo==="entra"?"ok":""}" id="mcGuardar" style="width:100%">Registrar ${tipo==="entra"?"entrada":"salida"}</button>`;
   abrirDlg(); $("#mcVal").focus();
   $("#mcGuardar").onclick=async()=>{ const val=Number($("#mcVal").value), mot=$("#mcMot").value.trim();
     if(!(val>0)) return toast("Escribe un valor mayor a cero"); if(!mot) return toast("Escribe el motivo");
+    const dia=$("#mcDia").value||hoy(); if(diaAntesDelArqueo(dia)) return;
     const b=$("#mcGuardar"); b.disabled=true; const nid=nuevoId();
-    try{ await rawSet("cajamovs",nid,{id:nid,tipo,cat:"interna",cuentaId:id,personaId:"",valor:val,medio:$("#mcMedio").value,concepto:mot,fecha:fechaDia($("#mcDia").value||hoy()),porUid:uid||"",porNombre:miNombre()});
+    try{ await rawSet("cajamovs",nid,{id:nid,tipo,cat:"interna",cuentaId:id,personaId:"",valor:val,medio:$("#mcMedio").value,concepto:mot,fecha:fechaCaja(dia),porUid:uid||"",porNombre:miNombre()});
       registrar((tipo==="entra"?"Entrada de ":"Salida a ")+cu.nombre+": "+pesos(val)+" · "+mot); cerrarDlg(); toast((tipo==="entra"?"Entrada":"Salida")+" registrada"); }
     catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
 /* Compra por encargo o ganancia ocasional de un cliente, desde la pestaña Cuentas.
    mov: el movimiento a editar (solo administración). pre: lo que ya estaba escrito al volver de crear un cliente. */
 function movClienteOficina(tipo,mov,pre){
+  if(mov&&mueveCaja(mov)&&yaContado(mov.fecha)) return avisoContado();
   const cs=listaOrdenada(S.clientes,"nombre"), compra=tipo==="compra_cliente", pago=tipo==="pago_de_cliente", pagoA=tipo==="pago_a_cliente";
   const conMedio=compra||pago||pagoA, soloHoy=(pago||pagoA)&&!esAdmin; // los pagos que registra el asistente quedan con la hora del momento
   const miCaja=esAsistente&&uid?cajaOficina(uid).saldo:null;
@@ -888,7 +893,7 @@ function movClienteOficina(tipo,mov,pre){
     <span class="sub" id="mxSaldo" style="display:block;margin-top:4px"></span></div>
     <div class="linea2"><div class="campo"><label for="mxVal">${pago?"Valor que pagó":pagoA?"Valor que le entregas":"Valor"}</label><input id="mxVal" type="number" inputmode="numeric" min="0" step="100" value="${Number(v0.val)||""}"></div>
     ${conMedio?`<div class="campo"><label for="mxMedio">${pago?"¿Cómo pagó?":pagoA?"¿Cómo le pagas?":"Pagado con"}</label><select id="mxMedio">${pago||pagoA?'<option value="">Elige…</option>':""}${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>`:""}</div>
-    <div class="linea2">${soloHoy?"":`<div class="campo"><label for="mxDia">Día</label><input id="mxDia" type="date" value="${esc(v0.dia||hoy())}"></div>`}
+    <div class="linea2">${soloHoy?"":`<div class="campo"><label for="mxDia">Día</label><input id="mxDia" type="date" value="${esc(v0.dia||hoy())}" max="${hoy()}"></div>`}
     <div class="campo"><label for="mxNota">Detalle</label><input id="mxNota" value="${esc(v0.nota||"")}" placeholder="${pago?"Ej: comprobante Nequi 4521":pagoA?"Ej: entregado en oficina":compra?"Ej: compra en almacén · guía JS-00120":"Ej: 3 puntos extra · guía JS-00120"}"></div></div>
     <button class="btn ok" id="mxGuardar" style="width:100%">${mov?"Guardar cambios":pago||pagoA?"Registrar pago":"Registrar"}</button>`;
   abrirDlg();
@@ -911,8 +916,9 @@ function movClienteOficina(tipo,mov,pre){
   };
   $("#mxGuardar").onclick=async()=>{ const cid=$("#mxCli").value, val=Number($("#mxVal").value), medio=conMedio?$("#mxMedio").value:"";
     if(!cid) return toast("Elige el cliente"); if(!(val>0)) return toast("Escribe un valor mayor a cero"); if(pago&&!medio) return toast("Elige cómo pagó"); if(pagoA&&!medio) return toast("Elige cómo le pagas");
+    const dia=$("#mxDia")?.value||hoy(), caja=mueveCaja({tipo}); if(!soloHoy&&caja&&diaAntesDelArqueo(dia)) return;
     const b=$("#mxGuardar"); b.disabled=true;
-    const datos={clienteId:cid,valor:val,medio,nota:$("#mxNota").value.trim(),fecha:soloHoy?Date.now():fechaDia($("#mxDia")?.value||hoy())};
+    const datos={clienteId:cid,valor:val,medio,nota:$("#mxNota").value.trim(),fecha:soloHoy?Date.now():caja?fechaCaja(dia):fechaDia(dia)};
     try{ if(mov) await actualizar("movimientos",mov.id,{...datos,tipo});
       else { const id=nuevoId(); await guardar("movimientos",id,{id,tipo,...datos,porUid:uid||"",porNombre:miNombre()}); }
       cerrarDlg(); toast(mov?"Cambios guardados":pago?`Pago de ${pesos(val)} de ${nombreCliente(cid)} registrado`:pagoA?`Pago de ${pesos(val)} a ${nombreCliente(cid)} registrado`:compra?"Compra registrada":"Ganancia registrada"); }
@@ -1031,7 +1037,7 @@ async function abrirPedido(guia, cliElegido){
   ${p.estado==="devuelto"?`<label class="check"><input type="checkbox" id="pDev" ${p.cobrarDev?"checked":""}> Cobrarle al cliente el domicilio de esta devolución</label>`:""}
   ${p.estado==="entregado"&&esAdmin?`<div class="linea2"><div class="campo"><label for="pValCob">Valor que cobró el mensajero</label><input id="pValCob" type="number" inputmode="numeric" min="0" step="100" value="${Number(p.valorCobrado)||0}"></div>
     <div class="campo"><label for="pMet">Cómo se lo pagaron</label><select id="pMet">${Object.entries(METODOS).map(([k,x])=>`<option value="${k}" ${p.metodo===k?"selected":""}>${x.t}</option>`).join("")}</select></div></div>
-    ${pedidoLiquidado(p)?`<p class="sub" style="margin-top:-6px">Esta entrega ya está en una liquidación cerrada de ${esc(S.mensajeros[p.mensajeroId]?.nombre||"el mensajero")}: corregirla cambia el saldo del cliente, pero no lo que quedó en esa liquidación.</p>`:""}`:""}
+    ${pedidoLiquidado(p)?`<p class="sub" style="margin-top:-6px">Esta entrega ya está en una liquidación cerrada de ${esc(S.mensajeros[p.mensajeroId]?.nombre||"el mensajero")}: si la corriges, la diferencia pasa sola a lo que debe en su período abierto (“Correcciones a liquidaciones cerradas”).</p>`:""}`:""}
   ${p.estado==="entregado"&&(p.metodo==="transf_js"||esAdmin)?`<div class="campo ${p.metodo==="transf_js"?"":"oculto"}" id="pCtaBox"><label for="pCta">Cuenta de JS donde llegó la transferencia</label><select id="pCta"><option value="">Sin especificar</option>${Object.entries(CUENTAS_JS).map(([k,t])=>`<option value="${k}" ${p.cuentaJs===k?"selected":""}>${t}</option>`).join("")}</select></div>`:""}
   <div class="linea2"><div class="campo"><label for="pGasto">Flete / gasto pagado por el mensajero (se le cobra al cliente)</label><input id="pGasto" type="number" inputmode="numeric" min="0" step="1000" value="${gastoDe(p)||""}" placeholder="0"></div>
   <div class="campo"><label for="pGastoNota">Detalle del gasto</label><input id="pGastoNota" value="${esc(p.gastoNota||"")}" placeholder="Ej: bus a Pasto"></div></div>
@@ -1071,20 +1077,21 @@ async function abrirPedido(guia, cliElegido){
       Object.assign(datos,{domiPagoMedio:medio,domiPagoValor:val,domiPagoFecha:p.domiPagado&&p.domiPagoFecha?p.domiPagoFecha:Date.now(),domiPagoUid:p.domiPagado?(p.domiPagoUid||""):(uid||"")}); }
     else Object.assign(datos,{domiPagoMedio:"",domiPagoValor:"",domiPagoFecha:0});
     if($("#pDev")) datos.cobrarDev=$("#pDev").checked; if($("#pCta")) datos.cuentaJs=$("#pCta").value;
-    if($("#pValCob")){ // corrección de lo que cobró el mensajero (solo administración); la diferencia se recalcula igual que al entregar
+    if($("#pValCob")){ // corrección de lo que cobró el mensajero (se revisa abajo contra el arqueo) (solo administración); la diferencia se recalcula igual que al entregar
       const v=Number($("#pValCob").value), met=$("#pMet").value; if($("#pValCob").value===""||v<0) return toast("Escribe el valor cobrado (0 si no cobró)");
       const dif=datos.aCobrar?v-(met==="transf_cliente"?0:datos.aCobrar):0;
       Object.assign(datos,{valorCobrado:v,metodo:met,cuentaJs:met==="transf_js"?datos.cuentaJs||"":"",difCobro:dif});
       if(dif!==(Number(p.difCobro)||0)) datos.difRevisada=false; }
+    if(cambiaLoContado(p,{...p,...datos})) return avisoContado();
     try{ await actualizar("pedidos",guia,datos); toast("Guía "+guia+" actualizada"); cerrarDlg(); }catch(e){toast("No se pudo guardar");} };
-  if($("#pBorrar")) $("#pBorrar").onclick=async()=>{ if(!await confirmar("Eliminar la guía "+guia,"Se borran el pedido y sus fotos. No se puede deshacer.","Eliminar")) return abrirPedido(guia);
+  if($("#pBorrar")) $("#pBorrar").onclick=async()=>{ if(cambiaLoContado(p,null)) return avisoContado(); if(!await confirmar("Eliminar la guía "+guia,"Se borran el pedido y sus fotos. No se puede deshacer.","Eliminar")) return abrirPedido(guia);
     const grupo=nuevoId(); try{ await borrar("pedidos",guia,{grupo}); await borrar("fotos",guia,{grupo}).catch(()=>{}); await borrar("entregas",guia,{grupo}).catch(()=>{}); cerrarDlg(); toast("Guía enviada a la papelera"); }catch(e){ toast("No se pudo eliminar"); } };
   const ne=$("#pNoEnt"); if(ne) ne.onclick=()=>abrirDevolucion(guia);
   const pe=$("#pEntregar"); if(pe) pe.onclick=()=>abrirEntrega(guia);
   const pc=$("#pCambioOk"); if(pc) pc.onclick=async()=>{ if(!await confirmar("Cambio de "+guia+" entregado","Se marca que el cliente ya recibió la prenda de cambio.","Marcar entregado")) return abrirPedido(guia);
     try{ await actualizar("pedidos",guia,{cambioRecibido:Date.now(),cambioConfirmo:uid||""}); toast("Cambio marcado como entregado"); abrirPedido(guia); }catch(e){ toast("No se pudo guardar"); } };
   const dk=$("#pDifOk"); if(dk) dk.onclick=async()=>{ try{ await actualizar("pedidos",guia,{difRevisada:true}); abrirPedido(guia); }catch(e){ toast("No se pudo guardar"); } };
-  const rb=$("#pReabrir"); if(rb) rb.onclick=async()=>{ if(!await confirmar("Reabrir la guía "+guia,"El pedido volverá a por entregar. La foto y la firma de esta entrega se guardan en el pedido como “entrega anterior”.","Reabrir")) return abrirPedido(guia);
+  const rb=$("#pReabrir"); if(rb) rb.onclick=async()=>{ if(cambiaLoContado(p,{...p,estado:"pendiente",metodo:""})) return avisoContado(); if(!await confirmar("Reabrir la guía "+guia,"El pedido volverá a por entregar. La foto y la firma de esta entrega se guardan en el pedido como “entrega anterior”.","Reabrir")) return abrirPedido(guia);
     try{ await guardarPruebaAnterior(p); }catch(e){ return toast("No se pudieron guardar las pruebas de entrega. No se reabrió."); }
     try{ await actualizar("pedidos",guia,{estado:"pendiente",entregado:null,destinatario:"",valorCobrado:0,metodo:"",cuentaJs:"",difCobro:0,difRevisada:false,motivoDev:"",notaDev:"",cobrarDev:false}); toast("Guía "+guia+" reabierta"); cerrarDlg(); }
     catch(e){ toast("No se pudo reabrir"); } };
@@ -1205,13 +1212,16 @@ function abrirCuenta(cid){
   const wa=$("#cWa"); if(wa) wa.onclick=()=>marcarEnviado(cid);
   const wc=$("#cWaCopiar"); if(wc) wc.onclick=async()=>{ try{ await navigator.clipboard.writeText(textoSaldo(cid)); toast("Mensaje copiado. Pégalo en WhatsApp."); }catch(e){ toast("No se pudo copiar en este navegador"); } };
   if($("#mReg")) $("#mReg").onclick=async()=>{ const val=Number($("#mVal").value); if(!(val>0)) return toast("Escribe un valor mayor a cero"); const id=nuevoId();
-    const tipo=$("#mTipo").value, fecha=!esAdmin&&esPago({tipo})?Date.now():fechaDia($("#mFecha").value||hoy()); // el pago que registra el asistente queda con la hora del momento
+    const tipo=$("#mTipo").value, diaM=$("#mFecha")?.value||hoy(), caja=mueveCaja({tipo}); if(esAdmin&&caja&&diaAntesDelArqueo(diaM)) return;
+    const fecha=!esAdmin&&esPago({tipo})?Date.now():caja?fechaCaja(diaM):fechaDia(diaM); // el pago que registra el asistente queda con la hora del momento
     try{ await guardar("movimientos",id,{id,clienteId:cid,tipo,valor:val,medio:$("#mMedio").value,nota:$("#mNota").value.trim(),fecha,porUid:uid||"",porNombre:miNombre()}); toast("Movimiento registrado"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){toast("No se pudo guardar");} };
   document.querySelectorAll("[data-domi]").forEach(b=>b.onclick=async()=>{ const g=b.dataset.domi, ped=S.pedidos[g];
-    if(ped?.domiPagado){ if(!await confirmar("Desmarcar el pago de "+g,"El pago del domicilio se quita de la caja y vuelve a sumarse al saldo del cliente.","Desmarcar")) return abrirCuenta(cid);
+    if(ped?.domiPagado){ if(cambiaLoContado(ped,{...ped,domiPagado:false,domiPagoMedio:""})) return avisoContado(); if(!await confirmar("Desmarcar el pago de "+g,"El pago del domicilio se quita de la caja y vuelve a sumarse al saldo del cliente.","Desmarcar")) return abrirCuenta(cid);
       try{ await actualizar("pedidos",g,{domiPagado:false,domiPagoMedio:"",domiPagoValor:"",domiPagoFecha:0}); toast("Guía "+g+" actualizada"); }catch(e){ toast("No se pudo guardar"); } return setTimeout(()=>abrirCuenta(cid),200); }
     pagoDomicilio(g,()=>abrirCuenta(cid)); });
-  document.querySelectorAll("[data-delmov]").forEach(b=>b.onclick=async()=>{ b.disabled=true; try{ await borrar("movimientos",b.dataset.delmov); toast("Movimiento quitado"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
+  document.querySelectorAll("[data-delmov]").forEach(b=>b.onclick=async()=>{ const m=S.movimientos[b.dataset.delmov]; if(!m) return; if(mueveCaja(m)&&yaContado(m.fecha)) return avisoContado();
+    if(!await confirmar("Quitar movimiento",`${MOVS[m.tipo]?.corto||"Movimiento"} · ${pesos(m.valor)}. Se quita de la cuenta del cliente${mueveCaja(m)?" y de la caja":""}.`,"Quitar")) return abrirCuenta(cid);
+    b.disabled=true; try{ await borrar("movimientos",b.dataset.delmov); toast("Movimiento quitado"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
   const bc=$("#cCsv"); if(bc) bc.onclick=async()=>{
     const lin=[["Fecha","Detalle","Valor"],...rows.slice().reverse().map(r=>[new Date(r.fecha).toLocaleString("es-CO"),r.det,Math.round(r.v)]),["","Saldo",Math.round(s)]];
     const csv="\uFEFF"+lin.map(l=>l.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(";")).join("\r\n");
@@ -1342,15 +1352,31 @@ const ganaPorcentaje = m => tipoDe(m)==="mensajero";
 const sueldoTexto = (mid,ps) => tipoDe(S.mensajeros[mid])==="dueno" ? "Ver “Mi sueldo”" : tipoDe(S.mensajeros[mid])==="oficina" ? "Pago por día" : pesos(sueldoPedidos(ps));
 function liquidacionesDe(mid){ return Object.values(S.liquidaciones).filter(l=>l.mensajeroId===mid).sort((a,b)=>b.fecha-a.fecha); }
 const yaLiquidado = (mid,fecha) => { const ul=liquidacionesDe(mid)[0]; return !!ul && fecha<=ul.fecha; };
-const pedidoLiquidado = p => cerrado(p) && yaLiquidado(p.mensajeroId,p.entregado);
+const guiasLiquidadas = mid => new Set(liquidacionesDe(mid).flatMap(l=>l.guias||[]));
+const pedidoLiquidado = p => cerrado(p) && guiasLiquidadas(p.mensajeroId).has(p.guia);
+/* Período abierto: las entregas que no están en ninguna liquidación, por pertenencia y no por la hora
+   (así no se pierde una entrega que llegó tarde por falta de señal o con el reloj del celular corrido).
+   ajuste: lo que cambió después en liquidaciones ya cerradas (valores corregidos, dinero recibido editado o quitado,
+   bases o fletes), menos lo que ya absorbió una liquidación posterior. Así lo que debe el mensajero siempre cuadra con la caja. */
 function periodoMensajero(mid){
-  const ul=liquidacionesDe(mid)[0]||null, desde=ul?ul.fecha:0, anterior=ul?(Number(ul.debe)||0):0;
-  const ps=Object.values(S.pedidos).filter(p=>cerrado(p)&&p.mensajeroId===mid&&p.entregado>desde).sort((a,b)=>a.entregado-b.entregado);
-  const recs=Object.values(S.recaudos).filter(r=>r.mensajeroId===mid&&r.fecha>desde).sort((a,b)=>a.fecha-b.fecha);
-  const bases=Object.values(S.cajamovs).filter(c=>c.cat==="base"&&c.personaId===mid&&c.fecha>desde).sort((a,b)=>a.fecha-b.fecha);
+  const liqs=liquidacionesDe(mid), ul=liqs[0]||null, desde=ul?ul.fecha:0, anterior=ul?(Number(ul.debe)||0):0;
+  const enLiq=new Set(liqs.flatMap(l=>l.guias||[])), sinGuias=Math.max(0,...liqs.filter(l=>!Array.isArray(l.guias)).map(l=>l.fecha)); // liquidaciones viejas sin lista de guías: por hora
+  const ps=Object.values(S.pedidos).filter(p=>cerrado(p)&&p.mensajeroId===mid&&!enLiq.has(p.guia)&&p.entregado>sinGuias).sort((a,b)=>a.entregado-b.entregado);
+  const todosRecs=Object.values(S.recaudos).filter(r=>r.mensajeroId===mid), todasBases=Object.values(S.cajamovs).filter(c=>c.cat==="base"&&c.personaId===mid);
+  const recs=todosRecs.filter(r=>r.fecha>desde).sort((a,b)=>a.fecha-b.fecha);
+  const bases=todasBases.filter(c=>c.fecha>desde).sort((a,b)=>a.fecha-b.fecha);
+  const enVentana=(xs,l)=>xs.filter(x=>x.fecha>(Number(l.desde)||0)&&x.fecha<=l.fecha).reduce((a,x)=>a+(Number(x.valor)||0),0);
+  let ajuste=0;
+  for(const l of liqs){ if(!Array.isArray(l.guias)) continue;
+    const lp=l.guias.map(g=>S.pedidos[g]).filter(p=>p&&cerrado(p));
+    ajuste+=(totales(lp).efectivo-(Number(l.efectivo)||0))-(lp.reduce((a,p)=>a+gastoDe(p),0)-(Number(l.gastos)||0))
+      +(enVentana(todasBases,l)-(Number(l.base)||0))-(enVentana(todosRecs,l)-(Number(l.recibido)||0))-(Number(l.ajuste)||0); }
+  ajuste=Math.round(ajuste);
   const efectivo=totales(ps).efectivo, recibido=recs.reduce((a,r)=>a+(Number(r.valor)||0),0), base=bases.reduce((a,c)=>a+(Number(c.valor)||0),0), gastos=ps.reduce((a,p)=>a+gastoDe(p),0);
-  return {ul,desde,anterior,ps,recs,bases,base,gastos,efectivo,recibido,debe:anterior+efectivo+base-gastos-recibido}; // la base vuelve con lo cobrado; los fletes que pagó se descuentan
+  return {ul,desde,anterior,ajuste,ps,recs,bases,base,gastos,efectivo,recibido,debe:anterior+ajuste+efectivo+base-gastos-recibido}; // la base vuelve con lo cobrado; los fletes que pagó se descuentan
 }
+const ajusteTxt = x => (x>0?"+ ":"− ")+pesos(Math.abs(x));
+const filaAjuste = pm => pm.ajuste?`<dt>Correcciones a liquidaciones cerradas</dt><dd class="${pm.ajuste>0?"neg":"pos"}">${ajusteTxt(pm.ajuste)}</dd>`:"";
 const recibidoDia=(mid,dia)=>Object.values(S.recaudos).filter(r=>r.mensajeroId===mid&&diaDe(r.fecha)===dia).reduce((a,r)=>a+(Number(r.valor)||0),0);
 const textoLiq = d => d>0 ? "Debe "+pesos(d) : d<0 ? "Sobró "+pesos(-d) : "Quedó en $ 0";
 
@@ -1372,7 +1398,7 @@ function liquidar(mid){
       <dt>Entregas</dt><dd>${pm.ps.length}</dd>
       <dt>Efectivo cobrado</dt><dd>${pesos(t.efectivo)}</dd>
       ${pm.base?`<dt>Base para vueltos</dt><dd>${pesos(pm.base)}</dd>`:""}${pm.gastos?`<dt>Fletes / gastos pagados</dt><dd>− ${pesos(pm.gastos)}</dd>`:""}
-      ${pm.anterior?`<dt>Pendiente de la liquidación anterior</dt><dd>${pesos(pm.anterior)}</dd>`:""}
+      ${pm.anterior?`<dt>Pendiente de la liquidación anterior</dt><dd>${pesos(pm.anterior)}</dd>`:""}${filaAjuste(pm)}
       <dt>Ya entregó</dt><dd>${pesos(pm.recibido)}</dd>
       <dt>Pendiente por entregar</dt><dd class="neg">${pesos(pm.debe)}</dd>
       <dt>Transferencias a JS</dt><dd>${pesos(t.transfJs)}</dd>
@@ -1400,10 +1426,10 @@ function liquidar(mid){
       const t0=Date.now();
       if(val>0){ const rid=nuevoId(); await guardar("recaudos",rid,{id:rid,mensajeroId:mid,valor:val,medio:$("#lMedio").value,nota:"Liquidación",fecha:t0}); }
       const fecha=Math.max(Date.now(),t0+1), id=mid+"_"+fecha, queda=pm.debe-val, adel=adelanto(queda);
-      await guardar("liquidaciones",id,{id,mensajeroId:mid,desde:pm.desde,fecha,dia:diaDe(fecha),entregas:pm.ps.length,guias:pm.ps.map(p=>p.guia),efectivo:t.efectivo,base:pm.base,gastos:pm.gastos,anterior:pm.anterior,recibidoAntes:pm.recibido,entregaFinal:val,recibido:pm.recibido+val,debe:queda-adel,adelanto:adel,transfJs:t.transfJs,transfCli:t.transfCli,sueldo,enRuta});
+      await guardar("liquidaciones",id,{id,mensajeroId:mid,desde:pm.desde,fecha,dia:diaDe(fecha),entregas:pm.ps.length,guias:pm.ps.map(p=>p.guia),efectivo:t.efectivo,base:pm.base,gastos:pm.gastos,anterior:pm.anterior,recibidoAntes:pm.recibido,entregaFinal:val,recibido:pm.recibido+val,debe:queda-adel,adelanto:adel,ajuste:pm.ajuste,transfJs:t.transfJs,transfCli:t.transfCli,sueldo,enRuta});
       if(adel){ // la plata ya la tiene el mensajero: es un adelanto que no sale de la caja (ver libroCaja) y se descuenta del sueldo de esa semana
-        const sem=$("#lSem").value, dias=diasSemana(sem), dia=dias.includes(hoy())?hoy():dias[6], aid=nuevoId();
-        await guardar("cajamovs",aid,{id:aid,tipo:"sale",cat:"adelanto",personaId:mid,valor:adel,medio:"efectivo",concepto:"Lo que quedó debiendo en la liquidación del "+hora(fecha),fecha:dia===hoy()?fecha:fechaDia(dia),semana:"",deLiquidacion:id}); }
+        const sem=$("#lSem").value, aid=nuevoId();
+        await guardar("cajamovs",aid,{id:aid,tipo:"sale",cat:"adelanto",personaId:mid,valor:adel,medio:"efectivo",concepto:"Lo que quedó debiendo en la liquidación del "+hora(fecha),fecha,semana:sem,deLiquidacion:id}); }
       toast(`${m.nombre}: ${adel?"adelanto de "+pesos(adel)+" en su sueldo":textoLiq(queda).toLowerCase()}`); setTimeout(()=>verLiquidacion(id),200);
     }catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
@@ -1420,6 +1446,7 @@ function verLiquidacion(id){
       ${l.base?`<dt>Base para vueltos</dt><dd>${pesos(l.base)}</dd>`:""}
       ${l.gastos?`<dt>Fletes / gastos pagados</dt><dd>− ${pesos(l.gastos)}</dd>`:""}
       ${l.anterior?`<dt>Pendiente anterior</dt><dd>${pesos(l.anterior)}</dd>`:""}
+      ${l.ajuste?`<dt>Correcciones a liquidaciones anteriores</dt><dd>${ajusteTxt(l.ajuste)}</dd>`:""}
       <dt>Entregó durante el período</dt><dd>${pesos(l.recibidoAntes)}</dd>
       <dt>Entrega final</dt><dd>${pesos(l.entregaFinal)}</dd>
       <dt>Total entregado</dt><dd>${pesos(l.recibido)}</dd>
@@ -1519,15 +1546,15 @@ function conectarCajaOficina(v){
   v.querySelectorAll("[data-ofbase]").forEach(b=>b.onclick=()=>movOficina(b.dataset.ofbase,"base"));
   v.querySelectorAll("[data-ofbasem]").forEach(b=>b.onclick=()=>baseDesdeOficina());
   v.querySelectorAll("[data-ofcierre]").forEach(b=>b.onclick=()=>movOficina(b.dataset.ofcierre,"entrega"));
-  v.querySelectorAll("[data-ofdel]").forEach(b=>b.onclick=async()=>{ if(!await confirmar("Quitar movimiento de la caja de oficina","Se quita la base o el cierre registrado.","Quitar")) return;
+  v.querySelectorAll("[data-ofdel]").forEach(b=>b.onclick=async()=>{ if(yaContado(S.cajamovs[b.dataset.ofdel]?.fecha)) return avisoContado(); if(!await confirmar("Quitar movimiento de la caja de oficina","Se quita la base o el cierre registrado.","Quitar")) return;
     try{ await borrar("cajamovs",b.dataset.ofdel); toast("Movimiento quitado"); }catch(e){ toast("No se pudo quitar"); } });
 }
 /* El asistente corrige el medio (efectivo, Nequi, Bancolombia) de un pago o una entrega que él registró, hasta 24 horas después.
    Queda guardado el medio anterior para que administración lo revise. */
-const puedoCambiarMedio = x => esAsistente && !!uid && x.porUid===uid && Date.now()-x.fecha<86400000;
+const puedoCambiarMedio = x => esAsistente && !!uid && x.porUid===uid && Date.now()-x.fecha<86400000 && !yaContado(x.fecha);
 const medioAntesTxt = x => x.medioAntes&&x.medioAntes!==x.medio?` <span class="sub" style="font-size:.8rem">(antes ${MEDIOS[x.medioAntes]||x.medioAntes})</span>`:"";
-function cambiarMedio(col,id){
-  const x=S[col]?.[id]; if(!x) return;
+async function cambiarMedio(col,id){
+  const x=S[col]?.[id]; if(!x) return; if(esAsistente) await leerCorte(); if(yaContado(x.fecha)) return avisoContado();
   const quien=col==="recaudos"?"Entrega de "+(S.mensajeros[x.mensajeroId]?.nombre||""):(x.tipo==="pago_de_cliente"?"Pago de ":x.tipo==="pago_a_cliente"?"Pago a ":"Compra para ")+nombreCliente(x.clienteId);
   $("#dlgCont").innerHTML=`<header><div><h2>Cambiar medio</h2><span class="sub">${esc(quien)} · ${pesos(x.valor)} · ${hora(x.fecha)}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     <p class="sub">Está como <b>${MEDIOS[x.medio]||"sin medio"}</b>. Administración verá el cambio.</p>
@@ -1543,7 +1570,7 @@ function recibirDinero(mid){
   const m=S.mensajeros[mid]; if(!m) return;
   const pm=periodoMensajero(mid);
   $("#dlgCont").innerHTML=`<header><div><h2>Recibir dinero</h2><span class="sub">${esc(m.nombre)}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
-    <dl class="datos"><dt>Efectivo cobrado</dt><dd>${pesos(pm.efectivo)}</dd>${pm.base?`<dt>Base para vueltos</dt><dd>${pesos(pm.base)}</dd>`:""}${pm.gastos?`<dt>Fletes / gastos pagados</dt><dd>− ${pesos(pm.gastos)}</dd>`:""}${pm.anterior?`<dt>Pendiente anterior</dt><dd>${pesos(pm.anterior)}</dd>`:""}<dt>Ya entregó</dt><dd>${pesos(pm.recibido)}</dd><dt>Debe</dt><dd class="neg">${pesos(pm.debe)}</dd></dl>
+    <dl class="datos"><dt>Efectivo cobrado</dt><dd>${pesos(pm.efectivo)}</dd>${pm.base?`<dt>Base para vueltos</dt><dd>${pesos(pm.base)}</dd>`:""}${pm.gastos?`<dt>Fletes / gastos pagados</dt><dd>− ${pesos(pm.gastos)}</dd>`:""}${pm.anterior?`<dt>Pendiente anterior</dt><dd>${pesos(pm.anterior)}</dd>`:""}${filaAjuste(pm)}<dt>Ya entregó</dt><dd>${pesos(pm.recibido)}</dd><dt>Debe</dt><dd class="neg">${pesos(pm.debe)}</dd></dl>
     <div class="linea2"><div class="campo"><label for="rVal">Valor que entrega</label><input id="rVal" type="number" inputmode="numeric" min="0" step="1000" value="${pm.debe>0?pm.debe:""}"></div>
     <div class="campo"><label for="rMedio">Medio</label><select id="rMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div></div>
     <div class="campo"><label for="rNota">Nota (opcional)</label><input id="rNota" placeholder="Ej: primera entrega de la tarde"></div>
@@ -1557,9 +1584,9 @@ function recibirDinero(mid){
 }
 /* Corregir una entrega de dinero ya registrada (valor, medio o nota). */
 function editarRecaudo(id){
-  const r=S.recaudos[id]; if(!r) return; const m=S.mensajeros[r.mensajeroId];
+  const r=S.recaudos[id]; if(!r) return; if(yaContado(r.fecha)) return avisoContado(); const m=S.mensajeros[r.mensajeroId];
   $("#dlgCont").innerHTML=`<header><div><h2>Editar dinero recibido</h2><span class="sub">${esc(m?.nombre||"")} · ${hora(r.fecha)}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
-    ${yaLiquidado(r.mensajeroId,r.fecha)?`<div class="aviso">Esta entrega de dinero ya está en una liquidación cerrada: corregirla cambia la caja, pero no lo que quedó debiendo en esa liquidación.</div>`:""}
+    ${yaLiquidado(r.mensajeroId,r.fecha)?`<div class="aviso">Esta entrega de dinero ya está en una liquidación cerrada: si la corriges, la diferencia pasa sola a lo que debe en su período abierto.</div>`:""}
     <div class="linea2"><div class="campo"><label for="erVal">Valor que entregó</label><input id="erVal" type="number" inputmode="numeric" min="0" step="1000" value="${Number(r.valor)||""}"></div>
     <div class="campo"><label for="erMedio">Medio</label><select id="erMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}" ${r.medio===k?"selected":""}>${t}</option>`).join("")}</select></div></div>
     <div class="campo"><label for="erNota">Nota (opcional)</label><input id="erNota" value="${esc(r.nota||"")}"></div>
@@ -1772,17 +1799,85 @@ async function descargarCartera(btn){
 
 /* ======================= CAJA GENERAL ======================= */
 const MEDIOS_CAJA={...MEDIOS, cuentas:"Cuentas JS (transferencias)"};
-const CATS={interna:"Cuenta interna",inicial:"Caja inicial",otro_entra:"Otra entrada",sobrante:"Sobrante de caja",gasto:"Gasto",base:"Base para vueltos",arriendo:"Arriendo",adelanto:"Adelanto",sueldo:"Pago de sueldo",otro:"Otra salida"};
-const CATS_TIPO={entra:["inicial","otro_entra"],sale:["gasto","base","arriendo","adelanto","sueldo","otro"]};
+const CATS={arqueo:"Arqueo",interna:"Cuenta interna",inicial:"Caja inicial",otro_entra:"Otra entrada",sobrante:"Sobrante de caja",gasto:"Gasto",base:"Base para vueltos",arriendo:"Arriendo",adelanto:"Adelanto",sueldo:"Pago de sueldo",otro:"Otra salida"};
+const CATS_TIPO={entra:["otro_entra"],sale:["gasto","base","arriendo","adelanto","sueldo","otro"]};
 const CATS_PERSONA=["adelanto","sueldo","base"]; // movimientos de caja que van a nombre de una persona
+const CATS_SEMANA=["adelanto","sueldo"]; // se descuentan del sueldo de la semana que se elige, sin importar el día en que salió la plata
+/* Semanas para elegir: la que se paga (o esta), la anterior y hasta 6 atrás, más la que venga de Sueldos. */
+function semanasSueldo(pre){
+  const l=semanasAdelanto(), ya=new Set(l.map(([w])=>w)), txt=w=>{ const d=diasSemana(w); return "Semana del "+new Date(d[0]+"T12:00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short"})+" al "+new Date(d[6]+"T12:00:00").toLocaleDateString("es-CO",{day:"numeric",month:"short"}); };
+  for(let i=2;i<=6;i++){ const w=moverSemana(semanaDe(hoy()),-i); if(!ya.has(w)){ l.push([w,txt(w)]); ya.add(w); } }
+  if(pre&&!ya.has(pre)) l.unshift([pre,txt(pre)]);
+  return l;
+}
 let diaLibro=hoy();
+/* ---- Arqueo: el conteo real de la plata ----
+   Lo que ya se contó no se cambia ni se borra: si algo quedó mal, se corrige con un movimiento nuevo.
+   La diferencia entre lo contado y lo que la app esperaba queda como faltante o sobrante, con fecha y quién contó. */
+let corteRemoto=0; // el asistente no ve los arqueos: lee solo la fecha del último en meta/caja
+function corteCaja(sin){ let c=corteRemoto; for(const x of Object.values(S.cajamovs)) if((x.cat==="arqueo"||x.cat==="inicial")&&!(sin&&sin.includes(x.id))) c=Math.max(c,Number(x.fecha)||0); return c; }
+async function leerCorte(){ try{ const c=await leer("meta","caja"); corteRemoto=Number(c?.corte)||0; }catch(e){} }
+const yaContado = f => { const c=corteCaja(); return !!c && Number(f)<=c; };
+const avisoContado = () => toast("Eso ya quedó contado en el arqueo del "+hora(corteCaja())+". Para corregirlo, registra un movimiento nuevo.");
+const diaMinCaja = () => corteCaja()?diaDe(corteCaja()):"";
+const fechaCaja = dia => Math.max(fechaDia(dia),corteCaja()+1); // lo del mismo día del arqueo queda después del arqueo
+const diaAntesDelArqueo = dia => { const m=diaMinCaja(); if(m&&dia<m){ toast("La caja ya se contó el "+fechaLarga(m)+": no se pueden registrar movimientos de días anteriores."); return true; } return false; };
+/* Las líneas de caja que produce un pedido: transferencia a JS y pago del domicilio. */
+const lineasCajaPedido = p => [...(cerrado(p)&&p.metodo==="transf_js"?[[p.entregado,p.cuentaJs||"cuentas",Number(p.valorCobrado)||0]]:[]),...(p.domiPagado&&p.domiPagoMedio?[[p.domiPagoFecha||p.entregado||p.creado,p.domiPagoMedio,pagoDomi(p)]]:[])];
+function cambiaLoContado(antes,despues){ const c=corteCaja(); if(!c) return false;
+  const k=p=>p?lineasCajaPedido(p).filter(l=>l[0]<=c).map(l=>l.join("|")).sort().join(";"):""; return k(antes)!==k(despues); }
+function arqueosCaja(){
+  const g={}; for(const c of Object.values(S.cajamovs)) if(c.cat==="arqueo"){ const a=g[c.arqueoId||c.id]=g[c.arqueoId||c.id]||{id:c.arqueoId||c.id,fecha:c.fecha,dif:{},docs:[]}; a.docs.push(c.id);
+    if(c.tipo==="marca") Object.assign(a,{esperado:c.esperado||{},contado:c.contado||{},nota:c.concepto||"",por:c.porNombre||""}); else a.dif[c.medio]=(a.dif[c.medio]||0)+(c.tipo==="entra"?1:-1)*(Number(c.valor)||0); }
+  return Object.values(g).sort((a,b)=>b.fecha-a.fecha);
+}
+/* Lo que la app espera que tengas tú: la caja general menos lo que está en las cajas de oficina (eso se cuenta al recibir el cierre). */
+function esperadoArqueo(){
+  const R=resumenCaja(), of={efectivo:0,nequi:0,bancolombia:0};
+  if(esAdmin) asistentes().forEach(u=>{ const x=cajaOficina(u.uid).saldo; for(const k in of) of[k]+=x[k]; });
+  const e={}; for(const k of Object.keys(MEDIOS)) e[k]=Math.round((R.porMedio[k]||0)-of[k]);
+  return {e,of,sinCuenta:Math.round(R.porMedio.cuentas||0)};
+}
+const resultadoArqueo = a => { const f=Object.entries(a.dif).filter(([,x])=>Math.round(x)); return f.length?f.map(([m,x])=>`${x<0?"faltó":"sobró"} ${pesos(Math.abs(x))} en ${MEDIOS[m]||m}`).join(" · "):"Cuadró exacto"; };
+function hacerArqueo(){
+  const {e,of,sinCuenta}=esperadoArqueo(), conOf=Object.values(of).some(x=>Math.round(x));
+  $("#dlgCont").innerHTML=`<header><div><h2>Arqueo de caja</h2><span class="sub">Cuenta la plata que tienes ahora mismo</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <p class="sub">Escribe lo que cuentas en cada medio: el efectivo en la mano y el saldo que ves en la app de Nequi y de Bancolombia. La diferencia queda registrada como faltante o sobrante y desde ese momento esa plata ya no se puede cambiar.</p>
+    ${sinCuenta?`<div class="aviso alerta">Hay ${pesos(sinCuenta)} en transferencias a JS sin cuenta asignada. Antes del arqueo, abre esos pedidos y elige si llegaron a Nequi o a Bancolombia.</div>`:""}
+    ${conOf?`<div class="aviso">No cuentes la plata de las cajas de oficina (${Object.entries(of).filter(([,x])=>Math.round(x)).map(([k,x])=>MEDIOS[k]+" "+pesos(x)).join(" · ")}): esa se cuenta cuando recibes el cierre de cada asistente.</div>`:""}
+    ${Object.entries(MEDIOS).map(([k,t])=>`<div class="linea2" style="align-items:center"><div class="campo"><label for="aq_${k}">${t} que cuentas</label><input id="aq_${k}" data-aq="${k}" type="number" inputmode="numeric" min="0" step="100"></div>
+      <div class="campo"><span class="lbl">La app espera</span><b style="font-size:1.1rem">${pesos(e[k])}</b><span class="sub" id="aqd_${k}" style="margin:0"></span></div></div>`).join("")}
+    <div class="campo"><label for="aqNota">Nota (opcional)</label><input id="aqNota" placeholder="Ej: arqueo de cierre del sábado"></div>
+    <button class="btn ok" id="aqGuardar" style="width:100%">Guardar arqueo</button>`;
+  abrirDlg(); $("#aq_efectivo").focus();
+  const leerC=()=>Object.fromEntries(Object.keys(MEDIOS).map(k=>[k,$("#aq_"+k).value]));
+  const ver=()=>{ const c=leerC(); for(const k of Object.keys(MEDIOS)){ const d=c[k]===""?null:Math.round(Number(c[k])-e[k]), el=$("#aqd_"+k);
+    el.innerHTML=d===null?"":d===0?'<b class="pos">Cuadra</b>':d<0?`<b class="neg">Falta ${pesos(-d)}</b>`:`<b class="pos">Sobra ${pesos(d)}</b>`; } };
+  document.querySelectorAll("[data-aq]").forEach(i=>i.oninput=ver);
+  $("#aqGuardar").onclick=async()=>{ const c=leerC();
+    if(Object.values(c).some(x=>x==="")) return toast("Escribe lo que contaste en cada medio (0 si no hay nada)");
+    if(Object.values(c).some(x=>Number(x)<0)) return toast("Los valores no pueden ser negativos");
+    const b=$("#aqGuardar"); b.disabled=true; const aid=nuevoId(), t=Date.now(), nota=$("#aqNota").value.trim(), contado=Object.fromEntries(Object.entries(c).map(([k,x])=>[k,Math.round(Number(x))]));
+    try{ for(const k of Object.keys(MEDIOS)){ const d=contado[k]-e[k]; if(!d) continue; const id=nuevoId();
+        await guardar("cajamovs",id,{id,cat:"arqueo",tipo:d>0?"entra":"sale",valor:Math.abs(d),medio:k,arqueoId:aid,personaId:"",concepto:nota,fecha:t,porNombre:miNombre()}); }
+      await rawSet("meta","caja",{corte:t});
+      await guardar("cajamovs",aid,{id:aid,cat:"arqueo",tipo:"marca",valor:0,medio:"",arqueoId:aid,personaId:"",esperado:e,contado,oficina:of,concepto:nota,fecha:t,porNombre:miNombre()});
+      cerrarDlg(); const a=arqueosCaja().find(x=>x.id===aid); toast("Arqueo guardado: "+(a?resultadoArqueo(a):"listo")); }
+    catch(err){ b.disabled=false; toast("No se pudo guardar el arqueo"); } };
+}
+async function deshacerArqueo(id){
+  const a=arqueosCaja().find(x=>x.id===id); if(!a) return;
+  if(!await confirmar("Deshacer el arqueo del "+hora(a.fecha),"Se quitan el conteo y su faltante o sobrante. La caja vuelve a quedar abierta hasta el arqueo anterior.","Deshacer")) return;
+  try{ const antes=corteCaja(a.docs); corteRemoto=0; for(const d of a.docs) await borrar("cajamovs",d); await rawSet("meta","caja",{corte:antes}); toast("Arqueo deshecho"); }catch(e){ toast("No se pudo deshacer"); }
+}
 function libroCaja(){
   const L=[], nomM=id=>S.mensajeros[id]?.nombre||"";
   for(const r of Object.values(S.recaudos)) L.push({fecha:r.fecha,concepto:"Entrega de "+nomM(r.mensajeroId)+(r.nota?" · "+r.nota:""),valor:Number(r.valor)||0,medio:r.medio||"efectivo",cat:"Mensajeros",ref:"recaudos|"+r.id});
   for(const p of Object.values(S.pedidos)) if(cerrado(p)&&p.metodo==="transf_js") L.push({fecha:p.entregado,concepto:"Transferencia a JS · "+p.guia+(p.destinatario?" · "+p.destinatario:""),valor:Number(p.valorCobrado)||0,medio:p.cuentaJs||"cuentas",cat:"Transferencias"});
   for(const p of Object.values(S.pedidos)) if(p.domiPagado&&p.domiPagoMedio) L.push({fecha:p.domiPagoFecha||p.entregado||p.creado,concepto:"Pago de domicilio · "+p.guia+(p.clienteId?" · "+nombreCliente(p.clienteId):""),valor:pagoDomi(p),medio:p.domiPagoMedio,cat:"Clientes"});
   for(const m of Object.values(S.movimientos)) if(mueveCaja(m)) L.push({fecha:m.fecha,concepto:(m.tipo==="pago_de_cliente"?"Pago de ":m.tipo==="compra_cliente"?"Compra por encargo de ":"Pago a ")+nombreCliente(m.clienteId)+(m.nota?" · "+m.nota:""),valor:signoMov(m),medio:m.medio||"efectivo",cat:"Clientes"});
-  for(const c of Object.values(S.cajamovs)) if((c.cat==="interna"&&c.inicial)||c.cat==="oficina"||c.deLiquidacion) continue; // oficina: la plata pasa de tus manos a las del asistente // saldo inicial de la cuenta: la plata salió antes del empalme // adelanto de una liquidación: el mensajero ya tenía esa plata, no sale de la caja
+  for(const c of Object.values(S.cajamovs)) if((c.cat==="interna"&&c.inicial)||c.cat==="oficina"||c.deLiquidacion||(c.cat==="arqueo"&&c.tipo==="marca")) continue; // oficina: la plata pasa de tus manos a las del asistente // saldo inicial de la cuenta: la plata salió antes del empalme // adelanto de una liquidación: el mensajero ya tenía esa plata, no sale de la caja
+  else if(c.cat==="arqueo") L.push({fecha:c.fecha,concepto:(c.tipo==="entra"?"Sobrante":"Faltante")+" de arqueo"+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:"Arqueo",ref:"cajamovs|"+c.id});
   else if(c.cat==="interna"){ const n=S.cuentas[c.cuentaId]?.nombre||"Cuenta interna";
     L.push({fecha:c.fecha,concepto:(c.tipo==="entra"?"Entrada de ":"Salida a ")+n+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:n,ref:"cajamovs|"+c.id}); }
   else L.push({fecha:c.fecha,concepto:(CATS[c.cat]||"Movimiento")+(c.personaId?" · "+nomM(c.personaId):"")+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:CATS[c.cat]||"Otro",ref:"cajamovs|"+c.id});
@@ -1809,23 +1904,31 @@ function bloqueCajaGeneral(){
     <div class="cifra"><span>Disponible de JS</span><b class="${R.disponible<0?"neg":""}">${pesos(R.disponible)}</b><span>Caja − clientes − sueldos</span></div>
     <div class="cifra"><span>Todavía en manos de mensajeros</span><b>${pesos(R.enMens)}</b></div>
     <div class="cifra"><span>Cuentas por cobrar a clientes</span><b>${pesos(R.porCobrar)}</b></div>
+    ${(()=>{ const a=arqueosCaja()[0]; return `<div class="cifra"><span>Último arqueo</span><b>${a?hora(a.fecha):"Nunca"}</b><span>${a?resultadoArqueo(a):"Cuenta la plata real para comprobar que cuadra"}</span></div>`; })()}
     ${R.sobrantes.n?`<div class="cifra"><span>Sobrantes de cajas de oficina</span><b class="pos">${pesos(R.sobrantes.mes)}</b><span>Este mes · ${R.sobrantes.n} en total (${pesos(R.sobrantes.total)})</span></div>`:""}
   </div>
-  <div class="acciones" style="margin:14px 0"><button class="btn ok" id="cjEntra">Registrar entrada</button><button class="btn sec" id="cjSale">Registrar salida o gasto</button>${descargas?'<button class="btn sec" id="cjXls">Descargar cuadre de caja</button>':""}</div>
+  <div class="acciones" style="margin:14px 0"><button class="btn" id="cjArqueo">Hacer arqueo</button><button class="btn ok" id="cjEntra">Registrar entrada</button><button class="btn sec" id="cjSale">Registrar salida o gasto</button>${descargas?'<button class="btn sec" id="cjXls">Descargar cuadre de caja</button>':""}</div>
   <h2>Movimientos de caja</h2>
   <div class="campo" style="max-width:220px"><label for="diaL">Día</label><input type="date" id="diaL" value="${diaLibro}"></div>
   ${delDia.length?`<div class="tabla-env"><table><thead><tr><th>Hora</th><th>Concepto</th><th>Tipo</th><th>Medio</th><th class="n">Valor</th><th></th></tr></thead><tbody>
   ${delDia.map(x=>`<tr><td>${hora(x.fecha)}</td><td>${esc(x.concepto)}</td><td>${esc(x.cat)}</td><td>${MEDIOS_CAJA[x.medio]||""}</td><td class="n ${x.valor<0?"neg":"pos"}">${pesos(x.valor)}</td><td>${x.ref?`<button class="btn peligro chico" data-delref="${esc(x.ref)}">Quitar</button>`:""}</td></tr>`).join("")}
   <tr><td></td><td><b>Entradas ${pesos(ent)} · Salidas ${pesos(sal)}</b></td><td></td><td></td><td class="n"><b>${pesos(ent-sal)}</b></td><td></td></tr>
-  </tbody></table></div>`:`<div class="vacio">Sin movimientos de caja este día.</div>`}`;
+  </tbody></table></div>`:`<div class="vacio">Sin movimientos de caja este día.</div>`}
+  ${(()=>{ const A=arqueosCaja().slice(0,10); if(!A.length) return ""; const M=Object.keys(MEDIOS);
+    return `<h2>Arqueos</h2><div class="tabla-env"><table><thead><tr><th>Fecha</th>${M.map(k=>`<th class="n">${MEDIOS[k]}<br><small>contado / esperado</small></th>`).join("")}<th>Resultado</th><th>Contó</th><th></th></tr></thead><tbody>
+    ${A.map((a,i)=>`<tr><td>${hora(a.fecha)}${a.nota?`<br><span class="sub" style="font-size:.8rem">${esc(a.nota)}</span>`:""}</td>${M.map(k=>`<td class="n">${a.contado?pesos(a.contado[k]):"—"}<br><span class="sub" style="font-size:.8rem">${a.esperado?pesos(a.esperado[k]):""}</span></td>`).join("")}<td class="${Object.values(a.dif).some(x=>x<0)?"neg":"pos"}">${resultadoArqueo(a)}</td><td>${esc(a.por||"")}</td><td>${i===0?`<button class="btn sec chico" data-deshacer="${esc(a.id)}">Deshacer</button>`:""}</td></tr>`).join("")}</tbody></table></div>`; })()}`;
 }
 function conectarCajaGeneral(v){
   $("#diaL").onchange=e=>{diaLibro=e.target.value||hoy(); pintar();};
+  $("#cjArqueo").onclick=()=>hacerArqueo();
+  v.querySelectorAll("[data-deshacer]").forEach(b=>b.onclick=()=>deshacerArqueo(b.dataset.deshacer));
   $("#cjEntra").onclick=()=>movCaja("entra");
   $("#cjSale").onclick=()=>movCaja("sale");
   const bx=$("#cjXls"); if(bx) bx.onclick=()=>descargarCajaExcel(bx);
-  v.querySelectorAll("[data-delref]").forEach(b=>b.onclick=async()=>{ const [col,id]=b.dataset.delref.split("|"); b.disabled=true;
-    try{ await borrar(col,id); toast("Movimiento quitado"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
+  v.querySelectorAll("[data-delref]").forEach(b=>b.onclick=async()=>{ const [col,id]=b.dataset.delref.split("|"), x=S[col]?.[id]; if(!x) return;
+    if(yaContado(x.fecha)) return avisoContado();
+    if(!await confirmar("Quitar movimiento de caja",`${hora(x.fecha)} · ${pesos(x.valor)}. Se quita de la caja.`,"Quitar")) return;
+    b.disabled=true; try{ await borrar(col,id); toast("Movimiento quitado"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
 }
 function movCaja(tipo,pre={}){
   const personas=listaOrdenada(S.mensajeros,"nombre");
@@ -1835,16 +1938,17 @@ function movCaja(tipo,pre={}){
     <div class="campo" id="cjPerC"><label for="cjPer">Persona</label><select id="cjPer"><option value="">Elige…</option>${personas.map(m=>`<option value="${esc(m.id)}" ${m.id===pre.personaId?"selected":""}>${esc(m.nombre)}</option>`).join("")}</select></div></div>
     <div class="linea2"><div class="campo"><label for="cjVal">Valor</label><input id="cjVal" type="number" inputmode="numeric" min="0" step="1000" value="${pre.valor>0?Math.round(pre.valor):""}"></div>
     <div class="campo"><label for="cjMedio">Medio</label><select id="cjMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div></div>
-    <div class="linea2"><div class="campo"><label for="cjDia">Día</label><input id="cjDia" type="date" value="${pre.dia||hoy()}"></div>
+    <div class="campo" id="cjSemC"><label for="cjSem">Semana del sueldo</label><select id="cjSem">${semanasSueldo(pre.semana).map(([w,t])=>`<option value="${w}" ${w===pre.semana?"selected":""}>${t}</option>`).join("")}</select></div>
+    <div class="linea2"><div class="campo"><label for="cjDia">Día en que salió o entró la plata</label><input id="cjDia" type="date" value="${pre.dia||hoy()}" min="${diaMinCaja()}" max="${hoy()}"></div>
     <div class="campo"><label for="cjCon">Detalle (opcional)</label><input id="cjCon" placeholder="Ej: gasolina, arriendo de mayo"></div></div>
     <button class="btn ${tipo==="entra"?"ok":""}" id="cjGuardar" style="width:100%">Guardar</button>`;
   abrirDlg();
-  const ver=()=>$("#cjPerC").classList.toggle("oculto",!CATS_PERSONA.includes($("#cjCat").value)); $("#cjCat").onchange=ver; ver();
+  const ver=()=>{ $("#cjPerC").classList.toggle("oculto",!CATS_PERSONA.includes($("#cjCat").value)); $("#cjSemC").classList.toggle("oculto",!CATS_SEMANA.includes($("#cjCat").value)); }; $("#cjCat").onchange=ver; ver();
   $("#cjVal").focus();
   $("#cjGuardar").onclick=async()=>{ const val=Number($("#cjVal").value), cat=$("#cjCat").value, per=CATS_PERSONA.includes(cat)?$("#cjPer").value:"";
     if(!(val>0)) return toast("Escribe un valor mayor a cero"); if(CATS_PERSONA.includes(cat)&&!per) return toast("Elige la persona");
-    const dia=$("#cjDia").value||hoy(), id=nuevoId(); const b=$("#cjGuardar"); b.disabled=true;
-    try{ await guardar("cajamovs",id,{id,tipo,cat,personaId:per,valor:val,medio:$("#cjMedio").value,concepto:$("#cjCon").value.trim(),fecha:fechaDia(dia),semana:cat==="sueldo"?(pre.semana||semanaDe(dia)):""});
+    const dia=$("#cjDia").value||hoy(), id=nuevoId(); if(diaAntesDelArqueo(dia)) return; const b=$("#cjGuardar"); b.disabled=true;
+    try{ await guardar("cajamovs",id,{id,tipo,cat,personaId:per,valor:val,medio:$("#cjMedio").value,concepto:$("#cjCon").value.trim(),fecha:fechaCaja(dia),semana:CATS_SEMANA.includes(cat)?$("#cjSem").value:""});
       cerrarDlg(); toast((CATS[cat]||"Movimiento")+" registrado"); }catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
 }
 async function descargarCajaExcel(btn){
@@ -1906,12 +2010,13 @@ function sueldosDia(dia){
   return {res,dom30,propios,desc,ganancias,fijos,nMens,javier};
 }
 const ORDEN_TIPO=["mensajero","oficina","patinador","empresa","dueno"];
+const esDeSemana = (c,sem,dias) => c.semana ? c.semana===sem : dias.includes(diaDe(c.fecha)); // adelantos viejos sin semana: por la fecha
 function resumenSemana(sem){
   const dias=diasSemana(sem), porDia=dias.map(sueldosDia);
   const personas=listaOrdenada(S.mensajeros,"nombre").sort((a,b)=>ORDEN_TIPO.indexOf(tipoDe(a))-ORDEN_TIPO.indexOf(tipoDe(b)));
   const filas=personas.map(m=>{ const vals=porDia.map(x=>x.res[m.id]||0), previo=sueldoPrevio(m.id,sem), total=vals.reduce((a,x)=>a+x,0)+previo;
     const movs=Object.values(S.cajamovs).filter(c=>c.personaId===m.id);
-    const adelantos=movs.filter(c=>c.cat==="adelanto"&&dias.includes(diaDe(c.fecha)));
+    const adelantos=movs.filter(c=>c.cat==="adelanto"&&esDeSemana(c,sem,dias));
     const adel=adelantos.reduce((a,c)=>a+(Number(c.valor)||0),0);
     const pagado=movs.filter(c=>c.cat==="sueldo"&&c.semana===sem).reduce((a,c)=>a+(Number(c.valor)||0),0);
     return {m,vals,previo,total,adel,adelantos,pagado,neto:total-adel-pagado}; })
@@ -1923,7 +2028,7 @@ let semM=semanaDe(hoy());
 function sueldoPersonaSemana(mid,sem){
   const dias=diasSemana(sem), porDia=dias.map(sueldosDia), vals=porDia.map(x=>x.res[mid]||0), previo=sueldoPrevio(mid,sem), total=vals.reduce((a,x)=>a+x,0)+previo;
   const movs=Object.values(S.cajamovs).filter(c=>c.personaId===mid);
-  const adelantos=movs.filter(c=>c.cat==="adelanto"&&dias.includes(diaDe(c.fecha)));
+  const adelantos=movs.filter(c=>c.cat==="adelanto"&&esDeSemana(c,sem,dias));
   const pagos=movs.filter(c=>c.cat==="sueldo"&&c.semana===sem);
   const adel=adelantos.reduce((a,c)=>a+(Number(c.valor)||0),0), pagado=pagos.reduce((a,c)=>a+(Number(c.valor)||0),0);
   return {sem,dias,vals,previo,total,adelantos,pagos,adel,pagado,neto:total-adel-pagado};
@@ -1999,7 +2104,7 @@ function pintarSueldos(v,aviso){
   v.querySelectorAll("[data-tarifa-ed]").forEach(a=>a.onclick=e=>{ e.preventDefault(); pedirTarifa(S.mensajeros[a.dataset.tarifaEd]); });
   v.querySelectorAll("[data-otro]").forEach(a=>a.onclick=e=>{ e.preventDefault(); otroValorDias(S.mensajeros[a.dataset.otro],R.dias); });
   v.querySelectorAll("[data-previo]").forEach(a=>a.onclick=e=>{ e.preventDefault(); editarPrevio(S.mensajeros[a.dataset.previo],R.sem); });
-  v.querySelectorAll("[data-adel]").forEach(b=>b.onclick=()=>movCaja("sale",{cat:"adelanto",personaId:b.dataset.adel,dia:hoyS<R.dias[0]||hoyS>R.dias[6]?R.dias[0]:hoyS}));
+  v.querySelectorAll("[data-adel]").forEach(b=>b.onclick=()=>movCaja("sale",{cat:"adelanto",personaId:b.dataset.adel,semana:R.sem}));
   v.querySelectorAll("[data-pagar]").forEach(b=>b.onclick=()=>{ const f=R.filas.find(x=>x.m.id===b.dataset.pagar); movCaja("sale",{cat:"sueldo",personaId:f.m.id,valor:f.neto,semana:R.sem}); });
   v.querySelectorAll("[data-delref]").forEach(b=>b.onclick=async()=>{ const [col,id]=b.dataset.delref.split("|"); b.disabled=true; try{ await borrar(col,id); toast("Adelanto quitado"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
 }
@@ -2329,7 +2434,7 @@ function cargarDatos(){
   if(esAdmin){ setTimeout(completarNombres,8000); ["pedidos","clientes","mensajeros","movimientos","recaudos","liquidaciones","jornadas","cajamovs","vinculos","usuarios","cuentas"].forEach(c=>suscribir(c)); return; }
   const mid=usuario.mensajeroId();
   suscribir("vinculos",["uid","==",uid]);
-  if(esAsistente){ ["pedidos","clientes","mensajeros","movimientos","cuentas"].forEach(c=>suscribir(c)); suscribir("cajamovs",["cat","==","interna"]); suscribir("cajamovs",["cat","==","base"]); if(uid) suscribir("cajamovs",["personaUid","==",uid]); ["recaudos","liquidaciones"].forEach(c=>suscribir(c)); setTimeout(completarNombres,8000); }
+  if(esAsistente){ leerCorte(); ["pedidos","clientes","mensajeros","movimientos","cuentas"].forEach(c=>suscribir(c)); suscribir("cajamovs",["cat","==","interna"]); suscribir("cajamovs",["cat","==","base"]); if(uid) suscribir("cajamovs",["personaUid","==",uid]); ["recaudos","liquidaciones"].forEach(c=>suscribir(c)); setTimeout(completarNombres,8000); }
   else if(mid){ suscribir("pedidos",["mensajeroId","==",mid]); suscribir("mensajeros",["id","==",mid]); }
   if(mid){ suscribir("jornadas",["personaId","==",mid]); suscribir("recaudos",["mensajeroId","==",mid]); suscribir("liquidaciones",["mensajeroId","==",mid]); suscribir("cajamovs",["personaId","==",mid]); }
   if(!mid&&!esAsistente) cargado=true;

@@ -134,7 +134,9 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["medio", "medioAntes", "medioCambio"])
         && request.resource.data.medio in ["efectivo", "nequi", "bancolombia"]
         && request.resource.data.medioAntes == resource.data.get("medioAntes", resource.data.get("medio", ""))
-        && request.resource.data.medioCambio is int;
+        && request.resource.data.medioCambio is int
+        // lo que ya se contó en un arqueo no se cambia (meta/caja guarda la hora del último arqueo)
+        && (!exists(ruta("meta", "caja")) || resource.data.fecha > get(ruta("meta", "caja")).data.corte);
     }
     match /movimientos/{id} {
       allow read: if esOficina() || esClienteDe(resource.data.clienteId);

@@ -217,7 +217,7 @@ dialog::backdrop{background:rgba(8,12,16,.55);backdrop-filter:blur(2px)}
 .mcard-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
 .mcard-top b{font-size:1.05rem}
 .mcard .datos{margin:8px 0 0}
-.mcard .datos dd{text-align:right;font-variant-numeric:tabular-nums}
+.mcard .datos dd{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .mcard .debe dt,.mcard .debe dd{font-size:1.05rem;font-weight:700;color:var(--rojo)}
 .check{display:flex;gap:10px;align-items:center;margin:0 0 14px;font-weight:600;cursor:pointer}
 .check input{width:20px;height:20px}
