@@ -194,6 +194,7 @@ let ultimaGuia=null;
 let fotoPara=""; // id en Personal de la oficina cuando la foto se toma desde Oficina → Pedidos
 
 /* Filtro por día de los paneles de pedidos: un pedido es del día si salió o se entregó (o devolvió) ese día. "" = todos los días. */
+let buscarCli=""; // buscador por nombre o número en Clientes
 let diaPedA="", diaPedC="", diaPedM="", mensPedA="", diaCliF=""; // diaCliF: filtro por día en Clientes // mensPedA: filtro por mensajero en Oficina → Pedidos
 const delDia = (p,d) => !d || diaDe(p.creado)===d || (!!p.entregado && diaDe(p.entregado)===d);
 function moverDia(d,n){ const x=new Date((d||hoy())+"T12:00:00"); x.setDate(x.getDate()+n); return diaDe(x.getTime()); }
@@ -559,10 +560,19 @@ function pintarAdmin(){
       <div class="acciones" style="margin-bottom:16px"><button class="btn" id="nuevoCli">Registrar cliente</button><button class="btn ok" id="waMasivo">Enviar saldos por WhatsApp</button>${descargas&&esAdmin?'<button class="btn sec" id="xlsCartera">Descargar cartera en Excel</button>':""}<button class="btn sec" id="imprCli">Imprimir ${filtroCli==="cobrar"?"por cobrar":filtroCli==="pagar"?"por pagar":"por cobrar y por pagar"}</button><button class="btn sec" id="imprRecs">Imprimir recibos</button></div>
       <div class="filtros">${[["todos","Todos"],["cobrar","Por cobrar"],["pagar","Por pagar"]].map(([k,t])=>`<button data-fc="${k}" aria-pressed="${filtroCli===k}">${t}</button>`).join("")}</div>
       ${filtroDiaHtml(diaCliF)}${diaCliF?`<p class="sub">Clientes con movimiento ese día: lo que les quedó de ese día y, al lado, su saldo total de hoy.</p>`:""}
+      ${esAdmin&&gruposRepetidos().length?`<div class="aviso">${gruposRepetidos().length===1?"Hay 1 cliente que parece repetido":"Hay "+gruposRepetidos().length+" clientes que parecen repetidos"} (mismo nombre o mismo número). <button class="btn sec chico" id="cliRep">Revisar y unir</button></div>`:""}
+      <div class="campo" style="max-width:360px;margin-top:10px"><input id="buscarCli" type="search" placeholder="Buscar cliente por nombre o número" value="${esc(buscarCli)}" autocomplete="off" aria-label="Buscar cliente"></div>
+      <div class="vacio oculto" id="cliSinRes">Ningún cliente con ese nombre o número en esta lista.</div>
       ${vis.length?`<div class="tabla-env"><table><thead><tr><th>Cliente</th><th>Número</th><th>Cuenta</th>${diaCliF?'<th class="n">Ese día</th>':""}<th class="n">Saldo</th><th></th></tr></thead><tbody>
-      ${vis.map(c=>`<tr><td><b>${esc(c.nombre)}</b>${Number(c.tarifa)?`<br><span class="sub" style="font-size:.8rem">Domicilio ${pesos(c.tarifa)}</span>`:""}</td><td>${esc(c.telefono||"")}</td><td>${c.s<0?'<span class="etq sin">Por cobrar</span>':c.s>0?'<span class="etq ent">Por pagar</span>':'<span class="sub">Paz y salvo</span>'}</td>${diaCliF?`<td class="n ${c.d<0?"neg":"pos"}">${c.d<0?"Debe ":"A favor "}${pesos(Math.abs(c.d))}</td>`:""}<td class="n ${c.s<0?"neg":c.s>0?"pos":""}">${pesos(Math.abs(c.s))}</td><td><button class="btn sec chico" data-cli="${esc(c.id)}">Ver cuenta</button></td></tr>`).join("")}
+      ${vis.map(c=>`<tr data-bus="${esc(sinTildes(c.nombre)+" "+normTel(c.telefono))}"><td><b>${esc(c.nombre)}</b>${Number(c.tarifa)?`<br><span class="sub" style="font-size:.8rem">Domicilio ${pesos(c.tarifa)}</span>`:""}</td><td>${esc(c.telefono||"")}</td><td>${c.s<0?'<span class="etq sin">Por cobrar</span>':c.s>0?'<span class="etq ent">Por pagar</span>':'<span class="sub">Paz y salvo</span>'}</td>${diaCliF?`<td class="n ${c.d<0?"neg":"pos"}">${c.d<0?"Debe ":"A favor "}${pesos(Math.abs(c.d))}</td>`:""}<td class="n ${c.s<0?"neg":c.s>0?"pos":""}">${pesos(Math.abs(c.s))}</td><td><button class="btn sec chico" data-cli="${esc(c.id)}">Ver cuenta</button></td></tr>`).join("")}
       </tbody></table></div>`:`<div class="vacio">${cs.length?"No hay clientes en esta lista.":"Registra tus clientes (los remitentes) para llevar su saldo."}</div>`}`;
     $("#nuevoCli").onclick=()=>formCliente();
+    // el buscador filtra las filas sin volver a pintar, para no perder lo que se está escribiendo
+    const filtrarCli=()=>{ const q=sinTildes(buscarCli.trim()), qt=buscarCli.replace(/\D/g,""); let n=0;
+      v.querySelectorAll("tr[data-bus]").forEach(tr=>{ const ok=!q||tr.dataset.bus.includes(q)||(qt.length>=3&&tr.dataset.bus.includes(qt)); tr.classList.toggle("oculto",!ok); if(ok) n++; });
+      $("#cliSinRes").classList.toggle("oculto",!(q&&!n)); };
+    $("#buscarCli").oninput=e=>{ buscarCli=e.target.value; filtrarCli(); }; filtrarCli();
+    const cr=$("#cliRep"); if(cr) cr.onclick=()=>revisarRepetidos();
     $("#waMasivo").onclick=()=>envioMasivo(filtroCli==="pagar"?"pagar":"cobrar");
     const xc=$("#xlsCartera"); if(xc) xc.onclick=()=>descargarCartera(xc);
     $("#imprRecs").onclick=()=>recibosVarios(vis,k);
@@ -1179,6 +1189,46 @@ async function abrirPedido(guia, cliElegido){
   }catch(err){ const box=$("#pFotos"); if(box) box.innerHTML='<span class="sub">No se pudieron cargar las fotos.</span>'; }
 }
 
+/* Clientes repetidos: se comparan el nombre (sin tildes, espacios ni signos) y los últimos 10 dígitos del número. */
+const normNom = x => sinTildes(x).replace(/[^a-z0-9]/g,"");
+const normTel = x => String(x||"").replace(/\D/g,"").slice(-10);
+function parecidos(nombre,tel,excluir){
+  const nn=normNom(nombre), nt=normTel(tel);
+  return Object.values(S.clientes).filter(c=>c.id!==excluir).map(c=>{ const mismoNom=!!nn&&normNom(c.nombre)===nn, mismoTel=nt.length>=7&&normTel(c.telefono)===nt; return {c,mismoNom,mismoTel,igual:mismoNom&&mismoTel}; })
+    .filter(d=>d.mismoNom||d.mismoTel).sort((a,b)=>b.igual-a.igual);
+}
+function gruposRepetidos(){ // grupos de clientes unidos por mismo nombre o mismo número
+  const cs=Object.values(S.clientes), padre={}, raiz=x=>padre[x]===x?x:(padre[x]=raiz(padre[x]));
+  cs.forEach(c=>padre[c.id]=c.id);
+  const juntar=(clave)=>{ const vistos={}; cs.forEach(c=>{ const k=clave(c); if(!k) return; if(vistos[k]) padre[raiz(c.id)]=raiz(vistos[k]); else vistos[k]=c.id; }); };
+  juntar(c=>normNom(c.nombre)); juntar(c=>{ const t=normTel(c.telefono); return t.length>=7?t:""; });
+  const g={}; cs.forEach(c=>(g[raiz(c.id)]=g[raiz(c.id)]||[]).push(c));
+  return Object.values(g).filter(x=>x.length>1);
+}
+function revisarRepetidos(){
+  const gs=gruposRepetidos(), uso=id=>({ped:Object.values(S.pedidos).filter(p=>p.clienteId===id).length,mov:Object.values(S.movimientos).filter(m=>m.clienteId===id).length,cuenta:Object.values(S.usuarios||{}).some(u=>u.clienteId===id)});
+  $("#dlgCont").innerHTML=`<header><div><h2>Clientes repetidos</h2><span class="sub">${gs.length} grupo${gs.length===1?"":"s"}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <p class="sub">En cada grupo toca “Quedarse con este” en el que quieres conservar. Los pedidos, pagos y la cuenta de acceso de los otros pasan a ese cliente, el saldo se suma y los repetidos se borran. Si son clientes distintos (por ejemplo, dos tiendas del mismo dueño), no hagas nada.</p>
+    ${gs.length?gs.map(g=>`<div class="mcard" style="margin-bottom:10px">${g.map(c=>{ const u=uso(c.id), s=saldoCliente(c.id); return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--borde,#ddd)">
+      <span><b>${esc(c.nombre)}</b> · ${esc(c.telefono||"")}<br><span class="sub" style="font-size:.8rem">${u.ped} pedido${u.ped===1?"":"s"} · ${u.mov} movimiento${u.mov===1?"":"s"} · ${s<0?"debe "+pesos(-s):s>0?"a favor "+pesos(s):"paz y salvo"}${u.cuenta?" · tiene cuenta":""}</span></span>
+      <button class="btn sec chico" data-quedar="${esc(c.id)}" data-grupo="${esc(g.map(x=>x.id).join(","))}">Quedarse con este</button></div>`; }).join("")}</div>`).join(""):'<div class="vacio">No hay clientes repetidos.</div>'}`;
+  if(!$("#dlg").open) abrirDlg();
+  $("#dlgCont").querySelectorAll("[data-quedar]").forEach(b=>b.onclick=async()=>{ const k=b.dataset.quedar, otros=b.dataset.grupo.split(",").filter(x=>x!==k);
+    if(!await confirmar("Unir clientes",`Se queda ${S.clientes[k].nombre} (${S.clientes[k].telefono||""}). Se le pasa todo de: ${otros.map(o=>S.clientes[o].nombre+" ("+(S.clientes[o].telefono||"")+")").join(", ")}, y esos se borran.`,"Unir")) return revisarRepetidos();
+    try{ await unirClientes(k,otros); toast("Clientes unidos en "+S.clientes[k].nombre); }catch(e){ toast("No se pudo terminar de unir. Revisa y vuelve a intentar."); }
+    setTimeout(revisarRepetidos,300); });
+}
+async function unirClientes(k,otros){ // pasa pedidos, movimientos y cuentas de acceso de "otros" al cliente k y borra los otros
+  const kc=S.clientes[k]; let np=0, nm=0;
+  for(const o of otros){ const oc=S.clientes[o]; if(!oc) continue;
+    for(const p of Object.values(S.pedidos).filter(p=>p.clienteId===o)){ await rawUpd("pedidos",p.guia,p.clienteNombre!==undefined?{clienteId:k,clienteNombre:kc.nombre}:{clienteId:k}); np++; }
+    for(const m of Object.values(S.movimientos).filter(m=>m.clienteId===o)){ await rawUpd("movimientos",m.id,{clienteId:k}); nm++; }
+    for(const u of Object.values(S.usuarios||{}).filter(u=>u.clienteId===o)) await rawUpd("usuarios",u.uid,{clienteId:k});
+    const falta={}; if(!Number(kc.tarifa)&&Number(oc.tarifa)) falta.tarifa=Number(oc.tarifa); if(!kc.telefono&&oc.telefono) falta.telefono=oc.telefono;
+    if(Object.keys(falta).length) await rawUpd("clientes",k,falta);
+    await borrar("clientes",o); }
+  registrar(`Unió ${otros.length} cliente${otros.length===1?"":"s"} repetido${otros.length===1?"":"s"} en ${kc.nombre}: ${np} pedidos y ${nm} movimientos`);
+}
 function formCliente(id, alGuardar){
   const c=id?S.clientes[id]:{};
   $("#dlgCont").innerHTML=`<header><h2>${id?"Editar cliente":"Nuevo cliente"}</h2><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
@@ -1187,8 +1237,19 @@ function formCliente(id, alGuardar){
     <div class="campo"><label for="cTar">Valor del domicilio de este cliente (opcional)</label><input id="cTar" type="number" inputmode="numeric" min="0" step="100" value="${Number(c.tarifa)||""}" placeholder="Se llena solo al asignarle una guía"></div>
     <button class="btn" id="cGuardar" style="width:100%">Guardar cliente</button>`;
   abrirDlg(); $("#cNom").focus();
+  let aunAsi=false; // "guardar de todos modos" cuando solo coincide el nombre o solo el número
+  $("#cNom").oninput=$("#cTel").oninput=()=>{ aunAsi=false; $("#cDup")?.remove(); $("#cGuardar").textContent="Guardar cliente"; };
   $("#cGuardar").onclick=async()=>{ const n=$("#cNom").value.trim(), t=$("#cTel").value.trim();
     if(!n) return toast("Escribe el nombre"); if(!t) return toast("Escribe el número");
+    const cambio=!id||normNom(n)!==normNom(c.nombre)||normTel(t)!==normTel(c.telefono), dups=cambio?parecidos(n,t,id):[];
+    if(dups.length&&(!aunAsi||dups.some(d=>d.igual))){ const exacto=dups.some(d=>d.igual);
+      $("#cDup")?.remove();
+      $("#cGuardar").insertAdjacentHTML("beforebegin",`<div class="aviso alerta" id="cDup"><b>${exacto?"Este cliente ya existe":"Hay un cliente parecido"}:</b>
+        ${dups.map(d=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px"><span>${esc(d.c.nombre)} · ${esc(d.c.telefono||"")}<br><span class="sub" style="font-size:.8rem">${d.igual?"mismo nombre y número":d.mismoNom?"mismo nombre":"mismo número"}</span></span><button class="btn sec chico" data-usar="${esc(d.c.id)}">Usar este</button></div>`).join("")}
+        ${exacto?'<p class="sub" style="margin:6px 0 0">No se puede crear otro con el mismo nombre y número.</p>':'<p class="sub" style="margin:6px 0 0">Si de verdad es otro cliente, toca otra vez “Guardar de todos modos”.</p>'}</div>`);
+      $("#dlgCont").querySelectorAll("[data-usar]").forEach(b=>b.onclick=()=>{ const eid=b.dataset.usar; if(alGuardar) alGuardar(eid); else abrirCuenta(eid); });
+      if(!exacto){ aunAsi=true; $("#cGuardar").textContent="Guardar de todos modos"; }
+      return; }
     const cid=id||nuevoId();
     try{ await guardar("clientes",cid,{id:cid,nombre:n,telefono:t,tarifa:Number($("#cTar").value)||0}); toast("Cliente "+n+" guardado");
       if(id&&c.nombre!==n) for(const p of Object.values(S.pedidos)) if(p.clienteId===cid&&p.estado==="pendiente") rawUpd("pedidos",p.guia,{clienteNombre:n}).catch(()=>{});
