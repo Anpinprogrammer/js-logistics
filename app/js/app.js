@@ -1979,7 +1979,13 @@ function esperadoArqueo(){
   const e={}; for(const k of Object.keys(MEDIOS)) e[k]=Math.round((R.porMedio[k]||0)-of[k]);
   return {e,of,sinCuenta:Math.round(R.porMedio.cuentas||0)};
 }
-const resultadoArqueo = a => { const f=Object.entries(a.dif).filter(([,x])=>Math.round(x)); return f.length?f.map(([m,x])=>`${x<0?"faltó":"sobró"} ${pesos(Math.abs(x))} en ${MEDIOS[m]||m}`).join(" · "):"Cuadró exacto"; };
+/* Si lo que falta en un medio sobra en otro (por ejemplo, menos en Nequi y más en efectivo), la plata sí da: es un reacomodo entre medios, no una pérdida. */
+const netoArqueo = a => Math.round(Object.values(a.dif).reduce((x,y)=>x+y,0));
+function resultadoArqueo(a){
+  const f=Object.entries(a.dif).filter(([,x])=>Math.round(x)); if(!f.length) return "Cuadró exacto";
+  const n=netoArqueo(a), det=f.map(([m,x])=>`${MEDIOS[m]||m} ${x<0?"−":"+"}${pesos(Math.abs(x))}`).join(", ");
+  return n===0?`La plata da exacto · se reacomodó entre medios (${det})`:`${n<0?"Faltó":"Sobró"} ${pesos(Math.abs(n))} en total (${det})`;
+}
 function hacerArqueo(){
   const {e,of,sinCuenta}=esperadoArqueo(), conOf=Object.values(of).some(x=>Math.round(x));
   $("#dlgCont").innerHTML=`<header><div><h2>Arqueo de caja</h2><span class="sub">Cuenta la plata que tienes ahora mismo</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
@@ -1988,12 +1994,16 @@ function hacerArqueo(){
     ${conOf?`<div class="aviso">No cuentes la plata de las cajas de oficina (${Object.entries(of).filter(([,x])=>Math.round(x)).map(([k,x])=>MEDIOS[k]+" "+pesos(x)).join(" · ")}): esa se cuenta cuando recibes el cierre de cada asistente.</div>`:""}
     ${Object.entries(MEDIOS).map(([k,t])=>`<div class="linea2" style="align-items:center"><div class="campo"><label for="aq_${k}">${t} que cuentas</label><input id="aq_${k}" data-aq="${k}" type="number" inputmode="numeric" min="0" step="100"></div>
       <div class="campo"><span class="lbl">La app espera</span><b style="font-size:1.1rem">${pesos(e[k])}</b><span class="sub" id="aqd_${k}" style="margin:0"></span></div></div>`).join("")}
+    <div class="res-liq cero" id="aqTot" style="margin:6px 0 12px"><span>Total</span><b>La app espera ${pesos(Object.values(e).reduce((x,y)=>x+y,0))}</b></div>
     <div class="campo"><label for="aqNota">Nota (opcional)</label><input id="aqNota" placeholder="Ej: arqueo de cierre del sábado"></div>
     <button class="btn ok" id="aqGuardar" style="width:100%">Guardar arqueo</button>`;
   abrirDlg(); $("#aq_efectivo").focus();
   const leerC=()=>Object.fromEntries(Object.keys(MEDIOS).map(k=>[k,$("#aq_"+k).value]));
   const ver=()=>{ const c=leerC(); for(const k of Object.keys(MEDIOS)){ const d=c[k]===""?null:Math.round(Number(c[k])-e[k]), el=$("#aqd_"+k);
-    el.innerHTML=d===null?"":d===0?'<b class="pos">Cuadra</b>':d<0?`<b class="neg">Falta ${pesos(-d)}</b>`:`<b class="pos">Sobra ${pesos(d)}</b>`; } };
+    el.innerHTML=d===null?"":d===0?'<b class="pos">Cuadra</b>':d<0?`<b class="neg">Falta ${pesos(-d)}</b>`:`<b class="pos">Sobra ${pesos(d)}</b>`; }
+    const esp=Object.values(e).reduce((x,y)=>x+y,0), tot=Object.values(c).reduce((x,y)=>x+(Number(y)||0),0), dt=Math.round(tot-esp), r=$("#aqTot"), todo=Object.values(c).every(x=>x!==""), mueve=Object.keys(MEDIOS).some(k=>c[k]!==""&&Math.round(Number(c[k])-e[k]));
+    r.className="res-liq "+(!todo?"cero":dt<0?"debe":dt>0?"sobra":"cero");
+    r.innerHTML=`<span>Total contado ${pesos(tot)} · esperado ${pesos(esp)}</span><b>${!todo?"Escribe los tres medios":dt===0?(mueve?"La plata da exacto: cada medio queda como lo contaste":"Cuadra exacto"):dt<0?"Falta "+pesos(-dt)+" en total":"Sobra "+pesos(dt)+" en total"}</b>`; };
   document.querySelectorAll("[data-aq]").forEach(i=>i.oninput=ver);
   $("#aqGuardar").onclick=async()=>{ const c=leerC();
     if(Object.values(c).some(x=>x==="")) return toast("Escribe lo que contaste en cada medio (0 si no hay nada)");
@@ -2017,8 +2027,9 @@ function libroCaja(){
   for(const p of Object.values(S.pedidos)) if(cerrado(p)&&p.metodo==="transf_js") L.push({fecha:p.entregado,concepto:"Transferencia a JS · "+p.guia+(p.destinatario?" · "+p.destinatario:""),valor:Number(p.valorCobrado)||0,medio:p.cuentaJs||"cuentas",cat:"Transferencias"});
   for(const p of Object.values(S.pedidos)) if(p.domiPagado&&p.domiPagoMedio) L.push({fecha:p.domiPagoFecha||p.entregado||p.creado,concepto:"Pago de domicilio · "+p.guia+(p.clienteId?" · "+nombreCliente(p.clienteId):""),valor:pagoDomi(p),medio:p.domiPagoMedio,cat:"Clientes"});
   for(const m of Object.values(S.movimientos)) if(mueveCaja(m)) L.push({fecha:m.fecha,concepto:(m.tipo==="pago_de_cliente"?"Pago de ":m.tipo==="compra_cliente"?"Compra por encargo de ":"Pago a ")+nombreCliente(m.clienteId)+(m.nota?" · "+m.nota:""),valor:signoMov(m),medio:m.medio||"efectivo",cat:"Clientes"});
+  const reacomodos=new Set(arqueosCaja().filter(a=>netoArqueo(a)===0).map(a=>a.id)); // arqueos donde la plata dio exacto y solo cambió de medio
   for(const c of Object.values(S.cajamovs)) if((c.cat==="interna"&&c.inicial)||c.cat==="oficina"||c.deLiquidacion||(c.cat==="arqueo"&&c.tipo==="marca")) continue; // oficina: la plata pasa de tus manos a las del asistente // saldo inicial de la cuenta: la plata salió antes del empalme // adelanto de una liquidación: el mensajero ya tenía esa plata, no sale de la caja
-  else if(c.cat==="arqueo") L.push({fecha:c.fecha,concepto:(c.tipo==="entra"?"Sobrante":"Faltante")+" de arqueo"+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:"Arqueo",ref:"cajamovs|"+c.id});
+  else if(c.cat==="arqueo") L.push({fecha:c.fecha,concepto:(reacomodos.has(c.arqueoId)?(c.tipo==="entra"?"Arqueo: pasa a este medio":"Arqueo: sale de este medio"):(c.tipo==="entra"?"Sobrante":"Faltante")+" de arqueo")+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:"Arqueo",ref:"cajamovs|"+c.id});
   else if(c.cat==="interna"){ const n=S.cuentas[c.cuentaId]?.nombre||"Cuenta interna";
     L.push({fecha:c.fecha,concepto:(c.tipo==="entra"?"Entrada de ":"Salida a ")+n+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:n,ref:"cajamovs|"+c.id}); }
   else L.push({fecha:c.fecha,concepto:(CATS[c.cat]||"Movimiento")+(c.personaId?" · "+nomM(c.personaId):"")+(c.concepto?" · "+c.concepto:""),valor:(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),medio:c.medio||"efectivo",cat:CATS[c.cat]||"Otro",ref:"cajamovs|"+c.id});
@@ -2057,7 +2068,7 @@ function bloqueCajaGeneral(){
   </tbody></table></div>`:`<div class="vacio">Sin movimientos de caja este día.</div>`}
   ${(()=>{ const A=arqueosCaja().slice(0,10); if(!A.length) return ""; const M=Object.keys(MEDIOS);
     return `<h2>Arqueos</h2><div class="tabla-env"><table><thead><tr><th>Fecha</th>${M.map(k=>`<th class="n">${MEDIOS[k]}<br><small>contado / esperado</small></th>`).join("")}<th>Resultado</th><th>Contó</th><th></th></tr></thead><tbody>
-    ${A.map((a,i)=>`<tr><td>${hora(a.fecha)}${a.nota?`<br><span class="sub" style="font-size:.8rem">${esc(a.nota)}</span>`:""}</td>${M.map(k=>`<td class="n">${a.contado?pesos(a.contado[k]):"—"}<br><span class="sub" style="font-size:.8rem">${a.esperado?pesos(a.esperado[k]):""}</span></td>`).join("")}<td class="${Object.values(a.dif).some(x=>x<0)?"neg":"pos"}">${resultadoArqueo(a)}</td><td>${esc(a.por||"")}</td><td>${i===0?`<button class="btn sec chico" data-deshacer="${esc(a.id)}">Deshacer</button>`:""}</td></tr>`).join("")}</tbody></table></div>`; })()}`;
+    ${A.map((a,i)=>`<tr><td>${hora(a.fecha)}${a.nota?`<br><span class="sub" style="font-size:.8rem">${esc(a.nota)}</span>`:""}</td>${M.map(k=>`<td class="n">${a.contado?pesos(a.contado[k]):"—"}<br><span class="sub" style="font-size:.8rem">${a.esperado?pesos(a.esperado[k]):""}</span></td>`).join("")}<td class="${netoArqueo(a)<0?"neg":"pos"}">${resultadoArqueo(a)}</td><td>${esc(a.por||"")}</td><td>${i===0?`<button class="btn sec chico" data-deshacer="${esc(a.id)}">Deshacer</button>`:""}</td></tr>`).join("")}</tbody></table></div>`; })()}`;
 }
 function conectarCajaGeneral(v){
   $("#diaL").onchange=e=>{diaLibro=e.target.value||hoy(); pintar();};
