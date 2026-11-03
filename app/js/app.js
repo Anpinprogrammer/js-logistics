@@ -2057,6 +2057,9 @@ function bloqueCajaGeneral(){
     <div class="cifra"><span>Todavía en manos de mensajeros</span><b>${pesos(R.enMens)}</b></div>
     <div class="cifra"><span>Cuentas por cobrar a clientes</span><b>${pesos(R.porCobrar)}</b></div>
     ${(()=>{ const a=arqueosCaja()[0]; return `<div class="cifra"><span>Último arqueo</span><b>${a?hora(a.fecha):"Nunca"}</b><span>${a?resultadoArqueo(a):"Cuenta la plata real para comprobar que cuadra"}</span></div>`; })()}
+    ${(()=>{ const mes=hoy().slice(0,7), A=arqueosCaja().filter(a=>diaDe(a.fecha).startsWith(mes)), falto=A.reduce((x,a)=>x+Math.min(0,netoArqueo(a)),0), sobro=A.reduce((x,a)=>x+Math.max(0,netoArqueo(a)),0);
+      // solo cuenta lo que faltó o sobró en total; el reacomodo entre medios no es pérdida ni ganancia
+      return A.length?`<div class="cifra"><span>Faltantes y sobrantes de arqueos</span><b class="${falto+sobro<0?"neg":"pos"}">${falto||sobro?(falto+sobro<0?"− ":"+ ")+pesos(Math.abs(falto+sobro)):"$ 0"}</b><span>Este mes · faltó ${pesos(-falto)} · sobró ${pesos(sobro)} · ${A.length} arqueo${A.length===1?"":"s"}</span></div>`:""; })()}
     ${R.sobrantes.n?`<div class="cifra"><span>Sobrantes de cajas de oficina</span><b class="pos">${pesos(R.sobrantes.mes)}</b><span>Este mes · ${R.sobrantes.n} en total (${pesos(R.sobrantes.total)})</span></div>`:""}
   </div>
   <div class="acciones" style="margin:14px 0"><button class="btn" id="cjArqueo">Hacer arqueo</button><button class="btn ok" id="cjEntra">Registrar entrada</button><button class="btn sec" id="cjSale">Registrar salida o gasto</button>${descargas?'<button class="btn sec" id="cjXls">Descargar cuadre de caja</button>':""}</div>
