@@ -503,7 +503,7 @@ function tablaEntregas(ps,conCliente){
 
 function pintarAdmin(){
   const sin=Object.values(S.pedidos).filter(p=>!p.clienteId).length;
-  const tabs=[["inicio","Inicio"],["pedidos","Pedidos",sin],["clientes","Clientes"],["caja","Caja"],["recibos","Recibos"],["cuentas","Cuentas"],["sueldos","Sueldos"],["mas","Más"]].filter(([k])=>esAdmin||["inicio","pedidos","clientes","recibos","caja","cuentas"].includes(k));
+  const tabs=[["inicio","Inicio"],["pedidos","Pedidos",sin],["clientes","Clientes"],["caja","Caja"],["cuentas","Cuentas"],["sueldos","Sueldos"],["mas","Más"]].filter(([k])=>esAdmin||["inicio","pedidos","clientes","caja","cuentas"].includes(k));
   if(!tabs.some(([k])=>k===tabA)) tabA="inicio";
   ponerNav(tabs,tabA,k=>tabA=k);
   const v=$("#vista");
@@ -557,7 +557,7 @@ function pintarAdmin(){
         <div class="cifra"><span>${diaCliF?"Ese día te quedaron debiendo":"Cuentas por cobrar (te deben)"}</span><b class="neg">${pesos(totC)}</b><span>${cobrar.length} cliente${cobrar.length===1?"":"s"}</span></div>
         <div class="cifra"><span>${diaCliF?"Ese día les quedaste debiendo":"Cuentas por pagar (les debes)"}</span><b class="pos">${pesos(totP)}</b><span>${pagar.length} cliente${pagar.length===1?"":"s"}</span></div>
       </div>
-      <div class="acciones" style="margin-bottom:16px"><button class="btn" id="nuevoCli">Registrar cliente</button><button class="btn ok" id="waMasivo">Enviar saldos por WhatsApp</button>${descargas&&esAdmin?'<button class="btn sec" id="xlsCartera">Descargar cartera en Excel</button>':""}<button class="btn sec" id="imprCli">Imprimir ${filtroCli==="cobrar"?"por cobrar":filtroCli==="pagar"?"por pagar":"por cobrar y por pagar"}</button><button class="btn sec" id="imprRecs">Imprimir recibos</button></div>
+      <div class="acciones" style="margin-bottom:16px"><button class="btn" id="nuevoCli">Registrar cliente</button><button class="btn ok" id="waMasivo">Enviar saldos por WhatsApp</button>${descargas&&esAdmin?'<button class="btn sec" id="xlsCartera">Descargar cartera en Excel</button>':""}<button class="btn sec" id="imprCli">Imprimir ${filtroCli==="cobrar"?"por cobrar":filtroCli==="pagar"?"por pagar":"por cobrar y por pagar"}</button><button class="btn sec" id="imprRecs">Imprimir recibos${diaCliF?" del día":""}</button>${descargas&&esAdmin?`<button class="btn sec" id="xlsDiaCli">Excel del cuadre ${diaCliF&&diaCliF!==hoy()?"del día elegido":"de hoy"}</button>`:""}</div>
       <div class="filtros">${[["todos","Todos"],["cobrar","Por cobrar"],["pagar","Por pagar"]].map(([k,t])=>`<button data-fc="${k}" aria-pressed="${filtroCli===k}">${t}</button>`).join("")}</div>
       ${filtroDiaHtml(diaCliF)}${diaCliF?`<p class="sub">Clientes con movimiento ese día: lo que les quedó de ese día y, al lado, su saldo total de hoy.</p>`:""}
       ${esAdmin&&gruposRepetidos().length?`<div class="aviso">${gruposRepetidos().length===1?"Hay 1 cliente que parece repetido":"Hay "+gruposRepetidos().length+" clientes que parecen repetidos"} (mismo nombre o mismo número). <button class="btn sec chico" id="cliRep">Revisar y unir</button></div>`:""}
@@ -576,6 +576,7 @@ function pintarAdmin(){
     $("#waMasivo").onclick=()=>envioMasivo(filtroCli==="pagar"?"pagar":"cobrar");
     const xc=$("#xlsCartera"); if(xc) xc.onclick=()=>descargarCartera(xc);
     $("#imprRecs").onclick=()=>recibosVarios(vis,k);
+    const xd=$("#xlsDiaCli"); if(xd) xd.onclick=()=>{ const d=diaCliF||hoy(); if(!cuadreDia(d).length) return toast("No hay entregas ni pagos de clientes ese día"); descargarExcel(d,null,xd); };
     $("#imprCli").onclick=()=>imprimirClientes([filtroCli!=="pagar"&&["Cuentas por cobrar","Te deben",cobrar,totC],filtroCli!=="cobrar"&&["Cuentas por pagar","Les debes",pagar,totP]].filter(Boolean),k);
     v.querySelectorAll("[data-fc]").forEach(b=>b.onclick=()=>{filtroCli=b.dataset.fc; pintar();});
     v.querySelectorAll("[data-cli]").forEach(b=>b.onclick=()=>abrirCuenta(b.dataset.cli));
@@ -636,7 +637,6 @@ function pintarAdmin(){
       if(!await confirmar("Quitar dinero recibido",`${S.mensajeros[r.mensajeroId]?.nombre||""} · ${pesos(r.valor)} · ${hora(r.fecha)}. Se quita de la caja y vuelve a sumarse a lo que debe.`,"Quitar")) return;
       b.disabled=true; try{ await borrar("recaudos",b.dataset.delrec); toast("Entrega de dinero quitada"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
   }
-  else if(tabA==="recibos"){ pintarRecibos(v,aviso); }
   else if(tabA==="cuentas"){ pintarCuentas(v,aviso); }
   else if(tabA==="sueldos"){ pintarSueldos(v,aviso); }
   else pintarMas(v,aviso);
@@ -1432,14 +1432,30 @@ function armarRecibo(cid,pago){ // pago: {medio} cuando en ese momento se le pag
     if(s<0){ t.vacio(); t.texto("Nequi 316 493 3854 - Bancolombia ahorros 815 13203390 - Javier Salazar"); }
   };
 }
+/* Recibo de cuadre de un día (con el filtro de día de Clientes): saldo anterior, lo de ese día, lo pagado y lo que queda. */
+function armarReciboDia(cid,dia,pago){
+  const r=cuadreDia(dia).find(x=>x.cid===cid), c=S.clientes[cid]; if(!r||!c) return null;
+  return t=>{
+    t.centro("RECIBO DE CUADRE"); t.centro(c.nombre); if(c.telefono) t.centro(c.telefono); t.centro(fechaLarga(dia)); t.raya();
+    if(r.anterior) t.fila("Saldo anterior",tkPesos(r.anterior));
+    r.lineas.forEach(l=>t.fila(l.p?l.guia+" "+(l.p.estado==="devuelto"?"Devolucion "+(l.p.destinatario||""):(l.p.destinatario||"")):l.t,tkPesos(l.v)));
+    t.raya(); t.fila("TOTAL",tkPesos(r.total));
+    if(r.pagos) t.fila("PAGADO",tkPesos(r.pagos));
+    t.fila(r.queda>0?"JS LE DEBE":r.queda<0?"DEBE A JS":"PAZ Y SALVO",tkPesos(Math.abs(r.queda)));
+    if(pago&&r.queda>0){ t.fila("PAGADO EN "+MEDIOS[pago.medio].toUpperCase(),tkPesos(-pago.valor)); t.fila("SALDO",tkPesos(r.queda-pago.valor)); t.vacio(); t.vacio(); t.fila("Recibido: ______________________"); }
+    if(r.queda<0){ t.vacio(); t.texto("Nequi 316 493 3854 - Bancolombia ahorros 815 13203390 - Javier Salazar"); }
+  };
+}
 /* Varios recibos de una vez: se eligen los clientes de la lista que se está viendo en Clientes. */
 function recibosVarios(cs,k){
   const sel=new Set();
-  $("#dlgCont").innerHTML=`<header><div><h2>Imprimir recibos</h2><span class="sub">Elige los clientes</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+  const dia=diaCliF, pasado=!!dia&&dia!==hoy(); // con día elegido sale el recibo de cuadre de ese día; pagar solo si es hoy (el saldo de hoy)
+  $("#dlgCont").innerHTML=`<header><div><h2>Imprimir recibos</h2><span class="sub">${dia?"Recibo de cuadre del "+fechaLarga(dia):"Elige los clientes"}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     <div class="campo"><input id="rvBus" type="search" placeholder="Buscar cliente…" autocomplete="off"></div>
     <div class="acciones" style="margin:0 0 8px"><button class="btn sec chico" id="rvTodos">Marcar todos</button><button class="btn sec chico" id="rvNinguno">Ninguno</button></div>
     <div id="rvLista" style="max-height:45vh;overflow:auto"></div>
-    <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px"><input type="checkbox" id="rvPagar" checked style="width:auto;margin-top:3px"><span>Pagarles su saldo a favor y dejarlos en $ 0 (sale de la caja)</span></label>
+    ${pasado?'<p class="sub" style="margin-top:10px">Son recibos de un día anterior: solo se imprimen. Para pagar saldos, elige hoy o quita el filtro de día.</p>':""}
+    <label style="display:${pasado?"none":"flex"};gap:8px;align-items:flex-start;margin-top:10px"><input type="checkbox" id="rvPagar" ${pasado?"":"checked"} style="width:auto;margin-top:3px"><span>Pagarles su saldo a favor y dejarlos en $ 0 (sale de la caja)</span></label>
     <div class="campo" id="rvMedioC" style="margin-top:6px"><label for="rvMedio">Les pagas en</label><select id="rvMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div>
     <p class="sub" id="rvRes"></p>
     <button class="btn" id="rvImprimir" style="width:100%;margin-top:6px" disabled>Imprimir</button>`;
@@ -1459,7 +1475,7 @@ function recibosVarios(cs,k){
   $("#rvTodos").onclick=()=>{ vis().forEach(c=>sel.add(c.id)); ver(); };
   $("#rvNinguno").onclick=()=>{ sel.clear(); ver(); };
   $("#rvImprimir").onclick=()=>{ const ids=cs.map(c=>c.id).filter(id=>sel.has(id)), medio=$("#rvMedio").value, ps=aPagar(), pagar=new Map(ps), tot=ps.reduce((a,[,v])=>a+v,0);
-    const fns=ids.map(id=>armarRecibo(id,pagar.has(id)?{medio}:null)).filter(Boolean);
+    const fns=ids.map(id=>dia?armarReciboDia(id,dia,pagar.has(id)?{medio,valor:pagar.get(id)}:null):armarRecibo(id,pagar.has(id)?{medio}:null)).filter(Boolean);
     // el pago se guarda al tocar "Pagar e imprimir", con el saldo de ese momento (si ya quedó en 0, no se paga dos veces)
     const antes=ps.length?{texto:`Al imprimir se registra el pago de <b>${pesos(tot)}</b> en ${MEDIOS[medio]} a ${ps.length} cliente${ps.length===1?"":"s"} y quedan en $ 0.`,
       fn:async()=>{ let n=0, total=0; for(const [cid] of ps){ const v=Math.round(saldoCliente(cid)); if(!(v>0)) continue; const id=nuevoId();
@@ -1744,10 +1760,10 @@ function cuadreDia(dia){
   const res={};
   const get=cid=>res[cid]=res[cid]||{cid,anterior:0,lineas:[],delDia:0,pagos:0};
   for(const p of Object.values(S.pedidos)){
-    if(p.estado!=="entregado"||!p.clienteId) continue;
-    const d=diaDe(p.entregado), s=saldoPedido(p);
+    if(!cerrado(p)||!p.clienteId) continue; // las devoluciones también cuentan: se cobra el domicilio
+    const d=diaDe(p.entregado), s=saldoPedido(p), dev=p.estado==="devuelto";
     if(d<dia) get(p.clienteId).anterior+=s;
-    else if(d===dia){ const r=get(p.clienteId); r.lineas.push({t:p.destinatario||p.guia,guia:p.guia,p,v:s,f:p.entregado}); r.delDia+=s; }
+    else if(d===dia){ const r=get(p.clienteId); r.lineas.push({t:(dev?"Devolución":"")+(dev&&p.destinatario?" · ":"")+(p.destinatario||(dev?"":p.guia)),guia:p.guia,p,v:s,f:p.entregado}); r.delDia+=s; }
   }
   for(const m of Object.values(S.movimientos)){
     const d=diaDe(m.fecha), s=signoMov(m);
@@ -1758,21 +1774,6 @@ function cuadreDia(dia){
   return Object.values(res).filter(r=>S.clientes[r.cid]&&(r.lineas.length||r.pagos))
     .map(r=>{ r.lineas.sort((a,b)=>a.f-b.f); return {...r,nombre:nombreCliente(r.cid),total:r.anterior+r.delDia,queda:r.anterior+r.delDia+r.pagos}; })
     .sort((a,b)=>a.nombre.localeCompare(b.nombre,"es"));
-}
-
-function pintarRecibos(v,aviso){
-  const lista=cuadreDia(diaRec);
-  const sinRem=Object.values(S.pedidos).filter(p=>cerrado(p)&&!p.clienteId&&diaDe(p.entregado)===diaRec).length;
-  v.innerHTML=aviso+`<h1>Recibos de cuadre</h1><p class="sub">El saldo de cada cliente en el día, listo para imprimir o descargar en Excel.</p>
-    <div class="linea2" style="align-items:end"><div class="campo" style="max-width:220px"><label for="diaR">Día</label><input type="date" id="diaR" value="${diaRec}"></div>
-    <div class="campo">${descargas&&esAdmin?`<button class="btn" id="xlsDia" ${lista.length?"":"disabled"}>Descargar Excel del día</button>`:""}</div></div>
-    ${sinRem?`<div class="aviso">${sinRem===1?"1 entrega de este día no tiene remitente":sinRem+" entregas de este día no tienen remitente"} y no sale en los recibos. Asígnalo en Pedidos.</div>`:""}
-    ${lista.length?`<div class="tabla-env"><table><thead><tr><th>Cliente</th><th class="n">Entregas</th><th class="n">Saldo anterior</th><th class="n">Del día</th><th class="n">Total</th><th class="n">Pagado</th><th></th></tr></thead><tbody>
-    ${lista.map(r=>`<tr><td><b>${esc(r.nombre)}</b></td><td class="n">${r.lineas.filter(l=>l.p).length}</td><td class="n">${pesos(r.anterior)}</td><td class="n">${pesos(r.delDia)}</td><td class="n ${r.total<0?"neg":r.total>0?"pos":""}">${pesos(r.total)}</td><td class="n">${r.pagos?pesos(r.pagos):"—"}</td><td><button class="btn sec chico" data-rec="${esc(r.cid)}">Ver recibo</button></td></tr>`).join("")}
-    </tbody></table></div>`:`<div class="vacio">No hay entregas con remitente en este día.</div>`}`;
-  $("#diaR").onchange=e=>{diaRec=e.target.value||hoy(); pintar();};
-  const bx=$("#xlsDia"); if(bx) bx.onclick=()=>descargarExcel(diaRec,null,bx);
-  v.querySelectorAll("[data-rec]").forEach(b=>b.onclick=()=>verRecibo(b.dataset.rec));
 }
 
 function telWhatsApp(t){ let d=String(t||"").replace(/\D/g,""); if(d.length===10&&d[0]==="3") d="57"+d; return d; }
@@ -1799,13 +1800,10 @@ function verRecibo(cid){
     <div class="t-pie">${EMPRESA.lema}<br>${EMPRESA.tel}<br>${EMPRESA.ig}</div>
   </div>
   <p class="sub" style="margin-top:12px;text-align:center">${r.queda>0?"Cuenta por pagar: JS le debe entregar este valor al cliente.":r.queda<0?"Cuenta por cobrar: el cliente le debe este valor a JS.":"Cuadre en cero."}</p>
-  <div class="acciones" style="justify-content:center">${esCliente?"":`<a class="btn ok" href="${linkWhatsApp(S.clientes[cid]?.telefono,textoRecibo(r))}" target="_blank" rel="noopener">Enviar por WhatsApp</a>`}<button class="btn sec" id="copiarRec">Copiar texto</button>${descargas?'<button class="btn" id="xlsUno">Descargar recibo en Excel</button>':""}${r.queda&&esAdmin?`<button class="btn ok" id="liquidar">${r.queda>0?"Registrar que JS pagó ":"Registrar que el cliente pagó "}${pesos(Math.abs(r.queda))}</button>`:""}</div>`;
+  <div class="acciones" style="justify-content:center">${esCliente?"":`<a class="btn ok" href="${linkWhatsApp(S.clientes[cid]?.telefono,textoRecibo(r))}" target="_blank" rel="noopener">Enviar por WhatsApp</a>`}<button class="btn sec" id="copiarRec">Copiar texto</button>${descargas?'<button class="btn" id="xlsUno">Descargar recibo en Excel</button>':""}</div>`;
   abrirDlg();
   const bx=$("#xlsUno"); if(bx) bx.onclick=()=>descargarExcel(diaRec,cid,bx);
   $("#copiarRec").onclick=async()=>{ try{ await navigator.clipboard.writeText(textoRecibo(r)); toast("Texto copiado. Pégalo en WhatsApp."); }catch(e){ toast("No se pudo copiar en este navegador"); } };
-  const lq=$("#liquidar"); if(lq) lq.onclick=async()=>{ lq.disabled=true; const id=nuevoId();
-    try{ await guardar("movimientos",id,{id,clienteId:cid,tipo:r.queda>0?"pago_a_cliente":"pago_de_cliente",valor:Math.abs(r.queda),medio:"efectivo",nota:"Cuadre del "+diaRec,fecha:fechaDia(diaRec)});
-      toast("Pago registrado"); setTimeout(()=>verRecibo(cid),200); }catch(e){ lq.disabled=false; toast("No se pudo guardar"); } };
 }
 
 async function descargarExcel(dia,soloCid,btn){
