@@ -1627,7 +1627,7 @@ const antesTxt = x => x.medioAntes&&x.medioAntes!==x.medio?` (antes ${MEDIOS[x.m
 function cajaOficina(auid){
   const L=[], nomM=id=>S.mensajeros[id]?.nombre||"", add=(fecha,concepto,valor,medio,ref)=>L.push({fecha,concepto,valor,medio:MEDIOS[medio]?medio:"efectivo",ref});
   for(const c of Object.values(S.cajamovs)){
-    if(c.cat==="oficina"&&c.personaUid===auid) add(c.fecha,(c.tipo==="base"?"Base de caja que entregó administración":"Entregado a administración (cierre)")+(c.concepto?" · "+c.concepto:""),(c.tipo==="base"?1:-1)*(Number(c.valor)||0),c.medio,c.id);
+    if(c.cat==="oficina"&&c.personaUid===auid) add(c.fecha,(c.nivel?"Ajuste al cierre (cuenta de la empresa)":c.tipo==="base"?"Base de caja que entregó administración":"Entregado a administración (cierre)")+(c.concepto?" · "+c.concepto:""),(c.tipo==="base"?1:-1)*(Number(c.valor)||0),c.medio,c.id);
     else if(c.cat==="sobrante"&&c.personaUid===auid) add(c.fecha,"Sobrante registrado al cierre"+(c.concepto?" · "+c.concepto:""),Number(c.valor)||0,c.medio,c.id);
     else if(c.cat==="base"&&c.porUid===auid) add(c.fecha,"Base para vueltos a "+nomM(c.personaId),-(Number(c.valor)||0),c.medio);
     else if(c.cat==="interna"&&!c.inicial&&c.porUid===auid) add(c.fecha,(c.tipo==="entra"?"Entrada de ":"Salida a ")+(S.cuentas[c.cuentaId]?.nombre||"cuenta interna"),(c.tipo==="entra"?1:-1)*(Number(c.valor)||0),c.medio); }
@@ -1659,24 +1659,29 @@ function bloqueCajaOficina(){
 function movOficina(auid,tipo){
   const u=(S.usuarios||{})[auid], C=cajaOficina(auid), base=tipo==="base";
   $("#dlgCont").innerHTML=`<header><div><h2>${base?"Dar base de caja":"Recibir cierre de caja"}</h2><span class="sub">${esc(u?.nombre||u?.email||"")} · tiene ${Object.entries(MEDIOS).map(([k,t])=>t+" "+pesos(C.saldo[k])).join(" · ")}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
-    <p class="sub">${base?"Efectivo que le entregas para trabajar y dar base a los mensajeros.":"Lo que te entrega en cada medio. Viene lleno con lo que debe tener; cámbialo si te entrega otra cosa (por ejemplo, si le dejas base para mañana). Si en un medio está en negativo o te entrega de más, sobró plata: se registra como sobrante y ese medio queda en $ 0."}</p>
+    <p class="sub">${base?"Efectivo que le entregas para trabajar y dar base a los mensajeros.":"Lo que te entrega en cada medio. Viene lleno con lo que debe tener; cámbialo si te entrega otra cosa (por ejemplo, si le dejas base para mañana). Si en efectivo está en negativo o te entrega de más, sobró plata: se registra como sobrante. Nequi y Bancolombia son las mismas cuentas de la empresa: si quedan en negativo es porque pagó desde ellas más de lo que registró que entró; se dejan en $ 0 sin tocar la caja."}</p>
     ${base?`<div class="campo"><label for="of_efectivo">Valor (efectivo)</label><input id="of_efectivo" data-ofm="efectivo" type="number" inputmode="numeric" min="0" step="1000"></div>`
       :`<div class="linea2">${Object.entries(MEDIOS).map(([k,t])=>`<div class="campo" style="min-width:120px"><label for="of_${k}">${t}</label><input id="of_${k}" data-ofm="${k}" type="number" inputmode="numeric" min="0" step="1000" value="${C.saldo[k]>0?C.saldo[k]:""}"></div>`).join("")}</div>`}
     ${base?"":'<div id="ofRes" class="sub" style="margin:-4px 0 10px"></div>'}
     <div class="campo"><label for="ofNota">Nota (opcional)</label><input id="ofNota" placeholder="${base?"Ej: base del día":"Ej: cierre del día"}"></div>
     <button class="btn ${base?"":"ok"}" id="ofGuardar" style="width:100%">${base?"Entregar base":"Registrar cierre"}</button>`;
   abrirDlg(); $("#of_efectivo").focus();
-  // Al cierre: lo que entrega de más sobre lo que debe tener (o lo que está en negativo) es sobrante; entra a la caja y el medio queda en 0
+  // Al cierre, lo que pasa de lo que debía tener (o lo que está en negativo):
+  // - efectivo: es plata física de más → sobrante, entra a la caja;
+  // - Nequi y Bancolombia: son las cuentas de la empresa, compartidas con la caja general. El negativo es plata que pagó desde ellas
+  //   (ya salió de la caja); solo se deja su columna en 0 con un ajuste que no mueve la caja.
   const entregas=()=>[...document.querySelectorAll("[data-ofm]")].map(i=>[i.dataset.ofm,Number(i.value)||0]);
-  const sobrantes=()=>base?[]:entregas().map(([m,v])=>[m,Math.round(v-C.saldo[m])]).filter(([,x])=>x>0);
-  const resumen=()=>{ const r=$("#ofRes"); if(!r) return; const sb=new Map(sobrantes());
-    r.innerHTML=entregas().map(([m,v])=>{ const queda=Math.round(C.saldo[m]-v); return `${MEDIOS[m]}: ${sb.has(m)?`<b class="pos">sobrante ${pesos(sb.get(m))}</b>, queda en $ 0`:queda?`queda ${pesos(queda)} en su caja`:"queda en $ 0"}`; }).join(" · "); };
+  const excesos=()=>base?[]:entregas().map(([m,v])=>[m,Math.round(v-C.saldo[m])]).filter(([,x])=>x>0);
+  const sobrantes=()=>excesos().filter(([m])=>m==="efectivo"), niveles=()=>excesos().filter(([m])=>m!=="efectivo");
+  const resumen=()=>{ const r=$("#ofRes"); if(!r) return; const sb=new Map(sobrantes()), nv=new Map(niveles());
+    r.innerHTML=entregas().map(([m,v])=>{ const queda=Math.round(C.saldo[m]-v); return `${MEDIOS[m]}: ${sb.has(m)?`<b class="pos">sobrante ${pesos(sb.get(m))}</b>, queda en $ 0`:nv.has(m)?`pagó ${pesos(nv.get(m))} más de lo que entró; queda en $ 0 (no es sobrante)`:queda?`queda ${pesos(queda)} en su caja`:"queda en $ 0"}`; }).join(" · "); };
   document.querySelectorAll("[data-ofm]").forEach(i=>i.oninput=resumen); resumen();
   $("#ofGuardar").onclick=async()=>{ if(entregas().some(([,v])=>v<0)) return toast("Los valores no pueden ser negativos");
-    const vals=entregas().filter(([,v])=>v>0), sobs=sobrantes();
-    if(!vals.length&&!sobs.length) return toast("Escribe un valor mayor a cero");
+    const vals=entregas().filter(([,v])=>v>0), sobs=sobrantes(), nivs=niveles();
+    if(!vals.length&&!sobs.length&&!nivs.length) return toast("Escribe un valor mayor a cero");
     const b=$("#ofGuardar"); b.disabled=true; const nota=$("#ofNota").value.trim(), t=Date.now(), quien=u?.nombre||u?.email||"";
     try{ for(const [medio,val] of sobs){ const id=nuevoId(); await guardar("cajamovs",id,{id,tipo:"entra",cat:"sobrante",personaUid:auid,personaId:"",valor:val,medio,concepto:quien+(nota?" · "+nota:""),fecha:t}); }
+      for(const [medio,val] of nivs){ const id=nuevoId(); await guardar("cajamovs",id,{id,tipo:"base",cat:"oficina",nivel:true,personaUid:auid,personaId:"",valor:val,medio,concepto:"Pagó desde la cuenta de la empresa más de lo que registró que entró",fecha:t}); }
       for(const [medio,val] of vals){ const id=nuevoId(); await guardar("cajamovs",id,{id,tipo,cat:"oficina",personaUid:auid,personaId:"",valor:val,medio,concepto:nota,fecha:t+1}); }
       cerrarDlg(); toast((base?"Base entregada: ":"Cierre recibido: ")+(vals.map(([m,v])=>MEDIOS[m]+" "+pesos(v)).join(" · ")||"sin entrega")+(sobs.length?" · Sobrante: "+sobs.map(([m,v])=>MEDIOS[m]+" "+pesos(v)).join(" · "):"")); }
     catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
