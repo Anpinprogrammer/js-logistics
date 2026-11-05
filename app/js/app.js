@@ -932,7 +932,9 @@ function pintarCuentas(v,aviso){
   $("#cuGanancia").onclick=()=>movClienteOficina("ganancia");
   v.querySelectorAll("[data-cmmov]").forEach(b=>b.onclick=()=>cambiarMedio("movimientos",b.dataset.cmmov));
   v.querySelectorAll("[data-mxed]").forEach(b=>b.onclick=()=>{ const m=S.movimientos[b.dataset.mxed]; if(m) movClienteOficina(m.tipo,m); });
-  v.querySelectorAll("[data-mxdel]").forEach(b=>b.onclick=async()=>{ const m=S.movimientos[b.dataset.mxdel]; if(!m) return; if(mueveCaja(m)&&yaContado(m.fecha)) return avisoContado();
+  v.querySelectorAll("[data-mxdel]").forEach(b=>b.onclick=async()=>{ const m=S.movimientos[b.dataset.mxdel]; if(!m) return; if(mueveCaja(m)&&yaContado(m.fecha)&&!esPago(m)) return avisoContado();
+    if(esPago(m)&&yaContado(m.fecha)){ if(!await confirmar("Reversar pago",`${nombreCliente(m.clienteId)||"Cliente"} · ${pesos(m.valor)}. Ya se contó en un arqueo: se registra hoy un pago contrario por el mismo valor.`,"Reversar")) return;
+      try{ await reversarPago(m); toast("Pago reversado"); }catch(e){ toast("No se pudo reversar"); } return; }
     if(!await confirmar("Quitar "+(m.tipo==="ganancia"?"ganancia":esPago(m)?"pago":"compra"),`${nombreCliente(m.clienteId)||"Cliente"} · ${pesos(m.valor)}. Se quita de la cuenta del cliente${m.tipo==="ganancia"?" y del sueldo de JS":" y de la caja"}.`,"Quitar")) return;
     try{ await borrar("movimientos",m.id); toast("Movimiento quitado"); }catch(e){ toast("No se pudo quitar"); } });
 }
@@ -1356,7 +1358,9 @@ function abrirCuenta(cid){
     if(ped?.domiPagado){ if(cambiaLoContado(ped,{...ped,domiPagado:false,domiPagoMedio:""})) return avisoContado(); if(!await confirmar("Desmarcar el pago de "+g,"El pago del domicilio se quita de la caja y vuelve a sumarse al saldo del cliente.","Desmarcar")) return abrirCuenta(cid);
       try{ await actualizar("pedidos",g,{domiPagado:false,domiPagoMedio:"",domiPagoValor:"",domiPagoFecha:0}); toast("Guía "+g+" actualizada"); }catch(e){ toast("No se pudo guardar"); } return setTimeout(()=>abrirCuenta(cid),200); }
     pagoDomicilio(g,()=>abrirCuenta(cid)); });
-  document.querySelectorAll("[data-delmov]").forEach(b=>b.onclick=async()=>{ const m=S.movimientos[b.dataset.delmov]; if(!m) return; if(mueveCaja(m)&&yaContado(m.fecha)) return avisoContado();
+  document.querySelectorAll("[data-delmov]").forEach(b=>b.onclick=async()=>{ const m=S.movimientos[b.dataset.delmov]; if(!m) return; if(mueveCaja(m)&&yaContado(m.fecha)&&!esPago(m)) return avisoContado();
+    if(esPago(m)&&yaContado(m.fecha)){ if(!await confirmar("Reversar pago",`${MOVS[m.tipo]?.corto} · ${pesos(m.valor)}. Ya se contó en un arqueo: se registra hoy un pago contrario por el mismo valor.`,"Reversar")) return abrirCuenta(cid);
+      b.disabled=true; try{ await reversarPago(m); toast("Pago reversado"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){ b.disabled=false; toast("No se pudo reversar"); } return; }
     if(!await confirmar("Quitar movimiento",`${MOVS[m.tipo]?.corto||"Movimiento"} · ${pesos(m.valor)}. Se quita de la cuenta del cliente${mueveCaja(m)?" y de la caja":""}.`,"Quitar")) return abrirCuenta(cid);
     b.disabled=true; try{ await borrar("movimientos",b.dataset.delmov); toast("Movimiento quitado"); setTimeout(()=>abrirCuenta(cid),200); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
   const bc=$("#cCsv"); if(bc) bc.onclick=async()=>{
@@ -1399,9 +1403,14 @@ function imprimirTicket(titulo,armar,antes){ // armar: una función que llena el
   if(!$("#dlg").open) abrirDlg(); ver();
   $("#dlgCont").querySelectorAll("[data-mm]").forEach(b=>b.onclick=()=>{ mm=Number(b.dataset.mm); lsSet("js_papel",String(mm)); ver(); });
   $("#tkImprimir").onclick=async()=>{ // se imprime desde un marco aparte para que salga solo el ticket
-    if(antes){ const b=$("#tkImprimir"); b.disabled=true; b.textContent="Guardando…";
-      try{ await antes.fn(); }catch(e){ b.disabled=false; b.textContent="Pagar e imprimir"; return toast("No se pudo guardar el pago. No se imprimió."); }
-      antes=null; b.disabled=false; b.textContent="Imprimir otra vez"; $("#dlgCont").querySelector(".aviso")?.remove(); }
+    if(antes){ const b=$("#tkImprimir"); b.disabled=true; b.textContent="Guardando…"; let hechos=[];
+      try{ hechos=(await antes.fn())||[]; }catch(e){ b.disabled=false; b.textContent="Pagar e imprimir"; return toast("No se pudo guardar el pago. No se imprimió."); }
+      antes=null; b.disabled=false; b.textContent="Imprimir otra vez"; $("#dlgCont").querySelector(".aviso")?.remove();
+      if(hechos.length){ // por si se pagó por error: deshace los pagos que se acaban de registrar
+        b.insertAdjacentHTML("afterend",'<button class="btn peligro" id="tkReversar" style="width:100%;margin-top:8px">Reversar los pagos</button>');
+        $("#tkReversar").onclick=async()=>{ const ms=hechos.map(id=>S.movimientos[id]).filter(Boolean), tot=ms.reduce((a,m)=>a+(Number(m.valor)||0),0);
+          if(!await confirmar("Reversar los pagos",`Se quitan ${ms.length} pago${ms.length===1?"":"s"} por ${pesos(tot)}: la plata vuelve a la caja y los clientes vuelven a quedar con su saldo a favor.`,"Reversar")) return;
+          try{ for(const m of ms) await reversarPago(m); cerrarDlg(); toast(`Pagos reversados: ${pesos(tot)}`); }catch(e){ toast("No se pudieron reversar todos. Revisa en Cuentas."); } }; } }
     const fr=document.createElement("iframe"); fr.style.cssText="position:fixed;width:0;height:0;border:0;right:0;bottom:0"; document.body.appendChild(fr);
     const d=fr.contentWindow.document; d.open(); d.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(tkTxt(titulo))}</title><style>@page{margin:0}html,body{margin:0;background:#fff}body{padding:2mm 4mm}</style></head><body>${pre(lineas(),mm===80?72:48)}</body></html>`); d.close();
     setTimeout(()=>{ fr.contentWindow.focus(); fr.contentWindow.print(); setTimeout(()=>fr.remove(),60000); },200); };
@@ -1446,6 +1455,12 @@ function armarReciboDia(cid,dia,pago){
     if(r.queda<0){ t.vacio(); t.texto("Nequi 316 493 3854 - Bancolombia ahorros 815 13203390 - Javier Salazar"); }
   };
 }
+/* Reversar un pago de cliente (entrada o salida de caja). Si todavía no se contó en un arqueo, se borra;
+   si ya se contó, se registra hoy un pago contrario, para no cambiar lo que ya se contó. */
+async function reversarPago(m){
+  if(!yaContado(m.fecha)) return borrar("movimientos",m.id);
+  const id=nuevoId(); return guardar("movimientos",id,{id,clienteId:m.clienteId,tipo:m.tipo==="pago_a_cliente"?"pago_de_cliente":"pago_a_cliente",valor:Number(m.valor)||0,medio:m.medio||"efectivo",nota:"Reverso del pago del "+hora(m.fecha),reversoDe:m.id,fecha:Date.now(),porUid:uid||"",porNombre:miNombre()});
+}
 /* Varios recibos de una vez: se eligen los clientes de la lista que se está viendo en Clientes. */
 function recibosVarios(cs,k){
   const sel=new Set();
@@ -1478,9 +1493,9 @@ function recibosVarios(cs,k){
     const fns=ids.map(id=>dia?armarReciboDia(id,dia,pagar.has(id)?{medio,valor:pagar.get(id)}:null):armarRecibo(id,pagar.has(id)?{medio}:null)).filter(Boolean);
     // el pago se guarda al tocar "Pagar e imprimir", con el saldo de ese momento (si ya quedó en 0, no se paga dos veces)
     const antes=ps.length?{texto:`Al imprimir se registra el pago de <b>${pesos(tot)}</b> en ${MEDIOS[medio]} a ${ps.length} cliente${ps.length===1?"":"s"} y quedan en $ 0.`,
-      fn:async()=>{ let n=0, total=0; for(const [cid] of ps){ const v=Math.round(saldoCliente(cid)); if(!(v>0)) continue; const id=nuevoId();
-          await guardar("movimientos",id,{id,clienteId:cid,tipo:"pago_a_cliente",valor:v,medio,nota:"Pago con recibo impreso",fecha:Date.now(),porUid:uid||"",porNombre:miNombre()}); n++; total+=v; }
-        toast(`Pagados ${pesos(total)} a ${n} cliente${n===1?"":"s"}`); }}:null;
+      fn:async()=>{ let total=0; const hechos=[]; for(const [cid] of ps){ const v=Math.round(saldoCliente(cid)); if(!(v>0)) continue; const id=nuevoId();
+          await guardar("movimientos",id,{id,clienteId:cid,tipo:"pago_a_cliente",valor:v,medio,nota:"Pago con recibo impreso",fecha:Date.now(),porUid:uid||"",porNombre:miNombre()}); hechos.push(id); total+=v; }
+        toast(`Pagados ${pesos(total)} a ${hechos.length} cliente${hechos.length===1?"":"s"}`); return hechos; }}:null;
     imprimirTicket(`${ids.length} recibo${ids.length===1?"":"s"}`,fns,antes); };
   ver();
 }
@@ -1943,7 +1958,7 @@ async function descargarCartera(btn){
 
 /* ======================= CAJA GENERAL ======================= */
 const MEDIOS_CAJA={...MEDIOS, cuentas:"Cuentas JS (transferencias)"};
-const CATS={arqueo:"Arqueo",interna:"Cuenta interna",inicial:"Caja inicial",otro_entra:"Otra entrada",sobrante:"Sobrante de caja",gasto:"Gasto",base:"Base para vueltos",arriendo:"Arriendo",adelanto:"Adelanto",sueldo:"Pago de sueldo",otro:"Otra salida"};
+const CATS={devolucion:"Devolución de adelanto",arqueo:"Arqueo",interna:"Cuenta interna",inicial:"Caja inicial",otro_entra:"Otra entrada",sobrante:"Sobrante de caja",gasto:"Gasto",base:"Base para vueltos",arriendo:"Arriendo",adelanto:"Adelanto",sueldo:"Pago de sueldo",otro:"Otra salida"};
 const CATS_TIPO={entra:["otro_entra"],sale:["gasto","base","arriendo","adelanto","sueldo","otro"]};
 const CATS_PERSONA=["adelanto","sueldo","base"]; // movimientos de caja que van a nombre de una persona
 const CATS_SEMANA=["adelanto","sueldo"]; // se descuentan del sueldo de la semana que se elige, sin importar el día en que salió la plata
@@ -2086,7 +2101,8 @@ function conectarCajaGeneral(v){
   v.querySelectorAll("[data-delref]").forEach(b=>b.onclick=async()=>{ const [col,id]=b.dataset.delref.split("|"), x=S[col]?.[id]; if(!x) return;
     if(yaContado(x.fecha)) return avisoContado();
     if(!await confirmar("Quitar movimiento de caja",`${hora(x.fecha)} · ${pesos(x.valor)}. Se quita de la caja.`,"Quitar")) return;
-    b.disabled=true; try{ await borrar(col,id); toast("Movimiento quitado"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
+    b.disabled=true; try{ const ad=x.cat==="devolucion"&&S.cajamovs[x.adelantoId]; if(ad) await actualizar("cajamovs",ad.id,{devuelto:Math.max(0,(Number(ad.devuelto)||0)-(Number(x.valor)||0))});
+      await borrar(col,id); toast("Movimiento quitado"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
 }
 function movCaja(tipo,pre={}){
   const personas=listaOrdenada(S.mensajeros,"nombre");
@@ -2168,6 +2184,7 @@ function sueldosDia(dia){
   return {res,dom30,propios,desc,ganancias,fijos,nMens,javier};
 }
 const ORDEN_TIPO=["mensajero","oficina","patinador","empresa","dueno"];
+const valorAdel = c => Math.max(0,(Number(c.valor)||0)-(Number(c.devuelto)||0)); // adelanto menos lo que ya devolvió
 const esDeSemana = (c,sem,dias) => c.semana ? c.semana===sem : dias.includes(diaDe(c.fecha)); // adelantos viejos sin semana: por la fecha
 function resumenSemana(sem){
   const dias=diasSemana(sem), porDia=dias.map(sueldosDia);
@@ -2175,7 +2192,7 @@ function resumenSemana(sem){
   const filas=personas.map(m=>{ const vals=porDia.map(x=>x.res[m.id]||0), previo=sueldoPrevio(m.id,sem), total=vals.reduce((a,x)=>a+x,0)+previo;
     const movs=Object.values(S.cajamovs).filter(c=>c.personaId===m.id);
     const adelantos=movs.filter(c=>c.cat==="adelanto"&&esDeSemana(c,sem,dias));
-    const adel=adelantos.reduce((a,c)=>a+(Number(c.valor)||0),0);
+    const adel=adelantos.reduce((a,c)=>a+valorAdel(c),0);
     const pagado=movs.filter(c=>c.cat==="sueldo"&&c.semana===sem).reduce((a,c)=>a+(Number(c.valor)||0),0);
     return {m,vals,previo,total,adel,adelantos,pagado,neto:total-adel-pagado}; })
     ; // todo el personal aparece, aunque no tenga movimiento, para poder marcarle días o sueldo anterior
@@ -2188,7 +2205,7 @@ function sueldoPersonaSemana(mid,sem){
   const movs=Object.values(S.cajamovs).filter(c=>c.personaId===mid);
   const adelantos=movs.filter(c=>c.cat==="adelanto"&&esDeSemana(c,sem,dias));
   const pagos=movs.filter(c=>c.cat==="sueldo"&&c.semana===sem);
-  const adel=adelantos.reduce((a,c)=>a+(Number(c.valor)||0),0), pagado=pagos.reduce((a,c)=>a+(Number(c.valor)||0),0);
+  const adel=adelantos.reduce((a,c)=>a+valorAdel(c),0), pagado=pagos.reduce((a,c)=>a+(Number(c.valor)||0),0);
   return {sem,dias,vals,previo,total,adelantos,pagos,adel,pagado,neto:total-adel-pagado};
 }
 function pendienteAnterior(mid,sem){ // semanas anteriores con saldo sin pagar (hasta 12 semanas atrás)
@@ -2218,7 +2235,7 @@ function miSueldoHtml(mid){
       <tr><td><b>Total</b></td><td class="n">${ent.filter(p=>R.dias.includes(diaSueldo(p))).length}</td><td class="n"></td><td class="n"><b>${pesos(R.total)}</b></td></tr></tbody></table></div>
     <p class="sub" style="margin-top:8px">${esDueno?"Tu sueldo diario: 30% de los domicilios de los mensajeros + tus domicilios y los de oficina + ganancias ocasionales + "+pesos(DESC_SUELDO)+" por mensajero − pagos fijos (patinadores, oficina y JS).":tipoDe(yo)==="oficina"?"Pago fijo por día trabajado. Los domicilios de tus pedidos son 100% de JS.":"Cada día: 70% de tus domicilios − "+pesos(DESC_SUELDO)+"."}</p>
     <h2>Adelantos y pagos</h2>
-    ${movs.length?`<div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Medio</th><th class="n">Valor</th></tr></thead><tbody>${movs.map(c=>`<tr><td>${hora(c.fecha)}</td><td>${c.t}${c.concepto?`<br><span class="sub" style="font-size:.8rem">${esc(c.concepto)}</span>`:""}</td><td>${MEDIOS[c.medio]||""}</td><td class="n">${pesos(c.valor)}</td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Sin adelantos ni pagos esta semana.</div>`}`;
+    ${movs.length?`<div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Medio</th><th class="n">Valor</th></tr></thead><tbody>${movs.map(c=>`<tr><td>${hora(c.fecha)}</td><td>${c.t}${c.concepto?`<br><span class="sub" style="font-size:.8rem">${esc(c.concepto)}</span>`:""}</td><td>${MEDIOS[c.medio]||""}</td><td class="n">${pesos(c.valor)}${Number(c.devuelto)?`<br><span class="sub" style="font-size:.8rem">devolvió ${pesos(c.devuelto)}</span>`:""}</td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Sin adelantos ni pagos esta semana.</div>`}`;
 }
 
 function pintarSueldos(v,aviso){
@@ -2249,7 +2266,7 @@ function pintarSueldos(v,aviso){
     ${R.dias.map((d,i)=>{ const x=R.porDia[i]; if(!x.dom30&&!x.propios&&!x.fijos&&!x.ganancias) return ""; return `<tr><td>${DIAS_SEM[i]} ${d.slice(8)}</td><td class="n">${pesos(x.dom30)}</td><td class="n">${pesos(x.propios)}</td><td class="n">${pesos(x.ganancias)}</td><td class="n">${pesos(x.desc)} (${x.nMens})</td><td class="n neg">${pesos(-x.fijos)}</td><td class="n"><b>${pesos(x.javier)}</b></td></tr>`; }).join("")||`<tr><td colspan="7" class="sub">Sin movimiento esta semana.</td></tr>`}
     </tbody></table></div>`:""}
     <h2>Adelantos de la semana</h2>
-    ${adelSem.length?`<div class="tabla-env"><table><thead><tr><th>Día</th><th>Persona</th><th>Medio</th><th>Detalle</th><th class="n">Valor</th><th></th></tr></thead><tbody>${adelSem.map(c=>`<tr><td>${hora(c.fecha)}</td><td>${esc(c.nom)}</td><td>${MEDIOS[c.medio]||""}</td><td>${esc(c.concepto||"")}</td><td class="n">${pesos(c.valor)}</td><td><button class="btn peligro chico" data-delref="cajamovs|${esc(c.id)}">Quitar</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Sin adelantos esta semana. Usa el botón “Adelanto” en cada persona.</div>`}`;
+    ${adelSem.length?`<div class="tabla-env"><table><thead><tr><th>Día</th><th>Persona</th><th>Medio</th><th>Detalle</th><th class="n">Valor</th><th></th></tr></thead><tbody>${adelSem.map(c=>`<tr><td>${hora(c.fecha)}</td><td>${esc(c.nom)}</td><td>${MEDIOS[c.medio]||""}</td><td>${esc(c.concepto||"")}</td><td class="n">${pesos(c.valor)}${Number(c.devuelto)?`<br><span class="sub" style="font-size:.8rem">devolvió ${pesos(c.devuelto)}</span>`:""}</td><td>${valorAdel(c)>0?`<button class="btn sec chico" data-adelq="${esc(c.id)}">Devolvió / Quitar</button>`:'<span class="sub">Devuelto</span>'}</td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Sin adelantos esta semana. Usa el botón “Adelanto” en cada persona.</div>`}`;
   $("#semAnt").onclick=()=>{semSel=moverSemana(semSel,-1); pintar();};
   $("#semSig").onclick=()=>{semSel=moverSemana(semSel,1); pintar();};
   $("#semHoy").onclick=()=>{semSel=semanaDe(hoy()); pintar();};
@@ -2264,7 +2281,33 @@ function pintarSueldos(v,aviso){
   v.querySelectorAll("[data-previo]").forEach(a=>a.onclick=e=>{ e.preventDefault(); editarPrevio(S.mensajeros[a.dataset.previo],R.sem); });
   v.querySelectorAll("[data-adel]").forEach(b=>b.onclick=()=>movCaja("sale",{cat:"adelanto",personaId:b.dataset.adel,semana:R.sem}));
   v.querySelectorAll("[data-pagar]").forEach(b=>b.onclick=()=>{ const f=R.filas.find(x=>x.m.id===b.dataset.pagar); movCaja("sale",{cat:"sueldo",personaId:f.m.id,valor:f.neto,semana:R.sem}); });
-  v.querySelectorAll("[data-delref]").forEach(b=>b.onclick=async()=>{ const [col,id]=b.dataset.delref.split("|"); b.disabled=true; try{ await borrar(col,id); toast("Adelanto quitado"); }catch(e){ b.disabled=false; toast("No se pudo quitar"); } });
+  v.querySelectorAll("[data-adelq]").forEach(b=>b.onclick=()=>quitarAdelanto(b.dataset.adelq));
+}
+/* Adelanto que se devuelve o que se registró por error.
+   - Devolvió la plata (todo o una parte): entra a la caja hoy y se deja de descontar del sueldo; el adelanto queda en el historial.
+   - Quitar por error: se borra. Si salió de una liquidación, la deuda vuelve al mensajero; si ya se contó en un arqueo, no se borra. */
+function quitarAdelanto(id){
+  const c=S.cajamovs[id]; if(!c) return; const m=S.mensajeros[c.personaId], resta=valorAdel(c), liq=c.deLiquidacion?S.liquidaciones[c.deLiquidacion]:null;
+  $("#dlgCont").innerHTML=`<header><div><h2>Adelanto de ${esc(m?.nombre||"")}</h2><span class="sub">${hora(c.fecha)} · ${pesos(c.valor)}${Number(c.devuelto)?" · ya devolvió "+pesos(c.devuelto):""}${c.concepto?" · "+esc(c.concepto):""}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <h2>Devolvió la plata</h2><p class="sub">Entra hoy a la caja y se le deja de descontar del sueldo.</p>
+    <div class="linea2"><div class="campo"><label for="adVal">Valor que devolvió</label><input id="adVal" type="number" inputmode="numeric" min="0" step="1000" value="${resta}"></div>
+    <div class="campo"><label for="adMedio">Medio</label><select id="adMedio">${Object.entries(MEDIOS).map(([k,t])=>`<option value="${k}">${t}</option>`).join("")}</select></div></div>
+    <button class="btn ok" id="adDev" style="width:100%">Registrar devolución</button>
+    <h2>Se registró por error</h2><p class="sub">${liq?"Salió de una liquidación: se borra y lo que quedó debiendo vuelve a su cuenta de mensajero.":"Se borra y la plata vuelve a la caja en la fecha del adelanto."}</p>
+    <button class="btn peligro" id="adDel" style="width:100%">Quitar adelanto</button>`;
+  abrirDlg();
+  $("#adDev").onclick=async()=>{ const val=Math.round(Number($("#adVal").value)); if(!(val>0)) return toast("Escribe un valor mayor a cero"); if(val>resta) return toast("No puede devolver más de "+pesos(resta));
+    const b=$("#adDev"); b.disabled=true; const did=nuevoId();
+    try{ await guardar("cajamovs",did,{id:did,tipo:"entra",cat:"devolucion",personaId:c.personaId,valor:val,medio:$("#adMedio").value,concepto:"Adelanto del "+hora(c.fecha),adelantoId:id,fecha:Date.now(),semana:""});
+      await actualizar("cajamovs",id,{devuelto:(Number(c.devuelto)||0)+val}); cerrarDlg(); toast(`Devolución de ${pesos(val)} registrada`); }
+    catch(e){ b.disabled=false; toast("No se pudo guardar"); } };
+  $("#adDel").onclick=async()=>{
+    if(!liq&&yaContado(c.fecha)) return toast("Ese adelanto ya se contó en un arqueo: si devolvió la plata, usa “Registrar devolución”.");
+    if(liq&&liquidacionesDe(c.personaId)[0]?.id!==liq.id) return toast("Ya hay una liquidación más nueva de este mensajero: usa “Registrar devolución” cuando pague.");
+    if(Number(c.devuelto)) return toast("Este adelanto ya tiene una devolución registrada: no se puede quitar.");
+    if(!await confirmar("Quitar adelanto",`${m?.nombre||""} · ${pesos(c.valor)}. ${liq?"Vuelve a quedar debiéndolo como mensajero.":"La plata vuelve a la caja."}`,"Quitar")) return quitarAdelanto(id);
+    try{ if(liq) await actualizar("liquidaciones",liq.id,{debe:(Number(liq.debe)||0)+(Number(c.valor)||0),adelanto:0});
+      await borrar("cajamovs",id); cerrarDlg(); toast("Adelanto quitado"); }catch(e){ toast("No se pudo quitar"); } };
 }
 /* Pago fijo por día (patinadores, oficina, JS): se guarda en Personal y se usa al marcar cada día en Sueldos. */
 const marcarDia = (m,dia) => guardar("jornadas",m.id+"_"+dia,{id:m.id+"_"+dia,personaId:m.id,dia,valor:Number(m.tarifa)});
@@ -2324,7 +2367,7 @@ async function descargarPlanilla(R,btn){
     const wa=wb.addWorksheet("Adelantos");
     wa.columns=[{header:"X",width:20},...dl.map(h=>({header:h,width:12,style:{numFmt:MON}})),{header:"TOTAL",width:13,style:{numFmt:MON}}];
     cab(wa.getRow(1));
-    R.filas.forEach((f,i)=>{ const k=i+2; const porDia=R.dias.map(d=>f.adelantos.filter(c=>diaDe(c.fecha)===d).reduce((a,c)=>a+(Number(c.valor)||0),0));
+    R.filas.forEach((f,i)=>{ const k=i+2; const porDia=R.dias.map(d=>f.adelantos.filter(c=>diaDe(c.fecha)===d).reduce((a,c)=>a+valorAdel(c),0));
       wa.addRow([f.m.nombre,...porDia.map(x=>x||null),null]); wa.getCell("I"+k).value={formula:`SUM(B${k}:H${k})`,result:f.adel}; });
     const wj=wb.addWorksheet("Cálculo Javier");
     wj.columns=[{header:"Día",width:12},{header:"30% domicilios mensajeros",width:24,style:{numFmt:MON}},{header:"Domicilios propios",width:18,style:{numFmt:MON}},{header:"Descuentos de mensajeros",width:24,style:{numFmt:MON}},{header:"Patinadores y JS",width:18,style:{numFmt:MON}},{header:"Sueldo",width:14,style:{numFmt:MON}}];
