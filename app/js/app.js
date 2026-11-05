@@ -194,7 +194,7 @@ let ultimaGuia=null;
 let fotoPara=""; // id en Personal de la oficina cuando la foto se toma desde Oficina → Pedidos
 
 /* Filtro por día de los paneles de pedidos: un pedido es del día si salió o se entregó (o devolvió) ese día. "" = todos los días. */
-let buscarCli=""; // buscador por nombre o número en Clientes
+let buscarCli="", diaEntM=hoy(); // diaEntM: día de "Entregados" en la app del mensajero // buscador por nombre o número en Clientes
 let diaPedA="", diaPedC="", diaPedM="", mensPedA="", diaCliF=""; // diaCliF: filtro por día en Clientes // mensPedA: filtro por mensajero en Oficina → Pedidos
 const delDia = (p,d) => !d || diaDe(p.creado)===d || (!!p.entregado && diaDe(p.entregado)===d);
 function moverDia(d,n){ const x=new Date((d||hoy())+"T12:00:00"); x.setDate(x.getDate()+n); return diaDe(x.getTime()); }
@@ -226,7 +226,7 @@ const ICONOS={
   dev:ico('<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
   plata:ico('<circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.6.8-2.6 2s1.1 1.7 2.6 2 2.6.8 2.6 2-1.1 2-2.6 2c-1.1 0-2.1-.5-2.6-1.3M12 6.5V8M12 16v1.5"/>')
 };
-ICONOS.sueldo=ICONOS.sueldos; ICONOS.cuenta=ICONOS.caja;
+ICONOS.sueldo=ICONOS.sueldos; ICONOS.cuenta=ICONOS.caja; ICONOS.entregados=ICONOS.ok;
 /* items: [clave, nombre, número]. En el celular caben 5 abajo; si hay más, el quinto es "Menú" con el resto. */
 function ponerNav(items,actual,elegir){
   const ir=k=>{ elegir(k); pintar(); scrollTo(0,0); };
@@ -286,7 +286,7 @@ async function elegirMensajero(id){
 
 function pintarMensajero(){
   const pend=pendientesMios().length;
-  ponerNav([["inicio","Inicio"],["nuevo","Nuevo"],["pend","Por entregar",pend],["caja","Mi caja"],["sueldo","Mi sueldo"]],tabM,k=>tabM=k);
+  ponerNav([["inicio","Inicio"],["nuevo","Nuevo"],["pend","Por entregar",pend],["caja","Mi caja"],["sueldo","Mi sueldo"],["entregados","Entregados"]],tabM,k=>tabM=k);
 
   const mens=listaOrdenada(S.mensajeros,"nombre").filter(esRepartidor);
   const selector=`<div class="campo"><label for="selMens">¿Quién eres?</label>
@@ -321,6 +321,15 @@ function pintarMensajero(){
       :`<div class="vacio">${diaPedM?"No tienes pedidos pendientes de ese día.":"No tienes pedidos pendientes. Toma la foto en “Nuevo pedido” al salir."}</div>`);
   } else if(tabM==="sueldo"){
     h=miSueldoHtml(miMensajero);
+  } else if(tabM==="entregados"){ // solo para ver: no tiene botones para cambiar nada
+    const ps=Object.values(S.pedidos).filter(p=>cerrado(p)&&p.mensajeroId===miMensajero&&(!diaEntM||diaDe(p.entregado)===diaEntM)).sort((a,b)=>b.entregado-a.entregado);
+    const ent=ps.filter(p=>p.estado==="entregado"), t=totales(ent);
+    h=`<h1>Entregados</h1><p class="sub">${ent.length} entregado${ent.length===1?"":"s"}${ps.length-ent.length?` · ${ps.length-ent.length} devuelto${ps.length-ent.length===1?"":"s"}`:""}${diaEntM?"":" en total"}. Solo para consultar.</p>${filtroDiaHtml(diaEntM)}
+      ${ent.length?`<div class="cifras" style="margin:10px 0"><div class="cifra"><span>Efectivo cobrado</span><b>${pesos(t.efectivo)}</b></div><div class="cifra"><span>Transferencias a JS</span><b>${pesos(t.transfJs)}</b></div><div class="cifra"><span>Pagado directo al cliente</span><b>${pesos(t.transfCli)}</b></div></div>`:""}
+      ${ps.length?`<div class="lista">${ps.map(p=>`<button class="fila" data-verent="${esc(p.guia)}">
+        ${fotoSegura(p.mini)?`<img src="${fotoSegura(p.mini)}" alt="">`:'<span class="sinfoto"></span>'}
+        <span class="info"><span class="guia">${esc(p.guia)}</span> ${etqEstado(p)}<p>${p.estado==="entregado"?"Recibió "+esc(p.destinatario||"")+" · "+metodoTxt(p)+(Number(p.valorCobrado)?" · cobró "+pesos(p.valorCobrado):""):esc(MOTIVOS[p.motivoDev]||"Devuelto")} · ${hora(p.entregado)}</p></span>
+        <span class="btn chico sec">Ver</span></button>`).join("")}</div>`:`<div class="vacio">${diaEntM?"No entregaste pedidos ese día.":"Todavía no tienes pedidos entregados."}</div>`}`;
   } else {
     const pm=periodoMensajero(miMensajero), t=totales(pm.ps), ul=pm.ul;
     h=`<h1>Mi caja</h1><p class="sub">Período actual: ${ul?"desde la liquidación del "+hora(ul.fecha):"desde el inicio"} hasta ahora.</p>
@@ -350,6 +359,7 @@ function pintarMensajero(){
   document.querySelectorAll("[data-entregar]").forEach(b=>b.onclick=()=>abrirEntrega(b.dataset.entregar));
   document.querySelectorAll("#vista [data-irm]").forEach(b=>b.onclick=()=>{ tabM=b.dataset.irm; if(tabM==="pend") diaPedM=""; pintar(); scrollTo(0,0); });
   if(tabM==="pend") enlazarFiltroDia(diaPedM,d=>diaPedM=d);
+  if(tabM==="entregados"){ enlazarFiltroDia(diaEntM,d=>diaEntM=d); document.querySelectorAll("[data-verent]").forEach(b=>b.onclick=()=>verEntregadoMens(b.dataset.verent)); }
   const sa=$("#msAnt"), ss=$("#msSig"), sh=$("#msHoy");
   if(sa) sa.onclick=()=>{semM=moverSemana(semM,-1); pintar();};
   if(ss) ss.onclick=()=>{semM=moverSemana(semM,1); pintar();};
@@ -679,6 +689,27 @@ function pintarCliente(){
     $("#diaRC").onchange=e=>{diaRec=e.target.value||hoy();};
     $("#verRC").onclick=()=>{ if(cuadreDia(diaRec).some(r=>r.cid===miCliente)) verRecibo(miCliente); else toast("No hay entregas ni pagos ese día"); };
   }
+}
+/* Pedido entregado o devuelto visto por el mensajero: solo información y pruebas, sin acciones. */
+async function verEntregadoMens(guia){
+  const p=S.pedidos[guia]; if(!p) return;
+  $("#dlgCont").innerHTML=`<header><div><h2 class="guia">${esc(guia)}</h2>${etqEstado(p)}</div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+  <dl class="datos">
+    <dt>Remitente</dt><dd>${esc(nombreCliente(p.clienteId)||"Sin asignar")}</dd>
+    <dt>Salió</dt><dd>${hora(p.creado)}</dd>
+    ${Number(p.aCobrar)?`<dt>Valor a cobrar</dt><dd>${pesos(p.aCobrar)}</dd>`:""}
+    ${p.estado==="entregado"?`<dt>Entregado</dt><dd>${hora(p.entregado)}</dd><dt>Recibió</dt><dd>${esc(p.destinatario||"")}</dd><dt>Cobrado</dt><dd>${pesos(p.valorCobrado)}</dd><dt>Método</dt><dd>${metodoTxt(p)}</dd>`:""}
+    ${p.estado==="devuelto"?`<dt>Devuelto</dt><dd>${hora(p.entregado)}</dd><dt>Motivo</dt><dd>${esc(MOTIVOS[p.motivoDev]||"")}${p.notaDev?" · "+esc(p.notaDev):""}</dd>`:""}
+    ${gastoDe(p)?`<dt>Flete / gasto que pagaste</dt><dd>${pesos(gastoDe(p))}${p.gastoNota?" · "+esc(p.gastoNota):""}</dd>`:""}
+  </dl>
+  <p class="sub">Si algo quedó mal, avísale a la oficina para que lo corrija.</p>
+  <h2>Pruebas</h2><div class="fotos" id="meFotos"><span class="sub">Cargando fotos…</span></div>`;
+  abrirDlg();
+  try{
+    const [f,e]=await Promise.all([leer("fotos",guia),leer("entregas",guia)]);
+    const items=[["Salida",f?.salida],[p.estado==="devuelto"?"Evidencia":"Entrega",e?.foto],["Firma de quien recibió",e?.firma]].map(([t,x])=>[t,fotoSegura(x)]).filter(([,x])=>x);
+    const box=$("#meFotos"); if(box) box.innerHTML=items.length?items.map(([t,x])=>`<figure><img src="${x}" alt="${t}"><figcaption>${t}</figcaption></figure>`).join(""):'<span class="sub">Sin fotos.</span>';
+  }catch(err){ const box=$("#meFotos"); if(box) box.innerHTML='<span class="sub">No se pudieron cargar las fotos.</span>'; }
 }
 async function verPedidoCliente(guia){
   const p=S.pedidos[guia]; if(!p) return;
