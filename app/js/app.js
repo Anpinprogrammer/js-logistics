@@ -116,17 +116,34 @@ const COLA_K="js_cola";
 function colaLeer(){ try{ return JSON.parse(lsGet(COLA_K)||"[]"); }catch(e){ return []; } }
 function colaGuardar(c){ try{ localStorage.setItem(COLA_K,JSON.stringify(c)); return true; }catch(e){ return false; } }
 const conTiempo=(pr,ms)=>Promise.race([pr,new Promise((_,r)=>setTimeout(()=>r(new Error("tiempo")),ms))]);
-async function ejecutarOps(ops){ for(const o of ops){ await conTiempo(o.op==="set"?guardar(o.col,o.id,o.data,o.unir):actualizar(o.col,o.id,o.data),20000); } }
+async function ejecutarOps(ops){ for(const o of ops){ await conTiempo(o.op==="set"?guardar(o.col,o.id,o.data,o.unir):actualizar(o.col,o.id,o.data),45000); } } // con datos lentos una foto puede tardar
+/* Errores de Firebase: los de conexión se reintentan (la entrega espera en el teléfono); los demás (permiso, guía que no existe)
+   no se arreglan esperando, así que se dice la causa real en vez de "sin señal". */
+const codigoError = e => String(e?.code||e?.message||"").replace(/^firestore\//,"");
+const esDeConexion = e => /offline|tiempo|unavailable|deadline-exceeded|network|internal|resource-exhausted|cancelled/i.test(codigoError(e));
+function motivoError(e){
+  const c=codigoError(e);
+  if(/permission-denied/.test(c)) return "la app no le dio permiso a tu cuenta (puede que el pedido ya no esté a tu nombre o que tu cuenta no esté vinculada). Avísale a la oficina";
+  if(/aborted|failed-precondition/.test(c)) return "varios estaban guardando al mismo tiempo. Intenta de nuevo";
+  if(/not-found/.test(c)) return "ese pedido ya no existe. Avísale a la oficina";
+  if(/quota|resource-exhausted/.test(c)) return "se llenó el cupo diario del sistema. Avísale a la oficina";
+  if(esDeConexion(e)) return "la conexión está muy lenta o sin internet";
+  return "error inesperado"+(c?" ("+c.slice(0,40)+")":"");
+}
 async function enviarOps(ops,guia){
   if(!db){ await ejecutarOps(ops); return "ok"; }
   try{ if(navigator.onLine===false) throw new Error("offline"); await ejecutarOps(ops); return "ok"; }
-  catch(e){ const c=colaLeer().filter(x=>x.guia!==guia); c.push({guia,ops,t:Date.now()}); if(!colaGuardar(c)) throw e; pintar(); return "cola"; }
+  catch(e){ if(!esDeConexion(e)) throw e; // un permiso negado no se arregla esperando señal
+    const c=colaLeer().filter(x=>x.guia!==guia); c.push({guia,ops,t:Date.now()}); if(!colaGuardar(c)) throw e; pintar(); return "cola"; }
 }
 let enviandoCola=false;
 async function procesarCola(manual){
   if(enviandoCola||!db) return; let c=colaLeer(); if(!c.length) return; enviandoCola=true; let n=0;
-  try{ while(c.length){ await ejecutarOps(c[0].ops); c.shift(); colaGuardar(c); n++; } }
-  catch(e){ if(manual) toast("Todavía sin señal. Se reintentará sola."); }
+  try{ while(c.length){
+      try{ await ejecutarOps(c[0].ops); n++; }
+      catch(e){ if(esDeConexion(e)) throw e; toast("No se pudo enviar "+c[0].guia.replace("#foto"," (foto)")+": "+motivoError(e)); } // no se queda trabada la cola
+      c.shift(); colaGuardar(c); } }
+  catch(e){ if(manual) toast("Todavía sin conexión. Se reintentará sola."); }
   finally{ enviandoCola=false; if(n){ toast(n===1?"Se envió 1 entrega guardada":"Se enviaron "+n+" entregas guardadas"); } pintar(); }
 }
 addEventListener("online",()=>procesarCola());
@@ -295,7 +312,7 @@ function pintarMensajero(){
   const vinc=db&&uid&&S.vinculos[uid]&&S.mensajeros[S.vinculos[uid].mensajeroId];
   const puedeCambiar=!vinc||esAdmin;
   const cola=colaLeer();
-  const avisoCola=cola.length?`<div class="aviso alerta"><b>${cola.length===1?"1 entrega guardada":cola.length+" entregas guardadas"} en este teléfono</b>, esperando señal (${cola.map(x=>esc(x.guia)).join(", ")}). Se envían solas cuando vuelva la conexión.<br><button class="btn chico" id="colaRe">Reintentar ahora</button></div>`:"";
+  const avisoCola=cola.length?`<div class="aviso alerta"><b>${cola.length===1?"1 entrega guardada":cola.length+" entregas guardadas"} en este teléfono</b>, esperando señal (${cola.map(x=>esc(x.guia.replace("#foto"," (foto)"))).join(", ")}). Se envían solas cuando vuelva la conexión.<br><button class="btn chico" id="colaRe">Reintentar ahora</button></div>`:"";
   let h="";
   if(!mens.length && (esAdmin||!db)){
     h=`<h1>Hola</h1><div class="vacio">${cargado||!db?"Todavía no hay mensajeros registrados. El administrador los crea en Administración → Más → Personal.":"Cargando…"}</div>`;
@@ -380,11 +397,16 @@ async function crearGuias(files){
       const [foto,mini]=await Promise.all([comprimir(f,FOTO_PX,FOTO_Q), comprimir(f,140,.6)]);
       const armar=n=>{ const guia=formatoGuia(n); return {guia,foto,pedido:{guia,n,estado:"pendiente",creado:Date.now(),mensajeroId:mid,mini,clienteId:"",valorServicio:0,aCobrar:0,por:uid||""}}; };
       let guia;
-      if(db){ let armado; guia=await db.crearPedido(n=>armado=armar(n)); logCambio("crear","pedidos",guia,armado.pedido,null); }
+      if(db){ let armado;
+        // solo el número y el pedido van en la transacción (rápida); la foto se guarda después y, si no hay señal, espera en el teléfono
+        for(let i=0;;i++){ try{ guia=await conTiempo(db.crearPedido(n=>{ armado=armar(n); return {guia:armado.guia,pedido:armado.pedido}; }),45000); break; }
+          catch(e){ if(i<2&&/aborted|failed-precondition|unavailable|deadline/.test(codigoError(e))){ await sleep(400+Math.random()*900); continue; } throw e; } }
+        logCambio("crear","pedidos",guia,armado.pedido,null);
+        await enviarOps([{op:"set",col:"fotos",id:guia,data:{salida:foto}}],guia+"#foto").catch(e=>toast("La guía "+guia+" se creó, pero la foto no se guardó: "+motivoError(e))); }
       else { const x=armar(await siguienteGuia()); guia=x.guia; await guardar("fotos",guia,{salida:foto}); await guardar("pedidos",guia,x.pedido); }
       hechas.push(guia);
     }
-  }catch(err){ console.error(err); toast((hechas.length?"Se crearon "+hechas.length+" guías, pero falló la siguiente. ":"")+(navigator.onLine===false?"Sin señal: la guía necesita conexión para darle número.":"No se pudo guardar el pedido. Revisa la conexión e intenta de nuevo.")); }
+  }catch(err){ console.error(err); toast((hechas.length?"Se crearon "+hechas.length+" guías, pero falló la siguiente. ":"")+(navigator.onLine===false?"Sin señal: la guía necesita conexión para darle número.":"No se pudo crear la guía: "+motivoError(err)+".")); }
   if(hechas.length){
     toast(hechas.length===1?"Guía "+hechas[0]+" creada":"Se crearon "+hechas.length+" guías");
     if(desdeOficina&&hechas.length===1){ pintar(); const g=hechas[0]; for(let i=0;i<20&&!S.pedidos[g];i++) await sleep(250); abrirPedido(g); return; } // la guía llega por la suscripción un instante después
@@ -446,8 +468,8 @@ function abrirEntrega(guia){
     try{
       const r=await enviarOps([{op:"set",col:"entregas",id:guia,data:{foto:fotoEnt,firma:firma.imagen()},unir:true},
         {op:"upd",col:"pedidos",id:guia,data:{estado:"entregado",entregado:Date.now(),destinatario:nom,valorCobrado:v,metodo:met,cuentaJs:cta,difCobro:dif,entregoUid:uid||"",...($("#eCambio").checked?{cambio:true}:{}),...(gasto>0?{gasto,gastoNota}:{})}}],guia);
-      cerrarDlg(); toast(r==="ok"?"Entrega de "+guia+" registrada":"Sin señal: la entrega quedó guardada en el teléfono y se enviará sola");
-    }catch(err){ console.error(err); b.disabled=false; b.textContent="Confirmar entrega"; toast("No se pudo guardar. Intenta de nuevo."); }
+      cerrarDlg(); toast(r==="ok"?"Entrega de "+guia+" registrada":"Conexión lenta o sin señal: la entrega quedó guardada en el teléfono y se enviará sola");
+    }catch(err){ console.error(err); b.disabled=false; b.textContent="Confirmar entrega"; toast("No se pudo guardar la entrega: "+motivoError(err)+"."); }
   };
 }
 
@@ -473,8 +495,8 @@ function abrirDevolucion(guia){
       : [...(foto?[{op:"set",col:"entregas",id:guia,data:{foto,firma:""},unir:true}]:[]),{op:"upd",col:"pedidos",id:guia,data:{estado:"devuelto",entregado:Date.now(),motivoDev:motivo,notaDev:nota,valorCobrado:0,metodo:"devuelto",cuentaJs:"",difCobro:0,destinatario:"",cobrarDev:true,intentos}}];
     const b=$("#dGuardar"); b.disabled=true; b.textContent="Guardando…";
     try{ const r=await enviarOps(ops,guia); cerrarDlg();
-      toast(r!=="ok"?"Sin señal: quedó guardado en el teléfono y se enviará solo":motivo==="reprogramar"?"Intento registrado. "+guia+" sigue en tu lista":"Devolución de "+guia+" registrada"); }
-    catch(e){ b.disabled=false; b.textContent="Registrar"; toast("No se pudo guardar. Intenta de nuevo."); }
+      toast(r!=="ok"?"Conexión lenta o sin señal: quedó guardado en el teléfono y se enviará solo":motivo==="reprogramar"?"Intento registrado. "+guia+" sigue en tu lista":"Devolución de "+guia+" registrada"); }
+    catch(e){ b.disabled=false; b.textContent="Registrar"; toast("No se pudo guardar: "+motivoError(e)+"."); }
   };
 }
 

@@ -61,7 +61,8 @@ async function iniciar(){
       const r = F.doc(fs, "meta", "contador"); const s = await t.get(r);
       const n = ((s.exists() && s.data().n) || 0) + 1; t.set(r, { n }); return n;
     }),
-    /* Número de guía, pedido y foto de salida en una sola operación: si la guía ya existe, no se toca nada. */
+    /* Número de guía y pedido en una sola operación: si la guía ya existe, no se toca nada. La foto de salida la guarda app.js aparte,
+       para que la operación sea corta y no choque cuando varios mensajeros crean guías al mismo tiempo (si se pasa foto, también se guarda aquí). */
     crearPedido: armar => F.runTransaction(fs, async t => {
       const rc = F.doc(fs, "meta", "contador"); const sc = await t.get(rc);
       const n = ((sc.exists() && sc.data().n) || 0) + 1;
