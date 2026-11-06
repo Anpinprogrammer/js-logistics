@@ -544,9 +544,11 @@ function pintarAdmin(){
       <div class="filtros">${[["sin","Sin remitente"],["pend","Por entregar",porEntregar],["ent","Entregados"],["dev","Devueltos"],["dif","Con diferencia"],["cambio","Cambios por entregar"],["todos","Todos"]].map(([k,t,n])=>`<button data-f="${k}" aria-pressed="${filtroA===k}">${t}${n!==undefined?` <span class="num">${n}</span>`:""}</button>`).join("")}</div>
       <div class="linea2"><div class="campo" style="flex:2;min-width:220px"><input id="buscar" type="search" placeholder="Buscar guía, remitente, destinatario o mensajero" value="${esc(buscarA)}" aria-label="Buscar"></div>
       <div class="campo"><select id="mensPed" aria-label="Filtrar por mensajero"><option value="">Todos los mensajeros</option>${repartidores.map(m=>`<option value="${esc(m.id)}" ${m.id===mensPedA?"selected":""}>${esc(m.nombre)}</option>`).join("")}</select></div></div>
+      ${(filtroA==="sin"||filtroA==="serv")&&ps.length?`<div class="acciones" style="margin:6px 0"><button class="btn" id="enBloque">${filtroA==="sin"?"Asignar remitente a varios":"Poner domicilio a varios"} (${ps.length})</button></div>`:""}
       ${filtroDiaHtml(diaPedA)}${diaPedA||mensPedA?`<p class="sub">${ps.length} pedido${ps.length===1?"":"s"}${mensPedA?" de "+esc(S.mensajeros[mensPedA]?.nombre||""):""}${diaPedA?" que salieron o se cerraron ese día":""}</p>`:""}
       ${ps.length?`<div class="lista">${ps.slice(0,limiteA).map(p=>filaPedido(p)).join("")}</div>${ps.length>limiteA?`<div class="acciones" style="justify-content:center"><button class="btn sec" id="masPed">Ver más (${ps.length-limiteA} restantes)</button></div>`:""}`:`<div class="vacio">${filtroA==="sin"?"Todos los pedidos tienen remitente asignado.":filtroA==="serv"?"Todos los pedidos entregados tienen valor de servicio.":"No hay pedidos aquí."}</div>`}`;
     v.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{filtroA=b.dataset.f; limiteA=100; pintar();});
+    const eb=$("#enBloque"); if(eb) eb.onclick=()=>enBloque(filtroA,ps);
     const mp=$("#masPed"); if(mp) mp.onclick=()=>{limiteA+=200; pintar();};
     const bu=$("#buscar"); bu.oninput=()=>{buscarA=bu.value; clearTimeout(bu._t); bu._t=setTimeout(()=>{pintar(); const n=$("#buscar"); n.focus(); n.setSelectionRange(n.value.length,n.value.length);},300);};
     v.querySelectorAll("[data-ped]").forEach(b=>b.onclick=()=>abrirPedido(b.dataset.ped));
@@ -602,7 +604,7 @@ function pintarAdmin(){
     const porMedio={}; recsDia.forEach(r=>porMedio[r.medio]=(porMedio[r.medio]||0)+(Number(r.valor)||0));
     const liqs=Object.values(S.liquidaciones).sort((a,b)=>b.fecha-a.fecha).slice(0,25);
     // El asistente solo ve lo de los mensajeros y registra lo que le entregan; la caja de la empresa, los sueldos y las liquidaciones son de administración
-    v.innerHTML=aviso+`<h1>Caja</h1>${esAdmin?bloqueCajaGeneral():""}
+    v.innerHTML=aviso+`<h1>Caja</h1>${esAdmin?bloqueCierreDia()+bloqueCajaGeneral():""}
       <h2>Mensajeros</h2><p class="sub">${esAdmin?"Cada mensajero lleva un período abierto que se cierra cuando lo liquidas. Lo que entregue después cuenta para el siguiente período.":"Lo que cada mensajero debe entregar. Toca “Recibir dinero” cada vez que te entregue plata."}</p>
       <div class="cifras">
         <div class="cifra fuerte"><span>Pendiente por entregar (todos)</span><b>${pesos(tot.debe)}</b></div>
@@ -635,7 +637,7 @@ function pintarAdmin(){
       ${esAdmin?`<h2>Liquidaciones recientes</h2>`:""}
       ${!esAdmin?(recsDia.length?'<p class="sub" style="margin-top:8px">Si algo quedó mal registrado, avísale al administrador para que lo corrija.</p>':""):liqs.length?`<div class="tabla-env"><table><thead><tr><th>Liquidado</th><th>Mensajero</th><th class="n">Entregas</th><th class="n">Entregó</th><th>Resultado</th><th></th></tr></thead><tbody>${liqs.map(l=>`<tr><td>${hora(l.fecha)}</td><td>${esc(S.mensajeros[l.mensajeroId]?.nombre||"")}</td><td class="n">${l.entregas||0}</td><td class="n">${pesos(l.recibido)}</td><td class="${l.debe>0?"neg":"pos"}">${textoLiq(l.debe)}</td><td><button class="btn sec chico" data-verliq="${esc(l.id)}">Ver</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="vacio">Aún no has liquidado a ningún mensajero.</div>`}`;
     $("#diaC").onchange=e=>{diaCaja=e.target.value||hoy(); pintar();};
-    if(esAdmin) conectarCajaGeneral(v);
+    if(esAdmin){ conectarCierreDia(v); conectarCajaGeneral(v); }
     conectarCajaOficina(v);
     v.querySelectorAll("[data-recibir]").forEach(b=>b.onclick=()=>recibirDinero(b.dataset.recibir));
     v.querySelectorAll("[data-cmrec]").forEach(b=>b.onclick=()=>cambiarMedio("recaudos",b.dataset.cmrec));
@@ -689,6 +691,44 @@ function pintarCliente(){
     $("#diaRC").onchange=e=>{diaRec=e.target.value||hoy();};
     $("#verRC").onclick=()=>{ if(cuadreDia(diaRec).some(r=>r.cid===miCliente)) verRecibo(miCliente); else toast("No hay entregas ni pagos ese día"); };
   }
+}
+/* Pedidos en bloque desde Pedidos:
+   - "sin": a varias guías sin remitente se les pone el mismo remitente (y el domicilio, si se escribe);
+   - "serv": a varias entregas sin valor de domicilio se les pone el domicilio de su cliente o un valor fijo. */
+function enBloque(modo,lista){
+  const sin=modo==="sin", ps=lista.slice(), sel=new Set(ps.map(p=>p.guia)), cs=listaOrdenada(S.clientes,"nombre");
+  $("#dlgCont").innerHTML=`<header><div><h2>${sin?"Asignar remitente a varios":"Poner domicilio a varios"}</h2><span class="sub">${ps.length} guía${ps.length===1?"":"s"}</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    ${sin?`<div class="campo"><label for="ebCli">Remitente</label><input id="ebBus" type="search" placeholder="Buscar cliente…" autocomplete="off" style="margin-bottom:6px"><select id="ebCli"><option value="">Elige…</option>${cs.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join("")}</select></div>
+      <div class="campo"><label for="ebServ">Valor del domicilio (opcional)</label><input id="ebServ" type="number" inputmode="numeric" min="0" step="100" placeholder="Se llena con el del cliente"></div>`
+    :`<label style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input type="checkbox" id="ebSuyo" checked style="width:auto"><span>Usar el domicilio guardado de cada cliente</span></label>
+      <div class="campo" id="ebFijoC"><label for="ebServ">Valor para las que no tienen domicilio guardado</label><input id="ebServ" type="number" inputmode="numeric" min="0" step="100"></div>`}
+    <div class="acciones" style="margin:0 0 6px"><button class="btn sec chico" id="ebTodos">Marcar todas</button><button class="btn sec chico" id="ebNinguna">Ninguna</button></div>
+    <div style="max-height:40vh;overflow:auto"><table><tbody>${ps.map(p=>`<tr><td style="width:32px"><input type="checkbox" data-eb="${esc(p.guia)}" checked style="width:auto" aria-label="${esc(p.guia)}"></td>
+      <td>${fotoSegura(p.mini)?`<img src="${fotoSegura(p.mini)}" alt="" style="width:42px;height:42px;object-fit:cover;border-radius:6px">`:""}</td>
+      <td><b>${esc(p.guia)}</b> ${etqEstado(p)}<br><span class="sub" style="font-size:.8rem">${esc(sin?(S.mensajeros[p.mensajeroId]?.nombre||""):nombreCliente(p.clienteId))}${p.destinatario?" · "+esc(p.destinatario):""} · ${hora(p.creado)}${!sin&&Number(S.clientes[p.clienteId]?.tarifa)?" · domicilio "+pesos(S.clientes[p.clienteId].tarifa):""}</span></td></tr>`).join("")}</tbody></table></div>
+    <button class="btn ok" id="ebGuardar" style="width:100%;margin-top:10px">Guardar</button>`;
+  abrirDlg();
+  const boton=()=>{ $("#ebGuardar").textContent=`Guardar ${sel.size} guía${sel.size===1?"":"s"}`; $("#ebGuardar").disabled=!sel.size; };
+  $("#dlgCont").querySelectorAll("[data-eb]").forEach(x=>x.onchange=()=>{ x.checked?sel.add(x.dataset.eb):sel.delete(x.dataset.eb); boton(); });
+  $("#ebTodos").onclick=()=>{ $("#dlgCont").querySelectorAll("[data-eb]").forEach(x=>{ x.checked=true; sel.add(x.dataset.eb); }); boton(); };
+  $("#ebNinguna").onclick=()=>{ $("#dlgCont").querySelectorAll("[data-eb]").forEach(x=>x.checked=false); sel.clear(); boton(); };
+  if(sin){ $("#ebCli").onchange=()=>{ const t=Number(S.clientes[$("#ebCli").value]?.tarifa); $("#ebServ").value=t||""; };
+    $("#ebBus").oninput=e=>{ const q=sinTildes(e.target.value.trim()), vis=cs.filter(c=>!q||sinTildes(c.nombre+" "+(c.telefono||"")).includes(q));
+      $("#ebCli").innerHTML=`<option value="">${vis.length?"Elige…":"Ningún cliente con ese nombre"}</option>`+vis.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join(""); if(vis.length===1&&q){ $("#ebCli").value=vis[0].id; $("#ebCli").onchange(); } }; }
+  else $("#ebSuyo").onchange=()=>$("#ebFijoC").querySelector("label").textContent=$("#ebSuyo").checked?"Valor para las que no tienen domicilio guardado":"Valor del domicilio para todas";
+  boton();
+  $("#ebGuardar").onclick=async()=>{ const serv=Number($("#ebServ").value)||0, guias=ps.map(p=>p.guia).filter(g=>sel.has(g));
+    let cambios;
+    if(sin){ const cid=$("#ebCli").value; if(!cid) return toast("Elige el remitente"); const c=S.clientes[cid];
+      cambios=guias.map(g=>[g,{clienteId:cid,clienteNombre:c.nombre,...(serv?{valorServicio:serv}:{})}]); }
+    else { const suyo=$("#ebSuyo").checked; cambios=guias.map(g=>{ const t=suyo?Number(S.clientes[S.pedidos[g].clienteId]?.tarifa)||serv:serv; return [g,t?{valorServicio:t}:null]; });
+      const faltan=cambios.filter(([,d])=>!d).length; if(faltan) return toast(`${faltan} guía${faltan===1?"":"s"} sin valor: escribe el valor del domicilio`); }
+    const b=$("#ebGuardar"); b.disabled=true; b.textContent="Guardando…"; let n=0;
+    try{ for(const [g,d] of cambios){ await rawUpd("pedidos",g,d); n++; }
+      if(sin&&serv&&!Number(S.clientes[$("#ebCli").value]?.tarifa)) await rawUpd("clientes",$("#ebCli").value,{tarifa:serv}); // queda como el domicilio de ese cliente
+      registrar(sin?`Asignó ${S.clientes[$("#ebCli").value].nombre} como remitente de ${n} guías${serv?" con domicilio "+pesos(serv):""}: ${guias.join(", ")}`:`Puso el valor del domicilio a ${n} guías: ${guias.join(", ")}`);
+      cerrarDlg(); toast(`${n} guía${n===1?"":"s"} actualizada${n===1?"":"s"}`); }
+    catch(e){ b.disabled=false; boton(); toast(`Se guardaron ${n}; las demás no. Intenta otra vez.`); } };
 }
 /* Pedido entregado o devuelto visto por el mensajero: solo información y pruebas, sin acciones. */
 async function verEntregadoMens(guia){
@@ -2021,10 +2061,11 @@ function arqueosCaja(){
     if(c.tipo==="marca") Object.assign(a,{esperado:c.esperado||{},contado:c.contado||{},nota:c.concepto||"",por:c.porNombre||""}); else a.dif[c.medio]=(a.dif[c.medio]||0)+(c.tipo==="entra"?1:-1)*(Number(c.valor)||0); }
   return Object.values(g).sort((a,b)=>b.fecha-a.fecha);
 }
-/* Lo que la app espera que tengas tú: la caja general menos lo que está en las cajas de oficina (eso se cuenta al recibir el cierre). */
+/* Lo que la app espera que tengas tú: la caja general menos el efectivo que está en las cajas de oficina (eso se cuenta al recibir el cierre).
+   Nequi y Bancolombia no se restan: son las mismas cuentas de la empresa y en su app ves el saldo completo, también lo que registró la oficina. */
 function esperadoArqueo(){
   const R=resumenCaja(), of={efectivo:0,nequi:0,bancolombia:0};
-  if(esAdmin) asistentes().forEach(u=>{ const x=cajaOficina(u.uid).saldo; for(const k in of) of[k]+=x[k]; });
+  if(esAdmin) asistentes().forEach(u=>{ of.efectivo+=cajaOficina(u.uid).saldo.efectivo; });
   const e={}; for(const k of Object.keys(MEDIOS)) e[k]=Math.round((R.porMedio[k]||0)-of[k]);
   return {e,of,sinCuenta:Math.round(R.porMedio.cuentas||0)};
 }
@@ -2035,12 +2076,48 @@ function resultadoArqueo(a){
   const n=netoArqueo(a), det=f.map(([m,x])=>`${MEDIOS[m]||m} ${x<0?"−":"+"}${pesos(Math.abs(x))}`).join(", ");
   return n===0?`La plata da exacto · se reacomodó entre medios (${det})`:`${n<0?"Faltó":"Sobró"} ${pesos(Math.abs(n))} en total (${det})`;
 }
+/* Cierre del día: lo que hay que dejar listo antes del arqueo, en orden. Cada paso muestra lo pendiente y el botón para resolverlo;
+   cuando todo está en verde, el arqueo cuenta solo la plata que de verdad tienes. */
+let cierreAbierto=null; // null = se abre solo si hay pendientes
+function pendientesCierre(){
+  const mens=Object.values(S.mensajeros).filter(esRepartidor).map(m=>({m,debe:Math.round(periodoMensajero(m.id).debe)})).filter(x=>x.debe>0).sort((a,b)=>b.debe-a.debe);
+  const ofis=asistentes().map(u=>({u,s:cajaOficina(u.uid).saldo})).filter(x=>Object.values(x.s).some(v=>Math.round(v))), ofisEf=ofis.filter(x=>Math.round(x.s.efectivo));
+  const P=Object.values(S.pedidos), sinRem=P.filter(p=>!p.clienteId), sinServ=P.filter(sinServicio), enRuta=P.filter(p=>p.estado==="pendiente");
+  const a=arqueosCaja()[0];
+  return {mens,ofis,ofisEf,sinRem,sinServ,enRuta,arqueoHoy:!!a&&diaDe(a.fecha)===hoy(),a};
+}
+function bloqueCierreDia(){
+  const x=pendientesCierre(), listo=!x.mens.length&&!x.ofis.length&&!x.sinRem.length&&!x.sinServ.length;
+  const abierto=cierreAbierto===null?!listo||!x.arqueoHoy:cierreAbierto;
+  const paso=(ok,titulo,detalle,boton)=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--borde,#ddd)">
+    <b class="${ok?"pos":"neg"}" style="font-size:1.1rem;min-width:22px">${ok?"✓":"•"}</b><div style="flex:1"><b>${titulo}</b>${detalle?`<div class="sub" style="font-size:.85rem;margin-top:2px">${detalle}</div>`:""}</div>${boton||""}</div>`;
+  return `<details class="mcard" id="cierreDia" ${abierto?"open":""} style="margin-bottom:16px"><summary style="cursor:pointer"><b>Cierre del día</b> <span class="sub">${listo?(x.arqueoHoy?"· todo listo y contado hoy":"· listo para el arqueo"):"· hay pendientes antes del arqueo"}</span></summary>
+    ${paso(!x.mens.length,"1. Plata de los mensajeros",x.mens.length?x.mens.map(({m,debe})=>`${esc(m.nombre)} ${pesos(debe)} <button class="btn ok chico" data-cdrec="${esc(m.id)}">Recibir</button>`).join(" · "):"Ningún mensajero tiene plata pendiente.")}
+    ${paso(!x.ofis.length,"2. Cajas de oficina",x.ofis.length?x.ofis.map(({u,s})=>`${esc(u.nombre||u.email)}: ${Object.entries(MEDIOS).filter(([k])=>Math.round(s[k])).map(([k,t])=>t+" "+pesos(s[k])).join(", ")} <button class="btn ok chico" data-cdof="${esc(u.uid)}">Recibir cierre</button>`).join(" · "):"Todas en $ 0.")}
+    ${paso(!x.sinRem.length,"3. Pedidos sin remitente",x.sinRem.length?`${x.sinRem.length} guía${x.sinRem.length===1?"":"s"}: el saldo de esos clientes no está completo.`:"Todos tienen remitente.",x.sinRem.length?'<button class="btn sec chico" data-cdped="sin">Asignar</button>':"")}
+    ${paso(!x.sinServ.length,"4. Entregas sin valor de domicilio",x.sinServ.length?`${x.sinServ.length} entrega${x.sinServ.length===1?"":"s"}: no se descuenta el domicilio ni suma al sueldo.`:"Todas tienen domicilio.",x.sinServ.length?'<button class="btn sec chico" data-cdped="serv">Completar</button>':"")}
+    ${paso(true,"5. Gastos, adelantos o pagos que hayan quedado sin registrar","Regístralos ahora: después del arqueo ya no se pueden poner con fecha de días anteriores.",'<button class="btn sec chico" id="cdSalida">Registrar salida</button>')}
+    ${paso(x.arqueoHoy,"6. Arqueo",x.arqueoHoy?`Hecho hoy a las ${new Date(x.a.fecha).toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"})}: ${resultadoArqueo(x.a)}.`:(x.mens.length||x.ofisEf.length?"Primero recibe la plata de los pasos 1 y 2: si cuentas plata que la app todavía tiene en otra parte, el arqueo sale descuadrado.":"Cuenta efectivo, Nequi, Bancolombia y la Base de JS.")+(x.enRuta.length?` Hay ${x.enRuta.length} pedido${x.enRuta.length===1?"":"s"} en ruta: esa plata todavía no ha llegado.`:""),
+      `<button class="btn ${x.mens.length||x.ofisEf.length?"sec":"ok"} chico" id="cdArqueo">Hacer arqueo</button>`)}
+  </details>`;
+}
+function conectarCierreDia(v){
+  const d=$("#cierreDia"); if(d) d.ontoggle=()=>{ cierreAbierto=d.open; };
+  v.querySelectorAll("[data-cdrec]").forEach(b=>b.onclick=()=>recibirDinero(b.dataset.cdrec));
+  v.querySelectorAll("[data-cdof]").forEach(b=>b.onclick=()=>movOficina(b.dataset.cdof,"entrega"));
+  v.querySelectorAll("[data-cdped]").forEach(b=>b.onclick=()=>{ const f=b.dataset.cdped; tabA="pedidos"; filtroA=f; buscarA=""; mensPedA=""; diaPedA=""; limiteA=100; pintar(); scrollTo(0,0);
+    const ps=Object.values(S.pedidos).filter(f==="sin"?p=>!p.clienteId:sinServicio).sort((a,b)=>b.creado-a.creado); if(ps.length) enBloque(f,ps); });
+  const cs=$("#cdSalida"); if(cs) cs.onclick=()=>movCaja("sale");
+  const ca=$("#cdArqueo"); if(ca) ca.onclick=async()=>{ const x=pendientesCierre();
+    if((x.mens.length||x.ofisEf.length)&&!await confirmar("Hacer arqueo con pendientes",`Todavía ${[x.mens.length?`hay ${x.mens.length} mensajero${x.mens.length===1?"":"s"} con plata`:"",x.ofisEf.length?`hay ${x.ofisEf.length} caja${x.ofisEf.length===1?"":"s"} de oficina con efectivo sin cerrar`:""].filter(Boolean).join(" y ")}. No cuentes esa plata: la app todavía la tiene a nombre de ellos.`,"Hacer arqueo igual")) return;
+    hacerArqueo(); };
+}
 function hacerArqueo(){
   const {e,of,sinCuenta}=esperadoArqueo(), conOf=Object.values(of).some(x=>Math.round(x));
   $("#dlgCont").innerHTML=`<header><div><h2>Arqueo de caja</h2><span class="sub">Cuenta la plata que tienes ahora mismo</span></div><button class="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     <p class="sub">Escribe lo que cuentas en cada medio: el efectivo en la mano y el saldo que ves en la app de Nequi y de Bancolombia. La diferencia queda registrada como faltante o sobrante y desde ese momento esa plata ya no se puede cambiar.</p>
     ${sinCuenta?`<div class="aviso alerta">Hay ${pesos(sinCuenta)} en transferencias a JS sin cuenta asignada. Antes del arqueo, abre esos pedidos y elige si llegaron a Nequi o a Bancolombia.</div>`:""}
-    ${conOf?`<div class="aviso">No cuentes la plata de las cajas de oficina (${Object.entries(of).filter(([,x])=>Math.round(x)).map(([k,x])=>MEDIOS[k]+" "+pesos(x)).join(" · ")}): esa se cuenta cuando recibes el cierre de cada asistente.</div>`:""}
+    ${conOf?`<div class="aviso">No cuentes el efectivo que tienen las cajas de oficina (${pesos(of.efectivo)}): ese se cuenta cuando recibes el cierre de cada asistente. Nequi y Bancolombia sí cuéntalos completos, como los ves en su app.</div>`:""}
     ${Object.entries(MEDIOS).map(([k,t])=>`<div class="linea2" style="align-items:center"><div class="campo"><label for="aq_${k}">${t} que cuentas</label><input id="aq_${k}" data-aq="${k}" type="number" inputmode="numeric" min="0" step="100"></div>
       <div class="campo"><span class="lbl">La app espera</span><b style="font-size:1.1rem">${pesos(e[k])}</b><span class="sub" id="aqd_${k}" style="margin:0"></span></div></div>`).join("")}
     <div class="res-liq cero" id="aqTot" style="margin:6px 0 12px"><span>Total</span><b>La app espera ${pesos(Object.values(e).reduce((x,y)=>x+y,0))}</b></div>
