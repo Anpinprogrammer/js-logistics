@@ -19,7 +19,8 @@ const esquema = z.object({
   // Supabase Storage para fotos y firmas (opcional: sin esto, las listas de archivos salen vacías)
   SUPABASE_URL: z.string().url().optional().or(z.literal("")).transform(v => v ? v.replace(/\/$/, "") : undefined),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional().transform(v => v || undefined),
-  STORAGE_BUCKET: z.string().default("pedidos")
+  STORAGE_BUCKET: z.string().default("pedidos"),
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1)
 });
 
 const r = esquema.safeParse(process.env);
