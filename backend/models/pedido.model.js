@@ -16,7 +16,7 @@ const CON_INTENTOS = `
  * Lista con filtros. `alcance` lo pone el controlador según el rol: { mensajeroId } o { clienteId }
  * para que cada quien vea solo lo suyo, igual que firestore.rules.
  */
-export async function listar({ estado, mensajeroId, clienteId, desde, hasta, buscar, conDiferencia, limite = 100, cursor } = {}) {
+export async function listar({ estado, cerrados, mensajeroId, clienteId, desde, hasta, entregadoDesde, entregadoHasta, buscar, conDiferencia, limite = 100, cursor } = {}) {
   const cond = [], valores = [];
   const agregar = (sql, v) => { valores.push(v); cond.push(sql.replace("?", `$${valores.length}`)); };
   if (estado) agregar("p.estado = ?", estado);
@@ -24,6 +24,9 @@ export async function listar({ estado, mensajeroId, clienteId, desde, hasta, bus
   if (clienteId) agregar("p.cliente_id = ?", clienteId);
   if (desde) agregar("p.creado >= ?", desde);
   if (hasta) agregar("p.creado < ?", hasta);
+  if (cerrados) cond.push("p.estado <> 'pendiente'");
+  if (entregadoDesde) agregar("p.entregado >= ?", entregadoDesde); // por hora de entrega o devolución
+  if (entregadoHasta) agregar("p.entregado < ?", entregadoHasta);
   if (buscar) {
     valores.push(`%${buscar.replace(/[\\%_]/g, c => "\\" + c)}%`);
     cond.push(`(p.guia ILIKE $${valores.length} OR p.destinatario ILIKE $${valores.length})`);

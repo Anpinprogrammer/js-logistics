@@ -103,7 +103,7 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `DELETE /clientes/:id` | admin | Borra (a la papelera) si no tiene pedidos ni movimientos |
 | `GET /mensajeros`, `GET /mensajeros/:id` | oficina; el mensajero solo su ficha | Personal |
 | `POST/PATCH/DELETE /mensajeros…` | admin | Cambia el personal |
-| `GET /pedidos?estado=&desde=&hasta=&buscar=&cursor=` | cada rol ve lo suyo | Lista paginada (`siguiente` es el cursor) |
+| `GET /pedidos?estado=&cerrados=&desde=&hasta=&entregadoDesde=&entregadoHasta=&buscar=&conDiferencia=&cursor=` | cada rol ve lo suyo | Lista paginada (`siguiente` es el cursor) |
 | `GET /pedidos/:guia` | quien la puede ver | Detalle con intentos. Lista y detalle traen `mini`: URL firmada de la miniatura, o `null` |
 | `GET /pedidos/:guia/archivos` | quien la puede ver | `{ archivos: [{ tipo, url, creado }] }` con URL firmadas de Storage que vencen en 1 hora (las `previa` solo para oficina) |
 | `POST /pedidos` | equipo | Crea la guía con el siguiente consecutivo. El mensajero la crea a su nombre y en cero |
@@ -122,3 +122,5 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 - `Idempotency-Key` en las escrituras que reenvía la cola sin señal del mensajero.
 - Tiempo real con SSE (`GET /api/events`).
 - Script de migración de Firestore a Postgres.
+
+
