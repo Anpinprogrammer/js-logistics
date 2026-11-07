@@ -539,7 +539,7 @@ function pintarAdmin(){
   if(!tabs.some(([k])=>k===tabA)) tabA="inicio";
   ponerNav(tabs,tabA,k=>tabA=k);
   const v=$("#vista");
-  const aviso = db ? "" : `<div class="aviso">Modo de prueba: los datos se borran al cerrar. Configura Firebase (ver LEEME.md) para que todo quede guardado y compartido entre mensajeros y administración.</div>`;
+  const aviso = db ? "" : `<div class="aviso">Modo de prueba: los datos se borran al cerrar. Configura Firebase (ver README.md) para que todo quede guardado y compartido entre mensajeros y administración.</div>`;
 
   if(tabA==="inicio"){ pintarInicioEmpresa(v,aviso); }
   else if(tabA==="pedidos"){
