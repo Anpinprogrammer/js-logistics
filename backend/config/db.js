@@ -1,0 +1,39 @@
+/* Pool de conexiones a Postgres compartido por toda la app. */
+import pg from "pg";
+import { env } from "./env.js";
+
+// BIGINT (int8) llega como texto por defecto; los montos en pesos caben de sobra en un Number.
+pg.types.setTypeParser(20, v => Number(v));
+
+export const pool = new pg.Pool({
+  connectionString: env.DATABASE_URL,
+  // Con DATABASE_CA se verifica el certificado del servidor; sin él, la conexión va cifrada pero sin verificar.
+  ssl: !env.DATABASE_SSL ? false : env.DATABASE_CA ? { ca: env.DATABASE_CA } : { rejectUnauthorized: false },
+  max: 10,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000
+});
+
+pool.on("error", e => console.error("Error en una conexión inactiva de Postgres:", e.message));
+
+/** Consulta simple con el pool. */
+export const query = (texto, valores) => pool.query(texto, valores);
+
+/**
+ * Ejecuta fn(cliente) dentro de una transacción. Si fn lanza, se hace ROLLBACK.
+ * Los modelos reciben el cliente opcional `db` para participar en la misma transacción.
+ */
+export async function transaccion(fn) {
+  const cliente = await pool.connect();
+  try {
+    await cliente.query("BEGIN");
+    const resultado = await fn(cliente);
+    await cliente.query("COMMIT");
+    return resultado;
+  } catch (e) {
+    await cliente.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    cliente.release();
+  }
+}

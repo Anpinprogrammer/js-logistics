@@ -1,0 +1,32 @@
+{
+  "name": "js-logistics-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "API de JS Logistics: Node.js + Express (MVC) sobre PostgreSQL (Supabase)",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch --env-file-if-exists=.env index.js",
+    "db:migrar": "node --env-file-if-exists=.env db/migrar.js",
+    "db:admin": "node --env-file-if-exists=.env db/crear-admin.js",
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.3",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.2"
+  }
+}
