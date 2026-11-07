@@ -9,6 +9,7 @@ const r = Router();
 
 r.get("/", permitir(OFICINA), validar({ query: V.listar }), C.listar);
 r.get("/:id", permitir(OFICINA, "cliente"), validar({ params: paramId }), C.obtener);
+r.get("/:id/movimientos", permitir(OFICINA, "cliente"), validar({ params: paramId, query: V.movimientos }), C.movimientos);
 r.post("/", permitir(OFICINA), validar({ body: V.crear }), C.crear);
 r.patch("/:id", permitir(OFICINA), validar({ params: paramId, body: V.actualizar }), C.actualizar);
 r.delete("/:id", permitir("admin"), validar({ params: paramId }), C.eliminar);

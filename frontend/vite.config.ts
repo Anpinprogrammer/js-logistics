@@ -1,0 +1,13 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+
+// En desarrollo, /api va al backend local: el navegador ve un solo sitio y la cookie de sesión funciona con SameSite=Lax.
+// En producción se hace lo mismo con una regla de reescritura (/api/* → servicio del backend). Ver README.
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  server: {
+    port: 5173,
+    proxy: { "/api": { target: process.env.VITE_API_PROXY || "http://localhost:4000", changeOrigin: false } }
+  }
+});

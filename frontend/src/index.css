@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* Colores de la marca, los mismos de la app actual (app/css/estilos.css), con modo oscuro automático. */
+@theme {
+  --font-sans: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-fondo: #eef2f5;
+  --color-papel: #ffffff;
+  --color-tinta: #0e1a24;
+  --color-suave: #5f7183;
+  --color-linea: #e2e8ee;
+  --color-hueco: #f6f8fa;
+  --color-marca: #1670b0;
+  --color-marca-claro: #e3f0fa;
+  --color-verde: #16794a;
+  --color-verde-claro: #ddf3e6;
+  --color-rojo: #c0392b;
+  --color-rojo-claro: #fbe4e0;
+  --color-ambar: #8a5a00;
+  --color-ambar-claro: #fdf1d3;
+  --color-noche: #0b0f14;
+  --color-lateral-suave: #9aa6b2;
+  --radius-caja: 18px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-fondo: #090d12;
+    --color-papel: #121a22;
+    --color-tinta: #e7eef4;
+    --color-suave: #8c9ba8;
+    --color-linea: #22303c;
+    --color-hueco: #0e151c;
+    --color-marca: #3ba3e6;
+    --color-marca-claro: #12324a;
+    --color-verde: #5cc28c;
+    --color-verde-claro: #163828;
+    --color-rojo: #f08470;
+    --color-rojo-claro: #41221c;
+    --color-ambar: #f2b632;
+    --color-ambar-claro: #3a3018;
+    --color-noche: #05080b;
+    color-scheme: dark;
+  }
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-fondo text-tinta font-sans antialiased;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  :focus-visible { @apply outline-2 outline-offset-2 outline-marca; }
+}
+
+@layer components {
+  .caja { @apply bg-papel border border-linea rounded-caja shadow-[0_1px_2px_rgba(16,24,40,.04),0_6px_20px_rgba(16,24,40,.05)]; }
+  .entrada {
+    @apply w-full rounded-xl border border-linea bg-papel px-3 py-2.5 text-tinta placeholder:text-suave
+           focus:border-marca focus:outline-none focus:ring-2 focus:ring-marca/25 disabled:opacity-60;
+  }
+  .etiqueta { @apply mb-1 block text-sm font-medium text-suave; }
+}

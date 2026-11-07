@@ -73,7 +73,8 @@ TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/jsl_test npm test
 1. Crea el proyecto y copia la cadena de conexión: *Project Settings → Database → Connection string*. Desde Render conviene el **pooler** (Supavisor).
 2. `DATABASE_SSL=true`. Para verificar el certificado, descarga el de *Database Settings → SSL* y ponlo en `DATABASE_CA`.
 3. `npm run db:migrar`. El esquema activa **RLS sin políticas** en todas las tablas: así la Data API pública de Supabase (la anon key) no puede leer nada, y todo pasa por esta API.
-4. Usa un proyecto de Supabase para pruebas y otro para producción.
+4. **Storage:** crea un bucket **privado** llamado `pedidos` y pon `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` (*Project Settings → API*). La service role key es secreta: solo va en el backend, nunca en el frontend.
+5. Usa un proyecto de Supabase para pruebas y otro para producción.
 
 ## Render
 
@@ -98,11 +99,13 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `GET /clientes?buscar=` | oficina | Lista y busca |
 | `GET /clientes/:id` | oficina, o el propio cliente | Ficha |
 | `POST /clientes`, `PATCH /clientes/:id` | oficina | Crea (avisa de repetidos con 409 `POSIBLE_REPETIDO`) y edita |
+| `GET /clientes/:id/movimientos?desde=&hasta=` | oficina, o el propio cliente | `{ movimientos: [{ id, clienteId, tipo, valor, medio, nota, fecha, … }] }` |
 | `DELETE /clientes/:id` | admin | Borra (a la papelera) si no tiene pedidos ni movimientos |
 | `GET /mensajeros`, `GET /mensajeros/:id` | oficina; el mensajero solo su ficha | Personal |
 | `POST/PATCH/DELETE /mensajeros…` | admin | Cambia el personal |
-| `GET /pedidos?estado=&desde=&hasta=&buscar=&cursor=` | cada rol ve lo suyo | Lista paginada (`siguiente` es el cursor) |
-| `GET /pedidos/:guia` | quien la puede ver | Detalle con intentos |
+| `GET /pedidos?estado=&cerrados=&desde=&hasta=&entregadoDesde=&entregadoHasta=&buscar=&conDiferencia=&cursor=` | cada rol ve lo suyo | Lista paginada (`siguiente` es el cursor) |
+| `GET /pedidos/:guia` | quien la puede ver | Detalle con intentos. Lista y detalle traen `mini`: URL firmada de la miniatura, o `null` |
+| `GET /pedidos/:guia/archivos` | quien la puede ver | `{ archivos: [{ tipo, url, creado }] }` con URL firmadas de Storage que vencen en 1 hora (las `previa` solo para oficina) |
 | `POST /pedidos` | equipo | Crea la guía con el siguiente consecutivo. El mensajero la crea a su nombre y en cero |
 | `PATCH /pedidos/:guia` | oficina | Remitente, valores, domicilio pagado. Lo cobrado solo lo corrige admin |
 | `POST /pedidos/:guia/entrega` | su mensajero u oficina | Entrega. El servidor calcula `difCobro` |
@@ -113,9 +116,11 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 
 ## Pendiente
 
-- Fotos y firmas en Supabase Storage (la tabla `pedido_archivos` ya existe).
+- Subir fotos y firmas a Supabase Storage (leerlas con URL firmadas ya funciona: `helpers/storage.js`).
 - Movimientos de clientes, recaudos, caja, arqueos, cajas de oficina, liquidaciones, sueldos y cuentas internas, con los cálculos de `app/js/app.js` en `helpers/negocio.js` y pruebas que comparen contra la app actual.
 - Bloquear cambios a lo ya contado en un arqueo (`ajustes.caja.corte`).
 - `Idempotency-Key` en las escrituras que reenvía la cola sin señal del mensajero.
 - Tiempo real con SSE (`GET /api/events`).
 - Script de migración de Firestore a Postgres.
+
+

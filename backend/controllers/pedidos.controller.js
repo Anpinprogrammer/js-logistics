@@ -11,6 +11,13 @@ import { transaccion } from "../config/db.js";
 import { noEncontrado, prohibido, conflicto, invalido } from "../helpers/errores.js";
 import { diferenciaCobro, VENTANA_CORRECCION_MS } from "../helpers/negocio.js";
 import { esOficina, esAdmin } from "../middleware/autorizar.js";
+import { firmarUrls } from "../helpers/storage.js";
+
+/** Cambia la ruta interna de la miniatura por una URL firmada (`mini`), sin exponer la ruta del bucket. */
+async function conMini(pedidos) {
+  const urls = await firmarUrls(pedidos.map(p => p.miniRuta).filter(Boolean)).catch(e => { console.error(e.message); return {}; });
+  return pedidos.map(({ miniRuta, ...p }) => ({ ...p, mini: (miniRuta && urls[miniRuta]) || null }));
+}
 
 const pesos = v => "$ " + Number(v || 0).toLocaleString("es-CO");
 
@@ -34,13 +41,23 @@ export async function listar(req, res) {
   }
   const pedidos = await Pedido.listar(filtros);
   const siguiente = pedidos.length === filtros.limite ? pedidos[pedidos.length - 1].n : null;
-  res.json({ pedidos, siguiente });
+  res.json({ pedidos: await conMini(pedidos), siguiente });
 }
 
 export async function obtener(req, res) {
   const p = await Pedido.buscarPorGuia(req.valido.params.guia);
   if (!p || !puedeVer(req.usuario, p)) throw noEncontrado("La guía no existe"); // no se dice si existe a quien no la puede ver
-  res.json({ pedido: p });
+  res.json({ pedido: (await conMini([p]))[0] });
+}
+
+/** Fotos y firmas del pedido con URL firmadas que vencen en 1 hora. */
+export async function archivos(req, res) {
+  const { guia } = req.valido.params;
+  const p = await Pedido.buscarPorGuia(guia);
+  if (!p || !puedeVer(req.usuario, p)) throw noEncontrado("La guía no existe");
+  const lista = await Pedido.listarArchivos(guia, { incluirPrevias: esOficina(req.usuario) });
+  const urls = await firmarUrls(lista.map(a => a.ruta));
+  res.json({ archivos: lista.filter(a => urls[a.ruta]).map(a => ({ tipo: a.tipo, url: urls[a.ruta], creado: a.creado })) });
 }
 
 export async function crear(req, res) {

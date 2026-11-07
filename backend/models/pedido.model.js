@@ -6,7 +6,8 @@ import { formatoGuia } from "../helpers/ids.js";
 const CON_INTENTOS = `
   SELECT p.*, c.nombre AS cliente_nombre, m.nombre AS mensajero_nombre,
     COALESCE((SELECT json_agg(json_build_object('fecha', i.fecha, 'motivo', i.motivo, 'nota', i.nota) ORDER BY i.fecha)
-              FROM pedido_intentos i WHERE i.guia = p.guia), '[]'::json) AS intentos
+              FROM pedido_intentos i WHERE i.guia = p.guia), '[]'::json) AS intentos,
+    (SELECT a.ruta FROM pedido_archivos a WHERE a.guia = p.guia AND a.tipo = 'mini' ORDER BY a.creado DESC LIMIT 1) AS mini_ruta
   FROM pedidos p
   LEFT JOIN clientes c ON c.id = p.cliente_id
   LEFT JOIN mensajeros m ON m.id = p.mensajero_id`;
@@ -15,7 +16,7 @@ const CON_INTENTOS = `
  * Lista con filtros. `alcance` lo pone el controlador según el rol: { mensajeroId } o { clienteId }
  * para que cada quien vea solo lo suyo, igual que firestore.rules.
  */
-export async function listar({ estado, mensajeroId, clienteId, desde, hasta, buscar, conDiferencia, limite = 100, cursor } = {}) {
+export async function listar({ estado, cerrados, mensajeroId, clienteId, desde, hasta, entregadoDesde, entregadoHasta, buscar, conDiferencia, limite = 100, cursor } = {}) {
   const cond = [], valores = [];
   const agregar = (sql, v) => { valores.push(v); cond.push(sql.replace("?", `$${valores.length}`)); };
   if (estado) agregar("p.estado = ?", estado);
@@ -23,6 +24,9 @@ export async function listar({ estado, mensajeroId, clienteId, desde, hasta, bus
   if (clienteId) agregar("p.cliente_id = ?", clienteId);
   if (desde) agregar("p.creado >= ?", desde);
   if (hasta) agregar("p.creado < ?", hasta);
+  if (cerrados) cond.push("p.estado <> 'pendiente'");
+  if (entregadoDesde) agregar("p.entregado >= ?", entregadoDesde); // por hora de entrega o devolución
+  if (entregadoHasta) agregar("p.entregado < ?", entregadoHasta);
   if (buscar) {
     valores.push(`%${buscar.replace(/[\\%_]/g, c => "\\" + c)}%`);
     cond.push(`(p.guia ILIKE $${valores.length} OR p.destinatario ILIKE $${valores.length})`);
@@ -87,4 +91,15 @@ export async function agregarIntento(guia, { motivo, nota = "", por }, db = { qu
 export async function eliminar(guia, db) {
   const { rows } = await db.query(`DELETE FROM pedidos WHERE guia = $1 RETURNING *`, [guia]);
   return filaAObjeto(rows[0]);
+}
+
+/** Fotos y firmas vigentes del pedido (las "previas" solo las ve la oficina). */
+export async function listarArchivos(guia, { incluirPrevias = false } = {}) {
+  const { rows } = await query(
+    `SELECT DISTINCT ON (tipo, CASE WHEN tipo = 'previa' THEN id END) id, tipo, ruta, creado
+     FROM pedido_archivos WHERE guia = $1 AND tipo <> 'mini' ${incluirPrevias ? "" : "AND tipo <> 'previa'"}
+     ORDER BY tipo, CASE WHEN tipo = 'previa' THEN id END, creado DESC`,
+    [guia]
+  );
+  return rows.map(filaAObjeto);
 }

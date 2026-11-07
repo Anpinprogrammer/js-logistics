@@ -15,7 +15,11 @@ const esquema = z.object({
   COOKIE_NOMBRE: z.string().default("jsl_sesion"),
   COOKIE_DOMINIO: z.string().optional().transform(v => v || undefined),
   // lax si el frontend y la API están en el mismo sitio (recomendado); none solo si están en dominios distintos
-  COOKIE_SAMESITE: z.enum(["lax", "strict", "none"]).default("lax")
+  COOKIE_SAMESITE: z.enum(["lax", "strict", "none"]).default("lax"),
+  // Supabase Storage para fotos y firmas (opcional: sin esto, las listas de archivos salen vacías)
+  SUPABASE_URL: z.string().url().optional().or(z.literal("")).transform(v => v ? v.replace(/\/$/, "") : undefined),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional().transform(v => v || undefined),
+  STORAGE_BUCKET: z.string().default("pedidos")
 });
 
 const r = esquema.safeParse(process.env);

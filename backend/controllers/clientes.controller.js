@@ -1,6 +1,7 @@
 /* Clientes: la oficina los ve y registra; borrar solo administración; el cliente ve solo su ficha. */
 import * as Cliente from "../models/cliente.model.js";
 import * as Auditoria from "../models/auditoria.model.js";
+import * as Movimiento from "../models/movimiento.model.js";
 import { transaccion } from "../config/db.js";
 import { conflicto, noEncontrado, prohibido } from "../helpers/errores.js";
 import { esOficina } from "../middleware/autorizar.js";
@@ -15,6 +16,14 @@ export async function obtener(req, res) {
   const c = await Cliente.buscarPorId(id);
   if (!c) throw noEncontrado("El cliente no existe");
   res.json({ cliente: c });
+}
+
+/** Movimientos de la cuenta del cliente: la oficina, o el propio cliente. */
+export async function movimientos(req, res) {
+  const { id } = req.valido.params;
+  if (!esOficina(req.usuario) && req.usuario.clienteId !== id) throw prohibido();
+  if (!(await Cliente.buscarPorId(id))) throw noEncontrado("El cliente no existe");
+  res.json({ movimientos: await Movimiento.listarDeCliente(id, req.valido.query) });
 }
 
 export async function crear(req, res) {

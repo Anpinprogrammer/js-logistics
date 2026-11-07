@@ -16,3 +16,9 @@ export const actualizar = z.object({
   telefono: telefono.optional(),
   tarifa: pesos.optional()
 });
+
+export const movimientos = z.object({
+  desde: z.coerce.date().optional(),
+  hasta: z.coerce.date().optional(),
+  limite: z.coerce.number().int().min(1).max(1000).default(200)
+});
