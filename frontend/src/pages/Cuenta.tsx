@@ -22,8 +22,8 @@ export default function Cuenta() {
   return (
     <>
       <Titulo>Mi cuenta</Titulo>
-      <div className="grid gap-4 md:grid-cols-2">
-        <section className="caja p-5">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <section className="caja min-w-0 p-5">
           <dl>
             <Dato k="Nombre">{u.nombre || "—"}</Dato>
             <Dato k="Correo">{u.email}</Dato>

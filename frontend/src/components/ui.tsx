@@ -129,7 +129,7 @@ export function EtiquetaEstado({ p }: { p: Pedido }) {
 /** Fila de datos "etiqueta: valor" para fichas de detalle. */
 export const Dato = ({ k, children }: { k: string; children: ReactNode }) => (
   <div className="flex justify-between gap-4 border-b border-linea py-2 text-sm last:border-0">
-    <dt className="text-suave">{k}</dt><dd className="text-right font-medium">{children}</dd>
+    <dt className="shrink-0 text-suave">{k}</dt><dd className="min-w-0 text-right font-medium [overflow-wrap:anywhere]">{children}</dd>
   </div>
 );
 

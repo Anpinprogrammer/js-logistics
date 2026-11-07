@@ -59,7 +59,7 @@
 }
 
 @layer base {
-  html { -webkit-text-size-adjust: 100%; }
+  html { -webkit-text-size-adjust: 100%; overflow-x: clip; /* red de seguridad: nunca scroll horizontal de la página */ }
   body {
     @apply bg-fondo text-tinta font-sans antialiased;
     font-size: 15px;

@@ -57,7 +57,7 @@ export default function Pedidos() {
 
       {q.isPending ? <Cargando /> : q.error ? <Aviso tipo="error">{mensajeDe(q.error)}</Aviso> : !lista.length ? <Vacio titulo="No hay guías con esos filtros" /> : <>
         {/* Celular: tarjetas */}
-        <div className="grid gap-3 md:hidden">
+        <div className="grid grid-cols-1 gap-3 md:hidden">
           {lista.map(p => <TarjetaPedido key={p.guia} p={p} onClick={() => ir(`/pedidos/${p.guia}`)} />)}
         </div>
         {/* Computador: tabla */}

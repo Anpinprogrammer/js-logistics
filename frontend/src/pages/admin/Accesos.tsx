@@ -21,8 +21,8 @@ export default function Accesos() {
         <ul className="caja divide-y divide-linea">
           {q.data.map(u => (
             <li key={u.id}>
-              <button className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-left hover:bg-hueco" onClick={() => setEditar(u)}>
-                <span>
+              <button className="flex w-full min-w-0 flex-wrap items-center justify-between gap-2 px-4 py-3 text-left hover:bg-hueco" onClick={() => setEditar(u)}>
+                <span className="min-w-0 [overflow-wrap:anywhere]">
                   <b className={u.activo === false ? "text-suave line-through" : ""}>{u.nombre || u.email}</b>{u.id === yo.id && <span className="text-sm text-suave"> (tú)</span>}
                   <span className="block text-sm text-suave">{u.email}</span>
                 </span>

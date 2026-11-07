@@ -80,7 +80,7 @@ function Detalle({ p }: { p: Pedido }) {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.2fr]">
         <section className="caja p-5">
           <h2 className="mb-2 font-bold">Datos</h2>
           <dl>
