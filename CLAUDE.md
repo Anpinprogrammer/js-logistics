@@ -20,7 +20,7 @@ Reglas sobre el sistema viejo:
 - `app/js/app.js` es **la referencia de las reglas de negocio** (saldos, caja, arqueos, liquidaciones, sueldos). Al pasar un cálculo al backend, cópialo con el mismo comportamiento y pruébalo.
 - Los skills `/publicar` y `/auditar` de `.claude/skills/` son del sistema viejo: publican en Firebase y hacen push directo a `main`. **No los uses para el sistema nuevo.**
 
-El portal de **clientes** es otro repositorio: `jslogistics-cliente-frontend`. Sigue las mismas convenciones y usa la misma API. `frontend/` de este repo es solo para la oficina y los mensajeros.
+El portal de **clientes** es otro repositorio: [`jslogistics-cliente-frontend`](https://github.com/Anpinprogrammer/jslogistics-cliente-frontend). Sigue las mismas convenciones y usa la misma API; su guía para agentes está en su `AGENTS.md` y su `ARCHITECTURE.md`. `frontend/` de este repo es solo para la oficina y los mensajeros.
 
 ## Arquitectura nueva
 
