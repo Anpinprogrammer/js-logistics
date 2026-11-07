@@ -1,5 +1,7 @@
 # JS Logistics
 
+> **Migración en curso.** El sistema nuevo está en [`backend/`](backend/) (Node.js + Express + PostgreSQL) y en [`frontend/`](frontend/) (React + TypeScript + Tailwind). Lo que describe este README (`app/` + Firebase) sigue en producción hasta el cambio. Convenciones para agentes de IA y para quien programe: [CLAUDE.md](CLAUDE.md).
+
 App web (PWA) de JS Logistics, empresa de mensajería en Cali. Maneja pedidos y entregas con fotos y firma, clientes y sus saldos, la caja de la empresa (arqueos y cajas de oficina por asistente), liquidaciones de mensajeros, sueldos, recibos imprimibles y el historial de cambios.
 
 - **En producción:** https://js-logistics-299ce.web.app (Firebase Hosting, proyecto `js-logistics-299ce`).
