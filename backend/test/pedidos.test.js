@@ -127,3 +127,23 @@ test("si administración cambia el rol, la sesión abierta deja de servir", asyn
   await admin.patch(`/api/usuarios/${id}`).send({ rol: "admin" });
   assert.equal((await temp.get("/api/usuarios")).status, 401);
 });
+
+test("movimientos: el cliente ve los suyos y no los de otro", async () => {
+  await pool.query(`INSERT INTO movimientos (id, cliente_id, tipo, valor, medio) VALUES ('mv1', $1, 'pago_de_cliente', 20000, 'nequi')`, [c1.id]);
+  const r = await cliente.get(`/api/clientes/${c1.id}/movimientos`);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.movimientos.map(m => [m.id, m.valor, m.medio]), [["mv1", 20000, "nequi"]]);
+  const otro = (await asistente.post("/api/clientes").send({ nombre: "Ajeno", confirmarRepetido: true })).body.cliente;
+  assert.equal((await cliente.get(`/api/clientes/${otro.id}/movimientos`)).status, 403);
+});
+
+test("archivos y miniatura: sin Storage configurado salen vacíos, y la ruta interna no se expone", async () => {
+  await pool.query(`INSERT INTO pedido_archivos (guia, tipo, ruta) VALUES ('JS-00001', 'mini', 'JS-00001/mini.jpg')`);
+  const p = (await cliente.get("/api/pedidos/JS-00001")).body.pedido;
+  assert.equal(p.mini, null);
+  assert.equal(p.miniRuta, undefined);
+  const a = await cliente.get("/api/pedidos/JS-00001/archivos");
+  assert.equal(a.status, 200);
+  assert.deepEqual(a.body.archivos, []);
+  assert.equal((await otroMensajero.get("/api/pedidos/JS-00001/archivos")).status, 404);
+});

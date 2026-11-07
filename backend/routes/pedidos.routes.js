@@ -9,6 +9,7 @@ const guia = { params: V.paramGuia };
 
 r.get("/", validar({ query: V.listar }), C.listar);                          // cada rol ve lo suyo
 r.get("/:guia", validar(guia), C.obtener);
+r.get("/:guia/archivos", validar(guia), C.archivos);
 r.post("/", permitir(EQUIPO), validar({ body: V.crear }), C.crear);
 r.patch("/:guia", permitir(OFICINA), validar({ ...guia, body: V.actualizar }), C.actualizar);
 r.post("/:guia/entrega", permitir(EQUIPO), validar({ ...guia, body: V.entrega }), C.entregar);
