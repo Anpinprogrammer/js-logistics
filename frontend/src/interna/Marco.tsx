@@ -4,11 +4,18 @@ import { useSesion, useUsuario } from "../auth/Sesion";
 import { ProveedorDatos, useDatos } from "./datos";
 import { ProveedorVentana, Icono, IconoSalir, useVentana } from "./ui";
 import { E, guardarLocal } from "./estado";
-import { S, fechaLarga, hoy, horaActual, type Pedido } from "./motor";
+import { S, fechaLarga, hoy, horaActual, ROLES, type Pedido } from "./motor";
 import Oficina from "./oficina/Oficina";
 import Mensajero, { pendientesMios } from "./mensajero/Mensajero";
 import "./estilos.css";
 import "./ajustes.css";
+
+/** Grupos del menú lateral en computador (las mismas pestañas de siempre, agrupadas). */
+const SECCIONES: [string, string[]][] = [
+  ["Principal", ["inicio", "nuevo", "pend", "entregados", "pedidos", "clientes"]],
+  ["Gestión financiera", ["caja", "cuentas", "sueldo", "sueldos"]],
+  ["Administración", ["mas"]],
+];
 
 export type ItemNav = [clave: string, nombre: string, num?: number];
 
@@ -67,8 +74,13 @@ function Marco() {
   return <>
     <aside className="lateral" id="lateral">
       <div className="marca-lat"><img src="/logo.png" alt="" /><span>JS Logistics<small>Servir es nuestra labor</small></span></div>
-      <nav id="navLateral" aria-label="Menú principal">{items.map(boton)}</nav>
-      <div className="lat-pie">JS Logistics · Cali</div>
+      <nav id="navLateral" aria-label="Menú principal">
+        {SECCIONES.map(([titulo, claves]) => { const xs = items.filter(([k]) => claves.includes(k)); return xs.length ? <div className="lat-grupo" key={titulo}><span className="lat-titulo">{titulo}</span>{xs.map(boton)}</div> : null; })}
+      </nav>
+      <div className="lat-pie">
+        <div className="lat-usuario"><span className="avatar" aria-hidden="true">{iniciales || "?"}</span><span><b>{corto || nom}</b><small>{ROLES[usuario?.rol || ""] || ""}</small></span></div>
+        <button className="lat-salir" onClick={() => salir()}><IconoSalir /><span>Salir</span></button>
+      </div>
     </aside>
     <header className="barra">
       <div className="marca"><img src="/logo.png" alt="" /><span>JS Logistics<small>Servir es nuestra labor</small></span></div>

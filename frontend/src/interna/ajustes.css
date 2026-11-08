@@ -2,3 +2,22 @@
 .jsl{min-height:100dvh}
 .jsl .oculto{display:none !important}
 .jsl a.enlace{cursor:pointer}
+
+/* Menú lateral en computador: pestañas agrupadas por sección y la cuenta abajo */
+@media (min-width:960px){
+  .jsl .marca-lat{padding:0 8px 18px;margin:0 -14px 14px;padding-left:22px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .jsl #navLateral{gap:18px}
+  .jsl .lat-grupo{display:flex;flex-direction:column;gap:4px}
+  .jsl .lat-titulo{padding:0 14px 4px;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lateral-suave);opacity:.75}
+  .jsl #navLateral button{border-left:3px solid transparent}
+  .jsl #navLateral button[aria-current="page"]{background:rgba(59,163,230,.14);color:var(--marca2);border-left-color:var(--marca2)}
+  .jsl .lat-pie{margin:auto -14px 0;padding:16px 14px 0;border-top:1px solid rgba(255,255,255,.08);font-size:inherit;opacity:1;display:flex;flex-direction:column;gap:12px}
+  .jsl .lat-usuario{display:flex;align-items:center;gap:10px;padding:0 4px}
+  .jsl .lat-usuario .avatar{display:grid;flex:none}
+  .jsl .lat-usuario span:last-child{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+  .jsl .lat-usuario b{color:#fff;font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .jsl .lat-usuario small{color:var(--lateral-suave);font-size:.78rem}
+  .jsl .lat-salir{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#fff;font-weight:500}
+  .jsl .lat-salir:hover{background:rgba(255,255,255,.09)}
+  .jsl .lat-salir svg{width:18px;height:18px}
+}
