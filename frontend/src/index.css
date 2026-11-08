@@ -76,3 +76,9 @@
   }
   .etiqueta { @apply mb-1 block text-sm font-medium text-suave; }
 }
+
+/* En el celular, Safari hace zoom al tocar un campo con letra de menos de 16 px, y después la página queda agrandada.
+   Con 16 px en todos los campos no hay zoom. Va con !important porque los estilos del prototipo (.jsl) son más específicos. */
+@media (max-width: 1023px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px !important; }
+}
