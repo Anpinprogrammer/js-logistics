@@ -141,10 +141,11 @@ test("importa todo con las relaciones, limpia lo inválido y lo reporta", async 
   assert.equal((await uno(`SELECT medio FROM recaudos WHERE id = 'r1'`)).medio, "efectivo");
   const liq = await uno(`SELECT * FROM liquidaciones WHERE id = 'm1_1'`);
   assert.equal(Number(liq.ajuste), 1000);
-  assert.equal(liq.dia.toISOString().slice(0, 10), "2026-10-20");
+  assert.equal(liq.dia, "2026-10-20");
+  assert.deepEqual(liq.guias, ["JS-00001"]);
   const a1 = await uno(`SELECT * FROM cajamovs WHERE id = 'a1'`);
-  assert.equal(a1.de_liquidacion, true);
-  assert.equal(a1.extra.liquidacionId, "m1_1");
+  assert.equal(a1.de_liquidacion, "m1_1"); // el ID de la liquidación, como en la app
+  assert.equal(a1.extra.liquidacionId, undefined);
   assert.equal((await uno(`SELECT adelanto_id FROM cajamovs WHERE id = 'd1'`)).adelanto_id, "a1");
   assert.deepEqual((await uno(`SELECT extra FROM cajamovs WHERE id = 'q1'`)).extra, { esperado: { efectivo: 100 }, contado: { efectivo: 90 } });
   const prev = await uno(`SELECT * FROM jornadas WHERE previo`);
