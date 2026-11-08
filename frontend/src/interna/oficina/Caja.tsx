@@ -88,7 +88,7 @@ function CierreDia({ pintar }: { pintar: () => void }) {
   const paso = (ok: boolean, titulo: string, detalle: React.ReactNode, boton?: React.ReactNode) => <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 0", borderBottom: "1px solid var(--borde,#ddd)" }}>
     <b className={ok ? "pos" : "neg"} style={{ fontSize: "1.1rem", minWidth: 22 }}>{ok ? "✓" : "•"}</b><div style={{ flex: 1 }}><b>{titulo}</b>{detalle ? <div className="sub" style={{ fontSize: ".85rem", marginTop: 2 }}>{detalle}</div> : null}</div>{boton || null}</div>;
   const aPedidos = (f: "sin" | "serv") => {
-    E.tabA = "pedidos"; E.filtroA = f; E.buscarA = ""; E.mensPedA = ""; E.diaPedA = ""; E.limiteA = 100; pintar(); scrollTo(0, 0);
+    E.tabA = "pedidos"; E.filtroA = f; E.buscarA = ""; E.mensPedA = ""; E.diaPedA = ""; E.paginaA = 1; pintar(); scrollTo(0, 0);
     const ps = Object.values(S.pedidos).filter(f === "sin" ? p => !p.clienteId : sinServicio).sort((a, b) => b.creado - a.creado); if (ps.length) v.abrir(<EnBloque modo={f} lista={ps} />);
   };
   const arquear = async () => {

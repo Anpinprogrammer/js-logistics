@@ -12,3 +12,10 @@
   .jsl #navLateral button{border-left:3px solid transparent}
   .jsl #navLateral button[aria-current="page"]{background:rgba(59,163,230,.14);color:var(--marca2);border-left-color:var(--marca2)}
 }
+
+/* Paginador de listas (Pedidos): botones grandes para el dedo en el celular */
+.jsl .paginador{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 4px;flex-wrap:wrap}
+.jsl .paginador .btn{min-height:44px}
+.jsl .paginador .btn:disabled{opacity:.45;cursor:default}
+.jsl .paginador .sub{text-align:center;flex:1;min-width:0;margin:0}
+@media (max-width:420px){.jsl .paginador .pag-rango{display:none}}

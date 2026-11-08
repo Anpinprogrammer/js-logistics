@@ -1,13 +1,17 @@
 /* Oficina → Pedidos, el detalle de una guía y la asignación en bloque, igual al prototipo. */
 import { useRef, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   S, yo, hora, pesos, listaOrdenada, esRepartidor, tipoDe, cambioPendiente, sinServicio, delDia, nombreCliente, sinTildes, cerrado, gastoDe, pagoDomi,
   saldoPedido, metodoTxt, pedidoLiquidado, cambiaLoContado, corteCaja, CUENTAS_JS, METODOS, MEDIOS, MOTIVOS, type Metodo, type Medio, type Motivo, type Pedido,
 } from "../motor";
-import { Cab, EtqEstado, FiltroDia, FilaPedido, FotosGuia, IconoCamara, pl, useVentana } from "../ui";
+import { Cab, EtqEstado, FiltroDia, FilaPedido, FotosGuia, IconoCamara, Paginador, pl, useVentana } from "../ui";
 import { E } from "../estado";
 import { actualizarPedido, cambioEntregado, crearGuias, eliminarPedido, reabrir } from "../acciones";
-import { motivoError, useDatos } from "../datos";
+import { aPedido, motivoError, useDatos } from "../datos";
+import { DEMO } from "../demo";
+import { usePorPagina } from "../../lib/pantalla";
+import { pedidos as apiPedidos, type FiltrosPedidos } from "../../api/servicios";
 import { abrirEntregaEn, DlgDevolucion } from "../mensajero/Entrega";
 import { FormCliente } from "./Clientes";
 import type { CambiosPedido } from "../../api/servicios";
@@ -15,12 +19,22 @@ import type { CambiosPedido } from "../../api/servicios";
 type Ventana = ReturnType<typeof useVentana>;
 export const avisoContado = (v: Ventana) => v.avisar("Eso ya quedó contado en el arqueo del " + hora(corteCaja()) + ". Para corregirlo, registra un movimiento nuevo.");
 
-export default function Pedidos({ pintar }: { pintar: () => void }) {
-  const v = useVentana();
-  const camara = useRef<HTMLInputElement>(null), galeria = useRef<HTMLInputElement>(null), ofiSel = useRef<HTMLSelectElement>(null);
-  const [buscar, setBuscar] = useState(E.buscarA);
-  let ps = Object.values(S.pedidos).sort((a, b) => b.creado - a.creado);
-  const f = E.filtroA;
+/** Lo que pide cada filtro de la pestaña al servidor. */
+function filtrosServidor(f: string, buscar: string, mensajeroId: string, dia: string): Omit<FiltrosPedidos, "limite" | "cursor"> {
+  const base = { buscar: buscar.trim() || undefined, mensajeroId: mensajeroId || undefined, dia: dia || undefined };
+  if (f === "sin") return { ...base, sinRemitente: true };
+  if (f === "pend") return { ...base, estado: "pendiente" };
+  if (f === "ent") return { ...base, estado: "entregado" };
+  if (f === "dev") return { ...base, estado: "devuelto" };
+  if (f === "dif") return { ...base, diferencia: "todas" };
+  if (f === "cambio") return { ...base, cambioPendiente: true };
+  if (f === "serv") return { ...base, sinServicio: true };
+  return base;
+}
+
+/** Los mismos filtros sobre los datos en memoria: para la asignación en bloque y para el modo demo, que no tiene servidor. */
+function filtrarEnMemoria(f: string, buscar: string, mensajeroId: string, dia: string) {
+  let ps = Object.values(S.pedidos).sort((a, b) => b.n - a.n);
   if (f === "sin") ps = ps.filter(p => !p.clienteId);
   else if (f === "pend") ps = ps.filter(p => p.estado === "pendiente");
   else if (f === "ent") ps = ps.filter(p => p.estado === "entregado");
@@ -28,9 +42,39 @@ export default function Pedidos({ pintar }: { pintar: () => void }) {
   else if (f === "dif") ps = ps.filter(p => Number(p.difCobro));
   else if (f === "cambio") ps = ps.filter(cambioPendiente);
   else if (f === "serv") ps = ps.filter(sinServicio);
-  if (E.buscarA) { const q = E.buscarA.toLowerCase(); ps = ps.filter(p => (p.guia + " " + nombreCliente(p.clienteId) + " " + (p.destinatario || "") + " " + (S.mensajeros[p.mensajeroId]?.nombre || "")).toLowerCase().includes(q)); }
-  if (E.mensPedA) ps = ps.filter(p => p.mensajeroId === E.mensPedA);
-  if (E.diaPedA) ps = ps.filter(p => delDia(p, E.diaPedA));
+  if (buscar) { const q = buscar.toLowerCase(); ps = ps.filter(p => (p.guia + " " + nombreCliente(p.clienteId) + " " + (p.destinatario || "") + " " + (S.mensajeros[p.mensajeroId]?.nombre || "")).toLowerCase().includes(q)); }
+  if (mensajeroId) ps = ps.filter(p => p.mensajeroId === mensajeroId);
+  if (dia) ps = ps.filter(p => delDia(p, dia));
+  return ps;
+}
+
+/** La página de pedidos que se ve. La corta el servidor; en demo se imita aquí con los datos en memoria. */
+function usePaginaPedidos(f: string, buscar: string, mensajeroId: string, dia: string, pagina: number, porPagina: number) {
+  const { version } = useDatos(); // cada recarga o cambio vuelve a pedir la página
+  const filtros = filtrosServidor(f, buscar, mensajeroId, dia);
+  return useQuery({
+    queryKey: ["pedidos", "pagina", filtros, pagina, porPagina, version],
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      if (DEMO) {
+        const todos = filtrarEnMemoria(f, buscar, mensajeroId, dia), paginas = Math.max(1, Math.ceil(todos.length / porPagina)), actual = Math.min(pagina, paginas);
+        return { pedidos: todos.slice((actual - 1) * porPagina, actual * porPagina), pagina: actual, porPagina, total: todos.length, paginas };
+      }
+      const r = await apiPedidos.pagina(filtros, pagina, porPagina);
+      return { ...r, pedidos: r.pedidos.map(p => S.pedidos[p.guia] || aPedido(p)) };
+    },
+  });
+}
+
+export default function Pedidos({ pintar }: { pintar: () => void }) {
+  const v = useVentana();
+  const camara = useRef<HTMLInputElement>(null), galeria = useRef<HTMLInputElement>(null), ofiSel = useRef<HTMLSelectElement>(null), arriba = useRef<HTMLDivElement>(null);
+  const [buscar, setBuscar] = useState(E.buscarA);
+  const f = E.filtroA, porPagina = usePorPagina();
+  const q = usePaginaPedidos(f, E.buscarA, E.mensPedA, E.diaPedA, E.paginaA, porPagina);
+  const pag = q.data, ps = pag?.pedidos ?? [], total = pag?.total ?? 0;
+  const enBloque = f === "sin" || f === "serv" ? filtrarEnMemoria(f, E.buscarA, E.mensPedA, E.diaPedA) : [];
+  const irA = (n: number) => { poner({ paginaA: n }); arriba.current?.scrollIntoView({ block: "start", behavior: "smooth" }); };
   const todos = Object.values(S.pedidos);
   const porEntregar = todos.filter(p => p.estado === "pendiente" && (!E.mensPedA || p.mensajeroId === E.mensPedA)).length;
   const repartidores = listaOrdenada(S.mensajeros, "nombre").filter(m => esRepartidor(m) || m.id === E.mensPedA);
@@ -60,19 +104,22 @@ export default function Pedidos({ pintar }: { pintar: () => void }) {
       <input type="file" ref={galeria} accept="image/*" multiple className="oculto" onChange={e => fotos(e.target.files)} />
     </div> : <div className="aviso">{yo.esAdmin ? "Para registrar pedidos con foto desde aquí, agrega en Más → Personal una persona de tipo “Oficina (JS)”." : "Para registrar pedidos con foto, el administrador debe crear la Oficina en Personal."}</div>}
     {nCambio && f !== "cambio" ? <div className="aviso">{nCambio === 1 ? "Hay 1 prenda de cambio" : "Hay " + nCambio + " prendas de cambio"} por entregar a los clientes. Míralas en “Cambios por entregar”.</div> : null}
-    {nServ && f !== "serv" ? <div className="aviso alerta">{nServ === 1 ? "1 pedido entregado no tiene" : nServ + " pedidos entregados no tienen"} valor de servicio: el saldo del cliente queda mal hasta que lo pongas. <button className="btn chico" onClick={() => poner({ filtroA: "serv", limiteA: 100 })}>Verlos</button></div>
+    {nServ && f !== "serv" ? <div className="aviso alerta">{nServ === 1 ? "1 pedido entregado no tiene" : nServ + " pedidos entregados no tienen"} valor de servicio: el saldo del cliente queda mal hasta que lo pongas. <button className="btn chico" onClick={() => poner({ filtroA: "serv", paginaA: 1 })}>Verlos</button></div>
       : f === "serv" ? <div className="aviso">Mostrando los pedidos entregados sin valor de servicio. Ábrelos y ponles el domicilio.</div> : null}
     {nDif ? <div className="aviso alerta">{nDif === 1 ? "1 entrega tiene" : nDif + " entregas tienen"} un valor cobrado distinto al que debían cobrar. Revísalas en “Con diferencia”.</div> : null}
     <div className="filtros">{([["sin", "Sin remitente"], ["pend", "Por entregar", porEntregar], ["ent", "Entregados"], ["dev", "Devueltos"], ["dif", "Con diferencia"], ["cambio", "Cambios por entregar"], ["todos", "Todos"]] as [string, string, number?][])
-      .map(([k, t, n]) => <button key={k} aria-pressed={f === k} onClick={() => poner({ filtroA: k, limiteA: 100 })}>{t}{n !== undefined ? <> <span className="num">{n}</span></> : null}</button>)}</div>
+      .map(([k, t, n]) => <button key={k} aria-pressed={f === k} onClick={() => poner({ filtroA: k, paginaA: 1 })}>{t}{n !== undefined ? <> <span className="num">{n}</span></> : null}</button>)}</div>
     <div className="linea2"><div className="campo" style={{ flex: 2, minWidth: 220 }}><input id="buscar" type="search" placeholder="Buscar guía, remitente, destinatario o mensajero" value={buscar} aria-label="Buscar"
-      onChange={e => { const x = e.target.value; setBuscar(x); clearTimeout(tBuscar.current); tBuscar.current = window.setTimeout(() => poner({ buscarA: x }), 300); }} /></div>
-      <div className="campo"><select id="mensPed" aria-label="Filtrar por mensajero" value={E.mensPedA} onChange={e => poner({ mensPedA: e.target.value, limiteA: 100 })}><option value="">Todos los mensajeros</option>{repartidores.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div></div>
-    {(f === "sin" || f === "serv") && ps.length ? <div className="acciones" style={{ margin: "6px 0" }}><button className="btn" id="enBloque" onClick={() => v.abrir(<EnBloque modo={f} lista={ps} />)}>{f === "sin" ? "Asignar remitente a varios" : "Poner domicilio a varios"} ({ps.length})</button></div> : null}
-    <FiltroDia d={E.diaPedA} poner={d => poner({ diaPedA: d, limiteA: 100 })} />
-    {E.diaPedA || E.mensPedA ? <p className="sub">{ps.length} {pl(ps.length, "pedido")}{E.mensPedA ? " de " + (S.mensajeros[E.mensPedA]?.nombre || "") : ""}{E.diaPedA ? " que salieron o se cerraron ese día" : ""}</p> : null}
-    {ps.length ? <><div className="lista">{ps.slice(0, E.limiteA).map(p => <FilaPedido key={p.guia} p={p} onClick={() => v.abrir(<AbrirPedido guia={p.guia} />)} />)}</div>
-      {ps.length > E.limiteA && <div className="acciones" style={{ justifyContent: "center" }}><button className="btn sec" id="masPed" onClick={() => poner({ limiteA: E.limiteA + 200 })}>Ver más ({ps.length - E.limiteA} restantes)</button></div>}</>
+      onChange={e => { const x = e.target.value; setBuscar(x); clearTimeout(tBuscar.current); tBuscar.current = window.setTimeout(() => poner({ buscarA: x, paginaA: 1 }), 300); }} /></div>
+      <div className="campo"><select id="mensPed" aria-label="Filtrar por mensajero" value={E.mensPedA} onChange={e => poner({ mensPedA: e.target.value, paginaA: 1 })}><option value="">Todos los mensajeros</option>{repartidores.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div></div>
+    {enBloque.length ? <div className="acciones" style={{ margin: "6px 0" }}><button className="btn" id="enBloque" onClick={() => v.abrir(<EnBloque modo={f} lista={enBloque} />)}>{f === "sin" ? "Asignar remitente a varios" : "Poner domicilio a varios"} ({enBloque.length})</button></div> : null}
+    <FiltroDia d={E.diaPedA} poner={d => poner({ diaPedA: d, paginaA: 1 })} />
+    <div ref={arriba} style={{ scrollMarginTop: 90 }} />
+    {pag && (E.diaPedA || E.mensPedA) ? <p className="sub">{total} {pl(total, "pedido")}{E.mensPedA ? " de " + (S.mensajeros[E.mensPedA]?.nombre || "") : ""}{E.diaPedA ? " que salieron o se cerraron ese día" : ""}</p> : null}
+    {q.isError ? <div className="aviso alerta">No se pudo traer la lista: {motivoError(q.error)} <button className="btn chico" onClick={() => q.refetch()}>Intentar otra vez</button></div>
+      : !pag ? <div className="vacio">Cargando pedidos…</div>
+      : ps.length ? <><div className="lista" aria-busy={q.isFetching} style={q.isPlaceholderData ? { opacity: .6 } : undefined}>{ps.map(p => <FilaPedido key={p.guia} p={p} onClick={() => v.abrir(<AbrirPedido guia={p.guia} />)} />)}</div>
+      <Paginador pagina={pag.pagina} paginas={pag.paginas} total={total} porPagina={pag.porPagina} ir={irA} cargando={q.isPlaceholderData} /></>
       : <div className="vacio">{f === "sin" ? "Todos los pedidos tienen remitente asignado." : f === "serv" ? "Todos los pedidos entregados tienen valor de servicio." : "No hay pedidos aquí."}</div>}
   </>;
 }

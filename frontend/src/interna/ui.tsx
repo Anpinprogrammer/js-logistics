@@ -196,3 +196,16 @@ export function FotosGuia({ p, id, firma = "Firma", conPrevias, soloSalida }: { 
 
 /** Re-pinta la pantalla cuando cambian los datos. */
 export const useVersion = () => useDatos().version;
+
+/** Paginador de listas: la página la corta el servidor; aquí solo se muestra y se pide otra. */
+export function Paginador({ pagina, paginas, total, porPagina, ir, cargando }: { pagina: number; paginas: number; total: number; porPagina: number; ir: (p: number) => void; cargando?: boolean }) {
+  if (paginas <= 1) return null;
+  const desde = (pagina - 1) * porPagina + 1, hasta = Math.min(total, pagina * porPagina);
+  return (
+    <nav className="paginador" aria-label="Páginas de la lista">
+      <button className="btn sec" disabled={pagina <= 1 || cargando} onClick={() => ir(pagina - 1)} aria-label="Página anterior">‹ Anterior</button>
+      <span className="sub" aria-live="polite">Página <b>{pagina}</b> de {paginas}<span className="pag-rango"> · {desde}–{hasta} de {total}</span></span>
+      <button className="btn sec" disabled={pagina >= paginas || cargando} onClick={() => ir(pagina + 1)} aria-label="Página siguiente">Siguiente ›</button>
+    </nav>
+  );
+}
