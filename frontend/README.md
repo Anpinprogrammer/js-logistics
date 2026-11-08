@@ -4,25 +4,55 @@ App de operación y administración en **React 19 + TypeScript + Tailwind CSS 4*
 
 ## Qué hay
 
+Con sesión, la app muestra **lo mismo que el prototipo** (`app/` del sistema viejo), con sus estilos, sus KPIs y sus pestañas, reescrito en React y TypeScript. El ingreso (`pages/Ingreso.tsx`) es el rediseño nuevo.
+
 | Rol | Pantallas |
 |---|---|
-| Mensajero (celular) | **Mi ruta**: guías en ruta, crear guía, foto del paquete al crear la guía, entregar con foto y firma (y aviso de diferencia de cobro) o "no se pudo" (reprogramar o devolver). **Entregados**: por día, con corrección durante 24 horas. **Mi cuenta**. |
-| Asistente | **Inicio** (resumen del día y alertas), **Pedidos** (filtros, búsqueda, paginación, detalle: remitente, valores, fotos y firma, domicilio pagado, revisar diferencias, registrar entrega), **Clientes** (búsqueda, alta con aviso de repetidos, ficha con pedidos y movimientos). |
-| Administración | Todo lo anterior, más corregir lo cobrado, eliminar guías y clientes, **Personal** y **Accesos** (cuentas, rol, vínculo, contraseña, desactivar). |
+| Mensajero (celular) | **Inicio** (KPIs, recomendaciones, efectividad, entregas por día, motivos, tus números), **Nuevo**, **Por entregar** (entregar con foto y firma, no entregado), **Mi caja**, **Mi sueldo**, **Entregados**. |
+| Asistente | **Inicio** (panel de control), **Pedidos**, **Clientes** (saldos, WhatsApp), **Caja** (recibir dinero de mensajeros, su caja de oficina), **Cuentas** (pagos, compras y ganancias de clientes). |
+| Administración | Todo lo anterior, más cierre del día, caja general y arqueos, liquidaciones, **Sueldos** y **Más** (Resultados, Personal y accesos, Historial, Papelera). Puede pasar a modo Mensajero. |
 
-**Caja** (arqueos, cierre del día, cajas de oficina, liquidaciones, sueldos) aparece "en construcción" hasta que el backend tenga esos módulos. Lo mismo pasa con los saldos de clientes.
+Los saldos, la caja y los sueldos se calculan en el navegador con las mismas reglas de `app/js/app.js` (en `src/interna/motor.ts`) mientras el backend no los calcule. Lo que todavía no está: tiquetes para imprimir, descargas de Excel y respaldo (llegan después).
+
+### Lo que la app interna espera del backend
+
+Si un endpoint todavía no existe (404 `RUTA_NO_ENCONTRADA`), la lectura se trata como vacía y las escrituras muestran "Esta función todavía no está lista en el servidor".
+
+- `GET/POST/PATCH/DELETE /movimientos`, `/recaudos`, `/liquidaciones`, `/caja/movimientos`, `/cuentas`
+- `PUT/DELETE /jornadas/:id` (pago por día y sueldo anterior, id `persona_dia` o `persona_previo_semana`)
+- `POST /caja/arqueos`, `DELETE /caja/arqueos/:id`, `GET /caja/corte` (fecha del último arqueo, para el asistente)
+- `POST /liquidaciones` con `entregaFinal`, `medio`, `adelanto` y `semanaAdelanto`: registra también el dinero recibido y el adelanto de sueldo
+- `POST /clientes/:id/unir` `{ otros }`, `POST /pedidos/:guia/reabrir`
+- `GET /historial?desde=`, `GET /papelera`, `POST /papelera/:id/restaurar`, `DELETE /papelera/:id`
+- Campos: `domiPagoFecha` y `domiPagoUid` en pedidos; `porUid` y `medioAntes` en movimientos y recaudos
 
 ## Estructura
 
 ```
 src/
-├── main.tsx            React Query, router, avisos y sesión
-├── App.tsx             Rutas por rol
+├── main.tsx            React Query, router y sesión
+├── App.tsx             Ingreso o app interna
 ├── api/                cliente.ts (axios), servicios.ts (llamadas por recurso), tipos.ts
-├── auth/Sesion.tsx     Sesión (/auth/yo, ingresar, salir)
-├── components/         Marco (menú lateral / barra inferior), ui, formularios de entrega, buscador de clientes
-├── lib/formato.ts      Pesos, fechas en hora de Colombia y textos del negocio
-└── pages/              mensajero/, oficina/, admin/
+├── auth/Sesion.tsx     Sesión (/auth/yo, ingresar, salir; cuentas de prueba en modo demo)
+├── pages/Ingreso.tsx   Ingreso
+├── lib/imagen.ts       Comprimir fotos y firma
+└── interna/            La app igual al prototipo
+    ├── estilos.css     Copia de app/css/estilos.css dentro de .jsl (generada, no editar)
+    ├── ajustes.css     Ajustes propios
+    ├── motor.ts        Datos en memoria y reglas de negocio copiadas de app.js
+    ├── datos.tsx       Carga desde la API (cada 45 s y al volver a la pestaña)
+    ├── acciones.ts     Escrituras (con su versión en memoria para el modo demo)
+    ├── demo.ts         Datos inventados para VITE_DEMO=true
+    ├── ui.tsx          Ventana, avisos, íconos, KPIs, dona, columnas, fotos
+    ├── Marco.tsx       Menú lateral, barra y pestañas
+    ├── mensajero/      Modo mensajero
+    └── oficina/        Panel, Pedidos, Clientes, Caja, Cuentas, Sueldos, Más
+```
+
+Para volver a copiar los estilos si cambia el prototipo:
+
+```bash
+npx -p postcss -p postcss-prefix-selector node scripts/estilos-prototipo.mjs ../app/css/estilos.css src/interna/estilos.css
 ```
 
 ## Sesión y seguridad

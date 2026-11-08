@@ -65,6 +65,9 @@ export interface Pedido {
   domiPagado: boolean;
   domiPagoMedio: Medio | null;
   domiPagoValor: number | null;
+  /** Cuándo y quién registró el pago aparte del domicilio (lo usa la caja de oficina). */
+  domiPagoFecha?: string | null;
+  domiPagoUid?: string | null;
   intentos: Intento[];
   mini: string | null;
 }
@@ -86,6 +89,8 @@ export interface Movimiento {
   nota: string;
   fecha: string;
   porNombre: string;
+  porUid?: string | null;
+  medioAntes?: string | null;
 }
 
 export interface ErrorApi {
@@ -93,3 +98,40 @@ export interface ErrorApi {
   message: string;
   campos?: { campo: string; mensaje: string }[];
 }
+
+/* ---------- Módulos de caja y sueldos ----------
+   Mismas formas que las colecciones del prototipo (app/js/app.js). La app interna las pide al backend y, mientras un
+   endpoint no exista (404), las trata como vacías. Ver "Lo que la app interna espera del backend" en frontend/README.md. */
+
+/** Dinero que un mensajero le entrega a la oficina. */
+export interface Recaudo {
+  id: string; mensajeroId: string; valor: number; medio: Medio; nota: string; fecha: string;
+  porUid?: string | null; porNombre?: string; medioAntes?: string | null;
+}
+
+/** Cierre del período de un mensajero. */
+export interface Liquidacion {
+  id: string; mensajeroId: string; fecha: string; desde?: string | null; guias?: string[] | null;
+  entregas: number; efectivo: number; transfJs: number; transfCli: number; gastos: number; base: number;
+  recibido: number; anterior: number; ajuste: number; debe: number; sueldo: number; nota?: string;
+  recibidoAntes?: number; entregaFinal?: number; adelanto?: number; enRuta?: number; dia?: string;
+}
+
+/** Pago por día de patinadores y oficina, y el "sueldo previo" de una semana (id `persona_previo_semana`). */
+export interface Jornada { id: string; personaId: string; dia: string; valor: number; previo?: boolean; nota?: string }
+
+/** Entradas y salidas de la caja de la empresa (gastos, bases, adelantos, sueldos, arqueos, cuentas internas…). */
+export interface CajaMovimiento {
+  id: string; tipo: "entra" | "sale" | "base" | "marca"; cat: string; valor: number; medio: Medio | "cuentas" | "" | null;
+  concepto: string; fecha: string; personaId?: string | null; personaUid?: string | null; cuentaId?: string | null; semana?: string | null;
+  porUid?: string | null; porNombre?: string; devuelto?: number; adelantoId?: string | null; deLiquidacion?: string | null;
+  inicial?: boolean; nivel?: boolean; arqueoId?: string | null; esperado?: Record<string, number> | null; contado?: Record<string, number> | null;
+  medioAntes?: string | null;
+}
+
+/** Cuentas internas: JS Envíos, MT, Base de JS. */
+export interface CuentaInterna { id: string; nombre: string; tipo: "socio" | "base" }
+
+/** Registro de cambios (historial) y papelera. */
+export interface Cambio { id: string; fecha: string; quien: string; op: string; col: string; docId: string; resumen: string }
+export interface EnPapelera { id: string; col: string; docId: string; resumen: string; fecha: string; quien: string }
