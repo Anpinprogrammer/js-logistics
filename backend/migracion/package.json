@@ -1,0 +1,16 @@
+{
+  "name": "js-logistics-exportar-firestore",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Exporta Firestore y las cuentas de Firebase Auth a archivos JSONL, para importarlos en el backend nuevo",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "exportar": "node exportar-firestore.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.10.0"
+  }
+}

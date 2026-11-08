@@ -194,8 +194,10 @@ CREATE TABLE IF NOT EXISTS liquidaciones (         -- cierre de período de un m
   transf_cli      BIGINT NOT NULL DEFAULT 0,
   sueldo          BIGINT NOT NULL DEFAULT 0,
   en_ruta         INTEGER NOT NULL DEFAULT 0,
+  ajuste          BIGINT NOT NULL DEFAULT 0,      -- ajuste manual del período (app.js lo suma al resultado)
   por_uid         TEXT REFERENCES usuarios(id) ON DELETE SET NULL
 );
+ALTER TABLE liquidaciones ADD COLUMN IF NOT EXISTS ajuste BIGINT NOT NULL DEFAULT 0;  -- bases creadas antes de esta columna
 CREATE INDEX IF NOT EXISTS liquidaciones_mensajero_idx ON liquidaciones (mensajero_id, fecha DESC);
 
 CREATE TABLE IF NOT EXISTS cajamovs (              -- caja general y cajas de oficina

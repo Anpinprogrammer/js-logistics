@@ -27,11 +27,12 @@ export async function firmarUrls(rutas, segundos = 3600) {
 
 const objeto = ruta => `${env.SUPABASE_URL}/storage/v1/object/${encodeURIComponent(env.STORAGE_BUCKET)}/${ruta}`;
 
-/** Sube un archivo al bucket. No reemplaza: cada foto tiene un nombre nuevo que pone el servidor. */
-export async function subirArchivo(ruta, contenido, tipoContenido) {
+/** Sube un archivo al bucket. Por defecto no reemplaza: cada foto tiene un nombre nuevo que pone el servidor.
+    La importación de Firestore usa `reemplazar` para poder repetirse sin error. */
+export async function subirArchivo(ruta, contenido, tipoContenido, { reemplazar = false } = {}) {
   const r = await fetch(objeto(ruta), {
     method: "POST",
-    headers: { ...cabeceras(), "Content-Type": tipoContenido, "x-upsert": "false", "Cache-Control": "max-age=31536000" },
+    headers: { ...cabeceras(), "Content-Type": tipoContenido, "x-upsert": String(reemplazar), "Cache-Control": "max-age=31536000" },
     body: contenido
   });
   if (!r.ok) throw new Error(`Supabase Storage respondió ${r.status} al subir ${ruta}`);

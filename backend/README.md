@@ -26,7 +26,10 @@ backend/
 ├── db/
 │   ├── schema.sql        Tablas, índices y restricciones (se puede correr varias veces)
 │   ├── migrar.js         npm run db:migrar
-│   └── crear-admin.js    npm run db:admin -- --email … --clave …
+│   ├── crear-admin.js    npm run db:admin -- --email … --clave … [--restablecer]
+│   ├── demo.js           npm run db:demo -- --si (datos inventados, solo en una base vacía)
+│   └── importar-firestore.js  npm run db:importar -- --carpeta … [--simular] (ver ../docs/migracion-firestore.md)
+├── migracion/            Exportador de Firestore (paquete aparte, con firebase-admin): lo corre el dueño de Firebase
 └── test/                 Pruebas de integración contra un Postgres de pruebas
 ```
 
@@ -121,6 +124,5 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 - Bloquear cambios a lo ya contado en un arqueo (`ajustes.caja.corte`).
 - `Idempotency-Key` en las escrituras que reenvía la cola sin señal del mensajero.
 - Tiempo real con SSE (`GET /api/events`).
-- Script de migración de Firestore a Postgres.
 
 
