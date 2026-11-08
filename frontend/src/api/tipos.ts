@@ -69,6 +69,14 @@ export interface Pedido {
   mini: string | null;
 }
 
+/** Fotos y firmas: la URL viene firmada por el servidor y vence en 1 hora. */
+export type TipoArchivo = "salida" | "mini" | "entrega" | "firma" | "previa";
+export interface Archivo {
+  tipo: TipoArchivo;
+  url: string;
+  creado: string;
+}
+
 export interface Movimiento {
   id: string;
   clienteId: string;

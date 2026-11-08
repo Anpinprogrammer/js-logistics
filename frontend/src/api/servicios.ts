@@ -1,6 +1,6 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
-import type { Cliente, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido } from "./tipos";
+import type { Archivo, TipoArchivo, Cliente, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido } from "./tipos";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
 
@@ -58,7 +58,13 @@ export const pedidos = {
     datos<{ pedido: Pedido }>(api.post(`/pedidos/${guia}/no-entregado`, d)).then(r => r.pedido),
   corregir: (guia: string, d: Partial<DatosEntrega> & { motivoDev?: Motivo; notaDev?: string }) =>
     datos<{ pedido: Pedido }>(api.patch(`/pedidos/${guia}/correccion`, d)).then(r => r.pedido),
-  eliminar: (guia: string) => api.delete(`/pedidos/${guia}`)
+  eliminar: (guia: string) => api.delete(`/pedidos/${guia}`),
+  archivos: (guia: string) => datos<{ archivos: Archivo[] }>(api.get(`/pedidos/${guia}/archivos`)).then(d => d.archivos),
+  /** La imagen va como cuerpo binario (ya comprimida en el celular), una por petición. */
+  subirArchivo: (guia: string, tipo: Exclude<TipoArchivo, "previa">, imagen: Blob) =>
+    datos<{ archivo: Archivo }>(api.post(`/pedidos/${guia}/archivos/${tipo}`, imagen, {
+      headers: { "Content-Type": imagen.type || "image/jpeg" }, timeout: 60_000
+    })).then(d => d.archivo)
 };
 
 export const clientes = {

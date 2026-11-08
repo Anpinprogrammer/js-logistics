@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { id, texto, pesos, medio } from "./comunes.js";
 import { METODOS_ENTREGA, CUENTAS_JS, MOTIVOS } from "../helpers/negocio.js";
+import { TIPOS_ARCHIVO } from "../helpers/imagenes.js";
 
 export const paramGuia = z.object({ guia: z.string().trim().regex(/^JS-\d{5,}$/, "Guía inválida") });
 
@@ -81,3 +82,5 @@ export const actualizar = z.object({
 }).refine(d => !d.domiPagado || (d.domiPagoMedio && d.domiPagoValor > 0), {
   message: "Elige cómo pagó el domicilio y el valor", path: ["domiPagoMedio"]
 });
+
+export const paramArchivo = paramGuia.extend({ tipo: z.enum(TIPOS_ARCHIVO, { error: "Tipo de archivo inválido" }) });

@@ -11,6 +11,7 @@ import { Aviso, Boton, Campo, Cargando, Casilla, Dato, Dialogo, EtiquetaEstado, 
 import BuscarCliente from "../../components/BuscarCliente";
 import { DialogoEntrega, DialogoNoEntregado } from "../../components/Entrega";
 import { useAviso } from "../../components/Avisos";
+import { FotosPedido } from "../../components/Fotos";
 
 export default function PedidoDetalle() {
   const { guia = "" } = useParams();
@@ -111,6 +112,11 @@ function Detalle({ p }: { p: Pedido }) {
               <Boton variante="secundario" className="flex-1" onClick={() => setNoEnt(true)}>No se pudo</Boton>
             </div>
           )}
+        </section>
+
+        <section className="caja p-5">
+          <h2 className="mb-3 font-bold">Fotos y firma</h2>
+          <FotosPedido guia={p.guia} estado={p.estado} />
         </section>
 
         <form className="caja space-y-4 p-5" onSubmit={enviar}>

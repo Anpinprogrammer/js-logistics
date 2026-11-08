@@ -11,7 +11,10 @@ import { transaccion } from "../config/db.js";
 import { noEncontrado, prohibido, conflicto, invalido } from "../helpers/errores.js";
 import { diferenciaCobro, VENTANA_CORRECCION_MS } from "../helpers/negocio.js";
 import { esOficina, esAdmin } from "../middleware/autorizar.js";
-import { firmarUrls } from "../helpers/storage.js";
+import { firmarUrls, subirArchivo as subirAlBucket, borrarArchivos, storageConfigurado } from "../helpers/storage.js";
+import { tipoDeImagen } from "../helpers/imagenes.js";
+import { HttpError } from "../helpers/errores.js";
+import { nuevoId } from "../helpers/ids.js";
 
 /** Cambia la ruta interna de la miniatura por una URL firmada (`mini`), sin exponer la ruta del bucket. */
 async function conMini(pedidos) {
@@ -58,6 +61,39 @@ export async function archivos(req, res) {
   const lista = await Pedido.listarArchivos(guia, { incluirPrevias: esOficina(req.usuario) });
   const urls = await firmarUrls(lista.map(a => a.ruta));
   res.json({ archivos: lista.filter(a => urls[a.ruta]).map(a => ({ tipo: a.tipo, url: urls[a.ruta], creado: a.creado })) });
+}
+
+/** Sube una foto o firma (cuerpo binario JPEG, PNG o WebP) y la deja en el pedido.
+    Oficina: cualquier guía. Mensajero: las suyas, mientras estén en ruta o dentro de las 24 horas de corrección. */
+export async function subirArchivo(req, res) {
+  const { guia, tipo } = req.valido.params, u = req.usuario;
+  if (!storageConfigurado())
+    throw new HttpError(503, "FOTOS_NO_CONFIGURADAS", "Las fotos todavía no están configuradas en el servidor. Avísale a administración.");
+  const p = await Pedido.buscarPorGuia(guia);
+  if (!p || !(esOficina(u) || esMio(u, p))) throw noEncontrado("La guía no existe");
+  if (!esOficina(u) && p.estado !== "pendiente" && Date.now() - new Date(p.entregado).getTime() > VENTANA_CORRECCION_MS)
+    throw prohibido("Ya pasaron 24 horas: pídele a administración que agregue la foto");
+
+  // El tipo se decide por el contenido, no por lo que diga el navegador.
+  const img = tipoDeImagen(req.body);
+  if (!img) throw new HttpError(415, "NO_ES_IMAGEN", "El archivo no es una foto válida. Usa una foto JPG, PNG o WebP.");
+
+  // El nombre lo pone el servidor: nadie puede escribir sobre la foto de otro.
+  const ruta = `${guia}/${tipo}-${Date.now()}-${nuevoId(8)}.${img.ext}`;
+  await subirAlBucket(ruta, req.body, img.mime);
+  let archivo;
+  try {
+    archivo = await transaccion(async db => {
+      const a = await Pedido.agregarArchivo({ guia, tipo, ruta, por: u.id }, db);
+      if (tipo !== "mini") await Auditoria.registrar({ uid: u.id, accion: `Agregó ${tipo === "firma" ? "la firma" : "foto de " + tipo} a ${guia}`, tabla: "pedidos", registro: guia }, db);
+      return a;
+    });
+  } catch (e) {
+    await borrarArchivos([ruta]).catch(x => console.error(x.message)); // que no quede un archivo sin registro
+    throw e;
+  }
+  const urls = await firmarUrls([ruta]).catch(() => ({}));
+  res.status(201).json({ archivo: { tipo, url: urls[ruta] ?? null, creado: archivo.creado } });
 }
 
 export async function crear(req, res) {

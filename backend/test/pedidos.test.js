@@ -146,4 +146,7 @@ test("archivos y miniatura: sin Storage configurado salen vacíos, y la ruta int
   assert.equal(a.status, 200);
   assert.deepEqual(a.body.archivos, []);
   assert.equal((await otroMensajero.get("/api/pedidos/JS-00001/archivos")).status, 404);
+  const subir = await admin.post("/api/pedidos/JS-00001/archivos/entrega").set("Content-Type", "image/jpeg").send(Buffer.from([0xff, 0xd8, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
+  assert.equal(subir.status, 503);
+  assert.equal(subir.body.error.code, "FOTOS_NO_CONFIGURADAS");
 });
