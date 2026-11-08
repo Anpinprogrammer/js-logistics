@@ -19,7 +19,7 @@ export function manejarErrores(err, req, res, _next) {
 
   if (err instanceof HttpError) {
     status = err.status;
-    error = { code: err.code, message: err.message, ...(err.campos ? { campos: err.campos } : {}) };
+    error = { code: err.code, message: err.message, ...(err.campos ? { campos: err.campos } : {}), ...(err.detalle !== undefined ? { detalle: err.detalle } : {}) };
   } else if (err.type === "entity.parse.failed") {
     status = 400; error = { code: "JSON_INVALIDO", message: "El cuerpo de la solicitud no es JSON válido" };
   } else if (err.type === "entity.too.large") {

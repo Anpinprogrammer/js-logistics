@@ -17,9 +17,10 @@ No agregues dependencias sin una razón clara. Si lo haces, explícala en el PR.
 | `config/` | `env.js` (variables validadas con Zod) y `db.js` (pool, `query`, `transaccion`). | `process.env` en otros archivos: siempre `import { env }`. |
 | `routes/` | Un archivo por recurso (`<recurso>.routes.js`): método, ruta, `permitir(...)`, `validar(...)` y controlador. Se montan en `routes/index.js`. | Lógica. |
 | `validators/` | Esquemas Zod de cada petición (`<recurso>.validator.js`). Las piezas comunes van en `comunes.js`. | Consultas a la base. |
-| `controllers/` | Un caso de uso por función: quién puede, qué se valida contra la base, qué se calcula, transacción, historial y respuesta. | SQL. |
+| `controllers/` | Un caso de uso por función: quién puede, qué se valida contra la base, qué se calcula, transacción, historial y respuesta. Los de dinero solo llaman a un servicio con `responder(...)` de `accion.js`. | SQL. |
+| `servicios/` | Reglas del negocio portadas de `app/js/app.js` (pedidos, caja, clientes, mensajeros, movimientos, sueldos, historial, papelera). Reciben `ctx = { actor, db, eventos }`, escriben con `enTransaccion` + `guardar/actualizar/borrar` de `transaccion.js` (historial y papelera automáticos) y calculan con `calculosDe`. | Express (`req`, `res`). |
 | `models/` | SQL de una tabla (`<entidad>.model.js`). Devuelve objetos camelCase con `filaAObjeto`. Las funciones que escriben aceptan un `db` opcional para participar en una transacción. | Permisos ni reglas de negocio. |
-| `helpers/` | Utilidades puras: `errores.js`, `jwt.js`, `cookies.js`, `claves.js`, `ids.js`, `sql.js`, `storage.js`, `negocio.js` (constantes y cálculos del negocio, sin base de datos). | Estado ni acceso a la base. |
+| `helpers/` | Utilidades puras: `errores.js`, `jwt.js`, `cookies.js`, `claves.js`, `ids.js`, `sql.js`, `storage.js`, `negocio.js` (listas cerradas para validar). `calculos.js`, `constantes.js`, `fechas.js`, `texto.js` y `reloj.js` son **copia fiel** de `app/js/app.js`: no los "mejores"; si cambia la regla, cámbiala igual que en la app y corre `test/equivalencia.test.js`. | Estado ni acceso a la base. |
 | `middleware/` | `autenticar`, `autorizar` (`permitir`, `OFICINA`, `EQUIPO`), `validar`, `seguridad`, `errores`. | |
 | `db/` | `schema.sql` (fuente de verdad del esquema), `migrar.js`, `crear-admin.js`, `demo.js`. | |
 | `test/` | Pruebas de integración por recurso (`<recurso>.test.js`) y `ayuda.js`. | |
@@ -48,7 +49,8 @@ No agregues dependencias sin una razón clara. Si lo haces, explícala en el PR.
 **Dinero y negocio**
 - Pesos enteros (`BIGINT` en la base, `pesos` en Zod). Nada de decimales ni `float`.
 - **El servidor calcula lo que se puede calcular**: diferencias de cobro, saldos, consecutivos, horas (`new Date()` del servidor, nunca la del cliente para algo contable).
-- Los cálculos van como funciones puras en `helpers/negocio.js`, copiados de `../app/js/app.js` con el mismo comportamiento, y con prueba.
+- Los cálculos van como funciones puras en `helpers/calculos.js`, copiados de `../app/js/app.js` con el mismo comportamiento. `test/equivalencia.test.js` compara contra la app y `test/documentos.test.js` prueba que guardar en Postgres y volver a leer no cambia ninguna cuenta.
+- `models/documentos.js` lee las tablas con la forma de documento de la app (fechas en ms, sin nulos). La API responde en ISO: eso lo hace `aIso` en `controllers/accion.js`.
 - El consecutivo de guías sale de `contadores`, con `UPDATE … RETURNING` dentro de la transacción, para que no queden huecos. No uses `SEQUENCE` para eso.
 - Las ventanas de corrección (24 horas) y "lo ya contado en un arqueo no se toca" se validan en el servidor.
 

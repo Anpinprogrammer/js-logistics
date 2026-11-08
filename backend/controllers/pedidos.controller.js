@@ -1,4 +1,4 @@
-/* Pedidos. Reglas tomadas de firestore.rules y de la app:
+/* Pedidos. Reglas tomadas de firestore.rules y de la app (los cambios de estado y de dinero están en servicios/pedidos.js):
    - Oficina (admin y asistente) ve y organiza todos; borrar solo administración.
    - El mensajero crea guías a su nombre y en cero, entrega o devuelve las suyas pendientes,
      y corrige algunos datos durante 24 horas.
@@ -8,9 +8,11 @@ import * as Cliente from "../models/cliente.model.js";
 import * as Mensajero from "../models/mensajero.model.js";
 import * as Auditoria from "../models/auditoria.model.js";
 import { transaccion } from "../config/db.js";
-import { noEncontrado, prohibido, conflicto, invalido } from "../helpers/errores.js";
-import { diferenciaCobro, VENTANA_CORRECCION_MS } from "../helpers/negocio.js";
-import { esOficina, esAdmin } from "../middleware/autorizar.js";
+import { noEncontrado, prohibido, invalido } from "../helpers/errores.js";
+import { VENTANA_CORRECCION_MS } from "../helpers/negocio.js";
+import * as Servicio from "../servicios/pedidos.js";
+import { ctxDe, responder } from "./accion.js";
+import { esOficina } from "../middleware/autorizar.js";
 import { firmarUrls, subirArchivo as subirAlBucket, borrarArchivos, storageConfigurado } from "../helpers/storage.js";
 import { tipoDeImagen } from "../helpers/imagenes.js";
 import { HttpError } from "../helpers/errores.js";
@@ -113,134 +115,35 @@ export async function crear(req, res) {
   res.status(201).json({ pedido: p });
 }
 
-/** Lo que organiza la oficina: remitente, valores, mensajero, domicilio pagado. */
-export async function actualizar(req, res) {
-  const { guia } = req.valido.params, b = { ...req.valido.body }, u = req.usuario;
-  const p = await transaccion(async db => {
-    const actual = await Pedido.bloquear(guia, db);
-    if (!actual) throw noEncontrado("La guía no existe");
-
-    // Corregir lo cobrado es solo de administración, y la diferencia se recalcula igual que al entregar.
-    const corrigeCobro = b.valorCobrado !== undefined || b.metodo !== undefined;
-    if (corrigeCobro && !esAdmin(u)) throw prohibido("Solo administración corrige lo cobrado");
-    if (corrigeCobro && actual.estado !== "entregado") throw conflicto("Solo se corrige lo cobrado de una guía entregada");
-    // Si cambia lo cobrado o lo que debía cobrar de una guía entregada, la diferencia se vuelve a calcular.
-    if (actual.estado === "entregado" && (corrigeCobro || b.aCobrar !== undefined)) {
-      const metodo = b.metodo ?? actual.metodo, valorCobrado = b.valorCobrado ?? actual.valorCobrado;
-      const aCobrar = b.aCobrar ?? actual.aCobrar;
-      const dif = diferenciaCobro({ aCobrar, valorCobrado, metodo });
-      Object.assign(b, { metodo, valorCobrado, difCobro: dif, cuentaJs: metodo === "transf_js" ? (b.cuentaJs ?? actual.cuentaJs) : "" });
-      if (b.metodo === "transf_js" && !b.cuentaJs) throw invalido("Elige a qué cuenta llegó la transferencia");
-      if (dif !== Number(actual.difCobro)) b.difRevisada = false;
-    }
-    if (b.domiPagado === true && !actual.domiPagado) Object.assign(b, { domiPagoFecha: new Date(), domiPagoUid: u.id });
-    if (b.domiPagado === false) Object.assign(b, { domiPagoMedio: null, domiPagoValor: null, domiPagoFecha: null, domiPagoUid: null });
-    if (b.clienteId && !(await Cliente.buscarPorId(b.clienteId, db))) throw invalido("El cliente no existe");
-    if (b.mensajeroId && !(await Mensajero.buscarPorId(b.mensajeroId, db))) throw invalido("El mensajero no existe");
-
-    const nuevo = await Pedido.actualizar(guia, b, db);
-    await Auditoria.registrar({ uid: u.id, accion: `Editó la guía ${guia}`, tabla: "pedidos", registro: guia, datos: req.valido.body }, db);
-    return nuevo;
-  });
-  res.json({ pedido: p });
-}
-
-/** El mensajero (o la oficina) registra la entrega de una guía pendiente. */
-export async function entregar(req, res) {
-  const { guia } = req.valido.params, b = req.valido.body, u = req.usuario;
-  const p = await transaccion(async db => {
-    const actual = await Pedido.bloquear(guia, db);
-    if (!actual || !(esOficina(u) || esMio(u, actual))) throw noEncontrado("La guía no existe");
-    if (actual.estado !== "pendiente") throw conflicto("La guía ya está cerrada", "YA_CERRADA");
-    const difCobro = diferenciaCobro({ aCobrar: actual.aCobrar, valorCobrado: b.valorCobrado, metodo: b.metodo });
-    const nuevo = await Pedido.actualizar(guia, {
-      estado: "entregado", entregado: new Date(), destinatario: b.destinatario, valorCobrado: b.valorCobrado,
-      metodo: b.metodo, cuentaJs: b.metodo === "transf_js" ? b.cuentaJs : "", difCobro, difRevisada: false,
-      entregoUid: u.id, cambio: b.cambio, gasto: b.gasto, gastoNota: b.gasto > 0 ? b.gastoNota : ""
-    }, db);
-    await Auditoria.registrar({
-      uid: u.id, tabla: "pedidos", registro: guia,
-      accion: `Entregó ${guia}: cobró ${pesos(b.valorCobrado)} (${b.metodo})${difCobro ? " · diferencia " + pesos(difCobro) : ""}`
-    }, db);
-    return nuevo;
-  });
-  res.json({ pedido: p });
-}
-
-/** No se pudo entregar: "reprogramar" deja la guía en ruta y anota el intento; los demás motivos la devuelven. */
-export async function noEntregado(req, res) {
-  const { guia } = req.valido.params, { motivo, nota } = req.valido.body, u = req.usuario;
-  const p = await transaccion(async db => {
-    const actual = await Pedido.bloquear(guia, db);
-    if (!actual || !(esOficina(u) || esMio(u, actual))) throw noEncontrado("La guía no existe");
-    if (actual.estado !== "pendiente") throw conflicto("La guía ya está cerrada", "YA_CERRADA");
-    await Pedido.agregarIntento(guia, { motivo, nota, por: u.id }, db);
-    if (motivo === "reprogramar") {
-      await Auditoria.registrar({ uid: u.id, accion: `Intento fallido en ${guia}: reprogramar${nota ? " · " + nota : ""}`, tabla: "pedidos", registro: guia }, db);
-      return Pedido.buscarPorGuia(guia, db);
-    }
-    const nuevo = await Pedido.actualizar(guia, {
-      estado: "devuelto", entregado: new Date(), motivoDev: motivo, notaDev: nota, valorCobrado: 0, metodo: "devuelto",
-      cuentaJs: "", difCobro: 0, destinatario: "", cobrarDev: true, entregoUid: u.id
-    }, db);
-    await Auditoria.registrar({ uid: u.id, accion: `Devolución de ${guia}: ${motivo}${nota ? " · " + nota : ""}`, tabla: "pedidos", registro: guia }, db);
-    return nuevo;
-  });
-  res.json({ pedido: p });
-}
-
-/** El mensajero corrige lo que registró, solo durante 24 horas. No cambia el estado ni la hora. */
-export async function corregir(req, res) {
-  const { guia } = req.valido.params, b = { ...req.valido.body }, u = req.usuario;
-  const p = await transaccion(async db => {
-    const actual = await Pedido.bloquear(guia, db);
-    if (!actual || !esMio(u, actual)) throw noEncontrado("La guía no existe");
-    if (actual.estado === "pendiente") throw conflicto("La guía todavía no está cerrada");
-    if (Date.now() - new Date(actual.entregado).getTime() > VENTANA_CORRECCION_MS)
-      throw prohibido("Ya pasaron 24 horas: pídele a administración que lo corrija");
-    if (actual.estado === "devuelto") {
-      // En una devolución solo se corrige el motivo, la nota, el flete y la prenda de cambio.
-      for (const k of ["destinatario", "valorCobrado", "metodo", "cuentaJs"]) delete b[k];
-    } else {
-      delete b.motivoDev; delete b.notaDev;
-      const metodo = b.metodo ?? actual.metodo, valorCobrado = b.valorCobrado ?? actual.valorCobrado;
-      const cuentaJs = metodo === "transf_js" ? (b.cuentaJs ?? actual.cuentaJs) : "";
-      if (metodo === "transf_js" && !cuentaJs) throw invalido("Elige a qué cuenta llegó la transferencia");
-      const difCobro = diferenciaCobro({ aCobrar: actual.aCobrar, valorCobrado, metodo });
-      Object.assign(b, { metodo, valorCobrado, cuentaJs, difCobro });
-      if (difCobro !== Number(actual.difCobro)) b.difRevisada = false;
-    }
-    const nuevo = await Pedido.actualizar(guia, b, db);
-    await Auditoria.registrar({ uid: u.id, accion: `Corrigió la guía ${guia}`, tabla: "pedidos", registro: guia, datos: req.valido.body }, db);
-    return nuevo;
-  });
-  res.json({ pedido: p });
-}
-
-/** El cliente confirma que recibió la prenda de un cambio. */
-export async function confirmarCambio(req, res) {
-  const { guia } = req.valido.params, u = req.usuario;
-  const p = await transaccion(async db => {
-    const actual = await Pedido.bloquear(guia, db);
-    if (!actual || !(esOficina(u) || (u.rol === "cliente" && actual.clienteId === u.clienteId))) throw noEncontrado("La guía no existe");
-    if (!actual.cambio) throw conflicto("Esta guía no tiene una prenda de cambio");
-    if (actual.cambioRecibido) throw conflicto("El cambio ya se confirmó", "YA_CONFIRMADO");
-    const nuevo = await Pedido.actualizar(guia, { cambioRecibido: new Date(), cambioConfirmo: u.id }, db);
-    await Auditoria.registrar({ uid: u.id, accion: `Confirmó que recibió el cambio de ${guia}`, tabla: "pedidos", registro: guia }, db);
-    return nuevo;
-  });
-  res.json({ pedido: p });
-}
-
-/** Solo administración. Queda copia en la papelera. */
-export async function eliminar(req, res) {
+/* ---- Cambios de estado y de dinero: las reglas de la app están en servicios/pedidos.js.
+   La respuesta es el pedido completo, con la misma forma que GET /pedidos/:guia. ---- */
+const conPedido = fn => async (req, res) => {
   const { guia } = req.valido.params;
-  await transaccion(async db => {
-    const p = await Pedido.buscarPorGuia(guia, db);
-    if (!p) throw noEncontrado("La guía no existe");
-    await Auditoria.aPapelera({ tabla: "pedidos", registro: guia, datos: p, grupo: guia, uid: req.usuario.id }, db);
-    await Pedido.eliminar(guia, db);
-    await Auditoria.registrar({ uid: req.usuario.id, accion: `Borró la guía ${guia}`, tabla: "pedidos", registro: guia }, db);
-  });
+  await fn(ctxDe(req), guia, req.valido.body ?? {});
+  res.json({ pedido: (await conMini([await Pedido.buscarPorGuia(guia)]))[0] });
+};
+
+/** Lo que organiza la oficina: remitente, valores, mensajero, domicilio pagado y (administración) la corrección de lo cobrado. */
+export const actualizar = conPedido(Servicio.editarOficina);
+/** El mensajero (o la oficina) registra la entrega de una guía pendiente. Con el bucket configurado, exige la foto y la firma. */
+export const entregar = conPedido(Servicio.entregar);
+/** No se pudo entregar: "reprogramar" deja la guía en ruta y anota el intento; los demás motivos la devuelven. */
+export const noEntregado = conPedido(Servicio.noEntregado);
+/** El mensajero corrige lo que registró, solo durante 24 horas. No cambia el estado ni la hora. */
+export const corregir = conPedido(Servicio.corregir);
+/** El cliente (o la oficina) confirma que la prenda de un cambio llegó. */
+export const confirmarCambio = conPedido(Servicio.cambioRecibido);
+/** Administración devuelve la guía a "por entregar". Las pruebas de la entrega quedan como "previas". */
+export const reabrir = conPedido(Servicio.reabrir);
+export const pagoDomicilio = conPedido(Servicio.registrarPagoDomicilio);
+export const quitarPagoDomicilio = conPedido(Servicio.quitarPagoDomicilio);
+export const diferenciaRevisada = conPedido(Servicio.marcarDiferenciaRevisada);
+
+/** Solo administración. Va a la papelera con sus intentos y fotos. Lo ya contado en un arqueo no se borra. */
+export async function eliminar(req, res) {
+  await Servicio.eliminar(ctxDe(req), req.valido.params.guia);
   res.status(204).end();
 }
+
+/** Remitente o valor del domicilio a varias guías a la vez. */
+export const enBloque = responder((ctx, req) => Servicio.enBloque(ctx, req.valido.body));

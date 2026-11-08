@@ -5,6 +5,8 @@ import * as Movimiento from "../models/movimiento.model.js";
 import { transaccion } from "../config/db.js";
 import { conflicto, noEncontrado, prohibido } from "../helpers/errores.js";
 import { esOficina } from "../middleware/autorizar.js";
+import * as S from "../servicios/clientes.js";
+import { responder } from "./accion.js";
 
 export async function listar(req, res) {
   res.json({ clientes: await Cliente.listar(req.valido.query) });
@@ -67,3 +69,16 @@ export async function eliminar(req, res) {
   });
   res.status(204).end();
 }
+
+/* ---- saldos y cuenta (cálculos de la app en servicios/clientes.js) ---- */
+export const saldos = responder((ctx, req) => S.listaConSaldos(ctx, req.valido.query)); // { clientes, porCobrar, porPagar, repetidos }
+export const cuadre = responder((ctx, req) => S.cuadre(ctx, req.valido.query));
+export const repetidos = responder(ctx => S.repetidos(ctx), { clave: "grupos" });
+export const pagarSaldos = responder((ctx, req) => S.pagarSaldos(ctx, req.valido.body), { status: 201 });
+/** Cuenta del cliente con su saldo (lo ve la oficina o el propio cliente; a otro cliente se le dice que no existe). */
+export const cuenta = responder((ctx, req) => S.cuenta(ctx, req.valido.params.id));
+/** Une repetidos en :id. Responde el cliente que queda y cuántos pedidos y movimientos se pasaron. */
+export const unir = responder(async (ctx, req) => {
+  const r = await S.unir(ctx, req.valido.params.id, req.valido.body);
+  return { ...r, cliente: await Cliente.buscarPorId(req.valido.params.id) };
+});

@@ -277,7 +277,7 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
       if (!f) { inf.omitir("liquidaciones", "sin fecha", id); continue; }
       const dia = /^\d{4}-\d{2}-\d{2}$/.test(d.dia) ? d.dia : diaColombia(f);
       const n = k => pesos(d[k]);
-      filasL.push([id, d.mensajeroId, fecha(d.desde), f, dia, n("entregas"), (Array.isArray(d.guias) ? d.guias : []).map(String), n("efectivo"),
+      filasL.push([id, d.mensajeroId, fecha(d.desde), f, dia, n("entregas"), Array.isArray(d.guias) ? d.guias.map(String) : null, n("efectivo"), // sin lista (liquidaciones viejas) queda NULL: la app no las mira guía por guía
         n("base"), n("gastos"), n("anterior"), n("recibidoAntes"), n("entregaFinal"), n("recibido"), n("debe"), n("adelanto"),
         n("transfJs"), n("transfCli"), n("sueldo"), n("enRuta"), n("ajuste"), uidO(d.porUid)]);
       inf.ok("liquidaciones");
@@ -289,6 +289,8 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
     // Caja. Lo que no tiene columna propia va en `extra` para no perder nada.
     const CONOCIDOS = new Set(["id", "tipo", "cat", "valor", "medio", "concepto", "fecha", "personaId", "personaUid", "cuentaId", "semana",
       "adelantoId", "devuelto", "deLiquidacion", "inicial", "nivel", "arqueoId", "porUid", "porNombre", "medioAntes", "medioCambio"]);
+    // deLiquidacion es el ID de la liquidación de la que salió el adelanto (reabrirla lo quita). Un true viejo queda como "importado".
+    const deLiq = v => (typeof v === "string" && v ? v : v ? "importado" : null);
     const filasCj = [], adelantos = [];
     for (const { id, datos: d } of L.cajamovs) {
       const cat = uno(d.cat, CATS);
@@ -296,10 +298,9 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
       if (d.personaId && !mensajeros.has(d.personaId)) inf.avisar("cajamovs", "persona que ya no está en Personal: queda sin persona", id);
       if (d.cuentaId && !cuentas.has(d.cuentaId)) inf.avisar("cajamovs", "cuenta interna que no existe: queda sin cuenta", id);
       const extra = Object.fromEntries(Object.entries(d).filter(([k]) => !CONOCIDOS.has(k)));
-      if (typeof d.deLiquidacion === "string" && d.deLiquidacion) extra.liquidacionId = d.deLiquidacion; // en la app es el ID, no un sí/no
       filasCj.push([id, texto(d.tipo) || "entra", cat, Math.abs(pesos(d.valor)), uno(d.medio, MEDIOS), texto(d.concepto), fecha(d.fecha) ?? new Date(),
         mensajeros.has(d.personaId) ? d.personaId : null, uidO(d.personaUid), cuentas.has(d.cuentaId) ? d.cuentaId : null,
-        texto(d.semana) || null, Math.max(0, pesos(d.devuelto)), !!d.deLiquidacion, !!d.inicial, !!d.nivel, texto(d.arqueoId) || null,
+        texto(d.semana) || null, Math.max(0, pesos(d.devuelto)), deLiq(d.deLiquidacion), !!d.inicial, !!d.nivel, texto(d.arqueoId) || null,
         JSON.stringify(extra), uidO(d.porUid), texto(d.porNombre), uno(d.medioAntes, MEDIOS), fecha(d.medioCambio)]);
       if (d.adelantoId) adelantos.push([id, String(d.adelantoId)]);
       inf.ok("cajamovs");
@@ -319,10 +320,10 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
       const previo = !!d.previo;
       const dia = !previo && /^\d{4}-\d{2}-\d{2}$/.test(d.dia) ? d.dia : null;
       if (!previo && !dia) { inf.omitir("jornadas", "día inválido", id); continue; }
-      filasJ.push([id, d.personaId, dia, previo ? texto(d.dia || d.semana) : null, Math.max(0, pesos(d.valor)), previo]);
+      filasJ.push([id, d.personaId, dia, previo ? texto(d.dia || d.semana) : null, Math.max(0, pesos(d.valor)), previo, texto(d.nota)]);
       inf.ok("jornadas");
     }
-    await upsert(q, "jornadas", ["id", "persona_id", "dia", "semana", "valor", "previo"], filasJ);
+    await upsert(q, "jornadas", ["id", "persona_id", "dia", "semana", "valor", "previo", "nota"], filasJ);
     listo("jornadas", filasJ.length);
 
     // Historial: en Firestore era un documento por día y persona con las entradas adentro. Se recarga completo.

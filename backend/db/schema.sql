@@ -180,7 +180,7 @@ CREATE TABLE IF NOT EXISTS liquidaciones (         -- cierre de período de un m
   fecha           TIMESTAMPTZ NOT NULL,
   dia             DATE NOT NULL,
   entregas        INTEGER NOT NULL DEFAULT 0,
-  guias           TEXT[] NOT NULL DEFAULT '{}',
+  guias           TEXT[],                          -- guías del período; NULL en liquidaciones viejas (se cuentan por hora)
   efectivo        BIGINT NOT NULL DEFAULT 0,
   base            BIGINT NOT NULL DEFAULT 0,
   gastos          BIGINT NOT NULL DEFAULT 0,
@@ -197,7 +197,14 @@ CREATE TABLE IF NOT EXISTS liquidaciones (         -- cierre de período de un m
   ajuste          BIGINT NOT NULL DEFAULT 0,      -- ajuste manual del período (app.js lo suma al resultado)
   por_uid         TEXT REFERENCES usuarios(id) ON DELETE SET NULL
 );
-ALTER TABLE liquidaciones ADD COLUMN IF NOT EXISTS ajuste BIGINT NOT NULL DEFAULT 0;  -- bases creadas antes de esta columna
+-- Bases creadas con versiones anteriores de este archivo (ver "Actualizar la base" en README.md):
+ALTER TABLE liquidaciones ADD COLUMN IF NOT EXISTS ajuste BIGINT NOT NULL DEFAULT 0;
+-- guias pasó a aceptar NULL: en la app, una liquidación sin lista de guías es de antes de que existiera la lista
+-- y sus entregas se cuentan por hora (periodoMensajero). Una lista vacía con entregas solo pudo salir de una
+-- importación anterior que no distinguía los dos casos.
+ALTER TABLE liquidaciones ALTER COLUMN guias DROP NOT NULL;
+ALTER TABLE liquidaciones ALTER COLUMN guias DROP DEFAULT;
+UPDATE liquidaciones SET guias = NULL WHERE guias = '{}' AND entregas > 0;
 CREATE INDEX IF NOT EXISTS liquidaciones_mensajero_idx ON liquidaciones (mensajero_id, fecha DESC);
 
 CREATE TABLE IF NOT EXISTS cajamovs (              -- caja general y cajas de oficina
@@ -215,7 +222,7 @@ CREATE TABLE IF NOT EXISTS cajamovs (              -- caja general y cajas de of
   semana         TEXT,                                               -- cat = sueldo
   adelanto_id    TEXT REFERENCES cajamovs(id) ON DELETE SET NULL,    -- cat = devolucion
   devuelto       BIGINT NOT NULL DEFAULT 0,                          -- cat = adelanto
-  de_liquidacion BOOLEAN NOT NULL DEFAULT false,
+  de_liquidacion TEXT,                                               -- cat = adelanto: id de la liquidación de la que salió
   inicial        BOOLEAN NOT NULL DEFAULT false,                     -- cat = interna: saldo del empalme
   nivel          BOOLEAN NOT NULL DEFAULT false,                     -- cat = oficina: ajuste de cuenta compartida
   arqueo_id      TEXT,
@@ -225,6 +232,19 @@ CREATE TABLE IF NOT EXISTS cajamovs (              -- caja general y cajas de of
   medio_antes    TEXT CHECK (medio_antes IN ('efectivo', 'nequi', 'bancolombia')),
   medio_cambio   TIMESTAMPTZ
 );
+-- de_liquidacion era sí/no; en la app es el id de la liquidación (para reabrirla o quitar el adelanto).
+DO $$
+BEGIN
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = 'cajamovs' AND column_name = 'de_liquidacion') = 'boolean' THEN
+    ALTER TABLE cajamovs ALTER COLUMN de_liquidacion DROP DEFAULT;
+    ALTER TABLE cajamovs ALTER COLUMN de_liquidacion DROP NOT NULL;
+    ALTER TABLE cajamovs ALTER COLUMN de_liquidacion TYPE TEXT
+      USING (CASE WHEN de_liquidacion THEN COALESCE(NULLIF(extra->>'liquidacionId', ''), 'importado') END);
+    UPDATE cajamovs SET extra = extra - 'liquidacionId' WHERE extra ? 'liquidacionId';
+  END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS cajamovs_liquidacion_idx ON cajamovs (de_liquidacion) WHERE de_liquidacion IS NOT NULL;
 CREATE INDEX IF NOT EXISTS cajamovs_fecha_idx   ON cajamovs (fecha DESC);
 CREATE INDEX IF NOT EXISTS cajamovs_cat_idx     ON cajamovs (cat, fecha DESC);
 CREATE INDEX IF NOT EXISTS cajamovs_persona_idx ON cajamovs (persona_id, fecha DESC);
@@ -235,8 +255,10 @@ CREATE TABLE IF NOT EXISTS jornadas (              -- días trabajados con pago 
   dia        DATE,
   semana     TEXT,
   valor      BIGINT NOT NULL DEFAULT 0 CHECK (valor >= 0),
-  previo     BOOLEAN NOT NULL DEFAULT false
+  previo     BOOLEAN NOT NULL DEFAULT false,
+  nota       TEXT NOT NULL DEFAULT ''
 );
+ALTER TABLE jornadas ADD COLUMN IF NOT EXISTS nota TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS jornadas_persona_idx ON jornadas (persona_id, dia);
 
 -- ---------- Auditoría y recuperación ----------

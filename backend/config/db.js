@@ -4,6 +4,8 @@ import { env } from "./env.js";
 
 // BIGINT (int8) llega como texto por defecto; los montos en pesos caben de sobra en un Number.
 pg.types.setTypeParser(20, v => Number(v));
+// DATE llega como texto AAAA-MM-DD (los "días" del negocio), sin pasar por la zona horaria del servidor.
+pg.types.setTypeParser(1082, v => v);
 
 export const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
