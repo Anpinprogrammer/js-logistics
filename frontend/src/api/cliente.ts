@@ -2,9 +2,18 @@
 import axios, { AxiosError } from "axios";
 import type { ErrorApi } from "./tipos";
 
+/**
+ * Dirección de la API. Sin VITE_API_URL se usa /api en el mismo dominio (proxy en desarrollo, reescritura de vercel.json en producción).
+ * Con VITE_API_URL (por ejemplo https://api.jslogistics.pro) se llama directo; se le agrega /api si no lo trae.
+ */
+function direccionApi(valor?: string): string {
+  const v = (valor ?? "").trim().replace(/\/+$/, "");
+  if (!v) return "/api";
+  return v.endsWith("/api") ? v : `${v}/api`;
+}
+
 export const api = axios.create({
-  // Por defecto el mismo sitio (/api), con proxy en desarrollo y reescritura en producción.
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL: direccionApi(import.meta.env.VITE_API_URL),
   withCredentials: true,
   timeout: 20_000,
   headers: { "X-JSL": "1" } // protección CSRF que exige el backend en todo lo que no sea GET
