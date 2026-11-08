@@ -1,0 +1,5 @@
+# La llave de la cuenta de servicio y los datos exportados NUNCA van al repositorio.
+*.json
+!package.json
+!package-lock.json
+exportacion*/

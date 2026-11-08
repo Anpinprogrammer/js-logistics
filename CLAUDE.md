@@ -78,10 +78,11 @@ Nunca apuntes `TEST_DATABASE_URL` ni `db:demo` a la base de producción.
 - [`backend/README.md`](backend/README.md): instalación, Supabase, Render y la tabla de endpoints.
 - [`frontend/README.md`](frontend/README.md): instalación y despliegue del frontend.
 - [`backend/db/schema.sql`](backend/db/schema.sql): el esquema de datos real.
+- [`docs/migracion-firestore.md`](docs/migracion-firestore.md): exportar Firebase e importarlo (y sincronizarlo) en Postgres.
 - [`docs/fotos-borrado-automatico.md`](docs/fotos-borrado-automatico.md): diseño (sin implementar) del borrado de fotos viejas.
 - [`docs/datos.md`](docs/datos.md) y [`ARCHITECTURE.md`](ARCHITECTURE.md): el sistema viejo (Firestore) y el diagnóstico que llevó a la migración.
 
 ## Qué falta (para no duplicar trabajo)
 
-- Backend: movimientos de clientes (crear), recaudos, caja, arqueos, cajas de oficina, liquidaciones, sueldos y cuentas internas, con sus saldos calculados en el servidor; bloqueo de lo ya contado en un arqueo; `Idempotency-Key` para la cola sin señal; tiempo real con SSE; script de migración de Firestore a Postgres.
+- Backend: movimientos de clientes (crear), recaudos, caja, arqueos, cajas de oficina, liquidaciones, sueldos y cuentas internas, con sus saldos calculados en el servidor; bloqueo de lo ya contado en un arqueo; `Idempotency-Key` para la cola sin señal; tiempo real con SSE.
 - Frontend: pantalla de Caja; funcionamiento sin señal para el mensajero (PWA y cola).
