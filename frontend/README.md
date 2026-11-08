@@ -6,11 +6,11 @@ App de operación y administración en **React 19 + TypeScript + Tailwind CSS 4*
 
 | Rol | Pantallas |
 |---|---|
-| Mensajero (celular) | **Mi ruta**: guías en ruta, crear guía, entregar (con aviso de diferencia de cobro) o "no se pudo" (reprogramar o devolver). **Entregados**: por día, con corrección durante 24 horas. **Mi cuenta**. |
-| Asistente | **Inicio** (resumen del día y alertas), **Pedidos** (filtros, búsqueda, paginación, detalle: remitente, valores, domicilio pagado, revisar diferencias, registrar entrega), **Clientes** (búsqueda, alta con aviso de repetidos, ficha con pedidos y movimientos). |
+| Mensajero (celular) | **Mi ruta**: guías en ruta, crear guía, foto del paquete al crear la guía, entregar con foto y firma (y aviso de diferencia de cobro) o "no se pudo" (reprogramar o devolver). **Entregados**: por día, con corrección durante 24 horas. **Mi cuenta**. |
+| Asistente | **Inicio** (resumen del día y alertas), **Pedidos** (filtros, búsqueda, paginación, detalle: remitente, valores, fotos y firma, domicilio pagado, revisar diferencias, registrar entrega), **Clientes** (búsqueda, alta con aviso de repetidos, ficha con pedidos y movimientos). |
 | Administración | Todo lo anterior, más corregir lo cobrado, eliminar guías y clientes, **Personal** y **Accesos** (cuentas, rol, vínculo, contraseña, desactivar). |
 
-**Caja** (arqueos, cierre del día, cajas de oficina, liquidaciones, sueldos) aparece "en construcción" hasta que el backend tenga esos módulos. Lo mismo pasa con fotos y firmas, que esperan la subida de archivos, y con los saldos de clientes.
+**Caja** (arqueos, cierre del día, cajas de oficina, liquidaciones, sueldos) aparece "en construcción" hasta que el backend tenga esos módulos. Lo mismo pasa con los saldos de clientes.
 
 ## Estructura
 

@@ -24,3 +24,24 @@ export async function firmarUrls(rutas, segundos = 3600) {
   for (const x of lista) if (x.signedURL && !x.error) out[x.path] = `${env.SUPABASE_URL}/storage/v1${x.signedURL}`;
   return out;
 }
+
+const objeto = ruta => `${env.SUPABASE_URL}/storage/v1/object/${encodeURIComponent(env.STORAGE_BUCKET)}/${ruta}`;
+
+/** Sube un archivo al bucket. No reemplaza: cada foto tiene un nombre nuevo que pone el servidor. */
+export async function subirArchivo(ruta, contenido, tipoContenido) {
+  const r = await fetch(objeto(ruta), {
+    method: "POST",
+    headers: { ...cabeceras(), "Content-Type": tipoContenido, "x-upsert": "false", "Cache-Control": "max-age=31536000" },
+    body: contenido
+  });
+  if (!r.ok) throw new Error(`Supabase Storage respondió ${r.status} al subir ${ruta}`);
+}
+
+/** Borra archivos del bucket. Se usa para no dejar huérfanos si falla el registro en la base. */
+export async function borrarArchivos(rutas) {
+  if (!rutas.length || !storageConfigurado()) return;
+  const r = await fetch(`${env.SUPABASE_URL}/storage/v1/object/${encodeURIComponent(env.STORAGE_BUCKET)}`, {
+    method: "DELETE", headers: cabeceras(), body: JSON.stringify({ prefixes: rutas })
+  });
+  if (!r.ok) throw new Error(`Supabase Storage respondió ${r.status} al borrar archivos`);
+}

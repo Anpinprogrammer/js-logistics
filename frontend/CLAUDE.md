@@ -23,8 +23,9 @@ src/
 │   ├── ui.tsx            Boton, Campo, Selector, Casilla, Aviso, Dialogo, Titulo, Cargando, Vacio, Dato, EtiquetaEstado
 │   ├── Marco.tsx         Menú lateral (computador) y barra inferior (celular), por rol
 │   ├── Avisos.tsx        useAviso(): mensajes cortos tipo toast
-│   └── …                 Componentes de dominio (Entrega, TarjetaPedido, BuscarCliente)
+│   └── …                 Componentes de dominio (Entrega, Fotos, TarjetaPedido, BuscarCliente)
 ├── lib/formato.ts        pesos(), fechas en hora de Colombia, etiquetas del negocio (MOTIVOS, METODOS, ROLES…)
+├── lib/imagen.ts         comprimir() fotos (800 px) y firmaABlob() antes de subirlas
 └── pages/
     ├── mensajero/        Ruta, Entregados
     ├── oficina/          Inicio, Pedidos, PedidoDetalle, Clientes, ClienteDetalle

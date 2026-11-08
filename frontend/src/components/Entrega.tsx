@@ -1,5 +1,5 @@
 /* Formularios de entrega, no entregado y corrección. Los usan el mensajero y la oficina. */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { pedidos } from "../api/servicios";
 import { mensajeDe } from "../api/cliente";
@@ -7,6 +7,9 @@ import type { MetodoEntrega, Motivo, Pedido } from "../api/tipos";
 import { METODOS, MOTIVOS, aPesos, pesos } from "../lib/formato";
 import { Aviso, Boton, Campo, Casilla, Dialogo, cx } from "./ui";
 import { useAviso } from "./Avisos";
+import { ElegirFoto, Firma, FotosPedido } from "./Fotos";
+import { firmaABlob } from "../lib/imagen";
+import { useUsuario } from "../auth/Sesion";
 
 const useRefrescar = () => {
   const qc = useQueryClient();
@@ -39,19 +42,34 @@ export function DialogoEntrega({ pedido, alCerrar }: { pedido: Pedido; alCerrar:
   const [gasto, setGasto] = useState("");
   const [gastoNota, setGastoNota] = useState("");
   const [aceptoDif, setAceptoDif] = useState(false);
+  const [foto, setFoto] = useState<Blob | null>(null);
+  const [hayFirma, setHayFirma] = useState(false);
+  const lienzo = useRef<HTMLCanvasElement | null>(null);
+  const [paso, setPaso] = useState("");
+  // El mensajero entrega con foto y firma, como en la app actual. La oficina puede registrar sin ellas.
+  const pideEvidencia = useUsuario().rol === "mensajero";
 
   const v = metodo === "transf_cliente" ? 0 : aPesos(valor);
   const esperado = metodo === "transf_cliente" ? 0 : pedido.aCobrar;
   const dif = pedido.aCobrar ? v - esperado : 0;
 
   const m = useMutation({
-    mutationFn: () => pedidos.entregar(pedido.guia, {
+    mutationFn: async () => {
+      // Primero las fotos: si la señal se cae aquí, la guía sigue en ruta y se puede intentar otra vez.
+      if (foto) { setPaso("Subiendo la foto…"); await pedidos.subirArchivo(pedido.guia, "entrega", foto); }
+      if (hayFirma && lienzo.current) { setPaso("Subiendo la firma…"); await pedidos.subirArchivo(pedido.guia, "firma", await firmaABlob(lienzo.current)); }
+      setPaso("Guardando…");
+      return entregar();
+    },
+    onSettled: () => setPaso(""),
+    onSuccess: () => { avisar(`Guía ${pedido.guia} entregada`); refrescar(); alCerrar(); }
+  });
+  const entregar = () => pedidos.entregar(pedido.guia, {
       destinatario: destinatario.trim(), valorCobrado: v, metodo,
       ...(metodo === "transf_js" ? { cuentaJs: cuentaJs as "nequi" | "bancolombia" } : {}),
       cambio, gasto: aPesos(gasto), gastoNota: gastoNota.trim()
-    }),
-    onSuccess: () => { avisar(`Guía ${pedido.guia} entregada`); refrescar(); alCerrar(); }
-  });
+    });
+  const falta = pideEvidencia && (!foto ? "Falta la foto de entrega" : !hayFirma ? "Falta la firma" : "");
 
   const enviar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +81,7 @@ export function DialogoEntrega({ pedido, alCerrar }: { pedido: Pedido; alCerrar:
     <Dialogo abierto alCerrar={alCerrar} titulo={`Entregar ${pedido.guia}`}>
       <form onSubmit={enviar} className="space-y-4">
         {pedido.aCobrar > 0 && <Aviso>Debes cobrar <b>{pesos(pedido.aCobrar)}</b>.</Aviso>}
+        <FotosPedido guia={pedido.guia} solo={["salida"]} />
         <Campo etiqueta="¿Quién recibió?" value={destinatario} onChange={e => setDestinatario(e.target.value)} required maxLength={120} autoComplete="off" />
         <div><span className="etiqueta">¿Cómo pagó?</span><Opciones nombre="metodo" valor={metodo} opciones={METODOS} onChange={v => { setMetodo(v); setAceptoDif(false); }} /></div>
         {metodo === "transf_js" && <div><span className="etiqueta">¿A qué cuenta llegó?</span><Opciones nombre="cuenta" valor={cuentaJs as "nequi"} opciones={CUENTAS} onChange={setCuentaJs} /></div>}
@@ -82,9 +101,11 @@ export function DialogoEntrega({ pedido, alCerrar }: { pedido: Pedido; alCerrar:
           <Aviso tipo="alerta">Debías cobrar <b>{pesos(esperado)}</b> y escribiste <b>{pesos(v)}</b> ({dif > 0 ? "sobran" : "faltan"} {pesos(Math.abs(dif))}). Si está bien, toca otra vez el botón.</Aviso>
         )}
         {m.error && <Aviso tipo="error">{mensajeDe(m.error)}</Aviso>}
-        <Aviso tipo="info">La foto de entrega y la firma se agregan cuando el backend tenga la subida de archivos.</Aviso>
-        <Boton type="submit" className="w-full" cargando={m.isPending} disabled={metodo === "transf_js" && !cuentaJs}>
-          {aceptoDif && dif !== 0 ? "Sí, guardar con diferencia" : "Guardar entrega"}
+        <ElegirFoto etiqueta={pideEvidencia ? "Foto de entrega" : "Foto de entrega (opcional)"} foto={foto} onFoto={setFoto} />
+        <Firma lienzo={lienzo} onCambio={setHayFirma} />
+        {falta && <p className="text-center text-sm text-suave">{falta}</p>}
+        <Boton type="submit" className="w-full" cargando={m.isPending} disabled={(metodo === "transf_js" && !cuentaJs) || !!falta}>
+          {m.isPending && paso ? paso : aceptoDif && dif !== 0 ? "Sí, guardar con diferencia" : "Guardar entrega"}
         </Boton>
       </form>
     </Dialogo>
@@ -95,8 +116,12 @@ export function DialogoNoEntregado({ pedido, alCerrar }: { pedido: Pedido; alCer
   const avisar = useAviso(), refrescar = useRefrescar();
   const [motivo, setMotivo] = useState<Motivo>("no_contesta");
   const [nota, setNota] = useState("");
+  const [foto, setFoto] = useState<Blob | null>(null);
   const m = useMutation({
-    mutationFn: () => pedidos.noEntregado(pedido.guia, { motivo, nota: nota.trim() }),
+    mutationFn: async () => {
+      if (foto && motivo !== "reprogramar") await pedidos.subirArchivo(pedido.guia, "entrega", foto); // evidencia de la devolución
+      return pedidos.noEntregado(pedido.guia, { motivo, nota: nota.trim() });
+    },
     onSuccess: p => { avisar(p.estado === "pendiente" ? `Intento anotado: ${pedido.guia} sigue en ruta` : `Guía ${pedido.guia} devuelta`); refrescar(); alCerrar(); }
   });
   return (
@@ -105,7 +130,10 @@ export function DialogoNoEntregado({ pedido, alCerrar }: { pedido: Pedido; alCer
         <Opciones nombre="motivo" valor={motivo} opciones={MOTIVOS} onChange={setMotivo} />
         <Campo etiqueta={motivo === "otro" ? "¿Qué pasó?" : "Detalle (opcional)"} value={nota} onChange={e => setNota(e.target.value)}
           required={motivo === "otro"} maxLength={300} placeholder="Ej: llamé 3 veces y no contestaron" />
-        {motivo !== "reprogramar" && <Aviso tipo="alerta">La guía queda como <b>devuelta</b>.</Aviso>}
+        {motivo !== "reprogramar" && <>
+          <ElegirFoto etiqueta="Foto de evidencia (opcional)" foto={foto} onFoto={setFoto} />
+          <Aviso tipo="alerta">La guía queda como <b>devuelta</b>.</Aviso>
+        </>}
         {m.error && <Aviso tipo="error">{mensajeDe(m.error)}</Aviso>}
         <Boton type="submit" className="w-full" cargando={m.isPending}>Registrar</Boton>
       </form>

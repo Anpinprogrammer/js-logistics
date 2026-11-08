@@ -106,6 +106,7 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `GET /pedidos?estado=&cerrados=&desde=&hasta=&entregadoDesde=&entregadoHasta=&buscar=&conDiferencia=&cursor=` | cada rol ve lo suyo | Lista paginada (`siguiente` es el cursor) |
 | `GET /pedidos/:guia` | quien la puede ver | Detalle con intentos. Lista y detalle traen `mini`: URL firmada de la miniatura, o `null` |
 | `GET /pedidos/:guia/archivos` | quien la puede ver | `{ archivos: [{ tipo, url, creado }] }` con URL firmadas de Storage que vencen en 1 hora (las `previa` solo para oficina) |
+| `POST /pedidos/:guia/archivos/:tipo` | oficina (cualquiera); mensajero (las suyas, en ruta o dentro de 24 horas) | Cuerpo **binario** de la imagen con `Content-Type: image/jpeg`, `image/png` o `image/webp`, máximo 1 MB. `tipo`: `salida`, `mini`, `entrega` o `firma`. El servidor revisa los bytes (`415 NO_ES_IMAGEN`), pone el nombre en el bucket y registra el historial. Responde `201 { archivo: { tipo, url, creado } }`. Sin Storage configurado: `503 FOTOS_NO_CONFIGURADAS`. La vigente de cada tipo es la más reciente |
 | `POST /pedidos` | equipo | Crea la guía con el siguiente consecutivo. El mensajero la crea a su nombre y en cero |
 | `PATCH /pedidos/:guia` | oficina | Remitente, valores, domicilio pagado. Lo cobrado solo lo corrige admin |
 | `POST /pedidos/:guia/entrega` | su mensajero u oficina | Entrega. El servidor calcula `difCobro` |
@@ -116,7 +117,6 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 
 ## Pendiente
 
-- Subir fotos y firmas a Supabase Storage (leerlas con URL firmadas ya funciona: `helpers/storage.js`).
 - Movimientos de clientes, recaudos, caja, arqueos, cajas de oficina, liquidaciones, sueldos y cuentas internas, con los cálculos de `app/js/app.js` en `helpers/negocio.js` y pruebas que comparen contra la app actual.
 - Bloquear cambios a lo ya contado en un arqueo (`ajustes.caja.corte`).
 - `Idempotency-Key` en las escrituras que reenvía la cola sin señal del mensajero.
