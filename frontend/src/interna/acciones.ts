@@ -168,7 +168,8 @@ export async function arqueo(esperado: Record<string, number>, contado: Record<s
       for (const m of Object.keys(contado)) { const dif = Math.round((contado[m] || 0) - (esperado[m] || 0)); if (dif) { const k = id(); s.cajamovs[k] = { id: k, tipo: dif > 0 ? "entra" : "sale", cat: "arqueo", arqueoId: aid, valor: Math.abs(dif), medio: m as Medio, concepto: nota, fecha: f, personaId: "" }; } }
     });
   }
-  await tras(api.caja.arqueo({ esperado, contado, nota }));
+  void esperado; // en el servidor lo calcula él
+  await tras(api.caja.arqueo({ contado, nota }));
 }
 export async function deshacerArqueo(aid: string) {
   if (DEMO) return tocar(s => { for (const c of Object.values(s.cajamovs)) if (c.arqueoId === aid || c.id === aid) delete s.cajamovs[c.id]; });
@@ -186,15 +187,24 @@ export async function devolverAdelanto(aid: string, valor: number, medio: Medio)
   const c = S.cajamovs[aid]; if (!c) return;
   const dev: Omit<CajaMov, "id"> = { tipo: "entra", cat: "devolucion", personaId: c.personaId, valor, medio, concepto: "Adelanto del " + hora(c.fecha), adelantoId: aid, fecha: Date.now(), semana: "" };
   if (DEMO) { const k = id(); return tocar(s => { s.cajamovs[k] = { ...dev, id: k }; s.cajamovs[aid].devuelto = (Number(c.devuelto) || 0) + valor; }); }
-  await api.cajaMovimientos.crear({ ...dev, fecha: iso(dev.fecha) } as Partial<T.CajaMovimiento>);
-  await tras(api.cajaMovimientos.actualizar(aid, { devuelto: (Number(c.devuelto) || 0) + valor } as Partial<T.CajaMovimiento>));
+  await tras(api.caja.devolverAdelanto(aid, { valor, medio }));
+}
+/** Cierre de la caja de oficina: en el servidor es una sola acción; en demo se registran las piezas como en el prototipo. */
+export async function cierreOficina(auid: string, entrega: Record<Medio, number>, nota: string, piezas: Omit<CajaMov, "id">[]) {
+  if (DEMO) { for (const p of piezas) await movCaja(p); return; }
+  await tras(api.caja.cierreOficina(auid, { ...entrega, nota }));
+}
+/** Quitar una devolución de adelanto: el servidor le resta lo devuelto al adelanto. */
+export async function quitarDevolucion(k: string) {
+  const c = S.cajamovs[k], ad = c?.adelantoId ? S.cajamovs[c.adelantoId] : undefined;
+  if (DEMO && ad) tocar(s => { s.cajamovs[ad.id].devuelto = Math.max(0, (Number(ad.devuelto) || 0) - (Number(c.valor) || 0)); });
+  await borrarDe("cajamovs", k);
 }
 /** Adelanto registrado por error: se borra. Si salió de una liquidación, lo que quedó debiendo vuelve al mensajero. */
 export async function quitarAdelanto(aid: string) {
   const c = S.cajamovs[aid]; if (!c) return; const liq = c.deLiquidacion ? S.liquidaciones[c.deLiquidacion] : null;
   if (DEMO) return tocar(s => { if (liq) Object.assign(s.liquidaciones[liq.id], { debe: (Number(liq.debe) || 0) + (Number(c.valor) || 0), adelanto: 0 }); delete s.cajamovs[aid]; });
-  if (liq) await api.liquidaciones.actualizar(liq.id, { debe: (Number(liq.debe) || 0) + (Number(c.valor) || 0), adelanto: 0 });
-  await tras(api.cajaMovimientos.eliminar(aid));
+  await tras(api.cajaMovimientos.eliminar(aid)); // el servidor le devuelve la deuda a la liquidación
 }
 
 /* ---------- personal y accesos ---------- */

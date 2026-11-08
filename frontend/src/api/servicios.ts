@@ -134,7 +134,12 @@ export const jornadas = {
 export const caja = {
   /** Fecha del último arqueo (lo anterior ya está contado y no se cambia). */
   corte: () => opcional(datos<{ corte: string | null }>(api.get("/caja/corte")).then(d => d.corte), null),
-  arqueo: (d: { esperado: Record<string, number>; contado: Record<string, number>; nota: string }) => api.post("/caja/arqueos", d),
+  /** Lo esperado lo calcula el servidor; se manda solo lo contado. */
+  arqueo: (d: { contado: Record<string, number>; nota: string }) => api.post("/caja/arqueos", d),
+  /** Cierre de la caja de oficina de un asistente: lo que entrega en cada medio (el servidor registra sobrantes y ajustes). */
+  cierreOficina: (uid: string, d: { efectivo: number; nequi: number; bancolombia: number; nota: string }) => api.post(`/caja/oficinas/${uid}/cierre`, d),
+  /** Devolución (todo o parte) de un adelanto de sueldo. */
+  devolverAdelanto: (id: string, d: { valor: number; medio: string }) => api.post(`/caja/adelantos/${id}/devolucion`, d),
   deshacerArqueo: (id: string) => api.delete(`/caja/arqueos/${id}`)
 };
 export const historial = {
