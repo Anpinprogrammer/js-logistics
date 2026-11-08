@@ -19,10 +19,14 @@ backend/
 │   ├── seguridad.js      Helmet, CORS, protección CSRF y límite de intentos
 │   └── errores.js        404 y manejo central de errores
 ├── routes/               Una por recurso, montadas en /api (routes/index.js)
-├── controllers/          Reglas de cada caso de uso (quién puede qué, qué se calcula)
-├── models/               Consultas SQL por tabla (sin lógica de permisos)
+├── controllers/          Reciben la petición y responden. accion.js conecta Express con los servicios (fechas a ISO)
+├── servicios/            Reglas del negocio copiadas de app/js/app.js: pedidos, caja, clientes, mensajeros, movimientos,
+│                         sueldos, historial, papelera. Corren en una transacción y avisan por SSE qué cambió
+├── models/               Consultas SQL por tabla (sin lógica de permisos). documentos.js ve las tablas con la forma
+│                         de documento de la app (fechas en ms), para que los cálculos den lo mismo
 ├── validators/           Esquemas de Zod de cada petición
-├── helpers/              Utilidades: errores HTTP, JWT, cookies, contraseñas, IDs, SQL y reglas de negocio puras
+├── helpers/              Utilidades: errores HTTP, JWT, cookies, contraseñas, IDs y SQL. calculos.js, constantes.js,
+│                         fechas.js y texto.js son copia fiel de app/js/app.js (saldos, caja, arqueos, sueldos…)
 ├── db/
 │   ├── schema.sql        Tablas, índices y restricciones (se puede correr varias veces)
 │   ├── migrar.js         npm run db:migrar
@@ -69,6 +73,41 @@ Usan una base **aparte**, que se vacía en cada corrida. Nunca apuntes `TEST_DAT
 ```bash
 createdb jsl_test
 TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/jsl_test npm test
+```
+
+## Actualizar la base de una instalación que ya existe
+
+El esquema está en un solo archivo, `db/schema.sql`, y **se puede correr cuantas veces quieras**: crea lo que falta y no borra datos.
+No hay archivos de migración sueltos; cada cambio se escribe ahí con `CREATE … IF NOT EXISTS`, `ALTER … ADD COLUMN IF NOT EXISTS` o un bloque `DO` que revisa antes de cambiar.
+
+```bash
+cd backend
+# 1. Respaldo antes de tocar producción (Supabase: Database → Backups, o pg_dump con la cadena de conexión)
+pg_dump "$DATABASE_URL" -Fc -f respaldo-$(date +%F).dump
+# 2. Aplicar el esquema (usa DATABASE_URL del .env)
+npm run db:migrar
+# 3. Si los datos vienen de Firebase, vuelve a importar para completar lo que el importador viejo no guardaba
+npm run db:importar -- --carpeta ../exportacion-… --simular
+npm run db:importar -- --carpeta ../exportacion-…
+```
+
+Qué cambia esta versión del esquema (todo lo hace `npm run db:migrar`):
+
+| Tabla | Cambio | Por qué |
+|---|---|---|
+| `liquidaciones.guias` | Puede ser `NULL` y ya no tiene `'{}'` por defecto. Las que tienen entregas pero lista vacía pasan a `NULL` | En la app, una liquidación vieja sin lista de guías se cuenta distinto que una con lista vacía |
+| `cajamovs.de_liquidacion` | Pasa de sí/no (`BOOLEAN`) a `TEXT` con el ID de la liquidación (sale de `extra.liquidacionId`; si no estaba, queda `'importado'`). Nuevo índice `cajamovs_liquidacion_idx` | Reabrir una liquidación quita el adelanto que salió de ella: hay que saber de cuál salió |
+| `jornadas.nota` | Columna nueva (`TEXT`, `''` por defecto) | La app guarda "Sueldo anterior" en los días previos |
+
+Después de `db:migrar`, la importación (paso 3) deja `de_liquidacion` con el ID real en los adelantos que quedaron como `'importado'`, y la nota de las jornadas.
+Si no vienes de Firebase, no hace falta.
+
+Para revisar que quedó bien:
+
+```sql
+SELECT count(*) FROM cajamovs WHERE de_liquidacion = 'importado';      -- 0 después de reimportar
+SELECT column_name, data_type FROM information_schema.columns
+ WHERE table_name IN ('cajamovs', 'jornadas', 'liquidaciones') AND column_name IN ('de_liquidacion', 'nota', 'guias');
 ```
 
 ## Supabase
@@ -118,11 +157,65 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `POST /pedidos/:guia/cambio-recibido` | el cliente u oficina | Confirma la prenda de cambio |
 | `DELETE /pedidos/:guia` | admin | Borra (a la papelera) |
 
+## Endpoints de dinero, sueldos e historial
+
+Las reglas son las de `app/js/app.js` (están en `servicios/`), y los cálculos se prueban contra la app en `test/equivalencia.test.js`.
+Lo que el servidor puede calcular **no se recibe**: totales de una liquidación, lo esperado en un arqueo, la diferencia de cobro, la hora.
+Lo ya contado en un arqueo no se cambia: responde `409 YA_CONTADO` con el texto para mostrar.
+
+| Método y ruta | Quién | Qué hace |
+|---|---|---|
+| `POST /pedidos/:guia/reabrir` | admin | Vuelve a "por entregar". La foto y la firma pasan a `previa` |
+| `POST /pedidos/en-bloque` | oficina | `{ modo: "sin", guias, clienteId, valorServicio? }` pone remitente; `{ modo: "serv", guias, valorServicio?, usarTarifaCliente }` pone el domicilio |
+| `POST/DELETE /pedidos/:guia/pago-domicilio` | oficina | `{ medio, valor }`: el cliente pagó el domicilio aparte |
+| `POST /pedidos/:guia/diferencia-revisada` | oficina | Marca revisada la diferencia de cobro |
+| `GET /movimientos` | oficina | `{ movimientos }` de todos los clientes |
+| `POST /movimientos` | oficina (el asistente: pagos, compras y ganancias) | `{ clienteId, tipo, valor, medio, nota, dia? \| fecha? }`. El pago del asistente queda con la hora del momento |
+| `PATCH /movimientos/:id` | `{ medio }`: el asistente, lo suyo en 24 h; lo demás: admin | Cambia el medio (queda `medioAntes`) o edita |
+| `DELETE /movimientos/:id` | oficina | Quita un pago (si ya se contó, registra el reverso) |
+| `POST /movimientos/reversar` | oficina | `{ ids }` reversa varios pagos |
+| `GET /clientes/saldos?dia=` | oficina | `{ clientes: [… saldo, delDia?], porCobrar, porPagar }` |
+| `GET /clientes/:id/cuenta` | oficina, o el propio cliente | `{ cliente, saldo, filas, enRuta }` |
+| `GET /clientes/cuadre?dia=&clienteId=` | oficina | Recibos de cuadre del día |
+| `GET /clientes/repetidos` | admin | Grupos de clientes parecidos |
+| `POST /clientes/:id/unir` | admin | `{ otros }`: pasa pedidos, movimientos y cuentas a `:id` y borra los otros |
+| `POST /clientes/pagar-saldos` | oficina | `{ clienteIds, medio }`: paga el saldo a favor de cada uno (sin pagar dos veces) |
+| `GET /recaudos` | equipo (el mensajero, lo suyo) | `{ recaudos }` |
+| `POST /recaudos` | oficina | `{ mensajeroId, valor, medio, nota }` → `{ recaudo, debe }` |
+| `PATCH /recaudos/:id` | `{ medio }`: el asistente, lo suyo; lo demás: admin | Cambia el medio o corrige |
+| `DELETE /recaudos/:id` | admin | Quita |
+| `GET /mensajeros/resumen` | oficina | Período abierto de cada repartidor |
+| `GET /mensajeros/:id/periodo` | oficina; el mensajero, el suyo | `{ periodo: { debe, efectivo, base, gastos, recibido, entregas, … } }` |
+| `GET /liquidaciones` | equipo (el mensajero, las suyas) | `{ liquidaciones }` |
+| `POST /liquidaciones` | admin | `{ mensajeroId, entregaFinal, medio, pasarAdelanto?, semana? }` (también acepta `adelanto` y `semanaAdelanto` de la app interna). El servidor calcula todo. → `{ liquidacion, adelanto, queda }` |
+| `DELETE /liquidaciones/:id` | admin | Reabre la última: borra la liquidación y su adelanto; el dinero recibido queda |
+| `PATCH /liquidaciones/:id` | admin | Solo compatibilidad: `{ debe, adelanto: 0 }` antes de quitar su adelanto. No cambia nada |
+| `GET /caja/resumen`, `/caja/libro?dia=`, `/caja/cierre-del-dia` | admin | Caja general, libro y lo que falta para cerrar el día |
+| `GET /caja/corte` | oficina | `{ corte }`: hora del último arqueo (lo de antes ya está contado) |
+| `GET /caja/movimientos` | equipo (cada rol, lo suyo) | `{ movimientos }` de caja |
+| `POST /caja/movimientos` | oficina | Según `cat`: `interna` (cuenta interna), `devolucion` con `adelantoId`, `oficina`/`sobrante` (piezas del cierre de una caja de oficina), `base` del asistente, o una entrada o salida de admin (`gasto`, `base`, `arriendo`, `adelanto`, `sueldo`, `otro`, `otro_entra`) |
+| `PATCH /caja/movimientos/:id` | admin | Solo `{ devuelto }` de un adelanto, cuando coincide con lo que calcula el servidor (compatibilidad) |
+| `DELETE /caja/movimientos/:id` | admin | Quita (un adelanto de liquidación devuelve la deuda; una devolución resta de `devuelto`) |
+| `POST /caja/bases` | oficina | `{ mensajeroId, valor, concepto }`: base para vueltos desde la caja de oficina |
+| `GET /caja/oficinas?dia=`, `GET /caja/oficinas/:uid?dia=` | admin; el asistente, la suya | Cajas de oficina |
+| `POST /caja/oficinas/:uid/base`, `POST /caja/oficinas/:uid/cierre` | admin | Base para un asistente y cierre (`{ efectivo, nequi, bancolombia, nota }`, con sobrante y ajuste) |
+| `GET /caja/arqueo/esperado`, `GET /caja/arqueos` | admin | Lo esperado por medio y los arqueos hechos |
+| `POST /caja/arqueos` | admin | `{ contado: { efectivo, nequi, bancolombia }, nota }`. Lo esperado lo calcula el servidor (si llega, se ignora) |
+| `DELETE /caja/arqueos/:id` | admin | Deshace el último arqueo |
+| `POST /caja/adelantos/:id/devolucion`, `DELETE /caja/adelantos/:id` | admin | Devolución (todo o parte) y quitar un adelanto |
+| `GET /cuentas`, `POST /cuentas`, `POST /cuentas/iniciales`, `POST /cuentas/:id/movimientos` | oficina (crear: admin) | Cuentas internas con su saldo |
+| `GET /jornadas` | equipo (cada quien, lo suyo) | Días de pago fijo |
+| `PUT /jornadas/:id`, `DELETE /jornadas/:id` | admin | `{ personaId, dia, valor, previo? }`. El ID lo arma el servidor |
+| `GET /sueldos/semana?semana=` | admin | Planilla de la semana |
+| `GET /sueldos/mensajeros/:id?semana=` | admin; el mensajero, el suyo | "Mi sueldo" |
+| `GET /historial?desde=AAAA-MM-DD&limite=` | equipo (admin todo; los demás, lo suyo) | `{ cambios: [{ id, fecha, quien, op, col, docId, resumen }] }` |
+| `POST /historial` | equipo | `{ texto }`: anota algo (por ejemplo, "Envió saldo por WhatsApp") |
+| `GET /papelera`, `POST /papelera/:id/restaurar`, `DELETE /papelera/:id`, `DELETE /papelera` | admin | Papelera. Un pedido vuelve con sus intentos y sus fotos |
+| `GET /respaldo/exportar`, `GET /respaldo/espacio` | admin | Copia en JSON y espacio usado |
+| `GET /sincronizar` | con sesión | `{ datos: { coleccion: { id: documento } }, corte }` con lo que ese rol puede ver |
+| `GET /eventos` | con sesión | Server-Sent Events: `event: cambio` con `{ cols }` cuando algo cambia |
+
 ## Pendiente
 
-- Movimientos de clientes, recaudos, caja, arqueos, cajas de oficina, liquidaciones, sueldos y cuentas internas, con los cálculos de `app/js/app.js` en `helpers/negocio.js` y pruebas que comparen contra la app actual.
-- Bloquear cambios a lo ya contado en un arqueo (`ajustes.caja.corte`).
 - `Idempotency-Key` en las escrituras que reenvía la cola sin señal del mensajero.
-- Tiempo real con SSE (`GET /api/events`).
-
-
+- Que la app interna use las rutas de una sola acción (cierre de caja de oficina, devolución y quitar adelanto) en vez de las piezas de compatibilidad.

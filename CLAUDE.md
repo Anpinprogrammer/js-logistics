@@ -84,5 +84,5 @@ Nunca apuntes `TEST_DATABASE_URL` ni `db:demo` a la base de producción.
 
 ## Qué falta (para no duplicar trabajo)
 
-- Backend: movimientos de clientes (crear), recaudos, caja, arqueos, cajas de oficina, liquidaciones, sueldos y cuentas internas, con sus saldos calculados en el servidor; bloqueo de lo ya contado en un arqueo; `Idempotency-Key` para la cola sin señal; tiempo real con SSE.
-- Frontend: los saldos, la caja y los sueldos se calculan en el navegador (`frontend/src/interna/motor.ts`) hasta que el backend los calcule; tiquetes, descargas de Excel y respaldo; funcionamiento sin señal para el mensajero (PWA y cola).
+- Backend: `Idempotency-Key` para la cola sin señal. Los saldos, la caja, los arqueos (con el bloqueo de lo ya contado), las liquidaciones, los sueldos, las cuentas internas, el historial, la papelera y el tiempo real (SSE en `GET /api/eventos`) ya están en `backend/servicios/`.
+- Frontend: los saldos, la caja y los sueldos todavía se calculan en el navegador (`frontend/src/interna/motor.ts`); el backend ya los da (`/caja/resumen`, `/clientes/saldos`, `/mensajeros/:id/periodo`, `/sueldos/semana`). Pasar el cierre de caja de oficina, la devolución y el quitar adelanto a las rutas de una sola acción. Tiquetes, descargas de Excel y respaldo; funcionamiento sin señal para el mensajero (PWA y cola).

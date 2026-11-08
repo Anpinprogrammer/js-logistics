@@ -63,6 +63,8 @@ Mientras corre, muestra cada paso ("Leyendo los archivos…", "Conectando con la
 - Si se queda en **"Conectando con la base de datos…"**, revisa `DATABASE_URL`. En Supabase usa la cadena del **Session pooler** (Project Settings → Database → Connection string).
 - La importación quita el límite de tiempo por consulta (`statement_timeout`) solo dentro de su propia transacción, así que el error "canceling statement due to statement timeout" ya no la corta.
 
+Si ya habías importado antes de esta versión, corre primero `npm run db:migrar` y vuelve a importar: así los adelantos quedan unidos a su liquidación y se recuperan las notas de las jornadas (ver "Actualizar la base" en [`backend/README.md`](../backend/README.md)).
+
 ### Qué hace con cada cosa
 
 | Firestore | Postgres | Notas |
@@ -71,7 +73,7 @@ Mientras corre, muestra cada paso ("Leyendo los archivos…", "Conectando con la
 | `usuarios` + `admins` + `vinculos` + Firebase Auth | `usuarios` | El uid de Firebase es el ID. `admins` da el rol de administración y `vinculos` da la persona de Personal. Las cuentas desactivadas en Auth quedan inactivas. |
 | `pedidos` (con `intentos[]` y `mini`) | `pedidos`, `pedido_intentos` | El consecutivo de guías sigue después de la última. |
 | `fotos`, `entregas` (dataURL) | archivos en Storage + `pedido_archivos` | Foto de salida, miniatura, foto de entrega, firma y pruebas anteriores (`previa`). |
-| `movimientos`, `recaudos`, `liquidaciones`, `cajamovs`, `jornadas` | mismas tablas | Lo de caja que no tiene columna propia (por ejemplo, la marca de arqueo) va en `cajamovs.extra`. |
+| `movimientos`, `recaudos`, `liquidaciones`, `cajamovs`, `jornadas` | mismas tablas | Lo de caja que no tiene columna propia (por ejemplo, la marca de arqueo) va en `cajamovs.extra`. `cajamovs.de_liquidacion` guarda el ID de la liquidación de la que salió el adelanto; `liquidaciones.guias` queda `NULL` si la liquidación vieja no tenía lista; la nota de las jornadas se conserva. |
 | `meta/contador`, `meta/caja` | `contadores`, `ajustes.caja` | Hora del último arqueo. |
 | `historial`, `papelera` | mismas tablas | El historial pasa de un documento por día a una fila por cambio. |
 | `papelera_fotos`, `meta/config` | — | No se importan. |
