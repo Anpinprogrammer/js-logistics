@@ -58,7 +58,7 @@ No agregues dependencias sin una razón clara. Si lo haces, explícala en el PR.
 - Nombres en español: archivos `<recurso>.routes.js`, `<recurso>.validator.js`, `<recurso>.controller.js` y `<entidad>.model.js`; funciones como verbos (`listar`, `obtener`, `crear`, `actualizar`, `eliminar`, `entregar`); el modelo importado como `* as Pedido`.
 - Cada archivo empieza con un comentario corto que dice para qué es. Comenta el **porqué** de las reglas no obvias.
 - Respuestas: `{ recurso: … }` o `{ recursos: [...] }` (por ejemplo `{ pedido }` o `{ pedidos, siguiente }`); `201` al crear; `204` sin cuerpo al borrar o en acciones sin respuesta.
-- Paginación: con cursor (`cursor` → `siguiente`), no con `OFFSET`, en las listas que crecen.
+- Paginación: con cursor (`cursor` → `siguiente`), no con `OFFSET`, en las listas que se cargan completas de a pedazos. La excepción es el paginador de pantalla (`pagina` y `porPagina` → `total` y `paginas`, ver `Pedido.listarPagina`): ahí se salta a una página cualquiera y se usa `OFFSET` con un máximo de 100 por página.
 - Errores: usa `HttpError` con un `code` estable en MAYÚSCULAS (`YA_CERRADA`, `POSIBLE_REPETIDO`). El frontend decide según el `code`.
 
 ## Revisar antes del PR

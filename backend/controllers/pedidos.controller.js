@@ -44,6 +44,12 @@ export async function listar(req, res) {
     if (!u.clienteId) throw prohibido("Tu cuenta no está vinculada con un cliente");
     filtros.clienteId = u.clienteId;
   }
+  if (filtros.pagina) { // paginador: el servidor filtra, cuenta y corta; la pantalla solo dibuja
+    const { cursor: _c, limite: _l, ...resto } = filtros;
+    const r = await Pedido.listarPagina(resto);
+    return res.json({ ...r, pedidos: await conMini(r.pedidos) });
+  }
+  delete filtros.porPagina;
   const pedidos = await Pedido.listar(filtros);
   const siguiente = pedidos.length === filtros.limite ? pedidos[pedidos.length - 1].n : null;
   res.json({ pedidos: await conMini(pedidos), siguiente });
