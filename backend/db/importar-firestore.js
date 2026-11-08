@@ -68,25 +68,58 @@ function crearInforme() {
   };
 }
 
+// ---------- Escritura por lotes ----------
+// Con Supabase cada consulta viaja por internet (~100 ms). Una por registro tardaría horas con miles de guías:
+// por eso se escribe de a cientos de filas por consulta.
+
+/** INSERT … ON CONFLICT DO UPDATE de muchas filas a la vez. `filas` son arreglos en el orden de `cols`. */
+async function upsert(q, tabla, cols, filas, { clave = "id", conservar = [], extra = [] } = {}) {
+  const set = [...cols.filter(c => c !== clave && !conservar.includes(c)).map(c => `${c} = EXCLUDED.${c}`), ...extra].join(", ");
+  const lote = Math.max(1, Math.min(500, Math.floor(30_000 / cols.length)));
+  for (let i = 0; i < filas.length; i += lote) {
+    const v = [];
+    const ph = filas.slice(i, i + lote).map(f => "(" + f.map(x => { v.push(x); return "$" + v.length; }).join(",") + ")");
+    await q(`INSERT INTO ${tabla} (${cols.join(", ")}) VALUES ${ph.join(", ")} ON CONFLICT (${clave}) DO UPDATE SET ${set}`, v);
+  }
+}
+
+/** INSERT simple de muchas filas (tablas sin clave propia: intentos, historial, papelera). */
+async function insertar(q, tabla, cols, filas) {
+  const lote = Math.max(1, Math.min(500, Math.floor(30_000 / cols.length)));
+  for (let i = 0; i < filas.length; i += lote) {
+    const v = [];
+    const ph = filas.slice(i, i + lote).map(f => "(" + f.map(x => { v.push(x); return "$" + v.length; }).join(",") + ")");
+    await q(`INSERT INTO ${tabla} (${cols.join(", ")}) VALUES ${ph.join(", ")}`, v);
+  }
+}
+
 // ---------- Importación ----------
 
 export async function importar({ carpeta, simular = false, conFotos = true, reemplazar = false, log = console.log }) {
   carpeta = resolve(carpeta);
   const manifiesto = JSON.parse(await readFile(join(carpeta, "manifiesto.json"), "utf8"));
   const inf = crearInforme();
+  const t0 = Date.now(), seg = () => `${Math.round((Date.now() - t0) / 1000)} s`;
   log(`Exportación de ${manifiesto.proyecto} del ${new Date(manifiesto.fecha).toLocaleString("es-CO", { timeZone: "America/Bogota" })}`);
   if (manifiesto.parcial) log("Ojo: la exportación es PARCIAL (--solo). Solo se actualizan las colecciones que trae.");
 
+  log("Leyendo los archivos…");
   const L = {};
   for (const c of ["mensajeros", "clientes", "cuentas", "usuarios", "admins", "vinculos", "meta", "pedidos", "movimientos",
     "recaudos", "liquidaciones", "cajamovs", "jornadas", "historial", "papelera", "auth"]) L[c] = await leerTodo(carpeta, c);
   const porId = lista => new Map(lista.map(d => [d.id, d.datos]));
   const auth = porId(L.auth), admins = new Set(L.admins.map(d => d.id)), vinculos = porId(L.vinculos), meta = porId(L.meta);
 
+  log("Conectando con la base de datos…");
   const db = await pool.connect();
   const q = (sql, v) => db.query(sql, v);
+  const listo = (c, n) => log(`  ${c.padEnd(14)} ${String(n).padStart(6)}  (${seg()})`);
   try {
     await q("BEGIN");
+    // Supabase corta las consultas largas (statement_timeout). Una importación grande puede pasar ese límite;
+    // SET LOCAL lo quita solo para esta transacción.
+    await q("SET LOCAL statement_timeout = 0");
+    await q("SET LOCAL idle_in_transaction_session_timeout = 0");
 
     if (reemplazar) {
       // DELETE en orden (no TRUNCATE ... CASCADE, que se llevaría también las cuentas y sus contraseñas).
@@ -99,39 +132,39 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
       await q(`UPDATE contadores SET n = 0 WHERE nombre = 'guia'`);
       log("Base vaciada (las cuentas de oficina y mensajeros se conservan con su contraseña).");
     }
+    log("Guardando:");
 
     // Personal
+    const filasM = [];
     for (const { id, datos: d } of L.mensajeros) {
       if (!texto(d.nombre)) { inf.omitir("mensajeros", "sin nombre", id); continue; }
-      await q(`INSERT INTO mensajeros (id, nombre, telefono, tipo, tarifa, activo) VALUES ($1,$2,$3,$4,$5,true)
-        ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre, telefono = EXCLUDED.telefono, tipo = EXCLUDED.tipo,
-          tarifa = EXCLUDED.tarifa, activo = true, actualizado = now()`,
-      [id, texto(d.nombre), texto(d.telefono), uno(d.tipo, TIPOS_PERSONAL, "mensajero"), Math.max(0, pesos(d.tarifa))]);
+      filasM.push([id, texto(d.nombre), texto(d.telefono), uno(d.tipo, TIPOS_PERSONAL, "mensajero"), Math.max(0, pesos(d.tarifa)), true]);
       inf.ok("mensajeros");
     }
+    await upsert(q, "mensajeros", ["id", "nombre", "telefono", "tipo", "tarifa", "activo"], filasM, { extra: ["actualizado = now()"] });
+    listo("mensajeros", filasM.length);
 
     // Clientes
+    const filasC = [];
     for (const { id, datos: d } of L.clientes) {
       if (!texto(d.nombre)) { inf.omitir("clientes", "sin nombre", id); continue; }
-      await q(`INSERT INTO clientes (id, nombre, telefono, tarifa) VALUES ($1,$2,$3,$4)
-        ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre, telefono = EXCLUDED.telefono, tarifa = EXCLUDED.tarifa, actualizado = now()`,
-      [id, texto(d.nombre), texto(d.telefono), Math.max(0, pesos(d.tarifa))]);
+      filasC.push([id, texto(d.nombre), texto(d.telefono), Math.max(0, pesos(d.tarifa))]);
       inf.ok("clientes");
     }
+    await upsert(q, "clientes", ["id", "nombre", "telefono", "tarifa"], filasC, { extra: ["actualizado = now()"] });
+    listo("clientes", filasC.length);
 
     // Cuentas internas
-    for (const { id, datos: d } of L.cuentas) {
-      await q(`INSERT INTO cuentas (id, nombre, tipo, creado) VALUES ($1,$2,$3,COALESCE($4, now()))
-        ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre, tipo = EXCLUDED.tipo`,
-      [id, texto(d.nombre) || id, uno(d.tipo, ["socio", "base"], "socio"), fecha(d.creado)]);
-      inf.ok("cuentas");
-    }
+    const filasK = L.cuentas.map(({ id, datos: d }) => { inf.ok("cuentas"); return [id, texto(d.nombre) || id, uno(d.tipo, ["socio", "base"], "socio"), fecha(d.creado) ?? new Date()]; });
+    await upsert(q, "cuentas", ["id", "nombre", "tipo", "creado"], filasK, { conservar: ["creado"] });
 
     const existe = async tabla => new Set((await q(`SELECT id FROM ${tabla}`)).rows.map(r => r.id));
     const mensajeros = await existe("mensajeros"), clientes = await existe("clientes"), cuentas = await existe("cuentas");
 
     // Cuentas de la app: usuarios + admins + vinculos + Firebase Auth. Las contraseñas de Firebase no se pueden pasar:
     // las cuentas nuevas quedan sin contraseña (no pueden entrar) hasta que administración les asigne una.
+    const correos = new Map((await q(`SELECT id, lower(email) AS email FROM usuarios`)).rows.map(r => [r.email, r.id]));
+    const filasU = [], vistos = new Set();
     for (const { id, datos: d } of L.usuarios) {
       const email = texto(d.email || auth.get(id)?.email).toLowerCase();
       if (!email) { inf.omitir("usuarios", "sin correo", id); continue; }
@@ -142,15 +175,15 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
       const vin = vinculos.get(id)?.mensajeroId;
       const mensajeroId = vin && mensajeros.has(vin) ? vin : null;
       if (vin && !mensajeroId) inf.avisar("usuarios", "vínculo con una persona que ya no está en Personal", id);
-      const otra = await q(`SELECT id FROM usuarios WHERE lower(email) = $1 AND id <> $2`, [email, id]);
-      if (otra.rowCount) { inf.omitir("usuarios", `el correo ya lo usa otra cuenta del sistema nuevo (${otra.rows[0].id})`, id); continue; }
-      await q(`INSERT INTO usuarios (id, email, nombre, rol, cliente_id, mensajero_id, activo, creado)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8, now()))
-        ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email, nombre = EXCLUDED.nombre, rol = EXCLUDED.rol,
-          cliente_id = EXCLUDED.cliente_id, mensajero_id = EXCLUDED.mensajero_id, activo = EXCLUDED.activo, actualizado = now()`,
-      [id, email, texto(d.nombre || auth.get(id)?.nombre), rol, clienteId, mensajeroId, !auth.get(id)?.desactivada, fecha(d.creado)]);
+      const otra = correos.get(email);
+      if ((otra && otra !== id) || vistos.has(email)) { inf.omitir("usuarios", `el correo ya lo usa otra cuenta (${otra || "repetido en Firebase"})`, id); continue; }
+      vistos.add(email);
+      filasU.push([id, email, texto(d.nombre || auth.get(id)?.nombre), rol, clienteId, mensajeroId, !auth.get(id)?.desactivada, fecha(d.creado) ?? new Date()]);
       inf.ok("usuarios");
     }
+    await upsert(q, "usuarios", ["id", "email", "nombre", "rol", "cliente_id", "mensajero_id", "activo", "creado"], filasU,
+      { conservar: ["creado"], extra: ["actualizado = now()"] }); // nunca toca clave_hash ni version_sesion
+    listo("usuarios", filasU.length);
     const usuarios = await existe("usuarios");
     const uidO = v => (v && usuarios.has(v) ? v : null);
 
@@ -162,7 +195,7 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
     }
 
     // Pedidos e intentos
-    const guias = [];
+    const guias = [], filasP = [], filasI = [];
     for (const { id, datos: d } of L.pedidos) {
       const n = pesos(d.n) || pesos(String(id).replace(/\D/g, ""));
       if (!/^JS-\d{5,}$/.test(id) || !n) { inf.omitir("pedidos", "número de guía inválido", id); continue; }
@@ -173,7 +206,7 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
       if (d.clienteId && !clientes.has(d.clienteId)) inf.avisar("pedidos", "remitente que ya no existe: queda sin remitente", id);
       const negativos = ["valorServicio", "aCobrar", "valorCobrado", "gasto"].filter(k => pesos(d[k]) < 0);
       if (negativos.length) inf.avisar("pedidos", `valores negativos puestos en 0 (${negativos.join(", ")})`, id);
-      const v = [
+      filasP.push([
         id, n, estado, fecha(d.creado) ?? new Date(), uidO(d.por), mensajeros.has(d.mensajeroId) ? d.mensajeroId : null,
         clientes.has(d.clienteId) ? d.clienteId : null, Math.max(0, pesos(d.valorServicio)), Math.max(0, pesos(d.aCobrar)),
         estado === "pendiente" ? null : entregado, texto(d.destinatario), Math.max(0, pesos(d.valorCobrado)), uno(d.metodo, METODOS, ""),
@@ -182,99 +215,81 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
         Math.max(0, pesos(d.gasto)), texto(d.gastoNota), !!d.domiPagado, uno(d.domiPagoMedio, MEDIOS),
         d.domiPagoValor == null || d.domiPagoValor === "" ? null : Math.max(0, pesos(d.domiPagoValor)), fecha(d.domiPagoFecha),
         uidO(d.domiPagoUid), !!d.fotosBorradas
-      ];
-      await q(`INSERT INTO pedidos (guia, n, estado, creado, creado_por, mensajero_id, cliente_id, valor_servicio, a_cobrar,
-          entregado, destinatario, valor_cobrado, metodo, cuenta_js, dif_cobro, dif_revisada, entrego_uid, motivo_dev, nota_dev,
-          cobrar_dev, cambio, cambio_recibido, cambio_confirmo, gasto, gasto_nota, domi_pagado, domi_pago_medio, domi_pago_valor,
-          domi_pago_fecha, domi_pago_uid, fotos_borradas)
-        VALUES (${v.map((_, i) => "$" + (i + 1)).join(",")})
-        ON CONFLICT (guia) DO UPDATE SET n = EXCLUDED.n, estado = EXCLUDED.estado, creado = EXCLUDED.creado, creado_por = EXCLUDED.creado_por,
-          mensajero_id = EXCLUDED.mensajero_id, cliente_id = EXCLUDED.cliente_id, valor_servicio = EXCLUDED.valor_servicio,
-          a_cobrar = EXCLUDED.a_cobrar, entregado = EXCLUDED.entregado, destinatario = EXCLUDED.destinatario,
-          valor_cobrado = EXCLUDED.valor_cobrado, metodo = EXCLUDED.metodo, cuenta_js = EXCLUDED.cuenta_js,
-          dif_cobro = EXCLUDED.dif_cobro, dif_revisada = EXCLUDED.dif_revisada, entrego_uid = EXCLUDED.entrego_uid,
-          motivo_dev = EXCLUDED.motivo_dev, nota_dev = EXCLUDED.nota_dev, cobrar_dev = EXCLUDED.cobrar_dev, cambio = EXCLUDED.cambio,
-          cambio_recibido = EXCLUDED.cambio_recibido, cambio_confirmo = EXCLUDED.cambio_confirmo, gasto = EXCLUDED.gasto,
-          gasto_nota = EXCLUDED.gasto_nota, domi_pagado = EXCLUDED.domi_pagado, domi_pago_medio = EXCLUDED.domi_pago_medio,
-          domi_pago_valor = EXCLUDED.domi_pago_valor, domi_pago_fecha = EXCLUDED.domi_pago_fecha, domi_pago_uid = EXCLUDED.domi_pago_uid,
-          fotos_borradas = EXCLUDED.fotos_borradas, actualizado = now()`, v);
+      ]);
       guias.push(id);
-      // Los intentos se reemplazan completos: en Firestore eran un arreglo dentro del pedido.
-      await q(`DELETE FROM pedido_intentos WHERE guia = $1`, [id]);
       for (const it of Array.isArray(d.intentos) ? d.intentos : []) {
         const motivo = uno(it?.motivo, MOTIVOS);
         if (!motivo) { inf.avisar("pedidos", "intento con motivo desconocido (omitido)", id); continue; }
-        await q(`INSERT INTO pedido_intentos (guia, fecha, motivo, nota) VALUES ($1, COALESCE($2, now()), $3, $4)`,
-          [id, fecha(it.fecha), motivo, texto(it.nota)]);
+        filasI.push([id, fecha(it.fecha) ?? new Date(), motivo, texto(it.nota)]);
       }
       inf.ok("pedidos");
     }
+    await upsert(q, "pedidos", ["guia", "n", "estado", "creado", "creado_por", "mensajero_id", "cliente_id", "valor_servicio", "a_cobrar",
+      "entregado", "destinatario", "valor_cobrado", "metodo", "cuenta_js", "dif_cobro", "dif_revisada", "entrego_uid", "motivo_dev", "nota_dev",
+      "cobrar_dev", "cambio", "cambio_recibido", "cambio_confirmo", "gasto", "gasto_nota", "domi_pagado", "domi_pago_medio", "domi_pago_valor",
+      "domi_pago_fecha", "domi_pago_uid", "fotos_borradas"], filasP, { clave: "guia", extra: ["actualizado = now()"] });
+    // Los intentos se reemplazan completos: en Firestore eran un arreglo dentro del pedido.
+    await q(`DELETE FROM pedido_intentos WHERE guia = ANY($1)`, [guias]);
+    await insertar(q, "pedido_intentos", ["guia", "fecha", "motivo", "nota"], filasI);
     // El consecutivo nunca baja: las guías nuevas siguen después de la última que exista.
     const ultima = Math.max(pesos(meta.get("contador")?.n), ...L.pedidos.map(p => pesos(p.datos.n)), 0);
     await q(`UPDATE contadores SET n = GREATEST(n, $1, (SELECT COALESCE(max(n), 0) FROM pedidos)) WHERE nombre = 'guia'`, [ultima]);
+    listo("pedidos", filasP.length);
 
-    // Movimientos de clientes (en dos pasos: el reverso apunta a otro movimiento)
-    const reversos = [];
+    // Movimientos de clientes (el reverso apunta a otro movimiento: se enlaza al final)
+    const filasMv = [], reversos = [];
     for (const { id, datos: d } of L.movimientos) {
       if (!clientes.has(d.clienteId)) { inf.omitir("movimientos", "cliente que no existe", id); continue; }
       const tipo = uno(d.tipo, TIPOS_MOV);
       if (!tipo) { inf.omitir("movimientos", "tipo desconocido", id); continue; }
       if (pesos(d.valor) <= 0) { inf.omitir("movimientos", "valor en cero o negativo", id); continue; }
-      await q(`INSERT INTO movimientos (id, cliente_id, tipo, valor, medio, nota, fecha, por_uid, por_nombre, medio_antes, medio_cambio)
-        VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7, now()),$8,$9,$10,$11)
-        ON CONFLICT (id) DO UPDATE SET cliente_id = EXCLUDED.cliente_id, tipo = EXCLUDED.tipo, valor = EXCLUDED.valor,
-          medio = EXCLUDED.medio, nota = EXCLUDED.nota, fecha = EXCLUDED.fecha, por_uid = EXCLUDED.por_uid,
-          por_nombre = EXCLUDED.por_nombre, medio_antes = EXCLUDED.medio_antes, medio_cambio = EXCLUDED.medio_cambio`,
-      [id, d.clienteId, tipo, pesos(d.valor), uno(d.medio, MEDIOS), texto(d.nota), fecha(d.fecha), uidO(d.porUid), texto(d.porNombre),
-        uno(d.medioAntes, MEDIOS), fecha(d.medioCambio)]);
-      if (d.reversoDe) reversos.push([id, d.reversoDe]);
+      filasMv.push([id, d.clienteId, tipo, pesos(d.valor), uno(d.medio, MEDIOS), texto(d.nota), fecha(d.fecha) ?? new Date(), uidO(d.porUid),
+        texto(d.porNombre), uno(d.medioAntes, MEDIOS), fecha(d.medioCambio)]);
+      if (d.reversoDe) reversos.push([id, String(d.reversoDe)]);
       inf.ok("movimientos");
     }
-    for (const [id, de] of reversos)
-      await q(`UPDATE movimientos SET reverso_de = (SELECT id FROM movimientos WHERE id = $2) WHERE id = $1`, [id, de]);
+    await upsert(q, "movimientos", ["id", "cliente_id", "tipo", "valor", "medio", "nota", "fecha", "por_uid", "por_nombre", "medio_antes", "medio_cambio"], filasMv);
+    if (reversos.length) {
+      await q(`UPDATE movimientos m SET reverso_de = r.de FROM unnest($1::text[], $2::text[]) AS r(id, de)
+        WHERE m.id = r.id AND EXISTS (SELECT 1 FROM movimientos x WHERE x.id = r.de)`, [reversos.map(r => r[0]), reversos.map(r => r[1])]);
+    }
+    listo("movimientos", filasMv.length);
 
     // Dinero que entregan los mensajeros
+    const filasR = [];
     for (const { id, datos: d } of L.recaudos) {
       if (!mensajeros.has(d.mensajeroId)) { inf.omitir("recaudos", "mensajero que no existe", id); continue; }
       if (pesos(d.valor) <= 0) { inf.omitir("recaudos", "valor en cero o negativo", id); continue; }
       const medio = uno(d.medio, MEDIOS, "efectivo");
       if (medio !== d.medio) inf.avisar("recaudos", "sin medio de pago: quedó como efectivo", id);
-      await q(`INSERT INTO recaudos (id, mensajero_id, valor, medio, nota, fecha, por_uid, por_nombre, medio_antes, medio_cambio)
-        VALUES ($1,$2,$3,$4,$5,COALESCE($6, now()),$7,$8,$9,$10)
-        ON CONFLICT (id) DO UPDATE SET mensajero_id = EXCLUDED.mensajero_id, valor = EXCLUDED.valor, medio = EXCLUDED.medio,
-          nota = EXCLUDED.nota, fecha = EXCLUDED.fecha, por_uid = EXCLUDED.por_uid, por_nombre = EXCLUDED.por_nombre,
-          medio_antes = EXCLUDED.medio_antes, medio_cambio = EXCLUDED.medio_cambio`,
-      [id, d.mensajeroId, pesos(d.valor), medio, texto(d.nota), fecha(d.fecha), uidO(d.porUid), texto(d.porNombre),
+      filasR.push([id, d.mensajeroId, pesos(d.valor), medio, texto(d.nota), fecha(d.fecha) ?? new Date(), uidO(d.porUid), texto(d.porNombre),
         uno(d.medioAntes, MEDIOS), fecha(d.medioCambio)]);
       inf.ok("recaudos");
     }
+    await upsert(q, "recaudos", ["id", "mensajero_id", "valor", "medio", "nota", "fecha", "por_uid", "por_nombre", "medio_antes", "medio_cambio"], filasR);
+    listo("recaudos", filasR.length);
 
     // Liquidaciones
+    const filasL = [];
     for (const { id, datos: d } of L.liquidaciones) {
       if (!mensajeros.has(d.mensajeroId)) { inf.omitir("liquidaciones", "mensajero que no existe", id); continue; }
       const f = fecha(d.fecha);
       if (!f) { inf.omitir("liquidaciones", "sin fecha", id); continue; }
       const dia = /^\d{4}-\d{2}-\d{2}$/.test(d.dia) ? d.dia : diaColombia(f);
       const n = k => pesos(d[k]);
-      await q(`INSERT INTO liquidaciones (id, mensajero_id, desde, fecha, dia, entregas, guias, efectivo, base, gastos, anterior,
-          recibido_antes, entrega_final, recibido, debe, adelanto, transf_js, transf_cli, sueldo, en_ruta, ajuste, por_uid)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
-        ON CONFLICT (id) DO UPDATE SET mensajero_id = EXCLUDED.mensajero_id, desde = EXCLUDED.desde, fecha = EXCLUDED.fecha,
-          dia = EXCLUDED.dia, entregas = EXCLUDED.entregas, guias = EXCLUDED.guias, efectivo = EXCLUDED.efectivo, base = EXCLUDED.base,
-          gastos = EXCLUDED.gastos, anterior = EXCLUDED.anterior, recibido_antes = EXCLUDED.recibido_antes,
-          entrega_final = EXCLUDED.entrega_final, recibido = EXCLUDED.recibido, debe = EXCLUDED.debe, adelanto = EXCLUDED.adelanto,
-          transf_js = EXCLUDED.transf_js, transf_cli = EXCLUDED.transf_cli, sueldo = EXCLUDED.sueldo, en_ruta = EXCLUDED.en_ruta,
-          ajuste = EXCLUDED.ajuste, por_uid = EXCLUDED.por_uid`,
-      [id, d.mensajeroId, fecha(d.desde), f, dia, n("entregas"), (Array.isArray(d.guias) ? d.guias : []).map(String), n("efectivo"),
+      filasL.push([id, d.mensajeroId, fecha(d.desde), f, dia, n("entregas"), (Array.isArray(d.guias) ? d.guias : []).map(String), n("efectivo"),
         n("base"), n("gastos"), n("anterior"), n("recibidoAntes"), n("entregaFinal"), n("recibido"), n("debe"), n("adelanto"),
         n("transfJs"), n("transfCli"), n("sueldo"), n("enRuta"), n("ajuste"), uidO(d.porUid)]);
       inf.ok("liquidaciones");
     }
+    await upsert(q, "liquidaciones", ["id", "mensajero_id", "desde", "fecha", "dia", "entregas", "guias", "efectivo", "base", "gastos", "anterior",
+      "recibido_antes", "entrega_final", "recibido", "debe", "adelanto", "transf_js", "transf_cli", "sueldo", "en_ruta", "ajuste", "por_uid"], filasL);
+    listo("liquidaciones", filasL.length);
 
     // Caja. Lo que no tiene columna propia va en `extra` para no perder nada.
     const CONOCIDOS = new Set(["id", "tipo", "cat", "valor", "medio", "concepto", "fecha", "personaId", "personaUid", "cuentaId", "semana",
       "adelantoId", "devuelto", "deLiquidacion", "inicial", "nivel", "arqueoId", "porUid", "porNombre", "medioAntes", "medioCambio"]);
-    const adelantos = [];
+    const filasCj = [], adelantos = [];
     for (const { id, datos: d } of L.cajamovs) {
       const cat = uno(d.cat, CATS);
       if (!cat) { inf.omitir("cajamovs", `categoría desconocida (${d.cat})`, id); continue; }
@@ -282,63 +297,66 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
       if (d.cuentaId && !cuentas.has(d.cuentaId)) inf.avisar("cajamovs", "cuenta interna que no existe: queda sin cuenta", id);
       const extra = Object.fromEntries(Object.entries(d).filter(([k]) => !CONOCIDOS.has(k)));
       if (typeof d.deLiquidacion === "string" && d.deLiquidacion) extra.liquidacionId = d.deLiquidacion; // en la app es el ID, no un sí/no
-      await q(`INSERT INTO cajamovs (id, tipo, cat, valor, medio, concepto, fecha, persona_id, persona_uid, cuenta_id, semana, devuelto,
-          de_liquidacion, inicial, nivel, arqueo_id, extra, por_uid, por_nombre, medio_antes, medio_cambio)
-        VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7, now()),$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
-        ON CONFLICT (id) DO UPDATE SET tipo = EXCLUDED.tipo, cat = EXCLUDED.cat, valor = EXCLUDED.valor, medio = EXCLUDED.medio,
-          concepto = EXCLUDED.concepto, fecha = EXCLUDED.fecha, persona_id = EXCLUDED.persona_id, persona_uid = EXCLUDED.persona_uid,
-          cuenta_id = EXCLUDED.cuenta_id, semana = EXCLUDED.semana, devuelto = EXCLUDED.devuelto, de_liquidacion = EXCLUDED.de_liquidacion,
-          inicial = EXCLUDED.inicial, nivel = EXCLUDED.nivel, arqueo_id = EXCLUDED.arqueo_id, extra = EXCLUDED.extra,
-          por_uid = EXCLUDED.por_uid, por_nombre = EXCLUDED.por_nombre, medio_antes = EXCLUDED.medio_antes, medio_cambio = EXCLUDED.medio_cambio`,
-      [id, texto(d.tipo) || "entra", cat, Math.abs(pesos(d.valor)), uno(d.medio, MEDIOS), texto(d.concepto), fecha(d.fecha),
+      filasCj.push([id, texto(d.tipo) || "entra", cat, Math.abs(pesos(d.valor)), uno(d.medio, MEDIOS), texto(d.concepto), fecha(d.fecha) ?? new Date(),
         mensajeros.has(d.personaId) ? d.personaId : null, uidO(d.personaUid), cuentas.has(d.cuentaId) ? d.cuentaId : null,
         texto(d.semana) || null, Math.max(0, pesos(d.devuelto)), !!d.deLiquidacion, !!d.inicial, !!d.nivel, texto(d.arqueoId) || null,
-        extra, uidO(d.porUid), texto(d.porNombre), uno(d.medioAntes, MEDIOS), fecha(d.medioCambio)]);
-      if (d.adelantoId) adelantos.push([id, d.adelantoId]);
+        JSON.stringify(extra), uidO(d.porUid), texto(d.porNombre), uno(d.medioAntes, MEDIOS), fecha(d.medioCambio)]);
+      if (d.adelantoId) adelantos.push([id, String(d.adelantoId)]);
       inf.ok("cajamovs");
     }
-    for (const [id, de] of adelantos)
-      await q(`UPDATE cajamovs SET adelanto_id = (SELECT id FROM cajamovs WHERE id = $2) WHERE id = $1`, [id, de]);
+    await upsert(q, "cajamovs", ["id", "tipo", "cat", "valor", "medio", "concepto", "fecha", "persona_id", "persona_uid", "cuenta_id", "semana", "devuelto",
+      "de_liquidacion", "inicial", "nivel", "arqueo_id", "extra", "por_uid", "por_nombre", "medio_antes", "medio_cambio"], filasCj);
+    if (adelantos.length) {
+      await q(`UPDATE cajamovs c SET adelanto_id = r.de FROM unnest($1::text[], $2::text[]) AS r(id, de)
+        WHERE c.id = r.id AND EXISTS (SELECT 1 FROM cajamovs x WHERE x.id = r.de)`, [adelantos.map(r => r[0]), adelantos.map(r => r[1])]);
+    }
+    listo("cajamovs", filasCj.length);
 
     // Días de sueldo. Los "previo" (sueldo de antes del empalme) guardan la semana en `dia`.
+    const filasJ = [];
     for (const { id, datos: d } of L.jornadas) {
       if (!mensajeros.has(d.personaId)) { inf.omitir("jornadas", "persona que no existe", id); continue; }
       const previo = !!d.previo;
       const dia = !previo && /^\d{4}-\d{2}-\d{2}$/.test(d.dia) ? d.dia : null;
       if (!previo && !dia) { inf.omitir("jornadas", "día inválido", id); continue; }
-      await q(`INSERT INTO jornadas (id, persona_id, dia, semana, valor, previo) VALUES ($1,$2,$3,$4,$5,$6)
-        ON CONFLICT (id) DO UPDATE SET persona_id = EXCLUDED.persona_id, dia = EXCLUDED.dia, semana = EXCLUDED.semana,
-          valor = EXCLUDED.valor, previo = EXCLUDED.previo`,
-      [id, d.personaId, dia, previo ? texto(d.dia || d.semana) : null, Math.max(0, pesos(d.valor)), previo]);
+      filasJ.push([id, d.personaId, dia, previo ? texto(d.dia || d.semana) : null, Math.max(0, pesos(d.valor)), previo]);
       inf.ok("jornadas");
     }
+    await upsert(q, "jornadas", ["id", "persona_id", "dia", "semana", "valor", "previo"], filasJ);
+    listo("jornadas", filasJ.length);
 
     // Historial: en Firestore era un documento por día y persona con las entradas adentro. Se recarga completo.
     if (L.historial.length) {
-      await q(`DELETE FROM historial WHERE datos->>'origen' = 'firestore'`);
+      const filasH = [];
       for (const { id, datos: d } of L.historial) {
         for (const e of Array.isArray(d.e) ? d.e : []) {
           if (!texto(e?.a)) continue;
-          await q(`INSERT INTO historial (fecha, uid, accion, datos) VALUES (COALESCE($1, now()), $2, $3, $4)`,
-            [fecha(e.t), uidO(e.u || d.uid), texto(e.a), { origen: "firestore", doc: id, rol: e.r || null, mensajeroId: e.m || null }]);
+          filasH.push([fecha(e.t) ?? new Date(), uidO(e.u || d.uid), texto(e.a),
+            JSON.stringify({ origen: "firestore", doc: id, rol: e.r || null, mensajeroId: e.m || null })]);
         }
         inf.ok("historial");
       }
+      await q(`DELETE FROM historial WHERE datos->>'origen' = 'firestore'`);
+      await insertar(q, "historial", ["fecha", "uid", "accion", "datos"], filasH);
+      listo("historial", filasH.length);
     }
 
     // Papelera (copias de lo borrado). Se marca con grupo "firestore:…" para poder recargarla.
     if (L.papelera.length) {
-      await q(`DELETE FROM papelera WHERE grupo LIKE 'firestore:%'`);
+      const filasPa = [];
       for (const { id, datos: d } of L.papelera) {
         const tabla = TABLA_DE[d.col];
         if (!tabla || !d.data) { inf.omitir("papelera", "colección sin tabla en el sistema nuevo", id); continue; }
-        await q(`INSERT INTO papelera (tabla, registro, datos, grupo, fecha, uid) VALUES ($1,$2,$3,$4,COALESCE($5, now()),$6)`,
-          [tabla, texto(d.docId), d.data, `firestore:${d.grupo || id}`, fecha(d.fecha), uidO(d.uid)]);
+        filasPa.push([tabla, texto(d.docId), JSON.stringify(d.data), `firestore:${d.grupo || id}`, fecha(d.fecha) ?? new Date(), uidO(d.uid)]);
         inf.ok("papelera");
       }
+      await q(`DELETE FROM papelera WHERE grupo LIKE 'firestore:%'`);
+      await insertar(q, "papelera", ["tabla", "registro", "datos", "grupo", "fecha", "uid"], filasPa);
+      listo("papelera", filasPa.length);
     }
 
     await q(simular ? "ROLLBACK" : "COMMIT");
+    log(simular ? `Simulación terminada en ${seg()} (no se guardó nada).` : `Datos guardados en ${seg()}.`);
     if (!simular && conFotos) await importarFotos({ carpeta, guias: new Set(guias), inf, log });
     else if (conFotos) log("Simulación: las fotos no se suben.");
   } catch (e) {

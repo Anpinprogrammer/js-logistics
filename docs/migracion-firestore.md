@@ -58,6 +58,11 @@ npm run db:importar -- --carpeta ../exportacion-2026-11-08-1030
 1. `--simular` hace todo dentro de una transacción y al final la deshace. Así ves cuántos registros entrarían y cuáles se omitirían, sin guardar nada ni subir fotos.
 2. Sin `--simular` se guarda y se suben las fotos. Al final deja `informe-importacion.json` dentro de la carpeta, con cada registro que se omitió y el motivo.
 
+Mientras corre, muestra cada paso ("Leyendo los archivos…", "Conectando con la base de datos…") y cuántos registros guardó de cada colección, con los segundos que lleva. Los datos se escriben por lotes: unos miles de guías tardan pocos segundos. Las fotos son lo más lento, y muestra el avance cada 200 guías.
+
+- Si se queda en **"Conectando con la base de datos…"**, revisa `DATABASE_URL`. En Supabase usa la cadena del **Session pooler** (Project Settings → Database → Connection string).
+- La importación quita el límite de tiempo por consulta (`statement_timeout`) solo dentro de su propia transacción, así que el error "canceling statement due to statement timeout" ya no la corta.
+
 ### Qué hace con cada cosa
 
 | Firestore | Postgres | Notas |
