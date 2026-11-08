@@ -46,6 +46,14 @@ npm run dev                              # http://localhost:5173 (el proxy manda
 
 Para tener datos de prueba inventados, carga el demo en una base **vacía** de pruebas: `cd ../backend && npm run db:demo -- --si`. Las cuentas son `admin@demo.co`, `oficina@demo.co`, `carlos@demo.co` y `diana@demo.co`, todas con la contraseña `demo-js-2026`.
 
+## Publicar (Vercel)
+
+- **Root Directory:** `frontend`. Vercel detecta Vite: build `npm run build`, carpeta `dist`.
+- **No pongas `VITE_API_URL`.** La app llama a `/api` en su propio dominio y `vercel.json` lo reenvía al backend de Render (`https://js-logistics.onrender.com`). Así la cookie de sesión es del mismo sitio y funciona con `SameSite=Lax`, también en Safari de iPhone. Si llamaras directo a `onrender.com`, el navegador no mandaría la cookie y todo daría 401.
+- `vercel.json` también manda las rutas de React a `index.html`, para que no den 404 al recargar.
+- En el backend (Render): `CORS_ORIGENES=https://TU-APP.vercel.app` (más tu dominio propio, separados por coma), `COOKIE_SAMESITE=lax` y `TRUST_PROXY=2` (Vercel y Render van delante).
+- Si cambias la URL del backend, cámbiala en `vercel.json`.
+
 ## Publicar (Render)
 
 - **Static Site**: raíz `frontend`, build `npm ci && npm run build`, carpeta `dist`.
