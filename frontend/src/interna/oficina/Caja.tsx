@@ -8,7 +8,7 @@ import {
 } from "../motor";
 import { Cab, TablaEntregas, pl, useVentana } from "../ui";
 import { E } from "../estado";
-import { borrarDe, cambiarMedio, deshacerArqueo, editarCajaMov, liquidar, movCaja, reabrirLiquidacion, recibirDinero, arqueo } from "../acciones";
+import { borrarDe, cambiarMedio, cierreOficina, deshacerArqueo, quitarDevolucion, liquidar, movCaja, reabrirLiquidacion, recibirDinero, arqueo } from "../acciones";
 import { motivoError, useDatos } from "../datos";
 import { avisoContado, EnBloque } from "./Pedidos";
 import { diaAntesDelArqueo } from "./Clientes";
@@ -122,9 +122,8 @@ function CajaGeneral({ pintar }: { pintar: () => void }) {
     if (yaContado(x.fecha)) return avisoContado(v);
     if (!await v.confirmar("Quitar movimiento de caja", `${hora(x.fecha)} · ${pesos(x.valor)}. Se quita de la caja.`, "Quitar")) return;
     try {
-      const ad = col === "cajamovs" && (x as CajaMov).cat === "devolucion" ? S.cajamovs[(x as CajaMov).adelantoId || ""] : undefined;
-      if (ad) await editarCajaMov(ad.id, { devuelto: Math.max(0, (Number(ad.devuelto) || 0) - (Number(x.valor) || 0)) });
-      await borrarDe(col, id); v.avisar("Movimiento quitado");
+      if (col === "cajamovs" && (x as CajaMov).cat === "devolucion") await quitarDevolucion(id); else await borrarDe(col, id);
+      v.avisar("Movimiento quitado");
     } catch (e) { noSePudo(v, "No se pudo quitar")(e); }
   };
   const deshacer = async (id: string) => {
@@ -395,9 +394,12 @@ function MovOficina({ auid, tipo }: { auid: string; tipo: "base" | "entrega" }) 
     if (!pos.length && !sobs.length && !nivs.length) return v.avisar("Escribe un valor mayor a cero");
     setGuardando(true); const t = Date.now(), quien = u?.nombre || u?.email || "", n = nota.trim();
     try {
-      for (const [medio, valor] of sobs) await movCaja({ tipo: "entra", cat: "sobrante", personaUid: auid, personaId: "", valor, medio, concepto: quien + (n ? " · " + n : ""), fecha: t });
-      for (const [medio, valor] of nivs) await movCaja({ tipo: "base", cat: "oficina", nivel: true, personaUid: auid, personaId: "", valor, medio, concepto: "Pagó desde la cuenta de la empresa más de lo que registró que entró", fecha: t });
-      for (const [medio, valor] of pos) await movCaja({ tipo: base ? "base" : "sale", cat: "oficina", personaUid: auid, personaId: "", valor, medio, concepto: n, fecha: t + 1 });
+      if (base) for (const [medio, valor] of pos) await movCaja({ tipo: "base", cat: "oficina", personaUid: auid, personaId: "", valor, medio, concepto: n, fecha: t + 1 });
+      else await cierreOficina(auid, { efectivo: Number(vals.efectivo) || 0, nequi: Number(vals.nequi) || 0, bancolombia: Number(vals.bancolombia) || 0 }, n, [
+        ...sobs.map(([medio, valor]) => ({ tipo: "entra" as const, cat: "sobrante", personaUid: auid, personaId: "", valor, medio, concepto: quien + (n ? " · " + n : ""), fecha: t })),
+        ...nivs.map(([medio, valor]) => ({ tipo: "base" as const, cat: "oficina", nivel: true, personaUid: auid, personaId: "", valor, medio, concepto: "Pagó desde la cuenta de la empresa más de lo que registró que entró", fecha: t })),
+        ...pos.map(([medio, valor]) => ({ tipo: "sale" as const, cat: "oficina", personaUid: auid, personaId: "", valor, medio, concepto: n, fecha: t + 1 })),
+      ]);
       v.cerrar(); v.avisar((base ? "Base entregada: " : "Cierre recibido: ") + (pos.map(([m, x]) => MEDIOS[m] + " " + pesos(x)).join(" · ") || "sin entrega") + (sobs.length ? " · Sobrante: " + sobs.map(([m, x]) => MEDIOS[m] + " " + pesos(x)).join(" · ") : ""));
     } catch (e) { setGuardando(false); noSePudo(v, "No se pudo guardar")(e); }
   };

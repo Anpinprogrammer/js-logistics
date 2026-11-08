@@ -20,7 +20,8 @@ Si un endpoint todavía no existe (404 `RUTA_NO_ENCONTRADA`), la lectura se trat
 
 - `GET/POST/PATCH/DELETE /movimientos`, `/recaudos`, `/liquidaciones`, `/caja/movimientos`, `/cuentas`
 - `PUT/DELETE /jornadas/:id` (pago por día y sueldo anterior, id `persona_dia` o `persona_previo_semana`)
-- `POST /caja/arqueos`, `DELETE /caja/arqueos/:id`, `GET /caja/corte` (fecha del último arqueo, para el asistente)
+- `POST /caja/arqueos` `{ contado, nota }` (lo esperado lo calcula el servidor), `DELETE /caja/arqueos/:id`, `GET /caja/corte` (fecha del último arqueo, para el asistente)
+- `POST /caja/oficinas/:uid/cierre` `{ efectivo, nequi, bancolombia, nota }`, `POST /caja/adelantos/:id/devolucion` `{ valor, medio }`; `DELETE /caja/movimientos/:id` ya resta lo devuelto y devuelve la deuda a la liquidación
 - `POST /liquidaciones` con `entregaFinal`, `medio`, `adelanto` y `semanaAdelanto`: registra también el dinero recibido y el adelanto de sueldo
 - `POST /clientes/:id/unir` `{ otros }`, `POST /pedidos/:guia/reabrir`
 - `GET /historial?desde=`, `GET /papelera`, `POST /papelera/:id/restaurar`, `DELETE /papelera/:id`
