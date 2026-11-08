@@ -1,0 +1,4 @@
+/* Ajustes propios de la app en React sobre los estilos del prototipo (estilos.css). Todo va dentro de .jsl. */
+.jsl{min-height:100dvh}
+.jsl .oculto{display:none !important}
+.jsl a.enlace{cursor:pointer}

@@ -4,7 +4,6 @@ import { BrowserRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FalloApi } from "./api/cliente";
 import { ProveedorSesion } from "./auth/Sesion";
-import { ProveedorAvisos } from "./components/Avisos";
 import App from "./App";
 import "./index.css";
 
@@ -23,11 +22,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={qc}>
       <BrowserRouter>
-        <ProveedorAvisos>
-          <ProveedorSesion>
-            <App />
-          </ProveedorSesion>
-        </ProveedorAvisos>
+        <ProveedorSesion>
+          <App />
+        </ProveedorSesion>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>

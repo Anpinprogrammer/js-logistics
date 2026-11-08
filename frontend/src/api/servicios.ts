@@ -1,6 +1,8 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
-import type { Archivo, TipoArchivo, Cliente, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido } from "./tipos";
+import type { Archivo, TipoArchivo, Cliente, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
+  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera } from "./tipos";
+import { FalloApi } from "./cliente";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
 
@@ -59,6 +61,9 @@ export const pedidos = {
   corregir: (guia: string, d: Partial<DatosEntrega> & { motivoDev?: Motivo; notaDev?: string }) =>
     datos<{ pedido: Pedido }>(api.patch(`/pedidos/${guia}/correccion`, d)).then(r => r.pedido),
   eliminar: (guia: string) => api.delete(`/pedidos/${guia}`),
+  cambioRecibido: (guia: string) => datos<{ pedido: Pedido }>(api.post(`/pedidos/${guia}/cambio-recibido`)).then(r => r.pedido),
+  /** Devuelve una guía entregada o devuelta a "por entregar" (solo administración). Las pruebas quedan como "previas". */
+  reabrir: (guia: string) => datos<{ pedido: Pedido }>(api.post(`/pedidos/${guia}/reabrir`)).then(r => r.pedido),
   archivos: (guia: string) => datos<{ archivos: Archivo[] }>(api.get(`/pedidos/${guia}/archivos`)).then(d => d.archivos),
   /** La imagen va como cuerpo binario (ya comprimida en el celular), una por petición. */
   subirArchivo: (guia: string, tipo: Exclude<TipoArchivo, "previa">, imagen: Blob) =>
@@ -75,11 +80,14 @@ export const clientes = {
     datos<{ cliente: Cliente }>(api.post("/clientes", d)).then(r => r.cliente),
   actualizar: (id: string, d: Partial<Pick<Cliente, "nombre" | "telefono" | "tarifa">>) =>
     datos<{ cliente: Cliente }>(api.patch(`/clientes/${id}`, d)).then(r => r.cliente),
-  eliminar: (id: string) => api.delete(`/clientes/${id}`)
+  eliminar: (id: string) => api.delete(`/clientes/${id}`),
+  /** Une clientes repetidos en `id`: le pasa pedidos, movimientos y cuentas de acceso de `otros`, y los borra. */
+  unir: (id: string, otros: string[]) => datos<{ cliente: Cliente }>(api.post(`/clientes/${id}/unir`, { otros })).then(r => r.cliente)
 };
 
 export const mensajeros = {
   listar: (inactivos = false) => datos<{ mensajeros: Mensajero[] }>(api.get("/mensajeros", { params: inactivos ? { inactivos: "true" } : {} })).then(d => d.mensajeros),
+  obtener: (id: string) => datos<{ mensajero: Mensajero }>(api.get(`/mensajeros/${id}`)).then(d => d.mensajero),
   crear: (d: { nombre: string; telefono: string; tipo: TipoPersonal; tarifa: number }) =>
     datos<{ mensajero: Mensajero }>(api.post("/mensajeros", d)).then(r => r.mensajero),
   actualizar: (id: string, d: Partial<Omit<Mensajero, "id">>) => datos<{ mensajero: Mensajero }>(api.patch(`/mensajeros/${id}`, d)).then(r => r.mensajero),
@@ -94,4 +102,45 @@ export const usuarios = {
     datos<{ usuario: Usuario }>(api.patch(`/usuarios/${id}`, d)).then(r => r.usuario),
   cambiarClave: (id: string, clave: string) => api.put(`/usuarios/${id}/clave`, { clave }),
   eliminar: (id: string) => api.delete(`/usuarios/${id}`)
+};
+
+/** Ruta que el servidor todavía no tiene (el módulo no se ha desplegado). */
+export const faltaEnServidor = (e: unknown) => e instanceof FalloApi && e.code === "RUTA_NO_ENCONTRADA";
+/** Si el módulo todavía no está en el servidor, o este rol no lo puede ver, se muestra como "sin datos". */
+export const opcional = <T>(p: Promise<T>, vacio: T): Promise<T> =>
+  p.catch(e => { if (faltaEnServidor(e) || (e instanceof FalloApi && e.status === 403)) return vacio; throw e; });
+
+/** Colección sencilla del backend: GET lista, POST crea, PATCH edita, DELETE borra. */
+function coleccion<T, C = Partial<T>>(ruta: string, clave: string, unidad: string) {
+  return {
+    listar: () => opcional(datos<Record<string, T[]>>(api.get(ruta)).then(d => d[clave] ?? []), [] as T[]),
+    crear: (d: C) => datos<Record<string, T>>(api.post(ruta, d)).then(r => r[unidad]),
+    actualizar: (id: string, d: Partial<C>) => datos<Record<string, T>>(api.patch(`${ruta}/${id}`, d)).then(r => r[unidad]),
+    eliminar: (id: string) => api.delete(`${ruta}/${id}`)
+  };
+}
+
+type Sin<T> = Omit<T, "id" | "fecha" | "porNombre" | "porUid"> & { fecha?: string };
+export const movimientos = coleccion<Movimiento, Sin<Movimiento>>("/movimientos", "movimientos", "movimiento");
+export const recaudos = coleccion<Recaudo, Sin<Recaudo>>("/recaudos", "recaudos", "recaudo");
+export const liquidaciones = coleccion<Liquidacion, Partial<Liquidacion>>("/liquidaciones", "liquidaciones", "liquidacion");
+export const cajaMovimientos = coleccion<CajaMovimiento, Partial<CajaMovimiento>>("/caja/movimientos", "movimientos", "movimiento");
+export const cuentasInternas = coleccion<CuentaInterna, Omit<CuentaInterna, "id">>("/cuentas", "cuentas", "cuenta");
+export const jornadas = {
+  ...coleccion<Jornada>("/jornadas", "jornadas", "jornada"),
+  /** Crea o cambia el pago de un día (o el sueldo previo de una semana). */
+  poner: (j: Jornada) => datos<{ jornada: Jornada }>(api.put(`/jornadas/${j.id}`, j)).then(r => r.jornada)
+};
+export const caja = {
+  /** Fecha del último arqueo (lo anterior ya está contado y no se cambia). */
+  corte: () => opcional(datos<{ corte: string | null }>(api.get("/caja/corte")).then(d => d.corte), null),
+  arqueo: (d: { esperado: Record<string, number>; contado: Record<string, number>; nota: string }) => api.post("/caja/arqueos", d),
+  deshacerArqueo: (id: string) => api.delete(`/caja/arqueos/${id}`)
+};
+export const historial = {
+  /** Cambios desde `desde` (día YYYY-MM-DD en Colombia), los más nuevos primero. */
+  listar: (desde: string) => opcional(datos<{ cambios: Cambio[] }>(api.get("/historial", { params: { desde, limite: 600 } })).then(d => d.cambios), [] as Cambio[]),
+  papelera: () => opcional(datos<{ papelera: EnPapelera[] }>(api.get("/papelera")).then(d => d.papelera), [] as EnPapelera[]),
+  restaurar: (id: string) => api.post(`/papelera/${id}/restaurar`),
+  eliminarDefinitivo: (id: string) => api.delete(`/papelera/${id}`)
 };

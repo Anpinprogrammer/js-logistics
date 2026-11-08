@@ -4,39 +4,24 @@ Primero lee el [`CLAUDE.md` de la raíz](../CLAUDE.md). Esta app es para **admin
 
 ## Stack
 
-React 19 · TypeScript (estricto) · Vite · Tailwind CSS 4 (tokens en `src/index.css`) · axios · TanStack Query 5 · React Router 7. No hay librería de componentes: se usan los de `src/components/ui.tsx`.
+React 19 · TypeScript (estricto) · Vite · Tailwind CSS 4 (tokens en `src/index.css`) · axios · TanStack Query 5 · React Router 7. No hay librería de componentes: la app interna usa las piezas de `src/interna/ui.tsx` y las clases del prototipo.
 
 No agregues dependencias (formularios, estado global, íconos, componentes) sin una razón clara en el PR. Lo que hay alcanza para casi todo.
 
 ## Estructura
 
-```
-src/
-├── main.tsx              QueryClient (sin reintentar los 4xx), Router, Avisos, Sesión
-├── App.tsx               Rutas por rol (<Solo roles={...}>)
-├── api/
-│   ├── cliente.ts        Instancia de axios (withCredentials, X-JSL) y FalloApi
-│   ├── servicios.ts      Una función por endpoint, agrupadas por recurso
-│   └── tipos.ts          Tipos de lo que devuelve la API (deben coincidir con backend/README.md)
-├── auth/Sesion.tsx       useSesion / useUsuario (sesión de /auth/yo)
-├── components/
-│   ├── ui.tsx            Boton, Campo, Selector, Casilla, Aviso, Dialogo, Titulo, Cargando, Vacio, Dato, EtiquetaEstado
-│   ├── Marco.tsx         Menú lateral (computador) y barra inferior (celular), por rol
-│   ├── Avisos.tsx        useAviso(): mensajes cortos tipo toast
-│   └── …                 Componentes de dominio (Entrega, Fotos, TarjetaPedido, BuscarCliente)
-├── lib/formato.ts        pesos(), fechas en hora de Colombia, etiquetas del negocio (MOTIVOS, METODOS, ROLES…)
-├── lib/imagen.ts         comprimir() fotos (800 px) y firmaABlob() antes de subirlas
-└── pages/
-    ├── mensajero/        Ruta, Entregados
-    ├── oficina/          Inicio, Pedidos, PedidoDetalle, Clientes, ClienteDetalle
-    └── admin/            Personal, Accesos
-```
+Con sesión, la app es **igual al prototipo** (`app/` del sistema viejo): mismo HTML, mismas clases y mismos KPIs, escrito en React. La estructura de carpetas está en [`README.md`](README.md#estructura). Lo importante:
+
+- `src/interna/estilos.css` es la copia generada de `app/css/estilos.css`, con todas sus reglas dentro de `.jsl`. **No lo edites a mano**; los ajustes van en `ajustes.css`. Dentro de `src/interna/` se usan las clases del prototipo, no Tailwind. Tailwind queda solo para `pages/Ingreso.tsx`.
+- `src/interna/motor.ts` tiene los datos en memoria (`S`) y las reglas de negocio copiadas de `app/js/app.js`, con el mismo comportamiento. Cuando el backend calcule un valor (saldos, caja, sueldos), se usa el suyo y se borra el cálculo de aquí.
+- `src/interna/acciones.ts` hace todas las escrituras. Cada una tiene su rama `if (DEMO)` que cambia los datos en memoria.
+- El estado de la interfaz (pestaña, filtros, día elegido) vive en `E` (`estado.ts`), como las variables del prototipo. `tocar()` vuelve a pintar.
 
 ## Reglas
 
 **Datos y API**
 - **Todo pasa por `src/api/servicios.ts`.** Los componentes no importan axios ni escriben URL.
-- Lecturas con `useQuery` y escrituras con `useMutation`. Después de escribir, invalida la clave del recurso (`qc.invalidateQueries({ queryKey: ["pedidos"] })`).
+- La app interna carga todo con `cargarTodo()` (`interna/datos.tsx`) y escribe con `interna/acciones.ts`, que recarga después de cada escritura. Lo que no entra en esa carga (historial, papelera, fotos) va con `useQuery`.
 - **Claves de query:** empiezan por el recurso. Por ejemplo `["pedidos", "lista", filtros]`, `["pedidos", "detalle", guia]`, `["clientes", id, "movimientos"]`. Así una invalidación por recurso refresca todo lo relacionado.
 - Los errores se muestran con `mensajeDe(error)` dentro de un `<Aviso tipo="error">`. El mensaje ya viene en español del backend. Para decidir algo según el error, usa `error instanceof FalloApi && error.code === "…"`, nunca el texto.
 - **No calcules en el navegador lo que decide el servidor** (diferencias, saldos, permisos). Mostrar un aviso previo está bien (como la diferencia de cobro antes de guardar), pero el valor que se guarda lo calcula el backend.
@@ -44,7 +29,7 @@ src/
 - Si falta un endpoint, no lo simules en el frontend: se agrega primero en el backend (ver `backend/CLAUDE.md`).
 
 **Roles y rutas**
-- Cada ruta nueva va en `App.tsx` dentro de `<Solo roles={[...]}>`, y en el menú de `Marco.tsx` si corresponde. Ocultar un botón es solo comodidad: **el permiso real lo impone el backend**.
+- Las pestañas por rol están en `interna/Marco.tsx`, como en el prototipo. Ocultar un botón es solo comodidad: **el permiso real lo impone el backend**.
 - El mensajero usa la app en el celular, en la calle: botones grandes (mínimo 44 px de alto), lo principal arriba, pocos pasos y textos cortos.
 
 **Interfaz y estilos**
@@ -60,11 +45,10 @@ src/
 
 ## Cómo agregar una pantalla (receta)
 
-1. Si el endpoint no existe, agrégalo primero en el backend, con su prueba.
-2. Agrega el tipo en `api/tipos.ts` y la función en `api/servicios.ts`.
-3. Crea la página en `pages/<rol>/<Nombre>.tsx` con `useQuery` / `useMutation`, y los estados de cargando (`<Cargando />`), error (`<Aviso tipo="error">`) y vacío (`<Vacio>`).
-4. Regístrala en `App.tsx` con `<Solo roles>` y, si va en el menú, en `Marco.tsx`.
-5. Revisa que se vea bien a 390 px de ancho y en modo oscuro.
+1. Si el endpoint no existe, agrégalo primero en el backend, con su prueba, y su función en `api/servicios.ts` y su tipo en `api/tipos.ts`.
+2. Si la pantalla existe en el prototipo, cópiala de `app/js/app.js` con el mismo HTML y las mismas clases.
+3. Escribe la acción en `interna/acciones.ts`, con su rama de modo demo.
+4. Revisa que se vea bien a 390 px de ancho y en computador, con `VITE_DEMO=true npm run dev`.
 
 ## Revisar antes del PR
 

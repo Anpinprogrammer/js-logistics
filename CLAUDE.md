@@ -85,4 +85,4 @@ Nunca apuntes `TEST_DATABASE_URL` ni `db:demo` a la base de producción.
 ## Qué falta (para no duplicar trabajo)
 
 - Backend: movimientos de clientes (crear), recaudos, caja, arqueos, cajas de oficina, liquidaciones, sueldos y cuentas internas, con sus saldos calculados en el servidor; bloqueo de lo ya contado en un arqueo; `Idempotency-Key` para la cola sin señal; tiempo real con SSE.
-- Frontend: pantalla de Caja; funcionamiento sin señal para el mensajero (PWA y cola).
+- Frontend: los saldos, la caja y los sueldos se calculan en el navegador (`frontend/src/interna/motor.ts`) hasta que el backend los calcule; tiquetes, descargas de Excel y respaldo; funcionamiento sin señal para el mensajero (PWA y cola).
