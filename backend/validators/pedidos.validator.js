@@ -79,8 +79,15 @@ export const actualizar = z.object({
   valorCobrado: pesos.optional(),
   metodo: z.enum(METODOS_ENTREGA).optional(),
   cuentaJs: z.enum(["", ...CUENTAS_JS]).optional()
-}).refine(d => !d.domiPagado || (d.domiPagoMedio && d.domiPagoValor > 0), {
-  message: "Elige cómo pagó el domicilio y el valor", path: ["domiPagoMedio"]
+}); // si domiPagado viene sin medio o sin valor, el servidor usa los que ya tenía la guía (o responde qué falta)
+
+export const pagoDomicilio = z.object({ medio, valor: pesos.refine(v => v > 0, "Escribe el valor que pagó") });
+export const enBloque = z.object({
+  modo: z.enum(["sin", "serv"]),
+  guias: z.array(paramGuia.shape.guia).min(1).max(1000),
+  clienteId: id.optional(),
+  valorServicio: pesos.optional(),
+  usarTarifaCliente: z.boolean().default(true)
 });
 
 export const paramArchivo = paramGuia.extend({ tipo: z.enum(TIPOS_ARCHIVO, { error: "Tipo de archivo inválido" }) });
