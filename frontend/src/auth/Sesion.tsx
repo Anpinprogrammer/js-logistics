@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { auth } from "../api/servicios";
 import { cuandoSePierdaLaSesion } from "../api/cliente";
 import type { Rol, Usuario } from "../api/tipos";
-import { DEMO, USUARIOS_DEMO } from "../interna/demo";
+import { DEMO, USUARIOS_DEMO } from "../interna/cuentasDemo";
 
 /* Modo demo: sin backend. Solo se recuerda cuál cuenta de prueba se eligió (no hay token). */
 const CLAVE_DEMO = "jsl_demo_cuenta";

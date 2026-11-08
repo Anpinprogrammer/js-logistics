@@ -1,14 +1,19 @@
 /* Marco de la app interna, igual al prototipo: menú lateral en computador, barra arriba y pestañas abajo en el celular. */
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSesion, useUsuario } from "../auth/Sesion";
 import { ProveedorDatos, useDatos } from "./datos";
 import { ProveedorVentana, Icono, IconoSalir, useVentana } from "./ui";
 import { E, guardarLocal } from "./estado";
 import { S, fechaLarga, hoy, horaActual, type Pedido } from "./motor";
-import Oficina from "./oficina/Oficina";
-import Mensajero, { pendientesMios } from "./mensajero/Mensajero";
+import { pendientesMios } from "./mensajero/pendientes";
+import { perezoso } from "../lib/perezoso";
 import "./estilos.css";
 import "./ajustes.css";
+
+// Cada modo se descarga solo cuando se usa: el mensajero en el celular no baja las pantallas de la oficina, y al revés.
+const Oficina = perezoso(() => import("./oficina/Oficina"));
+const Mensajero = perezoso(() => import("./mensajero/Mensajero"));
+const cargando = <div className="vacio" role="status">Cargando…</div>;
 
 /** Grupos del menú lateral en computador (las mismas pestañas de siempre, agrupadas). */
 const SECCIONES: [string, string[]][] = [
@@ -69,6 +74,8 @@ function Marco() {
   const cambiarRol = (r: "mensajero" | "admin") => { E.rol = r; guardarLocal("js_rol", r); pintar(); scrollTo(0, 0); };
 
   useEffect(() => { document.title = "JS Logistics"; }, []);
+  // Mientras llegan los datos, se baja la pantalla del modo actual: así no se espera una cosa después de la otra.
+  useEffect(() => { (enMensajero ? Mensajero : Oficina).precargar().catch(() => { /* se reintenta al pintarla */ }); }, [enMensajero]);
   void version;
 
   return <>
@@ -92,7 +99,7 @@ function Marco() {
     </header>
     <main id="vista">
       {error && <div className="aviso alerta">No se pudieron traer los datos: {error} Se vuelve a intentar solo en unos segundos.</div>}
-      {!cargado && !error ? <div className="vacio">Cargando…</div> : enMensajero ? <Mensajero pintar={pintar} /> : <Oficina pintar={pintar} />}
+      {!cargado && !error ? cargando : <Suspense fallback={cargando}>{enMensajero ? <Mensajero pintar={pintar} /> : <Oficina pintar={pintar} />}</Suspense>}
     </main>
     <nav className="pestanas" id="pestanas" aria-label="Secciones">
       {vis.map(boton)}
