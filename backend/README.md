@@ -143,6 +143,7 @@ La API funciona sin correo configurado: si falta `RESEND_API_KEY`, no se envía 
 | `RESEND_API_KEY` | Llave de Resend (Dashboard → API Keys). Sin ella no se envían correos. |
 | `CORREO_REMITENTE` | Correo que aparece como remitente. **Su dominio debe estar verificado en Resend** (Domains). Por defecto `no-responder@jslogistics.pro`. |
 | `CORREO_NOMBRE` | Nombre visible del remitente. Por defecto `JS Logistics`. |
+| `CORREO_LOGO_URL` | URL absoluta del logo del encabezado. Por defecto `https://app.jslogistics.pro/logo.png`. Usa PNG: Outlook 2016 no muestra WebP. |
 | `CORREO_RESPUESTA` | Correo de respuesta (opcional). |
 | `URL_CLIENTES` | Portal de clientes, para armar los enlaces. En producción: `https://jslogistics.pro`. |
 | `URL_EQUIPO` | App de oficina y mensajeros. En producción: `https://app.jslogistics.pro`. |
@@ -151,6 +152,7 @@ La API funciona sin correo configurado: si falta `RESEND_API_KEY`, no se envía 
 
 Cómo funciona:
 
+- La plantilla está en `helpers/correo.js`: tablas con estilos inline, logo desde `CORREO_LOGO_URL` (PNG por Outlook) y enlace alternativo con `word-break: break-all`.
 - El token es aleatorio (32 bytes) y **solo se guarda su hash SHA-256** en la tabla `enlaces`; el token en claro viaja únicamente en el correo.
 - Cada enlace sirve una sola vez y, al usarlo, se cierran las sesiones abiertas de la cuenta.
 - Los enlaces de clientes apuntan a `URL_CLIENTES`; los de trabajadores, a `URL_EQUIPO`. Los dos portales deben tener las pantallas `/activar` y `/restablecer` (se implementan en cada frontend).

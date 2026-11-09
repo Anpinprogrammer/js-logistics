@@ -43,7 +43,7 @@ test("pedir recuperación manda un enlace al portal de clientes y no delata corr
   assert.equal(r.status, 204);
   assert.equal(capturados.length, 1);
   assert.equal(capturados[0].to[0], "cliente@js.co");
-  assert.match(capturados[0].subject, /Cambia tu contraseña/);
+  assert.match(capturados[0].subject, /Restablece tu contraseña/);
   assert.match(capturados[0].html, /http:\/\/localhost:3000\/restablecer\?token=/);
 
   const token = tokenDe(capturados[0], "restablecer");
@@ -189,6 +189,12 @@ test("la plantilla escapa el nombre y arma el remitente", () => {
   assert.equal(mensaje.html.includes("<script>"), false);
   assert.ok(mensaje.html.includes("&lt;script&gt;"));
   assert.ok(mensaje.text.includes("https://jslogistics.pro/restablecer?token=abc"));
+  // Diseño del correo: logo absoluto, CTA, aviso de vigencia y enlace alternativo.
+  assert.ok(mensaje.html.includes("https://app.jslogistics.pro/logo.png"));
+  assert.ok(mensaje.html.includes("Restablece tu contraseña"));
+  assert.ok(mensaje.html.includes("Restablecer contraseña"));
+  assert.ok(mensaje.html.includes("Este enlace expira en 60 minutos."));
+  assert.ok(mensaje.html.includes("word-break:break-all"));
 });
 
 test("validación y CSRF en las rutas públicas de correo", async () => {

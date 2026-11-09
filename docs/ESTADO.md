@@ -33,6 +33,7 @@ Está en la sección "Qué falta" de [`CLAUDE.md`](../CLAUDE.md) (la fuente úni
 4. **Sin desbordes laterales en móvil.** Dos causas reales ya corregidas: (a) un `grid` sin columna base se ensancha al contenido más largo: usa `grid grid-cols-1 md:grid-cols-N`; (b) correos y nombres largos en flex: `min-w-0` y `[overflow-wrap:anywhere]`. `html { overflow-x: clip }` es solo red de seguridad, no sustituye arreglar la causa.
 5. **Los enlaces de correo son de un solo uso y se guardan hasheados.** En la tabla `enlaces` queda el SHA-256 del token, nunca el token en claro. La contraseña vence en 60 minutos y la activación en 7 días; al usarlos se cierran las sesiones abiertas. Los clientes reciben enlaces a `URL_CLIENTES` y los trabajadores a `URL_EQUIPO`. Sin `RESEND_API_KEY` la API funciona, pero no manda correos (en desarrollo el enlace sale en la consola). Para probar sin verificar el dominio, `CORREO_REMITENTE=onboarding@resend.dev`: Resend solo deja enviar así al correo de la cuenta de Resend. Si el envío falla en desarrollo, el enlace también queda en la consola.
 6. **Las pantallas de acceso comparten el marco del ingreso.** `frontend/src/pages/AccesoComun.tsx` tiene el fondo, la tarjeta, los íconos y los campos con las mismas clases del ingreso; `Recuperar.tsx` y `Restablecer.tsx` lo reutilizan. No se cambió el diseño: si hay que ajustar algo visual, se hace en `AccesoComun.tsx` para las tres pantallas.
+7. **La plantilla de correo es de tablas y estilos inline.** Está en `backend/helpers/correo.js` para que se vea igual en Gmail, Outlook 2016+, Apple Mail y Yahoo. El logo va por `CORREO_LOGO_URL` en PNG (Outlook no muestra WebP) y el enlace alternativo usa `word-break: break-all`. Si se cambia el diseño, mantener esa estructura: Outlook no soporta flexbox ni grid.
 
 ## Trampas conocidas del entorno local
 
@@ -56,6 +57,7 @@ Es una receta, no un script del repo. Si lo conviertes en prueba automática, gu
 
 ## Registro de sesiones (lo más reciente arriba)
 
+- **2026-11-09:** correo de restablecimiento rediseñado: encabezado oscuro con logo, CTA `#0084c7`, aviso de vigencia/seguridad, enlace alternativo con `word-break: break-all` y pie corporativo. Logo por `CORREO_LOGO_URL` (PNG por Outlook). Revisado a 700 px y 390 px.
 - **2026-11-09:** app de oficina: enlace “¿Olvidaste tu contraseña?” en el ingreso y pantallas públicas `/recuperar`, `/restablecer` y `/activar`, con el mismo diseño (marco compartido en `pages/AccesoComun.tsx`). Revisadas a 390 px en modo demo.
 - **2026-11-09:** backend: servicio de correo con Resend y enlaces de un solo uso para activar cuentas y reiniciar contraseñas (`servicios/enlaces.js`, `helpers/correo.js`, tabla `enlaces`, 11 pruebas nuevas). `POST /usuarios` ya no exige contraseña: la crea la persona con el enlace. Pendiente: botones de envío en Accesos y las pantallas del portal de clientes.
 - **2026-11-09:** diagnóstico de un 403 al conectar el frontend: el puerto 4000 lo ocupaba el backend de otro proyecto. Revisión de toda la documentación; se agregó este archivo, la guía de trampas locales y se corrigieron las referencias viejas en `frontend/CLAUDE.md`.

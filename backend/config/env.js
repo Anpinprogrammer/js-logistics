@@ -25,6 +25,8 @@ const esquema = z.object({
   CORREO_REMITENTE: z.email("CORREO_REMITENTE debe ser un correo").default("no-responder@jslogistics.pro"),
   CORREO_NOMBRE: z.string().default("JS Logistics"),
   CORREO_RESPUESTA: z.email("CORREO_RESPUESTA debe ser un correo").optional().or(z.literal("")).transform(v => v || undefined),
+  // Logo de los correos: URL absoluta y pública (en el correo no sirven rutas locales). PNG por compatibilidad con Outlook.
+  CORREO_LOGO_URL: z.string().url("CORREO_LOGO_URL debe ser una URL completa").default("https://app.jslogistics.pro/logo.png"),
   // A dónde apuntan los enlaces de los correos. Cada portal tiene sus propias pantallas de activar y restablecer.
   URL_CLIENTES: z.string().url("URL_CLIENTES debe ser una URL completa").default("http://localhost:3000"),
   URL_EQUIPO: z.string().url("URL_EQUIPO debe ser una URL completa").default("http://localhost:5173"),
