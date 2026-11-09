@@ -21,12 +21,14 @@ backend/
 ├── routes/               Una por recurso, montadas en /api (routes/index.js)
 ├── controllers/          Reciben la petición y responden. accion.js conecta Express con los servicios (fechas a ISO)
 ├── servicios/            Reglas del negocio copiadas de app/js/app.js: pedidos, caja, clientes, mensajeros, movimientos,
-│                         sueldos, historial, papelera. Corren en una transacción y avisan por SSE qué cambió
+│                         sueldos, historial, papelera. Corren en una transacción y avisan por SSE qué cambió.
+│                         enlaces.js crea y consume los enlaces de correo (activación y contraseña).
 ├── models/               Consultas SQL por tabla (sin lógica de permisos). documentos.js ve las tablas con la forma
 │                         de documento de la app (fechas en ms), para que los cálculos den lo mismo
 ├── validators/           Esquemas de Zod de cada petición
 ├── helpers/              Utilidades: errores HTTP, JWT, cookies, contraseñas, IDs y SQL. calculos.js, constantes.js,
-│                         fechas.js y texto.js son copia fiel de app/js/app.js (saldos, caja, arqueos, sueldos…)
+│                         fechas.js y texto.js son copia fiel de app/js/app.js (saldos, caja, arqueos, sueldos…).
+│                         correo.js habla con Resend y arma las plantillas de los correos.
 ├── db/
 │   ├── schema.sql        Tablas, índices y restricciones (se puede correr varias veces)
 │   ├── migrar.js         npm run db:migrar
@@ -65,6 +67,12 @@ curl -i -c c.txt -H 'X-JSL: 1' -H 'Content-Type: application/json' \
   -d '{"email":"tu@correo.com","clave":"una-clave-larga"}' http://localhost:4000/api/auth/ingresar
 curl -b c.txt http://localhost:4000/api/auth/yo
 ```
+
+### Si el frontend recibe 403 o 404 raros
+
+Casi siempre es que **otro proceso ocupa el puerto 4000** y las llamadas llegan a otro backend. Este API responde los errores como `{ "error": { "code", "message" } }`; un 404 en HTML ("Cannot GET /api/…") o un `{"error":"Origen no permitido"}` sin `code` viene de otro servidor. Mira quién escucha con `lsof -iTCP:4000 -sTCP:LISTEN -n -P`. Cierra ese proceso, o cambia `PORT` en `.env` y arranca el frontend con `VITE_API_PROXY=http://localhost:<puerto> npm run dev`.
+
+Los 403 de este API: `Falta la cabecera X-JSL` (se llamó sin `X-JSL: 1`) y `Origen no permitido` (el navegador entró por un origen que no está en `CORS_ORIGENES`, por ejemplo `127.0.0.1:5173` en vez de `localhost:5173`).
 
 ## Pruebas
 
@@ -125,6 +133,33 @@ SELECT column_name, data_type FROM information_schema.columns
 - Variables: las de `.env.example`, con `NODE_ENV=production` y un `JWT_SECRET` nuevo y largo.
 - El plan gratis se duerme a los 15 minutos sin tráfico y tarda en despertar; para los mensajeros en la calle conviene un plan pago.
 
+## Correo (Resend)
+
+Los enlaces de **activación** y de **reinicio de contraseña** se mandan con [Resend](https://resend.com).
+La API funciona sin correo configurado: si falta `RESEND_API_KEY`, no se envía nada y en desarrollo el enlace sale en la consola.
+
+| Variable | Para qué |
+|---|---|
+| `RESEND_API_KEY` | Llave de Resend (Dashboard → API Keys). Sin ella no se envían correos. |
+| `CORREO_REMITENTE` | Correo que aparece como remitente. **Su dominio debe estar verificado en Resend** (Domains). Por defecto `no-responder@jslogistics.pro`. |
+| `CORREO_NOMBRE` | Nombre visible del remitente. Por defecto `JS Logistics`. |
+| `CORREO_RESPUESTA` | Correo de respuesta (opcional). |
+| `URL_CLIENTES` | Portal de clientes, para armar los enlaces. En producción: `https://jslogistics.pro`. |
+| `URL_EQUIPO` | App de oficina y mensajeros. En producción: `https://app.jslogistics.pro`. |
+| `ENLACE_CLAVE_MINUTOS` | Vigencia del enlace de contraseña (60 por defecto). |
+| `ENLACE_ACTIVACION_DIAS` | Vigencia del enlace de activación (7 por defecto). |
+
+Cómo funciona:
+
+- El token es aleatorio (32 bytes) y **solo se guarda su hash SHA-256** en la tabla `enlaces`; el token en claro viaja únicamente en el correo.
+- Cada enlace sirve una sola vez y, al usarlo, se cierran las sesiones abiertas de la cuenta.
+- Los enlaces de clientes apuntan a `URL_CLIENTES`; los de trabajadores, a `URL_EQUIPO`. Los dos portales deben tener las pantallas `/activar` y `/restablecer` (se implementan en cada frontend).
+- `POST /auth/recuperar` responde siempre `204`, exista o no el correo, para no revelar qué cuentas existen.
+- Al crear una cuenta desde Accesos, la contraseña es opcional: sin ella la cuenta queda pendiente y se manda la activación. Si el correo falla, la cuenta igual se crea y administración puede reenviarlo.
+- En producción, agregar estas variables en Render y volver a desplegar. La tabla se crea con `npm run db:migrar`.
+
+**Para desarrollo sin verificar el dominio:** usa `CORREO_REMITENTE=onboarding@resend.dev`. Resend acepta ese remitente de pruebas, pero **solo envía al correo con el que creaste la cuenta de Resend**. Si el envío falla, el backend igual responde `204` y, en `development`, deja el enlace en la consola con `[correo] Enlace de …`; también sirve dejar `RESEND_API_KEY` vacío.
+
 ## Endpoints (todos bajo `/api`)
 
 Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, dinero en pesos enteros, fechas ISO.
@@ -137,7 +172,12 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `POST /auth/salir-de-todo` | con sesión | Cierra la sesión en todos los dispositivos |
 | `GET /auth/yo` | con sesión | `{ usuario: { id, email, nombre, rol, clienteId, mensajeroId } }` |
 | `POST /auth/clave` | con sesión | Cambia la propia contraseña |
-| `GET/POST /usuarios`, `PATCH/DELETE /usuarios/:id`, `PUT /usuarios/:id/clave` | admin | Accesos a la app |
+| `POST /auth/recuperar` | público | `{ email }`: manda un enlace de activación o de contraseña. Responde siempre `204` |
+| `GET /auth/enlace/:token` | público | Revisa el enlace: `{ enlace: { tipo, nombre, email (tapado), expira } }` |
+| `POST /auth/restablecer` | público | `{ token, clave }`: cambia la contraseña con el enlace del correo |
+| `POST /auth/activar` | público | `{ token, clave }`: crea la contraseña de una cuenta nueva |
+| `GET/POST /usuarios`, `PATCH/DELETE /usuarios/:id`, `PUT /usuarios/:id/clave` | admin | Accesos a la app. `POST /usuarios` acepta `clave` opcional: sin ella manda la activación |
+| `POST /usuarios/:id/activacion`, `POST /usuarios/:id/recuperacion` | admin | Reenvía la activación o manda el enlace de contraseña |
 | `GET /clientes?buscar=` | oficina | Lista y busca |
 | `GET /clientes/:id` | oficina, o el propio cliente | Ficha |
 | `POST /clientes`, `PATCH /clientes/:id` | oficina | Crea (avisa de repetidos con 409 `POSIBLE_REPETIDO`) y edita |
@@ -220,3 +260,4 @@ Lo ya contado en un arqueo no se cambia: responde `409 YA_CONTADO` con el texto 
 
 - `Idempotency-Key` en las escrituras que reenvía la cola sin señal del mensajero.
 - Que la app interna use las rutas de una sola acción (cierre de caja de oficina, devolución y quitar adelanto) en vez de las piezas de compatibilidad.
+- En los dos frontends: pantallas `/activar` y `/restablecer`, y en Accesos el botón para enviar el enlace en vez de escribir una contraseña.

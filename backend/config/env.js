@@ -20,6 +20,17 @@ const esquema = z.object({
   SUPABASE_URL: z.string().url().optional().or(z.literal("")).transform(v => v ? v.replace(/\/$/, "") : undefined),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional().transform(v => v || undefined),
   STORAGE_BUCKET: z.string().default("pedidos"),
+  // Correo transaccional con Resend (https://resend.com). Sin clave no se envían correos, pero la API funciona.
+  RESEND_API_KEY: z.string().optional().transform(v => v || undefined),
+  CORREO_REMITENTE: z.email("CORREO_REMITENTE debe ser un correo").default("no-responder@jslogistics.pro"),
+  CORREO_NOMBRE: z.string().default("JS Logistics"),
+  CORREO_RESPUESTA: z.email("CORREO_RESPUESTA debe ser un correo").optional().or(z.literal("")).transform(v => v || undefined),
+  // A dónde apuntan los enlaces de los correos. Cada portal tiene sus propias pantallas de activar y restablecer.
+  URL_CLIENTES: z.string().url("URL_CLIENTES debe ser una URL completa").default("http://localhost:3000"),
+  URL_EQUIPO: z.string().url("URL_EQUIPO debe ser una URL completa").default("http://localhost:5173"),
+  // Vigencia de los enlaces. La contraseña vence rápido; la activación da tiempo para abrir el correo.
+  ENLACE_CLAVE_MINUTOS: z.coerce.number().int().positive().default(60),
+  ENLACE_ACTIVACION_DIAS: z.coerce.number().int().positive().default(7),
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1)
 });
 

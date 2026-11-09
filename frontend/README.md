@@ -4,7 +4,7 @@ App de operación y administración en **React 19 + TypeScript + Tailwind CSS 4*
 
 ## Qué hay
 
-Con sesión, la app muestra **lo mismo que el prototipo** (`app/` del sistema viejo), con sus estilos, sus KPIs y sus pestañas, reescrito en React y TypeScript. El ingreso (`pages/Ingreso.tsx`) es el rediseño nuevo.
+Con sesión, la app muestra **lo mismo que el prototipo** (`app/` del sistema viejo), con sus estilos, sus KPIs y sus pestañas, reescrito en React y TypeScript. El ingreso (`pages/Ingreso.tsx`) es el rediseño nuevo: siempre oscuro, con el logo en un badge claro (ver [`../docs/ESTADO.md`](../docs/ESTADO.md)). Desde el ingreso se puede pedir un enlace de recuperación (`/recuperar`), y los correos abren las pantallas públicas `/restablecer` y `/activar` (crear o cambiar la contraseña).
 
 | Rol | Pantallas |
 |---|---|
@@ -35,7 +35,7 @@ src/
 ├── App.tsx             Ingreso o app interna
 ├── api/                cliente.ts (axios), servicios.ts (llamadas por recurso), tipos.ts
 ├── auth/Sesion.tsx     Sesión (/auth/yo, ingresar, salir; cuentas de prueba en modo demo)
-├── pages/Ingreso.tsx   Ingreso
+├── pages/              Ingreso, Recuperar, Restablecer y AccesoComun (marco compartido del acceso)
 ├── lib/imagen.ts       Comprimir fotos y firma
 └── interna/            La app igual al prototipo
     ├── estilos.css     Copia de app/css/estilos.css dentro de .jsl (generada, no editar)
@@ -74,6 +74,8 @@ cd frontend
 npm install
 npm run dev                              # http://localhost:5173 (el proxy manda /api al backend)
 ```
+
+Si `/api` da 403 o 404 raros, mira que el puerto 4000 sea de este backend (ver [`../backend/README.md`](../backend/README.md#si-el-frontend-recibe-403-o-404-raros)). Para usar otro puerto: `VITE_API_PROXY=http://localhost:4001 npm run dev`. Más trampas del entorno local en [`../docs/ESTADO.md`](../docs/ESTADO.md).
 
 Para tener datos de prueba inventados, carga el demo en una base **vacía** de pruebas: `cd ../backend && npm run db:demo -- --si`. Las cuentas son `admin@demo.co`, `oficina@demo.co`, `carlos@demo.co` y `diana@demo.co`, todas con la contraseña `demo-js-2026`.
 

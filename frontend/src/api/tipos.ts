@@ -144,3 +144,12 @@ export interface CuentaInterna { id: string; nombre: string; tipo: "socio" | "ba
 /** Registro de cambios (historial) y papelera. */
 export interface Cambio { id: string; fecha: string; quien: string; op: string; col: string; docId: string; resumen: string }
 export interface EnPapelera { id: string; col: string; docId: string; resumen: string; fecha: string; quien: string }
+
+/** Enlace que llega por correo para activar una cuenta o cambiar la contraseña. */
+export interface EnlaceCorreo {
+  tipo: "activacion" | "clave";
+  nombre: string;
+  /** Correo tapado por el servidor, por ejemplo c******@js.co. */
+  email: string;
+  expira: string;
+}

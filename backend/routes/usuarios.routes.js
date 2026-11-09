@@ -13,6 +13,8 @@ r.get("/", C.listar);
 r.post("/", validar({ body: V.crear }), C.crear);
 r.patch("/:id", validar({ params: paramId, body: V.actualizar }), C.actualizar);
 r.put("/:id/clave", validar({ params: paramId, body: V.nuevaClave }), C.cambiarClave);
+r.post("/:id/activacion", validar({ params: paramId }), C.reenviarActivacion);
+r.post("/:id/recuperacion", validar({ params: paramId }), C.enviarRecuperacion);
 r.delete("/:id", validar({ params: paramId }), C.eliminar);
 
 export default r;

@@ -1,6 +1,6 @@
 # Guía para agentes de IA
 
-Las instrucciones para cualquier agente (Claude Code, Codex, Cursor, Copilot…) están en **[CLAUDE.md](CLAUDE.md)**. Léelo completo antes de hacer cambios, y después el `CLAUDE.md` de la carpeta en la que vayas a trabajar:
+Las instrucciones para cualquier agente (Claude Code, Codex, Cursor, Copilot…) están en **[CLAUDE.md](CLAUDE.md)**. Léelo completo antes de hacer cambios, y [`docs/ESTADO.md`](docs/ESTADO.md) (memoria del proyecto: decisiones, trampas y últimos cambios), y después el `CLAUDE.md` de la carpeta en la que vayas a trabajar:
 
 - [`backend/CLAUDE.md`](backend/CLAUDE.md): API en Node.js + Express (MVC) + PostgreSQL.
 - [`frontend/CLAUDE.md`](frontend/CLAUDE.md): app de oficina y mensajeros en React + TypeScript + Tailwind.

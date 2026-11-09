@@ -8,6 +8,8 @@ export const pesos = z.coerce.number().int("Debe ser un valor en pesos, sin deci
 export const medio = z.enum(MEDIOS);
 export const email = z.string().trim().toLowerCase().pipe(z.email("Correo inválido")).refine(v => v.length <= 254);
 export const telefono = z.string().trim().max(30).regex(/^[0-9+\-\s()]*$/, "Teléfono inválido");
+// Tokens de los enlaces de correo: base64url de 32 bytes (43 caracteres), con margen por si cambia el largo.
+export const token = z.string().trim().min(20, "El enlace no es válido").max(200);
 
 export const paginacion = {
   limite: z.coerce.number().int().min(1).max(500).default(100),

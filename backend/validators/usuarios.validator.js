@@ -9,7 +9,8 @@ export const crear = z.object({
   email,
   nombre: texto(120).default(""),
   rol: z.enum(ROLES),
-  clave,
+  // Opcional: sin contraseña la cuenta queda pendiente y se manda un enlace de activación.
+  clave: clave.optional(),
   clienteId: id.nullish(),
   mensajeroId: id.nullish()
 }).refine(d => d.rol !== "cliente" || d.clienteId, { message: "Una cuenta de cliente necesita el cliente", path: ["clienteId"] });

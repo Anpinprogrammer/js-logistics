@@ -1,6 +1,6 @@
 # JS Logistics: guía para agentes de IA
 
-Lee este archivo completo antes de cambiar algo. Después lee el `CLAUDE.md` de la carpeta en la que vayas a trabajar (`backend/` o `frontend/`). Si algo de aquí choca con lo que pide la persona, pregúntale antes de seguir.
+Lee este archivo completo antes de cambiar algo. Después lee [`docs/ESTADO.md`](docs/ESTADO.md) (la memoria del proyecto: decisiones, trampas del entorno y lo último que se hizo) y el `CLAUDE.md` de la carpeta en la que vayas a trabajar (`backend/` o `frontend/`). Si algo de aquí choca con lo que pide la persona, pregúntale antes de seguir.
 
 ## Qué es
 
@@ -73,6 +73,7 @@ Nunca apuntes `TEST_DATABASE_URL` ni `db:demo` a la base de producción.
 
 ## Dónde está cada cosa
 
+- [`docs/ESTADO.md`](docs/ESTADO.md): **memoria del proyecto**. Qué está hecho, decisiones que no son obvias, trampas del entorno local y registro de sesiones. Actualízalo cuando cambies algo que otro agente deba saber.
 - [`backend/CLAUDE.md`](backend/CLAUDE.md): cómo se escribe el backend y cómo agregar un endpoint.
 - [`frontend/CLAUDE.md`](frontend/CLAUDE.md): cómo se escribe el frontend y cómo agregar una pantalla.
 - [`backend/README.md`](backend/README.md): instalación, Supabase, Render y la tabla de endpoints.

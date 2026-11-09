@@ -21,12 +21,16 @@ export async function reiniciarBase() {
   const sql = await readFile(new URL("../db/schema.sql", import.meta.url), "utf8");
   await pool.query(sql);
   await pool.query(`TRUNCATE historial, papelera, pedido_intentos, pedido_archivos, pedidos, movimientos, recaudos,
-    liquidaciones, cajamovs, jornadas, usuarios, clientes, mensajeros, cuentas, ajustes RESTART IDENTITY CASCADE`);
+    liquidaciones, cajamovs, jornadas, enlaces, usuarios, clientes, mensajeros, cuentas, ajustes RESTART IDENTITY CASCADE`);
   await pool.query(`UPDATE contadores SET n = 0`);
 }
 
 export const crearCuenta = async (datos) =>
   Usuario.crear({ nombre: datos.rol, ...datos, claveHash: await hashClave(CLAVE) });
+
+/** Cuenta recién creada por administración: todavía no tiene contraseña (se activa con el enlace del correo). */
+export const crearCuentaSinClave = datos =>
+  Usuario.crear({ nombre: datos.rol, ...datos, claveHash: null });
 
 /** Agente de supertest que guarda la cookie y manda las cabeceras que exige la API. */
 export async function sesion(email) {

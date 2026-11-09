@@ -48,6 +48,20 @@ CREATE TABLE IF NOT EXISTS usuarios (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS usuarios_email_uq ON usuarios (lower(email));
 
+-- Enlaces de un solo uso que se mandan por correo (activar la cuenta y reiniciar la contraseña).
+-- Se guarda solo el hash del token: el token en claro viaja únicamente en el correo.
+CREATE TABLE IF NOT EXISTS enlaces (
+  id         TEXT PRIMARY KEY,
+  usuario_id TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  tipo       TEXT NOT NULL CHECK (tipo IN ('activacion', 'clave')),
+  token_hash TEXT NOT NULL UNIQUE,
+  expira     TIMESTAMPTZ NOT NULL,
+  usado      TIMESTAMPTZ,
+  creado     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  creado_por TEXT REFERENCES usuarios(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS enlaces_usuario_idx ON enlaces (usuario_id, tipo, creado DESC);
+
 CREATE TABLE IF NOT EXISTS cuentas (               -- cuentas internas: JS Envíos, MT Store, Base de JS
   id     TEXT PRIMARY KEY,
   nombre TEXT NOT NULL,
@@ -293,7 +307,7 @@ CREATE INDEX IF NOT EXISTS papelera_fecha_idx ON papelera (fecha DESC);
 DO $$
 DECLARE t TEXT;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['clientes', 'mensajeros', 'usuarios', 'cuentas', 'contadores', 'ajustes', 'pedidos',
+  FOREACH t IN ARRAY ARRAY['clientes', 'mensajeros', 'usuarios', 'enlaces', 'cuentas', 'contadores', 'ajustes', 'pedidos',
     'pedido_intentos', 'pedido_archivos', 'movimientos', 'recaudos', 'liquidaciones', 'cajamovs', 'jornadas',
     'historial', 'papelera']
   LOOP

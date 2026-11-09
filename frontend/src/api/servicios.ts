@@ -1,7 +1,7 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
 import type { Archivo, TipoArchivo, Cliente, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
-  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos } from "./tipos";
+  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo } from "./tipos";
 import { FalloApi } from "./cliente";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
@@ -10,7 +10,14 @@ export const auth = {
   yo: () => datos<{ usuario: Usuario }>(api.get("/auth/yo")).then(d => d.usuario),
   ingresar: (email: string, clave: string) => datos<{ usuario: Usuario }>(api.post("/auth/ingresar", { email, clave })).then(d => d.usuario),
   salir: () => api.post("/auth/salir"),
-  cambiarClave: (claveActual: string, claveNueva: string) => api.post("/auth/clave", { claveActual, claveNueva })
+  cambiarClave: (claveActual: string, claveNueva: string) => api.post("/auth/clave", { claveActual, claveNueva }),
+  /** Pide por correo un enlace de activación o de contraseña. Responde 204 exista o no la cuenta. */
+  recuperar: (email: string) => api.post("/auth/recuperar", { email }),
+  /** Revisa el enlace antes de mostrar el formulario. */
+  enlace: (token: string) =>
+    datos<{ enlace: EnlaceCorreo }>(api.get(`/auth/enlace/${encodeURIComponent(token)}`)).then(d => d.enlace),
+  restablecer: (token: string, clave: string) => api.post("/auth/restablecer", { token, clave }),
+  activar: (token: string, clave: string) => api.post("/auth/activar", { token, clave })
 };
 
 export interface FiltrosPedidos {

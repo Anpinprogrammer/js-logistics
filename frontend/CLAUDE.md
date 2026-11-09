@@ -1,6 +1,6 @@
 # Frontend (oficina y mensajeros): convenciones para agentes de IA
 
-Primero lee el [`CLAUDE.md` de la raíz](../CLAUDE.md). Esta app es para **administración, asistentes y mensajeros**. El portal de clientes es otro repositorio (`jslogistics-cliente-frontend`), con las mismas convenciones.
+Primero lee el [`CLAUDE.md` de la raíz](../CLAUDE.md) y [`docs/ESTADO.md`](../docs/ESTADO.md). Esta app es para **administración, asistentes y mensajeros**. El portal de clientes es otro repositorio (`jslogistics-cliente-frontend`), con las mismas convenciones.
 
 ## Stack
 
@@ -12,7 +12,7 @@ No agregues dependencias (formularios, estado global, íconos, componentes) sin 
 
 Con sesión, la app es **igual al prototipo** (`app/` del sistema viejo): mismo HTML, mismas clases y mismos KPIs, escrito en React. La estructura de carpetas está en [`README.md`](README.md#estructura). Lo importante:
 
-- `src/interna/estilos.css` es la copia generada de `app/css/estilos.css`, con todas sus reglas dentro de `.jsl`. **No lo edites a mano**; los ajustes van en `ajustes.css`. Dentro de `src/interna/` se usan las clases del prototipo, no Tailwind. Tailwind queda solo para `pages/Ingreso.tsx`.
+- `src/interna/estilos.css` es la copia generada de `app/css/estilos.css`, con todas sus reglas dentro de `.jsl`. **No lo edites a mano**; los ajustes van en `ajustes.css`. Dentro de `src/interna/` se usan las clases del prototipo, no Tailwind. Tailwind queda solo para `pages/` (ingreso, recuperar y restablecer).
 - `src/interna/motor.ts` tiene los datos en memoria (`S`) y las reglas de negocio copiadas de `app/js/app.js`, con el mismo comportamiento. Cuando el backend calcule un valor (saldos, caja, sueldos), se usa el suyo y se borra el cálculo de aquí.
 - `src/interna/acciones.ts` hace todas las escrituras. Cada una tiene su rama `if (DEMO)` que cambia los datos en memoria.
 - El estado de la interfaz (pestaña, filtros, día elegido) vive en `E` (`estado.ts`), como las variables del prototipo. `tocar()` vuelve a pintar.
@@ -34,10 +34,11 @@ Con sesión, la app es **igual al prototipo** (`app/` del sistema viejo): mismo 
 - El mensajero usa la app en el celular, en la calle: botones grandes (mínimo 44 px de alto), lo principal arriba, pocos pasos y textos cortos.
 
 **Interfaz y estilos**
-- Primero el celular, después el computador (`md:`). Las listas son tarjetas en el celular y tablas en el computador (ver `pages/oficina/Pedidos.tsx`).
-- Usa los **tokens** de color de `index.css` (`bg-papel`, `text-suave`, `bg-marca`, `text-rojo`, `bg-verde-claro`…), nunca colores sueltos (`#1670b0`, `bg-blue-600`). El modo oscuro funciona solo gracias a esos tokens.
-- Reutiliza `ui.tsx` (`Boton`, `Campo`, `Dialogo`…) y las clases `caja`, `entrada` y `etiqueta`. Si un patrón se repite en dos pantallas, pásalo a `components/`.
-- Accesibilidad: todo campo con su `label` (el componente `Campo` ya lo hace), botones de solo ícono con `aria-label`, diálogos con `Dialogo` (es un `<dialog>` nativo) y foco visible.
+- **Dos mundos de estilos.** Dentro de `src/interna/` (toda la app con sesión) se usan las clases del prototipo (`estilos.css` dentro de `.jsl`, ajustes en `ajustes.css`) y los componentes de `interna/ui.tsx`; nada de Tailwind ahí. Tailwind y los tokens de `src/index.css` (`bg-papel`, `text-suave`, `bg-marca`…) son solo para `pages/Ingreso.tsx` y las demás pantallas públicas de acceso (`Recuperar.tsx`, `Restablecer.tsx`), que comparten el marco de `AccesoComun.tsx`.
+- **`pages/Ingreso.tsx` es la excepción a "solo tokens"**: es siempre oscura y usa sus colores (`#070B19`, `#38bdf8`, `#0284c7`) a propósito. Si la cambias, conserva el badge claro con el logo recortado (ver `docs/ESTADO.md`, decisión 1). Las pantallas de recuperar y restablecer usan el mismo marco y los mismos colores.
+- Primero el celular, después el computador (`md:`). Las listas son tarjetas en el celular y tablas en el computador.
+- **Nada de scroll horizontal de la página.** Un `grid` lleva siempre su columna base (`grid grid-cols-1 md:grid-cols-2`); los textos largos (correos, nombres) en flex llevan `min-w-0` y `[overflow-wrap:anywhere]`. Compruébalo a 320, 360 y 390 px (receta en `docs/ESTADO.md`).
+- Accesibilidad: todo campo con su `label`, botones de solo ícono con `aria-label`, diálogos con la ventana de `interna/ui.tsx` y foco visible.
 - Textos en español de Colombia, de tú, cortos. Dinero con `pesos()` y fechas con `fechaHora()` / `hora()`, siempre en hora de Colombia. Para convertir lo que escribe el usuario a pesos, usa `aPesos("25.000")`.
 
 **TypeScript**

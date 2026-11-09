@@ -18,9 +18,9 @@ No agregues dependencias sin una razón clara. Si lo haces, explícala en el PR.
 | `routes/` | Un archivo por recurso (`<recurso>.routes.js`): método, ruta, `permitir(...)`, `validar(...)` y controlador. Se montan en `routes/index.js`. | Lógica. |
 | `validators/` | Esquemas Zod de cada petición (`<recurso>.validator.js`). Las piezas comunes van en `comunes.js`. | Consultas a la base. |
 | `controllers/` | Un caso de uso por función: quién puede, qué se valida contra la base, qué se calcula, transacción, historial y respuesta. Los de dinero solo llaman a un servicio con `responder(...)` de `accion.js`. | SQL. |
-| `servicios/` | Reglas del negocio portadas de `app/js/app.js` (pedidos, caja, clientes, mensajeros, movimientos, sueldos, historial, papelera). Reciben `ctx = { actor, db, eventos }`, escriben con `enTransaccion` + `guardar/actualizar/borrar` de `transaccion.js` (historial y papelera automáticos) y calculan con `calculosDe`. | Express (`req`, `res`). |
+| `servicios/` | Reglas del negocio portadas de `app/js/app.js` (pedidos, caja, clientes, mensajeros, movimientos, sueldos, historial, papelera). Reciben `ctx = { actor, db, eventos }`, escriben con `enTransaccion` + `guardar/actualizar/borrar` de `transaccion.js` (historial y papelera automáticos) y calculan con `calculosDe`. `enlaces.js` crea y consume los enlaces de correo (activación y contraseña). | Express (`req`, `res`). |
 | `models/` | SQL de una tabla (`<entidad>.model.js`). Devuelve objetos camelCase con `filaAObjeto`. Las funciones que escriben aceptan un `db` opcional para participar en una transacción. | Permisos ni reglas de negocio. |
-| `helpers/` | Utilidades puras: `errores.js`, `jwt.js`, `cookies.js`, `claves.js`, `ids.js`, `sql.js`, `storage.js`, `negocio.js` (listas cerradas para validar). `calculos.js`, `constantes.js`, `fechas.js`, `texto.js` y `reloj.js` son **copia fiel** de `app/js/app.js`: no los "mejores"; si cambia la regla, cámbiala igual que en la app y corre `test/equivalencia.test.js`. | Estado ni acceso a la base. |
+| `helpers/` | Utilidades puras: `errores.js`, `jwt.js`, `cookies.js`, `claves.js`, `ids.js`, `sql.js`, `storage.js`, `negocio.js` (listas cerradas para validar). `calculos.js`, `constantes.js`, `fechas.js`, `texto.js` y `reloj.js` son **copia fiel** de `app/js/app.js`: no los "mejores"; si cambia la regla, cámbiala igual que en la app y corre `test/equivalencia.test.js`. `correo.js` habla con Resend y arma las plantillas. | Estado ni acceso a la base. |
 | `middleware/` | `autenticar`, `autorizar` (`permitir`, `OFICINA`, `EQUIPO`), `validar`, `seguridad`, `errores`. | |
 | `db/` | `schema.sql` (fuente de verdad del esquema), `migrar.js`, `crear-admin.js`, `demo.js`. | |
 | `test/` | Pruebas de integración por recurso (`<recurso>.test.js`) y `ayuda.js`. | |
@@ -45,6 +45,7 @@ No agregues dependencias sin una razón clara. Si lo haces, explícala en el PR.
 - Nunca devuelvas `clave_hash`, `version_sesion` ni rutas internas de Storage (`miniRuta`): solo URL firmadas.
 - El rol se lee de la base en cada petición. Para cerrar sesiones se sube `version_sesion`, no se guardan listas de tokens.
 - No cambies cookies, CORS, CSRF (`X-JSL`) ni los límites de intentos sin explicarlo en el PR.
+- Los enlaces de correo (activación y contraseña) son de un solo uso: en `enlaces` se guarda solo el hash SHA-256 del token, nunca el token en claro. Cada enlace vence (60 min la contraseña, 7 días la activación) y al usarlo se sube `version_sesion`.
 
 **Dinero y negocio**
 - Pesos enteros (`BIGINT` en la base, `pesos` en Zod). Nada de decimales ni `float`.

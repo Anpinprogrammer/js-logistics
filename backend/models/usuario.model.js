@@ -22,6 +22,16 @@ export async function buscarParaIngreso(email) {
   return filaAObjeto(rows[0]);
 }
 
+/** Para pedir un enlace: dice si la cuenta ya tiene contraseña (si no, el enlace es de activación). */
+export async function buscarParaEnlace(email) {
+  const { rows } = await query(
+    `SELECT ${COLUMNAS}, (clave_hash IS NOT NULL) AS tiene_clave
+       FROM usuarios WHERE lower(email) = lower($1)`,
+    [email]
+  );
+  return filaAObjeto(rows[0]);
+}
+
 export async function listar() {
   const { rows } = await query(`SELECT ${COLUMNAS} FROM usuarios ORDER BY lower(nombre), lower(email)`);
   return rows.map(filaAObjeto);
@@ -52,8 +62,8 @@ export async function actualizar(id, datos) {
 }
 
 /** Nueva contraseña; cierra todas las sesiones abiertas de la cuenta. */
-export async function cambiarClave(id, claveHash) {
-  const { rows } = await query(
+export async function cambiarClave(id, claveHash, db = { query }) {
+  const { rows } = await db.query(
     `UPDATE usuarios SET clave_hash = $2, version_sesion = version_sesion + 1, actualizado = now()
      WHERE id = $1 RETURNING ${COLUMNAS}`,
     [id, claveHash]

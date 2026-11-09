@@ -42,6 +42,28 @@ export const limiteIngreso = rateLimit({
   message: { error: "Demasiados intentos. Espera unos minutos e intenta de nuevo." }
 });
 
+// Respuesta con la misma forma de error que el resto de la API.
+const respuesta429 = (code, message) => (_req, res) =>
+  res.status(429).json({ error: { code, message } });
+
+/** Pedir enlaces por correo: máximo 5 cada 15 minutos por IP (evita usar la API para mandar spam). */
+export const limiteCorreo = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: respuesta429("DEMASIADOS_CORREOS", "Pediste demasiados enlaces. Espera unos minutos e intenta de nuevo.")
+});
+
+/** Abrir o usar un enlace con token: 20 cada 15 minutos por IP (los tokens son largos y aleatorios). */
+export const limiteEnlace = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 20,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: respuesta429("DEMASIADOS_INTENTOS", "Demasiados intentos con este enlace. Espera unos minutos.")
+});
+
 /** Límite general para toda la API. */
 export const limiteGeneral = rateLimit({
   windowMs: 60_000,
