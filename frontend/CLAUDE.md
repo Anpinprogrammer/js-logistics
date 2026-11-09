@@ -16,6 +16,7 @@ Con sesión, la app es **igual al prototipo** (`app/` del sistema viejo): mismo 
 - `src/interna/motor.ts` tiene los datos en memoria (`S`) y las reglas de negocio copiadas de `app/js/app.js`, con el mismo comportamiento. Cuando el backend calcule un valor (saldos, caja, sueldos), se usa el suyo y se borra el cálculo de aquí.
 - `src/interna/acciones.ts` hace todas las escrituras. Cada una tiene su rama `if (DEMO)` que cambia los datos en memoria.
 - El estado de la interfaz (pestaña, filtros, día elegido) vive en `E` (`estado.ts`), como las variables del prototipo. `tocar()` vuelve a pintar.
+- **Carga diferida:** el ingreso, cada modo (oficina y mensajero) y cada pestaña de la oficina van en archivos aparte con `perezoso()` (`lib/perezoso.ts`), que además los precarga. Una pestaña nueva se agrega igual en `oficina/Oficina.tsx`; no la importes directo desde `Marco.tsx`, o vuelve al archivo principal.
 
 ## Reglas
 

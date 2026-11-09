@@ -5,13 +5,9 @@
 import type { Usuario } from "../api/tipos";
 import { diaDe, hoy, moverDia, semanaDe, type Almacen, type Pedido, type Metodo, type Motivo } from "./motor";
 
-export const DEMO = import.meta.env.VITE_DEMO === "true";
-
-export const USUARIOS_DEMO: Usuario[] = [
-  { id: "u-admin", email: "admin@demo.co", nombre: "Laura Gómez", rol: "admin", clienteId: null, mensajeroId: "m-dueno" },
-  { id: "u-asis", email: "asistente@demo.co", nombre: "Camila Ríos", rol: "asistente", clienteId: null, mensajeroId: null },
-  { id: "u-mens", email: "mensajero@demo.co", nombre: "Andrés Mora", rol: "mensajero", clienteId: null, mensajeroId: "m1" },
-];
+// Las cuentas demo van aparte (cuentasDemo.ts) para que la sesión no cargue el motor al abrir la página.
+import { USUARIOS_DEMO } from "./cuentasDemo";
+export { DEMO, USUARIOS_DEMO } from "./cuentasDemo";
 
 /** Generador pseudoaleatorio con semilla: los mismos datos en cada carga. */
 function azar(semilla: number) { let s = semilla; return () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646; }

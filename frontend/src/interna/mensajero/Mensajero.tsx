@@ -12,7 +12,7 @@ import { crearGuias } from "../acciones";
 import { motivoError } from "../datos";
 import { abrirEntregaEn, VerEntregado } from "./Entrega";
 
-export const pendientesMios = () => Object.values(S.pedidos).filter(p => p.estado === "pendiente" && p.mensajeroId === E.miMensajero).sort((a, b) => a.creado - b.creado);
+import { pendientesMios } from "./pendientes";
 const MAX_FOTOS = 30;
 
 export default function Mensajero({ pintar }: { pintar: () => void }) {
