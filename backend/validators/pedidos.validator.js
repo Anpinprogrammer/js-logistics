@@ -2,11 +2,17 @@ import { z } from "zod";
 import { id, texto, pesos, medio } from "./comunes.js";
 import { METODOS_ENTREGA, CUENTAS_JS, MOTIVOS } from "../helpers/negocio.js";
 import { TIPOS_ARCHIVO } from "../helpers/imagenes.js";
+import { esDia } from "../helpers/fechas.js";
 
 export const paramGuia = z.object({ guia: z.string().trim().regex(/^JS-\d{5,}$/, "Guía inválida") });
 
 const fecha = z.coerce.date();
 
+const bandera = z.enum(["true", "false"]).transform(v => v === "true");
+
+/* Dos formas de paginar:
+   - Por páginas (`pagina` y `porPagina`): para las pantallas con paginador. Responde también `total` y `paginas`.
+   - Por cursor (`cursor` → `siguiente`): para cargar todo de a pedazos (la app interna y la cola del mensajero). */
 export const listar = z.object({
   estado: z.enum(["pendiente", "entregado", "devuelto"]).optional(),
   mensajeroId: id.optional(),
@@ -17,10 +23,17 @@ export const listar = z.object({
   entregadoHasta: fecha.optional(),
   cerrados: z.enum(["true", "false"]).transform(v => v === "true").optional(),
   buscar: texto(60).optional(),
-  conDiferencia: z.enum(["true", "false"]).transform(v => v === "true").optional(),
+  conDiferencia: bandera.optional(),                                    // diferencia de cobro sin revisar
+  diferencia: z.enum(["todas", "sinRevisar"]).optional(),               // "todas" incluye las ya revisadas
+  sinRemitente: bandera.optional(),
+  cambioPendiente: bandera.optional(),                                  // prenda de cambio que el cliente no ha recibido
+  sinServicio: bandera.optional(),                                      // entregado, con remitente y sin valor de servicio
+  dia: z.string().refine(esDia, "Usa un día con el formato AAAA-MM-DD").optional(), // salió o se cerró ese día (hora de Colombia)
   limite: z.coerce.number().int().min(1).max(500).default(100),
-  cursor: z.coerce.number().int().positive().optional()
-});
+  cursor: z.coerce.number().int().positive().optional(),
+  pagina: z.coerce.number().int().min(1).max(100_000).optional(),
+  porPagina: z.coerce.number().int().min(1).max(100).default(20)
+}).refine(d => !(d.pagina && d.cursor), { message: "Usa pagina o cursor, no los dos", path: ["cursor"] });
 
 // El mensajero solo manda el body vacío: la guía queda a su nombre y en cero.
 export const crear = z.object({

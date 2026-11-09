@@ -37,7 +37,7 @@ export default function Panel({ pintar }: { pintar: () => void }) {
   /** Atajos del panel: "pestaña|filtro|día". */
   const ir = (destino: string) => {
     const [t, f, d] = destino.split("|"); E.tabA = t;
-    if (t === "pedidos") { E.filtroA = f || "todos"; E.diaPedA = d === "hoy" ? h : ""; E.mensPedA = ""; E.buscarA = ""; E.limiteA = 100; }
+    if (t === "pedidos") { E.filtroA = f || "todos"; E.diaPedA = d === "hoy" ? h : ""; E.mensPedA = ""; E.buscarA = ""; E.paginaA = 1; }
     if (t === "mas") E.subMas = f || "panel";
     pintar(); scrollTo(0, 0);
   };

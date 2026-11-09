@@ -8,7 +8,7 @@ export const E = {
   rol: (leer("js_rol") || "admin") as "mensajero" | "admin",
   tabA: "inicio", tabM: "inicio", subMas: "panel",
   // Oficina → Pedidos
-  filtroA: "sin", buscarA: "", diaPedA: "", mensPedA: "", limiteA: 100,
+  filtroA: "sin", buscarA: "", diaPedA: "", mensPedA: "", paginaA: 1,
   // Oficina → Clientes
   filtroCli: "todos", buscarCli: "", diaCliF: "",
   // Oficina → Caja y Sueldos

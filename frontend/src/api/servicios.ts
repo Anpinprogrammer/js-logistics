@@ -1,7 +1,7 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
 import type { Archivo, TipoArchivo, Cliente, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
-  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera } from "./tipos";
+  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos } from "./tipos";
 import { FalloApi } from "./cliente";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
@@ -24,6 +24,13 @@ export interface FiltrosPedidos {
   cerrados?: boolean;
   buscar?: string;
   conDiferencia?: boolean;
+  /** "todas" incluye las diferencias ya revisadas. */
+  diferencia?: "todas" | "sinRevisar";
+  sinRemitente?: boolean;
+  cambioPendiente?: boolean;
+  sinServicio?: boolean;
+  /** AAAA-MM-DD: salió, se entregó o se devolvió ese día (hora de Colombia). */
+  dia?: string;
   limite?: number;
   cursor?: number;
 }
@@ -51,6 +58,9 @@ const limpio = (o: object) => Object.fromEntries(Object.entries(o).filter(([, v]
 
 export const pedidos = {
   listar: (f: FiltrosPedidos = {}) => datos<{ pedidos: Pedido[]; siguiente: number | null }>(api.get("/pedidos", { params: limpio(f) })),
+  /** Una página del paginador: el servidor filtra, cuenta y corta. */
+  pagina: (f: Omit<FiltrosPedidos, "limite" | "cursor">, pagina: number, porPagina: number) =>
+    datos<PaginaPedidos>(api.get("/pedidos", { params: { ...limpio(f), pagina, porPagina } })),
   obtener: (guia: string) => datos<{ pedido: Pedido }>(api.get(`/pedidos/${guia}`)).then(d => d.pedido),
   crear: (d: { mensajeroId?: string; clienteId?: string | null; valorServicio?: number; aCobrar?: number } = {}) =>
     datos<{ pedido: Pedido }>(api.post("/pedidos", d)).then(r => r.pedido),

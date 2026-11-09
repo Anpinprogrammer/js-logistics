@@ -72,6 +72,15 @@ export interface Pedido {
   mini: string | null;
 }
 
+/** Una página del paginador de pedidos (GET /pedidos?pagina=&porPagina=). */
+export interface PaginaPedidos {
+  pedidos: Pedido[];
+  pagina: number;
+  porPagina: number;
+  total: number;
+  paginas: number;
+}
+
 /** Fotos y firmas: la URL viene firmada por el servidor y vence en 1 hora. */
 export type TipoArchivo = "salida" | "mini" | "entrega" | "firma" | "previa";
 export interface Archivo {

@@ -12,11 +12,15 @@ const CON_INTENTOS = `
   LEFT JOIN clientes c ON c.id = p.cliente_id
   LEFT JOIN mensajeros m ON m.id = p.mensajero_id`;
 
+/** Inicio y fin (exclusivo) de un día de Colombia, que siempre es UTC−5. */
+const limitesDia = dia => { const ini = new Date(dia + "T00:00:00-05:00"); return [ini, new Date(ini.getTime() + 864e5)]; };
+
 /**
- * Lista con filtros. `alcance` lo pone el controlador según el rol: { mensajeroId } o { clienteId }
+ * Arma el WHERE de los filtros. `mensajeroId` o `clienteId` los pone el controlador según el rol,
  * para que cada quien vea solo lo suyo, igual que firestore.rules.
  */
-export async function listar({ estado, cerrados, mensajeroId, clienteId, desde, hasta, entregadoDesde, entregadoHasta, buscar, conDiferencia, limite = 100, cursor } = {}) {
+function filtrosSql({ estado, cerrados, mensajeroId, clienteId, desde, hasta, entregadoDesde, entregadoHasta, buscar, conDiferencia, diferencia,
+  sinRemitente, cambioPendiente, sinServicio, dia } = {}) {
   const cond = [], valores = [];
   const agregar = (sql, v) => { valores.push(v); cond.push(sql.replace("?", `$${valores.length}`)); };
   if (estado) agregar("p.estado = ?", estado);
@@ -27,18 +31,55 @@ export async function listar({ estado, cerrados, mensajeroId, clienteId, desde, 
   if (cerrados) cond.push("p.estado <> 'pendiente'");
   if (entregadoDesde) agregar("p.entregado >= ?", entregadoDesde); // por hora de entrega o devolución
   if (entregadoHasta) agregar("p.entregado < ?", entregadoHasta);
-  if (buscar) {
+  if (buscar) { // guía, quien recibió, remitente o mensajero, como el buscador de la app
     valores.push(`%${buscar.replace(/[\\%_]/g, c => "\\" + c)}%`);
-    cond.push(`(p.guia ILIKE $${valores.length} OR p.destinatario ILIKE $${valores.length})`);
+    const $ = `$${valores.length}`;
+    cond.push(`(p.guia ILIKE ${$} OR p.destinatario ILIKE ${$} OR c.nombre ILIKE ${$} OR m.nombre ILIKE ${$})`);
   }
-  if (conDiferencia) cond.push("p.dif_cobro <> 0 AND NOT p.dif_revisada");
-  if (cursor) agregar("p.n < ?", cursor); // paginación: el `n` más bajo de la página anterior
+  if (conDiferencia || diferencia === "sinRevisar") cond.push("p.dif_cobro <> 0 AND NOT p.dif_revisada");
+  else if (diferencia === "todas") cond.push("p.dif_cobro <> 0");
+  if (sinRemitente) cond.push("p.cliente_id IS NULL");
+  if (cambioPendiente) cond.push("p.cambio AND p.cambio_recibido IS NULL");
+  if (sinServicio) cond.push("p.estado = 'entregado' AND p.cliente_id IS NOT NULL AND p.valor_servicio = 0");
+  if (dia) { // como delDia() de la app: salió ese día, o se entregó o devolvió ese día
+    const [ini, fin] = limitesDia(dia);
+    valores.push(ini, fin);
+    const a = `$${valores.length - 1}`, b = `$${valores.length}`;
+    cond.push(`((p.creado >= ${a} AND p.creado < ${b}) OR (p.entregado >= ${a} AND p.entregado < ${b}))`);
+  }
+  return { cond, valores };
+}
+
+const donde = cond => (cond.length ? "WHERE " + cond.join(" AND ") : "");
+
+/** Lista por cursor: los `limite` pedidos siguientes, del más nuevo al más viejo. */
+export async function listar({ limite = 100, cursor, ...filtros } = {}) {
+  const { cond, valores } = filtrosSql(filtros);
+  if (cursor) { valores.push(cursor); cond.push(`p.n < $${valores.length}`); } // el `n` más bajo de la página anterior
   valores.push(limite);
-  const { rows } = await query(
-    `${CON_INTENTOS} ${cond.length ? "WHERE " + cond.join(" AND ") : ""} ORDER BY p.n DESC LIMIT $${valores.length}`,
+  const { rows } = await query(`${CON_INTENTOS} ${donde(cond)} ORDER BY p.n DESC LIMIT $${valores.length}`, valores);
+  return rows.map(filaAObjeto);
+}
+
+/**
+ * Lista por páginas numeradas, para el paginador de las pantallas. Si la página pedida ya no existe
+ * (por ejemplo, porque se borraron pedidos o cambió el filtro), devuelve la última y dice cuál mandó.
+ * Usa OFFSET: la pantalla salta a cualquier página, y con 20 por página el costo es bajo.
+ */
+export async function listarPagina({ pagina = 1, porPagina = 20, ...filtros } = {}) {
+  const { cond, valores } = filtrosSql(filtros);
+  const { rows: [c] } = await query(
+    `SELECT count(*)::int AS total FROM pedidos p
+     LEFT JOIN clientes c ON c.id = p.cliente_id LEFT JOIN mensajeros m ON m.id = p.mensajero_id ${donde(cond)}`,
     valores
   );
-  return rows.map(filaAObjeto);
+  const total = c.total, paginas = Math.max(1, Math.ceil(total / porPagina));
+  const actual = Math.min(pagina, paginas);
+  const { rows } = await query(
+    `${CON_INTENTOS} ${donde(cond)} ORDER BY p.n DESC LIMIT $${valores.length + 1} OFFSET $${valores.length + 2}`,
+    [...valores, porPagina, (actual - 1) * porPagina]
+  );
+  return { pedidos: rows.map(filaAObjeto), pagina: actual, porPagina, total, paginas };
 }
 
 export async function buscarPorGuia(guia, db = { query }) {
