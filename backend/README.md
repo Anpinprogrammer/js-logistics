@@ -217,7 +217,7 @@ Lo ya contado en un arqueo no se cambia: responde `409 YA_CONTADO` con el texto 
 | `PATCH /movimientos/:id` | `{ medio }`: el asistente, lo suyo en 24 h; lo demás: admin | Cambia el medio (queda `medioAntes`) o edita |
 | `DELETE /movimientos/:id` | oficina | Quita un pago (si ya se contó, registra el reverso) |
 | `POST /movimientos/reversar` | oficina | `{ ids }` reversa varios pagos |
-| `GET /clientes/saldos?dia=` | oficina | `{ clientes: [… saldo, delDia?], porCobrar, porPagar }` |
+| `GET /clientes/saldos?dia=&buscar=&filtro=&pagina=&porPagina=` | oficina | Clientes con su saldo. `filtro`: `todos`, `cobrar` o `pagar`. Con `pagina`/`porPagina` devuelve una página (`{ clientes, pagina, porPagina, total, paginas, totalClientes, porCobrar, porPagar, repetidos? }`); sin ellos, la lista completa. La app usa 8 en celular y 20 en computador |
 | `GET /clientes/:id/cuenta` | oficina, o el propio cliente | `{ cliente, saldo, filas, enRuta }` |
 | `GET /clientes/cuadre?dia=&clienteId=` | oficina | Recibos de cuadre del día |
 | `GET /clientes/repetidos` | admin | Grupos de clientes parecidos |

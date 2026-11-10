@@ -19,6 +19,7 @@ Con sesión, la app es **igual al prototipo** (`app/` del sistema viejo): mismo 
 - **Carga diferida:** el ingreso, cada modo (oficina y mensajero) y cada pestaña de la oficina van en archivos aparte con `perezoso()` (`lib/perezoso.ts`), que además los precarga. Una pestaña nueva se agrega igual en `oficina/Oficina.tsx`; no la importes directo desde `Marco.tsx`, o vuelve al archivo principal.
 - **Menú en el escritorio y en el celular:** el corte es 960 px (`useEscritorio()` en `lib/pantalla.ts`). En el escritorio el menú lateral muestra Resultados, Personal, Historial, Papelera y Respaldo como accesos directos (`ADMIN_ESCRITORIO` en `interna/Marco.tsx`, misma clave que `E.subMas`); en el celular esas sub-pestañas siguen dentro de **Más**, con sus chips, y las pestañas de abajo se cortan en 4 más un menú.
 - **Tema:** el claro/oscuro se pone con `data-theme="light"` o `"dark"` en el contenedor `.jsl` (`interna/tema.ts`); sin atributo sigue al sistema. La elección se guarda en `js_tema`. El botón está en el header de escritorio; en el celular está en el menú.
+- **Paginación de listas:** `usePorPagina()` (`lib/pantalla.ts`) devuelve 8 en celular y 20 en computador. Pedidos y Clientes piden la página al servidor; en demo la arman en memoria. El paginador compartido es `Paginador` de `interna/ui.tsx`.
 
 ## Reglas
 

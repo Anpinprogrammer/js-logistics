@@ -1,7 +1,7 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
 import type { Archivo, TipoArchivo, Cliente, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
-  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo } from "./tipos";
+  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes } from "./tipos";
 import { FalloApi } from "./cliente";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
@@ -91,6 +91,9 @@ export const pedidos = {
 
 export const clientes = {
   listar: (buscar = "") => datos<{ clientes: Cliente[] }>(api.get("/clientes", { params: limpio({ buscar, limite: 500 }) })).then(d => d.clientes),
+  /** Una página de la pestaña Clientes, con saldos y totales calculados por el servidor. */
+  pagina: (f: { filtro?: string; dia?: string; buscar?: string }, pagina: number, porPagina: number) =>
+    datos<PaginaClientes>(api.get("/clientes/saldos", { params: limpio({ ...f, pagina, porPagina }) })),
   obtener: (id: string) => datos<{ cliente: Cliente }>(api.get(`/clientes/${id}`)).then(d => d.cliente),
   movimientos: (id: string) => datos<{ movimientos: Movimiento[] }>(api.get(`/clientes/${id}/movimientos`)).then(d => d.movimientos),
   crear: (d: { nombre: string; telefono: string; tarifa: number; confirmarRepetido?: boolean }) =>

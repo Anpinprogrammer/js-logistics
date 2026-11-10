@@ -9,6 +9,7 @@ import { enTransaccion, guardar, borrar } from "./transaccion.js";
 import { registrar } from "./historial.js";
 import { calculosDe, exigirAdmin, exigirOficina, medioValido, numero, texto } from "./contexto.js";
 import { normNom, normTel } from "../helpers/calculos.js";
+import { sinTildes } from "../helpers/texto.js";
 
 const vistaParecido = d => ({ id: d.c.id, nombre: d.c.nombre, telefono: d.c.telefono || "", mismoNombre: d.mismoNom, mismoTelefono: d.mismoTel, igual: d.igual });
 
@@ -45,8 +46,44 @@ export async function editar(ctx, id, datos) {
   });
 }
 
-/** Lista de clientes con su saldo y, si se elige un día, lo que se movió ese día (pestaña Clientes). */
-export async function listaConSaldos(ctx, { dia } = {}) {
+/**
+ * Aplica búsqueda, filtro y paginación a la lista de clientes con saldo.
+ * Es pura para poder probarla sin base de datos.
+ */
+export function armarPaginaClientes(cs, { dia, buscar = "", filtro = "todos", pagina, porPagina } = {}) {
+  const k = c => (dia ? c.delDia : c.saldo);
+  const cobrar = cs.filter(c => k(c) < 0), pagar = cs.filter(c => k(c) > 0);
+  const porCobrar = { total: cobrar.reduce((a, c) => a - k(c), 0), clientes: cobrar.length };
+  const porPagar = { total: pagar.reduce((a, c) => a + k(c), 0), clientes: pagar.length };
+
+  const q = sinTildes(String(buscar || "").trim()), qt = String(buscar || "").replace(/\D/g, "");
+  const pasa = c => {
+    const bus = sinTildes(c.nombre) + " " + normTel(c.telefono);
+    return !q || bus.includes(q) || (qt.length >= 3 && bus.includes(qt));
+  };
+  const base = filtro === "cobrar" ? cobrar : filtro === "pagar" ? pagar : dia ? cs.filter(c => c.delDia) : cs;
+  const filtrados = base.filter(pasa);
+  const resultado = { clientes: filtrados, totalClientes: cs.length, porCobrar, porPagar };
+
+  // Sin pagina ni porPagina se mantiene la respuesta completa de siempre.
+  if (pagina === undefined && porPagina === undefined) return resultado;
+
+  const tam = Math.max(1, Math.min(100, Number(porPagina) || 20));
+  const paginas = Math.max(1, Math.ceil(filtrados.length / tam));
+  const actual = Math.min(Math.max(1, Number(pagina) || 1), paginas);
+  return {
+    ...resultado,
+    clientes: filtrados.slice((actual - 1) * tam, actual * tam),
+    pagina: actual,
+    porPagina: tam,
+    total: filtrados.length,
+    paginas
+  };
+}
+
+/** Lista de clientes con su saldo y, si se elige un día, lo que se movió ese día (pestaña Clientes).
+ *  Con `pagina`/`porPagina` corta la respuesta; sin ellos devuelve la lista completa (compatibilidad). */
+export async function listaConSaldos(ctx, { dia, buscar = "", filtro = "todos", pagina, porPagina } = {}) {
   exigirOficina(ctx.actor);
   if (dia && !esDia(dia)) throw datosInvalidos("El día no es válido.");
   const calc = await calculosDe(ctx.db, ["clientes", "pedidos", "movimientos"]);
@@ -54,11 +91,8 @@ export async function listaConSaldos(ctx, { dia } = {}) {
     ...c, saldo: calc.saldoCliente(c.id),
     ...(dia ? { delDia: calc.filasCuenta(c.id).filter(r => diaDe(r.fecha) === dia).reduce((a, r) => a + r.v, 0) } : {})
   }));
-  const k = c => (dia ? c.delDia : c.saldo), cobrar = cs.filter(c => k(c) < 0), pagar = cs.filter(c => k(c) > 0);
   return {
-    clientes: cs,
-    porCobrar: { total: cobrar.reduce((a, c) => a - k(c), 0), clientes: cobrar.length },
-    porPagar: { total: pagar.reduce((a, c) => a + k(c), 0), clientes: pagar.length },
+    ...armarPaginaClientes(cs, { dia, buscar, filtro, pagina, porPagina }),
     repetidos: ctx.actor.esAdmin ? calc.gruposRepetidos().length : undefined
   };
 }
