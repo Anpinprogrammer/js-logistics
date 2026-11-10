@@ -5,7 +5,7 @@ import {
   S, yo, hora, pesos, listaOrdenada, esRepartidor, tipoDe, cambioPendiente, sinServicio, delDia, nombreCliente, sinTildes, cerrado, gastoDe, pagoDomi,
   saldoPedido, metodoTxt, pedidoLiquidado, cambiaLoContado, corteCaja, CUENTAS_JS, METODOS, MEDIOS, MOTIVOS, type Metodo, type Medio, type Motivo, type Pedido,
 } from "../motor";
-import { Cab, EtqEstado, FiltroDia, FilaPedido, FotosGuia, IconoCamara, Paginador, pl, useVentana } from "../ui";
+import { Cab, EtqEstado, FiltroDia, FilaPedido, FotosGuia, IconoCamara, IconoInfo, Paginador, pl, useVentana } from "../ui";
 import { E } from "../estado";
 import { actualizarPedido, cambioEntregado, crearGuias, eliminarPedido, reabrir } from "../acciones";
 import { aPedido, motivoError, useDatos } from "../datos";
@@ -94,26 +94,35 @@ export default function Pedidos({ pintar }: { pintar: () => void }) {
   };
 
   return <>
-    <h1>Pedidos</h1><p className="sub">Asigna el remitente, el valor del servicio y el valor a cobrar a cada guía.</p>
-    {ofis.length ? <div className="acciones" style={{ margin: "0 0 14px", alignItems: "center" }}>
-      <button className="btn" id="fotoOfi" onClick={() => { if (camara.current) { camara.current.value = ""; camara.current.click(); } }}><IconoCamara chico /><span>Tomar foto del pedido</span></button>
-      <button className="btn sec" id="galeriaOfi" onClick={() => { if (galeria.current) { galeria.current.value = ""; galeria.current.click(); } }}>Subir fotos (varias)</button>
-      {ofis.length > 1 && <select id="ofiSel" ref={ofiSel} aria-label="Oficina encargada">{ofis.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select>}
-      <span className="sub">Queda a cargo de {ofis.length > 1 ? "la oficina elegida" : ofis[0].nombre}; el domicilio es 100% de JS.</span>
-      <input type="file" ref={camara} accept="image/*" capture="environment" className="oculto" onChange={e => fotos(e.target.files)} />
-      <input type="file" ref={galeria} accept="image/*" multiple className="oculto" onChange={e => fotos(e.target.files)} />
-    </div> : <div className="aviso">{yo.esAdmin ? "Para registrar pedidos con foto desde aquí, agrega en Más → Personal una persona de tipo “Oficina (JS)”." : "Para registrar pedidos con foto, el administrador debe crear la Oficina en Personal."}</div>}
-    {nCambio && f !== "cambio" ? <div className="aviso">{nCambio === 1 ? "Hay 1 prenda de cambio" : "Hay " + nCambio + " prendas de cambio"} por entregar a los clientes. Míralas en “Cambios por entregar”.</div> : null}
-    {nServ && f !== "serv" ? <div className="aviso alerta">{nServ === 1 ? "1 pedido entregado no tiene" : nServ + " pedidos entregados no tienen"} valor de servicio: el saldo del cliente queda mal hasta que lo pongas. <button className="btn chico" onClick={() => poner({ filtroA: "serv", paginaA: 1 })}>Verlos</button></div>
-      : f === "serv" ? <div className="aviso">Mostrando los pedidos entregados sin valor de servicio. Ábrelos y ponles el domicilio.</div> : null}
-    {nDif ? <div className="aviso alerta">{nDif === 1 ? "1 entrega tiene" : nDif + " entregas tienen"} un valor cobrado distinto al que debían cobrar. Revísalas en “Con diferencia”.</div> : null}
-    <div className="filtros">{([["sin", "Sin remitente"], ["pend", "Por entregar", porEntregar], ["ent", "Entregados"], ["dev", "Devueltos"], ["dif", "Con diferencia"], ["cambio", "Cambios por entregar"], ["todos", "Todos"]] as [string, string, number?][])
-      .map(([k, t, n]) => <button key={k} aria-pressed={f === k} onClick={() => poner({ filtroA: k, paginaA: 1 })}>{t}{n !== undefined ? <> <span className="num">{n}</span></> : null}</button>)}</div>
-    <div className="linea2"><div className="campo" style={{ flex: 2, minWidth: 220 }}><input id="buscar" type="search" placeholder="Buscar guía, remitente, destinatario o mensajero" value={buscar} aria-label="Buscar"
-      onChange={e => { const x = e.target.value; setBuscar(x); clearTimeout(tBuscar.current); tBuscar.current = window.setTimeout(() => poner({ buscarA: x, paginaA: 1 }), 300); }} /></div>
-      <div className="campo"><select id="mensPed" aria-label="Filtrar por mensajero" value={E.mensPedA} onChange={e => poner({ mensPedA: e.target.value, paginaA: 1 })}><option value="">Todos los mensajeros</option>{repartidores.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div></div>
+    <header className="cab-pedidos">
+      <div className="cab-pedidos-txt"><h1>Pedidos</h1><p className="sub">Asigna el remitente, el valor del servicio y el valor a cobrar a cada guía.</p></div>
+      {ofis.length ? <div className="acciones cab-pedidos-acciones">
+        <button className="btn" id="fotoOfi" onClick={() => { if (camara.current) { camara.current.value = ""; camara.current.click(); } }}><IconoCamara chico /><span>Tomar foto del pedido</span></button>
+        <button className="btn sec" id="galeriaOfi" onClick={() => { if (galeria.current) { galeria.current.value = ""; galeria.current.click(); } }}>Subir fotos (varias)</button>
+        <label className="ofi-sel" title={"Queda a cargo de " + (ofis.length > 1 ? "la oficina elegida" : ofis[0].nombre) + ". El domicilio es 100% de JS."}>
+          <select id="ofiSel" ref={ofiSel} aria-label="Oficina encargada">{ofis.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select>
+        </label>
+        <input type="file" ref={camara} accept="image/*" capture="environment" className="oculto" onChange={e => fotos(e.target.files)} />
+        <input type="file" ref={galeria} accept="image/*" multiple className="oculto" onChange={e => fotos(e.target.files)} />
+      </div> : <div className="aviso">{yo.esAdmin ? "Para registrar pedidos con foto desde aquí, agrega en Más → Personal una persona de tipo “Oficina (JS)”." : "Para registrar pedidos con foto, el administrador debe crear la Oficina en Personal."}</div>}
+    </header>
+    {nCambio && f !== "cambio" ? <div className="banner amber"><IconoInfo /><span>{nCambio === 1 ? "Hay 1 prenda de cambio" : "Hay " + nCambio + " prendas de cambio"} por entregar a los clientes.</span><button onClick={() => poner({ filtroA: "cambio", paginaA: 1 })}>Ver cambios</button></div> : null}
+    {nServ && f !== "serv" ? <div className="banner alerta"><IconoInfo /><span>{nServ === 1 ? "1 pedido entregado no tiene" : nServ + " pedidos entregados no tienen"} valor de servicio: el saldo del cliente queda mal hasta que lo pongas.</span><button onClick={() => poner({ filtroA: "serv", paginaA: 1 })}>Verlos</button></div>
+      : f === "serv" ? <div className="banner info"><IconoInfo /><span>Mostrando los pedidos entregados sin valor de servicio. Ábrelos y ponles el domicilio.</span></div> : null}
+    {nDif ? <div className="banner alerta"><IconoInfo /><span>{nDif === 1 ? "1 entrega tiene" : nDif + " entregas tienen"} un valor cobrado distinto al que debían cobrar.</span><button onClick={() => poner({ filtroA: "dif", paginaA: 1 })}>Verlas</button></div> : null}
+    <div className="toolbar-pedidos">
+      <div className="tp-filtros">
+        <div className="campo"><input id="buscar" type="search" placeholder="Buscar guía, remitente…" value={buscar} aria-label="Buscar guía, remitente, destinatario o mensajero"
+          onChange={e => { const x = e.target.value; setBuscar(x); clearTimeout(tBuscar.current); tBuscar.current = window.setTimeout(() => poner({ buscarA: x, paginaA: 1 }), 300); }} /></div>
+        <div className="campo"><select id="mensPed" aria-label="Filtrar por mensajero" value={E.mensPedA} onChange={e => poner({ mensPedA: e.target.value, paginaA: 1 })}><option value="">Todos los mensajeros</option>{repartidores.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div>
+      </div>
+      <div className="seg seg-estado" role="group" aria-label="Filtrar por estado">
+        {([["sin", "Sin remitente"], ["pend", "Por entregar", porEntregar], ["ent", "Entregados"], ["dev", "Devueltos"], ["dif", "Con diferencia"], ["cambio", "Cambios"], ["todos", "Todos"]] as [string, string, number?][])
+          .map(([k, t, n]) => <button key={k} aria-pressed={f === k} onClick={() => poner({ filtroA: k, paginaA: 1 })}>{t}{n !== undefined ? <> <span className="num">{n}</span></> : null}</button>)}
+      </div>
+      <div className="tp-fecha"><FiltroDia compacto id="diaPed" d={E.diaPedA} poner={d => poner({ diaPedA: d, paginaA: 1 })} /></div>
+    </div>
     {enBloque.length ? <div className="acciones" style={{ margin: "6px 0" }}><button className="btn" id="enBloque" onClick={() => v.abrir(<EnBloque modo={f} lista={enBloque} />)}>{f === "sin" ? "Asignar remitente a varios" : "Poner domicilio a varios"} ({enBloque.length})</button></div> : null}
-    <FiltroDia d={E.diaPedA} poner={d => poner({ diaPedA: d, paginaA: 1 })} />
     <div ref={arriba} style={{ scrollMarginTop: 90 }} />
     {pag && (E.diaPedA || E.mensPedA) ? <p className="sub">{total} {pl(total, "pedido")}{E.mensPedA ? " de " + (S.mensajeros[E.mensPedA]?.nombre || "") : ""}{E.diaPedA ? " que salieron o se cerraron ese día" : ""}</p> : null}
     {q.isError ? <div className="aviso alerta">No se pudo traer la lista: {motivoError(q.error)} <button className="btn chico" onClick={() => q.refetch()}>Intentar otra vez</button></div>

@@ -17,6 +17,21 @@ export const movimiento = z.looseObject({
 });
 export const reversar = z.object({ ids: z.array(id).min(1).max(500) });
 
+/** Pestaña Cuentas: página de movimientos de clientes y ganancias por cliente. */
+const pagina = z.coerce.number().int().min(1).optional();
+const porPagina = z.coerce.number().int().min(1).max(100).optional();
+export const movimientosPagina = z.object({
+  buscar: texto(80).optional(),
+  tipo: z.enum(["todos", "pagos", "compras", "ganancias"]).default("todos"),
+  desde: dia.optional(), hasta: dia.optional(), pagina, porPagina
+});
+export const gananciasPagina = z.object({ buscar: texto(80).optional(), desde: dia.optional(), hasta: dia.optional(), pagina, porPagina });
+export const movimientosCuentaPagina = z.object({
+  dia: dia.optional(),
+  medio: z.enum(["efectivo", "nequi", "bancolombia"]).optional(),
+  pagina, porPagina
+});
+
 export const recaudo = z.looseObject({ mensajeroId: id.optional(), valor: valor.optional(), medio: z.string().max(20).optional(), nota: texto(200).optional(), fecha });
 
 export const liquidacion = z.looseObject({

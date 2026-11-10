@@ -18,7 +18,21 @@ export function usePorPagina() {
   return esComputador ? POR_PAGINA.computador : POR_PAGINA.celular;
 }
 
+/** Cuentas → Movimientos y Ganancias: 6 filas en celular y 15 en computador. */
+export const POR_PAGINA_CUENTAS = { celular: 6, computador: 15 } as const;
+export function usePorPaginaCuentas() {
+  const esComputador = useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false);
+  return esComputador ? POR_PAGINA_CUENTAS.computador : POR_PAGINA_CUENTAS.celular;
+}
+
 /** `true` desde 960 px: ahí se muestra el menú lateral y se ocultan las pestañas del celular. */
 export function useEscritorio() {
   return useSyncExternalStore(suscribirEscritorio, esEscritorioAhora, () => false);
+}
+
+/** Cuentas → Movimientos de las cuentas internas: 5 filas en celular y 10 en computador. */
+export const POR_PAGINA_INTERNOS = { celular: 5, computador: 10 } as const;
+export function usePorPaginaInternos() {
+  const esComputador = useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false);
+  return esComputador ? POR_PAGINA_INTERNOS.computador : POR_PAGINA_INTERNOS.celular;
 }

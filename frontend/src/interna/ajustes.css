@@ -20,6 +20,8 @@
 /* Menú lateral en computador: pestañas agrupadas por sección.
    Los títulos de sección van pequeños, en mayúsculas y atenuados; los accesos conservan su tamaño y contraste. */
 @media (min-width:960px){
+  .jsl .lateral{transition:width .3s ease,padding .3s ease}
+  .jsl .barra,.jsl main{transition:margin-left .3s ease}
   .jsl .marca-lat{padding:0 8px 18px;margin:0 -14px 14px;padding-left:22px;border-bottom:1px solid rgba(255,255,255,.08)}
   .jsl #navLateral{gap:4px}
   .jsl .lat-grupo{display:flex;flex-direction:column;gap:1px}
@@ -29,6 +31,25 @@
   .jsl #navLateral button svg{opacity:.9}
   .jsl #navLateral button:hover svg,.jsl #navLateral button[aria-current="page"] svg{opacity:1}
   .jsl #navLateral button[aria-current="page"]{background:rgba(59,163,230,.14);color:var(--marca2);border-left-color:var(--marca2)}
+  /* Pie del menú: colapsar/expandir. */
+  .jsl .lat-pie{margin-top:auto;padding:12px 0 0;border-top:1px solid rgba(255,255,255,.08);opacity:1}
+  .jsl .lat-pie .plegar{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:10px;border:0;border-radius:10px;background:none;color:var(--lateral-suave);font-size:.75rem;font-weight:500;text-align:left;transition:background .15s,color .15s}
+  .jsl .lat-pie .plegar:hover{background:rgba(255,255,255,.07);color:#fff}
+  .jsl .lat-pie .plegar svg{width:18px;height:18px;flex:none}
+}
+
+/* Menú colapsado (solo escritorio): ancho mínimo, solo íconos y el nombre en el title. */
+@media (min-width:960px){
+  .jsl.menu-colapsado .lateral{width:76px;padding-left:10px;padding-right:10px}
+  .jsl.menu-colapsado .barra,.jsl.menu-colapsado main{margin-left:76px}
+  .jsl.menu-colapsado .marca-lat{justify-content:center;padding:0 0 16px;margin:0 0 12px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .jsl.menu-colapsado .marca-lat span{display:none}
+  .jsl.menu-colapsado .lat-titulo{display:none}
+  .jsl.menu-colapsado .lat-grupo + .lat-grupo{margin-top:8px;padding-top:8px}
+  .jsl.menu-colapsado #navLateral button{position:relative;justify-content:center;padding:10px;border-left-width:0}
+  .jsl.menu-colapsado #navLateral button .t{display:none}
+  .jsl.menu-colapsado #navLateral button .num{position:absolute;top:2px;right:2px;margin:0;min-width:16px;padding:0 4px;font-size:.62rem;line-height:15px}
+  .jsl.menu-colapsado .lat-pie .plegar{justify-content:center}
 }
 
 /* Paginador de listas (Pedidos): botones grandes para el dedo en el celular */
@@ -38,64 +59,281 @@
 .jsl .paginador .sub{text-align:center;flex:1;min-width:0;margin:0}
 @media (max-width:420px){.jsl .paginador .pag-rango{display:none}}
 
-/* ---------- Caja: fichas del cierre y tarjetas de mensajeros ---------- */
-/* Paso 1 del cierre: una ficha por mensajero, con la plata pendiente y "Recibir" a la derecha. */
-.jsl .fichas{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px}
-.jsl .ficha{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;padding:9px 12px;border:1px solid var(--linea);border-radius:12px;background:var(--hueco)}
+/* ---------- Caja: cierre del día, fichas y tarjetas de mensajeros ---------- */
+/* Bloque del cierre: una tarjeta con un bloque por paso. */
+.jsl .cierre{background:var(--papel);border:1px solid var(--linea);border-radius:var(--radio);padding:18px;box-shadow:var(--sombra);margin-bottom:24px}
+.jsl .cierre-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.jsl .cierre-cab h2{margin:0;font-size:1.15rem}
+.jsl .cierre-cab .sub{margin:2px 0 0}
+.jsl .pasos{display:grid;gap:12px}
+.jsl .paso{background:var(--hueco);border:1px solid var(--linea);border-radius:12px;padding:14px 16px}
+.jsl .paso-cab{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.jsl .paso-cab b{font-size:.95rem;font-weight:600;min-width:0}
+.jsl .paso-accion{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.jsl .paso-tag{flex:none;font-size:.68rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--mango-claro);color:var(--marca)}
+.jsl .paso-tag.ok{background:var(--verde-claro);color:var(--verde)}
+.jsl .paso-tag.pend{background:var(--amarillo-claro);color:var(--amarillo)}
+.jsl .paso-detalle{margin-top:6px;font-size:.86rem;color:var(--suave)}
+
+/* Paso 1: una ficha por mensajero, con el nombre, la plata y "Recibir" a la derecha. */
+.jsl .fichas{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+.jsl .ficha{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;padding:11px 12px;border:1px solid var(--linea);border-radius:10px;background:var(--papel)}
 .jsl .ficha-info{display:flex;flex-direction:column;min-width:0;line-height:1.3}
-.jsl .ficha-info b{font-size:.86rem;color:var(--tinta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.jsl .ficha-info span{font-size:.82rem;font-weight:600;font-variant-numeric:tabular-nums;color:var(--suave)}
+.jsl .ficha-info b{font-size:.84rem;color:var(--tinta);overflow-wrap:anywhere}
+.jsl .ficha-info span{font-size:.95rem;font-weight:700;font-variant-numeric:tabular-nums;color:var(--tinta)}
 .jsl .ficha-info span.neg{color:var(--rojo)}
 .jsl .ficha .btn{flex:none;min-width:80px;justify-content:center}
+/* "Recibir" sobrio: verde tenue en vez del botón sólido. */
+.jsl .btn.recibir{background:var(--verde-claro);color:var(--verde);border:1px solid color-mix(in srgb,var(--verde) 32%,transparent);transition:background .15s,border-color .15s}
+.jsl .btn.recibir:hover{background:color-mix(in srgb,var(--verde) 20%,var(--verde-claro));border-color:color-mix(in srgb,var(--verde) 55%,transparent);filter:none}
 
 /* Tarjetas de mensajeros: retícula estricta y todas de la misma altura. */
-.jsl .mgrid-mens{display:grid;grid-template-columns:1fr;gap:12px;align-items:stretch}
-.jsl .mcard-mens{display:flex;flex-direction:column;min-width:0;padding:13px}
-.jsl .mcard-mens .mcard-top{flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:2px}
+.jsl .mgrid-mens{display:grid;grid-template-columns:1fr;gap:20px;align-items:stretch;width:100%}
+.jsl .mcard-mens{display:flex;flex-direction:column;min-width:0;width:100%;padding:20px;border:1px solid var(--linea)}
+.jsl .mcard-mens .mcard-top{flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:4px}
 .jsl .mcard-mens .mcard-top b{font-size:1rem;font-weight:700;line-height:1.2;text-transform:uppercase;letter-spacing:.02em;min-width:0;overflow-wrap:anywhere}
-.jsl .mcard-mens .mcard-top .acciones{margin:0;gap:8px;flex-wrap:wrap}
-.jsl .mcard-mens .mcard-top .acciones .btn{flex:1 1 auto;justify-content:center}
+.jsl .mcard-mens .mcard-periodo{display:block;font-size:.85rem;margin:2px 0 12px}
+.jsl .mcard-mens .mcard-top .acciones{margin:0;margin-left:auto;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.jsl .mcard-mens .mcard-top .acciones .btn{flex:none;justify-content:center;padding-inline:10px}
 /* Cuerpo: clave-valor alineado con una línea fina entre filas. */
-.jsl .mcard-mens .datos{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 8px;margin:10px 0 0;font-size:.78rem}
-.jsl .mcard-mens .datos dt,.jsl .mcard-mens .datos dd{padding:5px 0;border-bottom:1px solid var(--linea)}
+.jsl .mcard-mens .datos{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 10px;margin:10px 0 0;font-size:.85rem}
+.jsl .mcard-mens .datos dt,.jsl .mcard-mens .datos dd{padding:6px 0;border-bottom:1px solid var(--linea)}
 .jsl .mcard-mens .datos dt{min-width:0;color:var(--suave)}
 .jsl .mcard-mens .datos dd{text-align:right;white-space:normal;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
-.jsl .mcard-mens .debe dt,.jsl .mcard-mens .debe dd{font-size:.92rem;font-weight:700;padding-top:7px;padding-bottom:7px}
+.jsl .mcard-mens .debe dt,.jsl .mcard-mens .debe dd{font-size:.95rem;font-weight:700;color:var(--rojo);padding-top:7px;padding-bottom:7px}
 /* Pie: siempre al fondo, así los "Liquidar" quedan en la misma línea. */
-.jsl .mcard-mens .liq{margin-top:auto;padding-top:12px;border-top:1px solid var(--linea);gap:8px;flex-wrap:wrap}
+.jsl .mcard-mens .liq{margin-top:auto;padding-top:16px;border-top:1px solid var(--linea);gap:10px;flex-wrap:wrap;justify-content:space-between;align-items:center}
 .jsl .mcard-mens .liq-est{font-size:.84rem;font-weight:600;flex:1 1 auto;min-width:0}
 .jsl .mcard-mens .liq .btn{flex:none}
 
-/* KPIs de la caja (Total en caja, De clientes, Sueldos…): misma altura y truncado limpio. */
-.jsl .cifras-caja{grid-template-columns:1fr;align-items:stretch}
-.jsl .cifras-caja .cifra{display:flex;flex-direction:column;min-width:0}
-.jsl .cifras-caja .cifra b{font-size:1.15rem;overflow-wrap:normal;word-break:normal}
-.jsl .cifras-caja .cifra span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+/* KPIs de caja: 1/2/4 columnas, etiqueta arriba y desglose sin recortes. */
+.jsl .cifras-caja{grid-template-columns:1fr;align-items:stretch;gap:16px}
+.jsl .cifras-caja .cifra{display:flex;flex-direction:column;min-width:0;gap:2px;padding:16px 18px}
+.jsl .cifras-caja .cifra > span:first-child{font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--suave)}
+.jsl .cifras-caja .cifra b{font-size:1.3rem;overflow-wrap:normal;word-break:normal;letter-spacing:-.01em}
+.jsl .cifras-caja .cifra b + span{font-size:.82rem;font-weight:400;letter-spacing:0;text-transform:none;color:var(--suave);overflow-wrap:anywhere}
+.jsl .cifras-caja .cifra.fuerte > span:first-child{color:inherit;opacity:.75}
+.jsl .cifras-caja .cifra.fuerte b + span{color:inherit;opacity:.78}
+/* Botones de la caja general, alineados a la derecha del bloque. */
+.jsl .acciones-caja{justify-content:flex-end;margin:18px 0}
 
 @media (min-width:640px){
   .jsl .fichas{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (min-width:768px){
   .jsl .mgrid-mens{grid-template-columns:repeat(2,minmax(0,1fr))}
   .jsl .cifras-caja{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
-@media (min-width:768px){
-  .jsl .mgrid-mens{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .jsl .cifras-caja{grid-template-columns:repeat(3,minmax(0,1fr))}
-}
-/* Las fichas necesitan ~230 px para que el nombre y el monto no se corten:
-   con el menú lateral de 248 px, 4 columnas solo caben desde 1280 px. */
+/* Con el menú lateral, 4 fichas solo caben desde 1280 px sin partir los nombres. */
 @media (min-width:900px){
   .jsl .fichas{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media (min-width:1024px){
-  .jsl .mgrid-mens{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .jsl .mgrid-mens{grid-template-columns:repeat(3,minmax(0,1fr))}
   .jsl .cifras-caja{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
 @media (min-width:1280px){
   .jsl .fichas{grid-template-columns:repeat(4,minmax(0,1fr))}
-  .jsl .mgrid-mens{grid-template-columns:repeat(5,minmax(0,1fr))}
-  .jsl .cifras-caja{grid-template-columns:repeat(8,minmax(0,1fr));gap:10px}
-  .jsl .cifras-caja .cifra{padding:12px 10px}
-  .jsl .cifras-caja .cifra b{font-size:clamp(.85rem,1.05vw,1.15rem);letter-spacing:-.02em}
+}
+
+/* Caja de oficina: las tarjetas se reparten todo el ancho disponible. */
+.jsl .mgrid-oficina{display:grid;grid-template-columns:1fr;gap:16px;width:100%}
+@media (min-width:768px){
+  .jsl .mgrid-oficina{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+}
+.jsl .mcard-oficina{display:flex;flex-direction:column;width:100%;height:100%;min-width:0;background:var(--hueco);border:1px solid var(--linea);border-radius:12px;padding:20px;box-shadow:var(--sombra)}
+.jsl .mcard-oficina .mcard-top{margin-bottom:2px;gap:10px;flex-wrap:wrap}
+.jsl .mcard-oficina .mcard-top b{font-size:1rem;font-weight:700;color:var(--tinta);min-width:0;overflow-wrap:anywhere}
+.jsl .mcard-oficina .oficina-acciones{margin:0;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.jsl .mcard-oficina .oficina-sub{display:block;font-size:.75rem;color:var(--suave);margin:0 0 16px}
+.jsl .mcard-oficina .datos{display:flex;flex-direction:column;margin:0}
+.jsl .mcard-oficina .dato{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;font-size:.88rem;border-bottom:1px solid var(--linea)}
+.jsl .mcard-oficina .dato dt{color:var(--suave)}
+.jsl .mcard-oficina .dato dd{margin:0;font-weight:600;font-variant-numeric:tabular-nums}
+.jsl .mcard-oficina .dato.total{border-bottom:0;padding-top:10px;font-size:1.05rem;font-weight:700;color:var(--amarillo)}
+.jsl .mcard-oficina .dato.total dt{color:inherit;font-weight:700}
+.jsl .mcard-oficina .oficina-pie{margin-top:auto;padding-top:12px}
+.jsl .mcard-oficina .oficina-pie .sub{margin:0;font-size:.8rem}
+.jsl .mcard-oficina .tabla-env{margin-top:6px}
+
+/* ---------- Pedidos: cabecera, avisos compactos y toolbar ---------- */
+.jsl .cab-pedidos{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.jsl .cab-pedidos-txt{min-width:0}
+.jsl .cab-pedidos h1{margin:0}
+.jsl .cab-pedidos .sub{margin:2px 0 0}
+.jsl .cab-pedidos-acciones{margin:0;align-items:center;justify-content:flex-end}
+/* Selector de oficina sobrio, con flecha propia y aclaración al pasar el mouse. */
+.jsl .ofi-sel{position:relative;display:inline-flex}
+.jsl .ofi-sel select{appearance:none;max-width:190px;border:1px solid var(--linea);background:var(--papel);color:var(--tinta);border-radius:10px;padding:9px 30px 9px 12px;font-size:.78rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;text-overflow:ellipsis}
+.jsl .ofi-sel::after{content:"▾";position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:.7rem;color:var(--suave)}
+
+/* Avisos compactos: una línea, con ícono y acción a la derecha. */
+.jsl .banner{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:9px 14px;border-radius:10px;border:1px solid transparent;font-size:.84rem}
+.jsl .banner svg{width:17px;height:17px;flex:none}
+.jsl .banner > span{flex:1;min-width:0}
+.jsl .banner button{flex:none;border:0;background:none;color:inherit;font-weight:600;font-size:.82rem;text-decoration:underline;padding:2px 4px;border-radius:6px}
+.jsl .banner button:hover{background:rgba(0,0,0,.08)}
+.jsl .banner.amber{background:var(--amarillo-claro);border-color:color-mix(in srgb,var(--amarillo) 22%,transparent);color:var(--amarillo)}
+.jsl .banner.alerta{background:var(--rojo-claro);border-color:color-mix(in srgb,var(--rojo) 22%,transparent);color:var(--rojo)}
+.jsl .banner.info{background:var(--mango-claro);border-color:color-mix(in srgb,var(--marca) 20%,transparent);color:var(--marca)}
+
+/* Toolbar de Pedidos: apilada en el celular, 2 filas en tablet y 1 fila desde 1280 px. */
+.jsl .toolbar-pedidos{display:flex;flex-direction:column;align-items:stretch;gap:12px;background:var(--hueco);border:1px solid var(--linea);border-radius:12px;padding:12px;margin-bottom:18px}
+.jsl .tp-filtros{display:grid;grid-template-columns:1fr;gap:8px;width:100%;min-width:0}
+.jsl .tp-filtros .campo{margin:0;min-width:0}
+.jsl .tp-filtros .campo select{appearance:none;-webkit-appearance:none;min-width:210px;width:auto;max-width:260px;padding:8px 36px 8px 16px;background-color:var(--papel);background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:9px 9px}
+.jsl .tp-fecha{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-width:0}
+.jsl .toolbar-pedidos .seg-estado{width:100%;min-width:0;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;padding:4px;gap:2px}
+.jsl .toolbar-pedidos .seg-estado::-webkit-scrollbar{display:none}
+.jsl .toolbar-pedidos .seg-estado button{flex:none;white-space:nowrap;padding:6px 12px;font-size:.78rem;border-radius:999px}
+.jsl .toolbar-pedidos .seg-estado button:not([aria-pressed="true"]){background:transparent;color:var(--suave)}
+.jsl .toolbar-pedidos .seg-estado button:not([aria-pressed="true"]):hover{background:var(--papel);color:var(--tinta)}
+.jsl .toolbar-pedidos .seg-estado button[aria-pressed="true"]{background:var(--marca2);color:#fff;box-shadow:0 1px 2px rgba(16,24,40,.28)}
+.jsl .toolbar-pedidos .seg-estado .num{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--rojo);color:#fff;font-size:.66rem;text-align:center;line-height:17px}
+.jsl .toolbar-pedidos .seg-estado button[aria-pressed="true"] .num{background:#fff;color:var(--lateral)}
+.jsl .toolbar-pedidos .filtro-dia.compacto{width:auto;justify-content:center;margin:0;flex-wrap:wrap}
+@media (min-width:640px){
+  .jsl .tp-filtros{grid-template-columns:1fr 1fr}
+}
+/* Tablet y laptop pequeña: búsqueda y mensajero a la izquierda, fecha a la derecha; estados abajo. */
+@media (min-width:768px){
+  .jsl .toolbar-pedidos{display:grid;grid-template-columns:1fr auto;grid-template-areas:"filtros fecha" "estado estado";column-gap:12px;row-gap:10px}
+  .jsl .tp-filtros{grid-area:filtros;display:flex;align-items:center;gap:8px;width:auto}
+  .jsl .tp-filtros .campo:first-child{flex:1 1 220px;max-width:300px}
+  .jsl .tp-filtros .campo:last-child{flex:0 0 auto;width:auto;min-width:210px}
+  .jsl .toolbar-pedidos .seg-estado{grid-area:estado}
+  .jsl .tp-fecha{grid-area:fecha;width:auto;justify-content:flex-end}
+  .jsl .toolbar-pedidos .filtro-dia.compacto{width:auto;justify-content:flex-end}
+}
+/* Escritorio grande: todo en una fila, con separadores verticales. */
+@media (min-width:1280px){
+  .jsl .toolbar-pedidos{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:12px}
+  .jsl .tp-filtros{flex:none;display:flex;gap:8px}
+  .jsl .tp-filtros .campo:first-child{flex:0 0 240px;max-width:240px}
+  .jsl .tp-filtros .campo:last-child{flex:0 0 auto;width:auto;min-width:210px}
+  .jsl .toolbar-pedidos .seg-estado{flex:0 1 auto;width:fit-content;gap:4px}
+  .jsl .toolbar-pedidos .seg-estado button{padding:6px 16px}
+  .jsl .tp-fecha{width:auto}
+  .jsl .toolbar-pedidos .filtro-dia.compacto{flex:none;width:auto;justify-content:flex-end}
+}
+@media (max-width:767px){
+  .jsl .tp-filtros .campo select{width:100%;max-width:none}
+}
+@media (max-width:520px){
+  .jsl .cab-pedidos-acciones{width:100%}
+  .jsl .cab-pedidos-acciones .btn{flex:1 1 auto;justify-content:center}
+  .jsl .cab-pedidos .ofi-sel{flex:1 1 100%}
+  .jsl .ofi-sel select{width:100%;max-width:none}
+}
+
+/* ---------- Cuentas: sub-pestañas, liquidez y filtros ---------- */
+/* Cabecera de Cuentas: sub-pestañas a la izquierda y "+ Nueva cuenta" a la derecha. */
+.jsl .cab-cuentas{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;width:100%;margin-bottom:18px}
+.jsl .cab-cuentas .subtabs{margin:0}
+.jsl .btn.nueva-cuenta{padding:8px 14px;font-size:.75rem;font-weight:600;border-radius:8px;background:var(--marca2);white-space:nowrap;box-shadow:0 1px 2px rgba(16,24,40,.2)}
+.jsl .btn.nueva-cuenta:hover{filter:brightness(1.08)}
+@media (max-width:600px){
+  .jsl .cab-cuentas{flex-direction:column;align-items:stretch}
+  .jsl .btn.nueva-cuenta{justify-content:center}
+}
+
+/* Tarjetas de las cuentas internas: 1 / 2 / 3 columnas, todas del mismo ancho. */
+.jsl .mgrid-cuentas{display:grid;grid-template-columns:1fr;gap:16px;width:100%;margin-top:24px}
+@media (min-width:768px){.jsl .mgrid-cuentas{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1024px){.jsl .mgrid-cuentas{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.jsl .mcard-cuenta{width:100%;padding:20px;border:1px solid var(--linea);display:flex;flex-direction:column;justify-content:space-between}
+.jsl .mcard-cuenta .mcard-top{margin-bottom:2px;gap:10px;flex-wrap:wrap;align-items:flex-start}
+.jsl .mcard-cuenta .mcard-top b{font-size:1rem;font-weight:700;color:var(--tinta);min-width:0;overflow-wrap:anywhere}
+.jsl .mcard-cuenta .acciones{margin:0 0 0 auto;gap:8px;flex-wrap:nowrap;justify-content:flex-end;flex:none}
+.jsl .mcard-cuenta-sub{display:block;font-size:.75rem;color:var(--suave);margin:8px 0}
+.jsl .mcard-cuenta .datos{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0;padding-top:12px;border-top:1px solid var(--linea);font-size:.88rem;font-weight:600}
+.jsl .mcard-cuenta .datos dt{color:var(--suave)}
+.jsl .mcard-cuenta .datos dd{margin:0;font-weight:700}
+.jsl .cifras-cuentas{margin-bottom:16px}
+.jsl .cifras-cuentas .cifra b{font-size:1.25rem}
+.jsl .mgrid-cuentas{margin-bottom:4px}
+/* Movimientos de las cuentas: título y filtros en una barra; en móvil se apilan. */
+.jsl .cab-mov-cuentas{display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:16px;width:100%;margin:24px 0 16px}
+@media (min-width:640px){.jsl .cab-mov-cuentas{flex-direction:row;align-items:center}}
+.jsl .cab-mov-cuentas h2{margin:0;font-size:1.125rem;font-weight:700;color:var(--tinta);flex:none}
+.jsl .cab-mov-cuentas .filtros-mov{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:flex-start;min-width:0}
+.jsl .cab-mov-cuentas .filtro-dia.compacto{margin:0}
+/* Selector de medio: flecha propia y aire a la derecha para que no toque el borde. */
+.jsl .sel-medio{appearance:none;-webkit-appearance:none;min-width:170px;padding:8px 36px 8px 16px;border:1px solid var(--linea);border-radius:8px;background-color:var(--papel);color:var(--tinta);font-size:.75rem;font-weight:500;cursor:pointer;background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:9px 9px;transition:border-color .15s}
+.jsl .sel-medio:hover{border-color:var(--suave)}
+@media (max-width:600px){
+  .jsl .cab-mov-cuentas .filtro-dia.compacto{flex:1 1 100%}
+  .jsl .sel-medio{width:100%}
+}
+
+/* Cabecera de Ganancias: título y descripción a la izquierda; búsqueda por cliente a la derecha. */
+.jsl .cab-ganancias{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px}
+.jsl .cab-ganancias h2{margin:0}
+.jsl .cab-ganancias .sub{margin:2px 0 0}
+.jsl .cab-ganancias .campo{width:320px;max-width:100%;margin:0}
+@media (max-width:600px){
+  .jsl .cab-ganancias{flex-direction:column;align-items:stretch}
+  .jsl .cab-ganancias .campo{width:100%}
+}
+
+/* Toolbar de "Movimientos y ganancias": columna en móvil, 2 filas en tablet y 1 fila en escritorio. */
+.jsl .toolbar-cuentas{display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;gap:12px;width:100%;background:var(--hueco);border:1px solid var(--linea);border-radius:12px;padding:12px;margin:16px 0}
+.jsl .toolbar-cuentas .campo{width:100%;margin:0;min-width:0}
+.jsl .toolbar-cuentas .seg-tipo{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%;padding:4px;border-radius:8px;background:var(--papel);box-shadow:inset 0 0 0 1px var(--linea);flex:none}
+.jsl .toolbar-cuentas .seg-tipo button{flex:1 1 0;justify-content:center;padding:6px 12px;font-size:.75rem;font-weight:600;white-space:nowrap;border-radius:6px;color:var(--suave);background:transparent}
+.jsl .toolbar-cuentas .seg-tipo button:hover{background:var(--hueco);color:var(--tinta)}
+.jsl .toolbar-cuentas .seg-tipo button[aria-pressed="true"]{background:var(--marca2);color:#fff;box-shadow:0 1px 2px rgba(16,24,40,.25)}
+.jsl .toolbar-cuentas .filtro-dia.rango-cuentas{display:flex;align-items:center;justify-content:flex-end;gap:8px;width:100%;margin:0;flex-wrap:wrap;min-width:0}
+.jsl .toolbar-cuentas .filtro-dia.rango-cuentas .sub{margin:0}
+.jsl .acciones-cuentas{justify-content:flex-end;margin:16px 0}
+.jsl .ayuda-cuentas{margin:0 0 14px}
+.jsl .ayuda-cuentas summary{cursor:pointer;font-size:.84rem;font-weight:600;color:var(--suave)}
+.jsl .ayuda-cuentas .sub{margin:8px 0 0;font-size:.84rem}
+@media (max-width:600px){
+  .jsl .toolbar-cuentas .filtro-dia.rango-cuentas{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center}
+  .jsl .toolbar-cuentas .filtro-dia.rango-cuentas .sub{display:none}
+  .jsl .toolbar-cuentas .filtro-dia.rango-cuentas .dia-pill{width:100%;min-width:0}
+  .jsl .toolbar-cuentas .filtro-dia.rango-cuentas .dia-pill input{flex:1;min-width:0}
+  .jsl .toolbar-cuentas .filtro-dia.rango-cuentas .btn{grid-column:1/-1;justify-content:center}
+}
+@media (min-width:768px){
+  .jsl .toolbar-cuentas{flex-direction:row;flex-wrap:wrap;align-items:center}
+  .jsl .toolbar-cuentas .campo{flex:0 1 288px;width:288px}
+  .jsl .toolbar-cuentas .seg-tipo{width:auto}
+  .jsl .toolbar-cuentas .seg-tipo button{flex:0 0 auto}
+  .jsl .toolbar-cuentas .filtro-dia.rango-cuentas{width:auto;margin-left:auto}
+}
+@media (min-width:1280px){
+  .jsl .toolbar-cuentas{flex-wrap:nowrap}
+  .jsl .toolbar-cuentas .campo{flex:0 1 320px;width:320px;min-width:240px}
+}
+
+/* ---------- Panel: tarjeta "Pedidos de hoy" (dona centrada y grande) ---------- */
+.jsl .tarjeta-dona{padding:16px}
+.jsl .tarjeta-dona h3{margin-bottom:8px}
+.jsl .tarjeta-dona .dona{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-width:0}
+.jsl .tarjeta-dona .dona-svg{width:11rem;height:11rem}
+.jsl .tarjeta-dona .dona-centro b{font-size:1.5rem;line-height:1}
+.jsl .tarjeta-dona .dona-centro span{font-size:.78rem}
+.jsl .tarjeta-dona .leyenda{display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;gap:8px 12px;margin:0;padding:0;list-style:none}
+.jsl .tarjeta-dona .leyenda li{display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--suave);white-space:nowrap}
+.jsl .tarjeta-dona .leyenda li i{width:9px;height:9px;border-radius:50%;flex:none}
+.jsl .tarjeta-dona .leyenda li b{margin-left:2px;color:var(--tinta);font-size:.9rem;font-weight:700;font-variant-numeric:tabular-nums}
+@media (min-width:640px){
+  .jsl .tarjeta-dona .dona-svg{width:13rem;height:13rem}
+  .jsl .tarjeta-dona .dona-centro b{font-size:1.875rem}
+}
+@media (min-width:768px){
+  .jsl .tarjeta-dona .dona{flex-direction:row;flex-wrap:wrap;gap:18px 20px}
+  .jsl .tarjeta-dona .leyenda{flex-direction:column;gap:10px}
+  .jsl .tarjeta-dona .leyenda li{min-width:118px;font-size:.88rem}
+  .jsl .tarjeta-dona .leyenda li b{margin-left:auto;font-size:1rem}
+}
+@media (min-width:1024px){
+  .jsl .tarjeta-dona .dona-svg{width:14rem;height:14rem}
+}
+@media (min-width:1440px){
+  .jsl .tarjeta-dona .dona-svg{width:15rem;height:15rem}
 }
 
 /* ---------- Clientes: acciones y toolbar de la tabla ---------- */
@@ -113,9 +351,30 @@
 .jsl .seg{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:var(--hueco);box-shadow:inset 0 0 0 1px var(--linea);flex:none}
 .jsl .seg button{border:0;background:none;border-radius:999px;padding:7px 14px;font-weight:600;font-size:.86rem;color:var(--suave);white-space:nowrap;transition:background .15s,color .15s}
 .jsl .seg button:hover{color:var(--tinta)}
-.jsl .seg button[aria-pressed="true"]{background:var(--lateral);color:#fff}
-@media (prefers-color-scheme:dark){.jsl:not([data-theme="light"]) .seg button[aria-pressed="true"]{background:var(--marca)}}
-.jsl[data-theme="dark"] .seg button[aria-pressed="true"]{background:var(--marca)}
+.jsl .seg button[aria-pressed="true"],.jsl .seg button[aria-selected="true"]{background:var(--lateral);color:#fff;box-shadow:0 1px 2px rgba(16,24,40,.25)}
+@media (prefers-color-scheme:dark){.jsl:not([data-theme="light"]) .seg button[aria-pressed="true"],.jsl:not([data-theme="light"]) .seg button[aria-selected="true"]{background:var(--marca)}}
+.jsl[data-theme="dark"] .seg button[aria-pressed="true"],.jsl[data-theme="dark"] .seg button[aria-selected="true"]{background:var(--marca)}
+
+/* Sub-pestañas de una vista (Caja): el mismo control, con scroll horizontal en el celular. */
+.jsl .subtabs{max-width:100%;overflow-x:auto;scrollbar-width:none;margin:0 0 4px}
+.jsl .subtabs::-webkit-scrollbar{display:none}
+.jsl .subtabs button{flex:none}
+
+/* Cabecera de Caja: título y descripción a la izquierda; sub-pestañas a la derecha en escritorio. */
+.jsl .caja-cab{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.jsl .caja-cab-txt{min-width:0}
+.jsl .caja-cab h1{margin-top:0}
+.jsl .caja-cab .sub{margin:0}
+.jsl .caja-cab .subtabs{margin:0}
+@media (max-width:600px){
+  .jsl .caja-cab{flex-direction:column;align-items:flex-start;gap:10px}
+}
+/* En escritorio el título y la descripción dejan la derecha para las pestañas. */
+@media (min-width:960px){
+  .jsl .caja-cab{flex-wrap:nowrap}
+  .jsl .caja-cab-txt{flex:1 1 auto}
+  .jsl .caja-cab .subtabs{flex:none;margin-left:auto}
+}
 
 /* Filtro de día integrado a la toolbar: ícono de calendario, ‹ fecha › y "Hoy"/"Ver todos". */
 .jsl .filtro-dia.compacto{margin:0;flex-wrap:wrap;gap:4px;justify-content:flex-end}

@@ -13,6 +13,7 @@ export const cierreDelDia = responder(ctx => C.cierreDelDia(ctx));
 export const corte = responder(ctx => C.corte(ctx));
 
 export const listar = responder(ctx => leerDe(ctx, "cajamovs"), { clave: "movimientos" });
+export const paginaInternos = responder((ctx, req) => C.paginaInternos(ctx, req.valido.query));
 
 /** Un solo POST para todo lo que la app interna escribe en la caja; cada caso va a su regla. */
 export const crear = responder(async (ctx, req) => {

@@ -1,7 +1,7 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
 import type { Archivo, TipoArchivo, Cliente, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
-  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes } from "./tipos";
+  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos } from "./tipos";
 import { FalloApi } from "./cliente";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
@@ -141,7 +141,15 @@ function coleccion<T, C = Partial<T>>(ruta: string, clave: string, unidad: strin
 }
 
 type Sin<T> = Omit<T, "id" | "fecha" | "porNombre" | "porUid"> & { fecha?: string };
-export const movimientos = coleccion<Movimiento, Sin<Movimiento>>("/movimientos", "movimientos", "movimiento");
+export const movimientos = {
+  ...coleccion<Movimiento, Sin<Movimiento>>("/movimientos", "movimientos", "movimiento"),
+  /** Una página de la pestaña Movimientos de Cuentas; el servidor filtra, cuenta y corta. */
+  pagina: (f: { buscar?: string; tipo?: string; desde?: string; hasta?: string }, pagina: number, porPagina: number) =>
+    datos<PaginaMovimientos>(api.get("/movimientos/pagina", { params: limpio({ ...f, pagina, porPagina }) })),
+  /** Ganancias por cliente (pestaña Ganancias de Cuentas). */
+  ganancias: (f: { buscar?: string; desde?: string; hasta?: string }, pagina: number, porPagina: number) =>
+    datos<PaginaGanancias>(api.get("/movimientos/ganancias", { params: limpio({ ...f, pagina, porPagina }) }))
+};
 export const recaudos = coleccion<Recaudo, Sin<Recaudo>>("/recaudos", "recaudos", "recaudo");
 export const liquidaciones = coleccion<Liquidacion, Partial<Liquidacion>>("/liquidaciones", "liquidaciones", "liquidacion");
 export const cajaMovimientos = coleccion<CajaMovimiento, Partial<CajaMovimiento>>("/caja/movimientos", "movimientos", "movimiento");
@@ -154,6 +162,9 @@ export const jornadas = {
 export const caja = {
   /** Fecha del último arqueo (lo anterior ya está contado y no se cambia). */
   corte: () => opcional(datos<{ corte: string | null }>(api.get("/caja/corte")).then(d => d.corte), null),
+  /** Movimientos de las cuentas internas, por páginas y con filtros de día y medio. */
+  movimientosPagina: (f: { dia?: string; medio?: string }, pagina: number, porPagina: number) =>
+    datos<PaginaCajaMovimientos>(api.get("/caja/movimientos/pagina", { params: limpio({ ...f, pagina, porPagina }) })),
   /** Lo esperado lo calcula el servidor; se manda solo lo contado. */
   arqueo: (d: { contado: Record<string, number>; nota: string }) => api.post("/caja/arqueos", d),
   /** Cierre de la caja de oficina de un asistente: lo que entrega en cada medio (el servidor registra sobrantes y ajustes). */

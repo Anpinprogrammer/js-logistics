@@ -18,3 +18,5 @@ export const actualizar = responder((ctx, req) => {
 }, { clave: "movimiento" });
 export const eliminar = responder((ctx, req) => S.eliminar(ctx, req.valido.params.id));
 export const reversar = responder((ctx, req) => S.reversarPagos(ctx, req.valido.body));
+export const pagina = responder((ctx, req) => S.paginaOficina(ctx, req.valido.query));
+export const ganancias = responder((ctx, req) => S.gananciasPorCliente(ctx, req.valido.query));

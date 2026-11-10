@@ -38,6 +38,7 @@ export const Icono = ({ n }: { n: string }) => svg(TRAZOS[n] ?? TRAZOS.mas);
 export const IconoCamara = ({ chico }: { chico?: boolean }) => svg(camara, chico ? { width: 22, height: 22 } : undefined);
 export const IconoWhatsApp = () => svg(<><path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.5L3.5 20.5l1.4-4.3a8.5 8.5 0 1 1 15.6-4.6z" /><path d="M9.4 8.2c.2-.4.4-.4.6-.4h.5c.2 0 .4.05.5.35l.65 1.55c.08.2.05.4-.06.52l-.4.48c-.1.12-.2.24-.1.44.4.75 1 1.4 1.75 1.8.2.1.33 0 .44-.1l.5-.55c.12-.14.3-.2.5-.12l1.55.72c.2.1.3.2.3.4v.5c0 .4-.4.9-1 1-1.4.3-4.05-1.2-4.9-3.3-.2-.5-.3-1-.3-1.4 0-.35.14-.68.32-.9z" /></>);
 export const IconoCalendario = () => svg(<><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M8 3v4M16 3v4M3.5 10h17" /></>);
+export const IconoInfo = () => svg(<><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 7.5v.01" /></>);
 export const IconoSalir = () => svg(<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" />);
 
 /* ---------- diálogo, avisos y confirmación (una sola ventana, como el prototipo) ---------- */
@@ -131,16 +132,16 @@ export function FilaPedido({ p, onClick }: { p: Pedido; onClick: () => void }) {
 
 /** Filtro por día: ‹ fecha › y "Ver todos"/"Hoy". "" = todos los días.
     Con `compacto` se integra a una toolbar (ícono de calendario y controles más ajustados). */
-export function FiltroDia({ d, poner, compacto }: { d: string; poner: (d: string) => void; compacto?: boolean }) {
+export function FiltroDia({ d, poner, compacto, id }: { d: string; poner: (d: string) => void; compacto?: boolean; id?: string }) {
   const anterior = <button className="btn sec chico" aria-label="Día anterior" onClick={() => poner(moverDia(d, -1))}>‹</button>;
   const siguiente = <button className="btn sec chico" aria-label="Día siguiente" disabled={!d || d >= hoy()} onClick={() => poner(moverDia(d, 1))}>›</button>;
   const atajo = d ? <button className="btn sec chico" onClick={() => poner("")}>Ver todos</button> : <button className="btn sec chico" onClick={() => poner(hoy())}>Hoy</button>;
   if (!compacto) return <div className="filtro-dia">{anterior}
-    <input type="date" id="diaPed" value={d} max={hoy()} aria-label="Filtrar por día" onChange={e => poner(e.target.value)} />
+    <input type="date" id={id || "diaPed"} value={d} max={hoy()} aria-label="Filtrar por día" onChange={e => poner(e.target.value)} />
     {siguiente}{atajo}</div>;
   return <div className="filtro-dia compacto">{anterior}
     <label className="dia-pill"><IconoCalendario />
-      <input type="date" id="diaCli" value={d} max={hoy()} aria-label="Filtrar por día" onChange={e => poner(e.target.value)} /></label>
+      <input type="date" id={id || "diaCli"} value={d} max={hoy()} aria-label="Filtrar por día" onChange={e => poner(e.target.value)} /></label>
     {siguiente}{atajo}</div>;
 }
 
@@ -167,9 +168,9 @@ export function Dona({ segs, centro, sub }: { segs: { t: string; n: number; c: s
   let acum = 0;
   return (
     <div className="dona"><div className="dona-svg"><svg viewBox="0 0 42 42" role="img" aria-label={segs.map(x => x.t + ": " + x.n).join(", ")}>
-      <circle cx="21" cy="21" r={r} fill="none" stroke="var(--hueco)" strokeWidth="6" />
+      <circle cx="21" cy="21" r={r} fill="none" stroke="var(--hueco)" strokeWidth="6.5" />
       {segs.filter(x => x.n).map(x => { const p = (x.n * 100) / tot, l = Math.max(0.5, p - gap), o = -acum; acum += p;
-        return <circle key={x.t} cx="21" cy="21" r={r} fill="none" stroke={x.c} strokeWidth="6" strokeDasharray={`${l} ${100 - l}`} strokeDashoffset={o} data-tip=""><title>{x.t}: {x.n}</title></circle>; })}
+        return <circle key={x.t} cx="21" cy="21" r={r} fill="none" stroke={x.c} strokeWidth="6.5" strokeDasharray={`${l} ${100 - l}`} strokeDashoffset={o} data-tip=""><title>{x.t}: {x.n}</title></circle>; })}
     </svg><div className="dona-centro"><b>{centro}</b><span>{sub}</span></div></div>
       <ul className="leyenda">{segs.map(x => <li key={x.t}><i style={{ background: x.c }} />{x.t}<b>{x.n}</b></li>)}</ul></div>
   );

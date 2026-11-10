@@ -4,7 +4,8 @@ import { Movimientos, Recaudos, Clientes } from "../models/documentos.js";
 import { MOVS, MOVS_OFICINA, MEDIOS, VENTANA_CORRECCION_MS } from "../helpers/constantes.js";
 import { nuevoId } from "../helpers/ids.js";
 import { ahora } from "../helpers/reloj.js";
-import { hora, fechaDia } from "../helpers/fechas.js";
+import { hora, fechaDia, esDia, diaDe } from "../helpers/fechas.js";
+import { sinTildes } from "../helpers/texto.js";
 import { datosInvalidos, noEncontrado, permisoNegado, yaContadoError } from "./errores.js";
 import { enTransaccion, guardar, actualizar, borrar } from "./transaccion.js";
 import { calculosDe, exigirAdmin, exigirOficina, valorPositivo, diaValido, texto, exigirNoContado, exigirDiaAbierto } from "./contexto.js";
@@ -117,4 +118,74 @@ export async function cambiarMedio(ctx, col, id, { medio }) {
     if (medio === x.medio) return x;
     return actualizar(t, col, id, { medio, medioAntes: x.medioAntes || x.medio || "", medioCambio: ahora() }, { antes: x });
   });
+}
+
+
+/* ---------- pestaña Cuentas: páginas de movimientos y ganancias por cliente ---------- */
+const delTipo = (tipo, filtro) => filtro === "todos" || (filtro === "pagos" ? tipo === "pago_de_cliente" || tipo === "pago_a_cliente" : filtro === "compras" ? tipo === "compra_cliente" : tipo === "ganancia");
+
+/** Corta una lista en páginas; sin página devuelve el tamaño por defecto (15). */
+function cortarPagina(lista, pagina, porPagina) {
+  const tam = Math.max(1, Math.min(100, Number(porPagina) || 15));
+  const paginas = Math.max(1, Math.ceil(lista.length / tam));
+  const actual = Math.min(Math.max(1, Number(pagina) || 1), paginas);
+  return { items: lista.slice((actual - 1) * tam, actual * tam), pagina: actual, porPagina: tam, total: lista.length, paginas };
+}
+
+/** Movimientos de oficina filtrados (fecha, tipo y búsqueda por cliente o detalle) con sus totales y una página. */
+export function armarPaginaMovimientos(movs, clientes, { buscar = "", tipo = "todos", desde, hasta, pagina, porPagina } = {}) {
+  const nombres = new Map(clientes.map(c => [c.id, c.nombre]));
+  const q = sinTildes(String(buscar || "").trim());
+  const lista = movs
+    .filter(m => MOVS_OFICINA.includes(m.tipo))
+    .filter(m => { const d = diaDe(m.fecha); return (!desde || d >= desde) && (!hasta || d <= hasta); })
+    .filter(m => delTipo(m.tipo, tipo))
+    .filter(m => !q || sinTildes((nombres.get(m.clienteId) || "") + " " + (m.nota || "")).includes(q))
+    .sort((a, b) => b.fecha - a.fecha);
+  const suma = t => lista.filter(m => m.tipo === t).reduce((a, m) => a + (Number(m.valor) || 0), 0);
+  const totales = { recibido: suma("pago_de_cliente"), pagado: suma("pago_a_cliente"), compras: suma("compra_cliente"), ganancia: suma("ganancia") };
+  const p = cortarPagina(lista, pagina, porPagina);
+  return { movimientos: p.items, pagina: p.pagina, porPagina: p.porPagina, total: p.total, paginas: p.paginas, totales };
+}
+
+/** Ganancias por cliente (con pagos y compras de contexto) según el rango y la búsqueda; una página. */
+export function armarGananciasPorCliente(movs, clientes, { buscar = "", desde, hasta, pagina, porPagina } = {}) {
+  const nombres = new Map(clientes.map(c => [c.id, c.nombre]));
+  const q = sinTildes(String(buscar || "").trim());
+  const filtrados = movs
+    .filter(m => MOVS_OFICINA.includes(m.tipo))
+    .filter(m => { const d = diaDe(m.fecha); return (!desde || d >= desde) && (!hasta || d <= hasta); })
+    .filter(m => !q || sinTildes((nombres.get(m.clienteId) || "") + " " + (m.nota || "")).includes(q));
+  const por = new Map();
+  for (const m of filtrados) {
+    if (!m.clienteId) continue;
+    const x = por.get(m.clienteId) || { clienteId: m.clienteId, nombre: nombres.get(m.clienteId) || "(eliminado)", recibido: 0, compras: 0, ganancia: 0 };
+    const valor = Number(m.valor) || 0;
+    if (m.tipo === "pago_de_cliente") x.recibido += valor; else if (m.tipo === "compra_cliente") x.compras += valor; else if (m.tipo === "ganancia") x.ganancia += valor;
+    por.set(m.clienteId, x);
+  }
+  const lista = [...por.values()].sort((a, b) => b.ganancia - a.ganancia || b.compras - a.compras || b.recibido - a.recibido);
+  const totalGanancia = filtrados.filter(m => m.tipo === "ganancia").reduce((a, m) => a + (Number(m.valor) || 0), 0);
+  const p = cortarPagina(lista, pagina, porPagina);
+  return { clientes: p.items, pagina: p.pagina, porPagina: p.porPagina, total: p.total, paginas: p.paginas, totalGanancia };
+}
+
+function diasValidos({ desde, hasta }) {
+  for (const d of [desde, hasta]) if (d && !esDia(d)) throw datosInvalidos("El día no es válido (AAAA-MM-DD).");
+}
+
+/** GET /movimientos/pagina: la pestaña Movimientos de Cuentas, filtrada y por páginas. */
+export async function paginaOficina(ctx, filtros = {}) {
+  exigirOficina(ctx.actor);
+  diasValidos(filtros);
+  const [movs, clientes] = await Promise.all([Movimientos.listar(ctx.db), Clientes.listar(ctx.db)]);
+  return armarPaginaMovimientos(movs, clientes, filtros);
+}
+
+/** GET /movimientos/ganancias: ganancias por cliente, la pestaña Ganancias de Cuentas. */
+export async function gananciasPorCliente(ctx, filtros = {}) {
+  exigirOficina(ctx.actor);
+  diasValidos(filtros);
+  const [movs, clientes] = await Promise.all([Movimientos.listar(ctx.db), Clientes.listar(ctx.db)]);
+  return armarGananciasPorCliente(movs, clientes, filtros);
 }
