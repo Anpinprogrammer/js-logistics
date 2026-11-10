@@ -163,6 +163,7 @@ Cómo funciona:
 - La plantilla está en `helpers/correo.js`: tablas con estilos inline, logo desde `CORREO_LOGO_URL` (PNG por Outlook) y enlace alternativo con `word-break: break-all`.
 - El token es aleatorio (32 bytes) y **solo se guarda su hash SHA-256** en la tabla `enlaces`; el token en claro viaja únicamente en el correo.
 - El **envío masivo** de restablecimientos entra a `resetEmailQueue` (BullMQ) y lo procesa un worker con concurrencia 5 y 3 intentos con espera exponencial. El mismo worker usa los enlaces de un solo uso de arriba; si Redis no está configurado o no responde, el lote se procesa en segundo plano en el proceso de la API para que la petición nunca se bloquee.
+- Al arrancar, `index.js` llama a `validarRedis()` (PING a `REDIS_URL`): si responde, deja la cola activa; si no está configurado o no contesta, avisa en el log y el envío masivo usa el respaldo en memoria. La API siempre arranca.
 - Cada enlace sirve una sola vez y, al usarlo, se cierran las sesiones abiertas de la cuenta.
 - Los enlaces de clientes apuntan a `URL_CLIENTES`; los de trabajadores, a `URL_EQUIPO`. Los dos portales deben tener las pantallas `/activar` y `/restablecer` (se implementan en cada frontend).
 - `POST /auth/recuperar` responde siempre `204`, exista o no el correo, para no revelar qué cuentas existen.
