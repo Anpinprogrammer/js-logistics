@@ -38,12 +38,12 @@ export default function Panel({ pintar }: { pintar: () => void }) {
   const ir = (destino: string) => {
     const [t, f, d] = destino.split("|"); E.tabA = t;
     if (t === "pedidos") { E.filtroA = f || "todos"; E.diaPedA = d === "hoy" ? h : ""; E.mensPedA = ""; E.buscarA = ""; E.paginaA = 1; }
-    if (t === "mas") E.subMas = f || "panel";
+    if (t === "mas") E.subMas = f || "resultados";
     pintar(); scrollTo(0, 0);
   };
 
   return <>
-    <div className="dash-cab"><div><h1>Panel de control</h1><p className="sub">Así va JS Logistics hoy</p></div>{yo.esAdmin && <button className="btn sec chico" onClick={() => ir("mas|panel")}>Ver resultados del mes</button>}</div>
+    <div className="dash-cab"><div><h1>Panel de control</h1><p className="sub">Así va JS Logistics hoy</p></div>{yo.esAdmin && <button className="btn sec chico" onClick={() => ir("mas|resultados")}>Ver resultados del mes</button>}</div>
     <div className="kpis">
       <Kpi ico="ok" lbl="Entregados hoy" val={entHoy.length} onClick={() => ir("pedidos|ent|hoy")}
         pie={<><div className="prog" aria-hidden="true"><i style={{ width: efec + "%" }} /></div><small>{entHoy.length + devHoy.length ? efec + "% efectividad · " + devHoy.length + " " + pl(devHoy.length, "devuelto") : "Todavía sin entregas hoy"}</small></>} />

@@ -6,11 +6,11 @@ export const guardarLocal = (k: string, v: string) => { try { localStorage.setIt
 
 export const E = {
   rol: (leer("js_rol") || "admin") as "mensajero" | "admin",
-  tabA: "inicio", tabM: "inicio", subMas: "panel",
+  tabA: "inicio", tabM: "inicio", subMas: "resultados",
   // Oficina → Pedidos
   filtroA: "sin", buscarA: "", diaPedA: "", mensPedA: "", paginaA: 1,
   // Oficina → Clientes
-  filtroCli: "todos", buscarCli: "", diaCliF: "",
+  filtroCli: "todos", buscarCli: "", diaCliF: "", paginaCli: 1,
   // Oficina → Caja y Sueldos
   diaCaja: hoy(), diaLibro: hoy(), cierreAbierto: null as boolean | null, semA: semanaDe(hoy()),
   // Mensajero

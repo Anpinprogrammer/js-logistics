@@ -4,8 +4,10 @@ import { useSesion, useUsuario } from "../auth/Sesion";
 import { ProveedorDatos, useDatos } from "./datos";
 import { ProveedorVentana, Icono, IconoSalir, useVentana } from "./ui";
 import { E, guardarLocal } from "./estado";
+import { useTema } from "./tema";
 import { S, fechaLarga, hoy, horaActual, type Pedido } from "./motor";
 import { pendientesMios } from "./mensajero/pendientes";
+import { useEscritorio } from "../lib/pantalla";
 import { perezoso } from "../lib/perezoso";
 import "./estilos.css";
 import "./ajustes.css";
@@ -15,30 +17,39 @@ const Oficina = perezoso(() => import("./oficina/Oficina"));
 const Mensajero = perezoso(() => import("./mensajero/Mensajero"));
 const cargando = <div className="vacio" role="status">Cargando…</div>;
 
+export type ItemNav = [clave: string, nombre: string, num?: number];
+
+/** En el escritorio las sub-pestañas de "Más" son accesos directos del menú; la clave es la misma de `E.subMas`. */
+const ADMIN_ESCRITORIO: ItemNav[] = [["resultados", "Resultados"], ["personal", "Personal"], ["historial", "Historial"], ["papelera", "Papelera"], ["respaldo", "Respaldo y espacio"]];
+
 /** Grupos del menú lateral en computador (las mismas pestañas de siempre, agrupadas). */
 const SECCIONES: [string, string[]][] = [
   ["Principal", ["inicio", "nuevo", "pend", "entregados", "pedidos", "clientes"]],
   ["Gestión financiera", ["caja", "cuentas", "sueldo", "sueldos"]],
-  ["Administración", ["mas"]],
+  ["Administración", ["mas", ...ADMIN_ESCRITORIO.map(([k]) => k)]],
 ];
 
-export type ItemNav = [clave: string, nombre: string, num?: number];
+const iconoTema = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+const IconoSol = () => <svg {...iconoTema}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg>;
+const IconoLuna = () => <svg {...iconoTema}><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8z" /></svg>;
 
 export default function AppInterna() {
   const usuario = useUsuario();
+  const { tema, oscuro, cambiar } = useTema();
   return (
-    <div className="jsl">
+    <div className="jsl" data-theme={tema === "sistema" ? undefined : tema}>
       <ProveedorDatos usuario={usuario}>
-        <ProveedorVentana><Marco /></ProveedorVentana>
+        <ProveedorVentana><Marco oscuro={oscuro} cambiarTema={cambiar} /></ProveedorVentana>
       </ProveedorDatos>
     </div>
   );
 }
 
-function Marco() {
+function Marco({ oscuro, cambiarTema }: { oscuro: boolean; cambiarTema: () => void }) {
   const { usuario, salir } = useSesion();
   const { version, tocar, error, cargado } = useDatos();
   const ventana = useVentana();
+  const escritorio = useEscritorio();
   const esAdmin = usuario?.rol === "admin", esAsistente = usuario?.rol === "asistente";
   if (esAsistente) E.rol = "admin"; else if (!esAdmin) E.rol = "mensajero";
   const pintar = () => tocar();
@@ -51,10 +62,14 @@ function Marco() {
     actual = E.tabM; elegir = k => { E.tabM = k; };
   } else {
     const sin = Object.values(S.pedidos).filter((p: Pedido) => !p.clienteId).length;
-    items = ([["inicio", "Inicio"], ["pedidos", "Pedidos", sin], ["clientes", "Clientes"], ["caja", "Caja"], ["cuentas", "Cuentas"], ["sueldos", "Sueldos"], ["mas", "Más"]] as ItemNav[])
-      .filter(([k]) => esAdmin || ["inicio", "pedidos", "clientes", "caja", "cuentas"].includes(k));
-    if (!items.some(([k]) => k === E.tabA)) E.tabA = "inicio";
-    actual = E.tabA; elegir = k => { E.tabA = k; };
+    const base: ItemNav[] = [["inicio", "Inicio"], ["pedidos", "Pedidos", sin], ["clientes", "Clientes"], ["caja", "Caja"], ["cuentas", "Cuentas"], ["sueldos", "Sueldos"]];
+    // El asistente no ve Sueldos ni Administración, como en el prototipo.
+    const propias = esAdmin ? base : base.filter(([k]) => ["inicio", "pedidos", "clientes", "caja", "cuentas"].includes(k));
+    // En el escritorio no hay "Más": sus sub-pestañas se abren desde el menú lateral. En el celular sigue igual.
+    items = esAdmin ? (escritorio ? [...propias, ...ADMIN_ESCRITORIO] : [...propias, ["mas", "Más"]]) : propias;
+    if (!items.some(([k]) => k === E.tabA) && !(esAdmin && E.tabA === "mas")) E.tabA = "inicio";
+    actual = escritorio && esAdmin && E.tabA === "mas" ? E.subMas : E.tabA;
+    elegir = k => { if (ADMIN_ESCRITORIO.some(([x]) => x === k)) { E.tabA = "mas"; E.subMas = k; } else E.tabA = k; };
   }
   const ir = (k: string) => { elegir(k); pintar(); scrollTo(0, 0); };
   const boton = ([k, t, n]: ItemNav) => (
@@ -64,7 +79,13 @@ function Marco() {
   const enResto = resto.find(([k]) => k === actual), nResto = resto.reduce((a, [, , n]) => a + (n || 0), 0);
   const abrirMenu = () => ventana.abrir(<>
     <header><h2>Menú</h2><button className="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
-    <div className="menu-grid">{items.map(([k, t, n]) => <button key={k} aria-current={actual === k ? "page" : undefined} onClick={() => { ventana.cerrar(); ir(k); }}><Icono n={k} /><span>{t}{n ? <> <span className="etq sin">{n}</span></> : null}</span></button>)}</div>
+    <div className="menu-grid">
+      {items.map(([k, t, n]) => <button key={k} aria-current={actual === k ? "page" : undefined} onClick={() => { ventana.cerrar(); ir(k); }}><Icono n={k} /><span>{t}{n ? <> <span className="etq sin">{n}</span></> : null}</span></button>)}
+      <button type="button" onClick={() => { cambiarTema(); ventana.cerrar(); }}>
+        {oscuro ? <IconoSol /> : <IconoLuna />}
+        <span>{oscuro ? "Modo claro" : "Modo oscuro"}</span>
+      </button>
+    </div>
   </>);
 
   // Saludo con la hora de Colombia
@@ -95,6 +116,15 @@ function Marco() {
         </div>
       )}
       {nom && <span className="avatar" id="avatar" aria-hidden="true">{iniciales}</span>}
+      <button
+        type="button"
+        className="tema"
+        onClick={cambiarTema}
+        aria-label={oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+        title={oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+      >
+        {oscuro ? <IconoSol /> : <IconoLuna />}
+      </button>
       <button className="salir" id="btnSalir" aria-label="Cerrar sesión" onClick={() => salir()}><IconoSalir /><span>Salir</span></button>
     </header>
     <main id="vista">

@@ -3,13 +3,31 @@
 .jsl .oculto{display:none !important}
 .jsl a.enlace{cursor:pointer}
 
-/* Menú lateral en computador: pestañas agrupadas por sección */
+/* Botón de tema claro/oscuro en el header de escritorio; en el celular aparece en el menú. */
+.jsl .tema{display:none}
+@media (min-width:960px){
+  .jsl .tema{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;flex:none;border-radius:50%;border:1px solid var(--linea);background:var(--papel);color:var(--tinta);transition:background .15s,color .15s,border-color .15s}
+  .jsl .tema:hover{background:var(--hueco)}
+  .jsl .tema svg{width:19px;height:19px}
+}
+
+/* Pantallas XL: el contenido ocupa todo el ancho disponible a la derecha del menú lateral.
+   El límite de 1240px del prototipo deja un hueco a la derecha en monitores grandes. */
+@media (min-width:1280px){
+  .jsl main{max-width:none;margin-right:0}
+}
+
+/* Menú lateral en computador: pestañas agrupadas por sección.
+   Los títulos de sección van pequeños, en mayúsculas y atenuados; los accesos conservan su tamaño y contraste. */
 @media (min-width:960px){
   .jsl .marca-lat{padding:0 8px 18px;margin:0 -14px 14px;padding-left:22px;border-bottom:1px solid rgba(255,255,255,.08)}
-  .jsl #navLateral{gap:18px}
-  .jsl .lat-grupo{display:flex;flex-direction:column;gap:4px}
-  .jsl .lat-titulo{padding:0 14px 4px;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--lateral-suave);opacity:.75}
-  .jsl #navLateral button{border-left:3px solid transparent}
+  .jsl #navLateral{gap:4px}
+  .jsl .lat-grupo{display:flex;flex-direction:column;gap:1px}
+  .jsl .lat-grupo + .lat-grupo{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07)}
+  .jsl .lat-titulo{padding:0 14px 7px;font-size:.72rem;font-weight:600;letter-spacing:.1em;line-height:1.2;text-transform:uppercase;color:#fff;opacity:.45}
+  .jsl #navLateral button{min-height:40px;padding:10px 14px;font-size:.9rem;color:#B9C5D0;border-left:3px solid transparent}
+  .jsl #navLateral button svg{opacity:.9}
+  .jsl #navLateral button:hover svg,.jsl #navLateral button[aria-current="page"] svg{opacity:1}
   .jsl #navLateral button[aria-current="page"]{background:rgba(59,163,230,.14);color:var(--marca2);border-left-color:var(--marca2)}
 }
 

@@ -17,6 +17,8 @@ Con sesión, la app es **igual al prototipo** (`app/` del sistema viejo): mismo 
 - `src/interna/acciones.ts` hace todas las escrituras. Cada una tiene su rama `if (DEMO)` que cambia los datos en memoria.
 - El estado de la interfaz (pestaña, filtros, día elegido) vive en `E` (`estado.ts`), como las variables del prototipo. `tocar()` vuelve a pintar.
 - **Carga diferida:** el ingreso, cada modo (oficina y mensajero) y cada pestaña de la oficina van en archivos aparte con `perezoso()` (`lib/perezoso.ts`), que además los precarga. Una pestaña nueva se agrega igual en `oficina/Oficina.tsx`; no la importes directo desde `Marco.tsx`, o vuelve al archivo principal.
+- **Menú en el escritorio y en el celular:** el corte es 960 px (`useEscritorio()` en `lib/pantalla.ts`). En el escritorio el menú lateral muestra Resultados, Personal, Historial, Papelera y Respaldo como accesos directos (`ADMIN_ESCRITORIO` en `interna/Marco.tsx`, misma clave que `E.subMas`); en el celular esas sub-pestañas siguen dentro de **Más**, con sus chips, y las pestañas de abajo se cortan en 4 más un menú.
+- **Tema:** el claro/oscuro se pone con `data-theme="light"` o `"dark"` en el contenedor `.jsl` (`interna/tema.ts`); sin atributo sigue al sistema. La elección se guarda en `js_tema`. El botón está en el header de escritorio; en el celular está en el menú.
 
 ## Reglas
 
@@ -37,6 +39,7 @@ Con sesión, la app es **igual al prototipo** (`app/` del sistema viejo): mismo 
 - **Dos mundos de estilos.** Dentro de `src/interna/` (toda la app con sesión) se usan las clases del prototipo (`estilos.css` dentro de `.jsl`, ajustes en `ajustes.css`) y los componentes de `interna/ui.tsx`; nada de Tailwind ahí. Tailwind y los tokens de `src/index.css` (`bg-papel`, `text-suave`, `bg-marca`…) son solo para `pages/Ingreso.tsx` y las demás pantallas públicas de acceso (`Recuperar.tsx`, `Restablecer.tsx`), que comparten el marco de `AccesoComun.tsx`.
 - **`pages/Ingreso.tsx` es la excepción a "solo tokens"**: es siempre oscura y usa sus colores (`#070B19`, `#38bdf8`, `#0284c7`) a propósito. Si la cambias, conserva el badge claro con el logo recortado (ver `docs/ESTADO.md`, decisión 1). Las pantallas de recuperar y restablecer usan el mismo marco y los mismos colores.
 - Primero el celular, después el computador (`md:`). Las listas son tarjetas en el celular y tablas en el computador.
+- En pantallas XL (≥ 1280 px) el contenido de la app interna ocupa todo el ancho a la derecha del menú lateral; el tope de 1240 px del prototipo se anula en `ajustes.css`. No lo reduzcas sin probar Panel y Pedidos en un monitor ancho.
 - **Nada de scroll horizontal de la página.** Un `grid` lleva siempre su columna base (`grid grid-cols-1 md:grid-cols-2`); los textos largos (correos, nombres) en flex llevan `min-w-0` y `[overflow-wrap:anywhere]`. Compruébalo a 320, 360 y 390 px (receta en `docs/ESTADO.md`).
 - Accesibilidad: todo campo con su `label`, botones de solo ícono con `aria-label`, diálogos con la ventana de `interna/ui.tsx` y foco visible.
 - Textos en español de Colombia, de tú, cortos. Dinero con `pesos()` y fechas con `fechaHora()` / `hora()`, siempre en hora de Colombia. Para convertir lo que escribe el usuario a pesos, usa `aPesos("25.000")`.
