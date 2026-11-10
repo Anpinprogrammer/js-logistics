@@ -65,6 +65,8 @@ Es una receta, no un script del repo. Si lo conviertes en prueba automática, gu
 
 ## Registro de sesiones (lo más reciente arriba)
 
+- **2026-11-10:** se agregó `animacion-ingreso/`, un proyecto de Remotion con la animación de entrada del ingreso que aprobó el dueño ("La ruta de entrega", 4 s, versiones de computador y celular en `referencia/`). Todavía no está en la app: las instrucciones para implementarla con Framer Motion (`motion`) están en `animacion-ingreso/IMPLEMENTAR.md`, y en opencode se arranca con `/animacion-ingreso`. La carpeta no se despliega ni la importa `frontend/`; no la borres, es la referencia para ajustes.
+
 - **2026-11-10:** `index.js` valida Redis antes de escuchar: `validarRedis()` usa `estadoRedis()` (conexión + `PING` con timeout de 2 s) y deja en el log si la cola `resetEmailQueue` está activa, si Redis no está configurado o si no responde (en esos casos el envío masivo sigue con el respaldo en memoria). Un fallo de Redis nunca impide arrancar la API. Probado con Redis apagado (aviso y arranque normal) y con un Redis temporal (PING correcto).
 
 - **2026-11-10:** se balanceó la tabla de Personal JS: Nombre con 24/16 px, columnas del medio con 16 px y Acciones con 16/24 px, anchos relativos 22/18/20/15/15/10 % (el navegador respeta el mínimo de las acciones, ~14 %). Los íconos van con `gap: 8px` y 4 px extra de aire, a 28 px del borde derecho. “Pago por día” queda a la izquierda, igual que el resto. Se conservan los tooltips y el marco redondeado.
