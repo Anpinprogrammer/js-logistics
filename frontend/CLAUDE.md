@@ -4,7 +4,7 @@ Primero lee el [`CLAUDE.md` de la raíz](../CLAUDE.md) y [`docs/ESTADO.md`](../d
 
 ## Stack
 
-React 19 · TypeScript (estricto) · Vite · Tailwind CSS 4 (tokens en `src/index.css`) · axios · TanStack Query 5 · React Router 7. No hay librería de componentes: la app interna usa las piezas de `src/interna/ui.tsx` y las clases del prototipo.
+React 19 · TypeScript (estricto) · Vite · Tailwind CSS 4 (tokens en `src/index.css`) · axios · TanStack Query 5 · React Router 7. No hay librería de componentes: la app interna usa las piezas de `src/interna/ui.tsx` y las clases del prototipo. La única dependencia de animación es `motion` (14.12.0), usada solo por la intro del ingreso (`pages/intro/`); no la importes desde `interna/`.
 
 No agregues dependencias (formularios, estado global, íconos, componentes) sin una razón clara en el PR. Lo que hay alcanza para casi todo.
 

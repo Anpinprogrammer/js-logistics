@@ -6,9 +6,12 @@ import {
   MarcoAcceso, CabeceraAcceso, BotonAcceso, AvisoError,
   TARJETA, ENTRADA, ICONO, ENLACE, IcCorreo, IcCandado, IcOjo, IcOjoTachado
 } from "./AccesoComun";
+import CapaIntro from "./intro/CapaIntro";
+import { useIntroIngreso } from "./intro/useIntroIngreso";
 
 export default function Ingreso() {
   const { ingresar } = useSesion();
+  const intro = useIntroIngreso();
   const idCorreo = useId();
   const idClave = useId();
   const [email, setEmail] = useState("");
@@ -24,16 +27,17 @@ export default function Ingreso() {
     catch (err) { setError(mensajeDe(err)); setEnviando(false); }
   };
 
-  return (
-    <MarcoAcceso>
-      <form onSubmit={enviar} className={TARJETA}>
+  return <>
+    <MarcoAcceso intro={intro.activa}>
+      <form onSubmit={enviar} className={TARJETA} data-intro-card>
         <CabeceraAcceso
+          intro={intro.activa}
           titulo="JS Logistics"
           descripcion="Ingresa con el correo y la contraseña que te dio administración."
         />
 
         <div className="space-y-3 sm:space-y-4">
-          <div>
+          <div className={intro.activa ? "jsl-intro-campo jsl-intro-campo-1" : undefined}>
             <label htmlFor={idCorreo} className="mb-1.5 block text-sm font-medium text-slate-300">Correo</label>
             <div className="relative">
               <input
@@ -45,7 +49,7 @@ export default function Ingreso() {
             </div>
           </div>
 
-          <div>
+          <div className={intro.activa ? "jsl-intro-campo jsl-intro-campo-2" : undefined}>
             <label htmlFor={idClave} className="mb-1.5 block text-sm font-medium text-slate-300">Contraseña</label>
             <div className="relative">
               <input
@@ -67,12 +71,13 @@ export default function Ingreso() {
 
         {error && <AvisoError>{error}</AvisoError>}
 
-        <BotonAcceso cargando={enviando} cargandoTexto="Ingresando…">Ingresar</BotonAcceso>
+        <BotonAcceso cargando={enviando} cargandoTexto="Ingresando…" intro={intro.activa}>Ingresar</BotonAcceso>
 
-        <p className="text-center text-xs leading-relaxed text-slate-400">
+        <p className={"text-center text-xs leading-relaxed text-slate-400" + (intro.activa ? " jsl-intro-enlace" : "")}>
           <Link to="/recuperar" className={ENLACE}>¿Olvidaste tu contraseña?</Link>
         </p>
       </form>
     </MarcoAcceso>
-  );
+    {intro.activa ? <CapaIntro /> : null}
+  </>;
 }
