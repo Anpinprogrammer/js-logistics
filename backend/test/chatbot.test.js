@@ -173,14 +173,15 @@ test("público: sin sesión se puede hablar y solo recibe las herramientas públ
   assert.match(f.llamadas[0].system[1].text, /VISITANTE/);
 });
 
-test("público: el estado de un envío no incluye nombres, valores ni mensajero", async () => {
+test("público: del envío solo se ve el estado actual, sin fechas ni datos sensibles", async () => {
   const f = falso([usaHerramienta("consultar_estado_envio", { guia: ga }), texto("Va en ruta")]);
   Chat.usarCliente(f);
   await visitante("¿cómo va mi envío?");
   const resultado = f.llamadas[1].messages.at(-1).content[0];
   assert.equal(resultado.is_error, undefined);
   const datos = JSON.parse(resultado.content);
-  assert.deepEqual(Object.keys(datos).sort(), ["entregadoODevueltoEn", "estado", "guia", "intentosDeEntrega", "salida"]);
+  assert.deepEqual(Object.keys(datos).sort(), ["estado", "guia"]);
+  assert.ok(!/20\d\d-\d\d-\d\d/.test(resultado.content)); // ninguna fecha
   assert.ok(!/Tienda|Carlos|50000|8000|destinatario/i.test(resultado.content));
 });
 

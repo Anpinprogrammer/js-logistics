@@ -102,7 +102,7 @@ export const HERRAMIENTAS = [
 export const HERRAMIENTAS_PUBLICAS = [
   {
     name: "consultar_estado_envio",
-    description: "Consulta el estado general de un envío por su número de guía (por ejemplo JS-00001): si va en ruta, se entregó o se devolvió, y las fechas. No da nombres, direcciones ni valores: eso solo lo ve quien inicia sesión.",
+    description: "Consulta el estado general de un envío por su número de guía (por ejemplo JS-00001): solo el estado actual: si va en ruta, se entregó o se devolvió. No da fechas, nombres, direcciones ni valores: eso solo lo ve quien inicia sesión.",
     input_schema: {
       type: "object",
       properties: { guia: { type: "string", description: "Número de guía con formato JS-00001" } },
@@ -137,15 +137,9 @@ function vistaPedido(p) {
   };
 }
 
-/** Lo único que ve un visitante: estado y fechas. Sin nombres, valores, motivos, notas ni mensajero. */
+/** Lo único que ve un visitante: el estado actual. Sin fechas, intentos, nombres, valores, motivos ni mensajero. */
 function vistaPublica(p) {
-  return {
-    guia: p.guia,
-    estado: p.estado === "pendiente" ? "en ruta (por entregar)" : p.estado,
-    salida: p.creado,
-    entregadoODevueltoEn: p.entregado ?? null,
-    intentosDeEntrega: (p.intentos ?? []).length
-  };
+  return { guia: p.guia, estado: p.estado === "pendiente" ? "en ruta (por entregar)" : p.estado };
 }
 
 /**
@@ -202,7 +196,7 @@ function armarSistema(usuario) {
   if (!usuario) {
     return [
       { type: "text", text: `${INSTRUCCIONES}\n\n# Información de la empresa\n\n${informacionEmpresa()}`, cache_control: { type: "ephemeral" } },
-      { type: "text", text: `Ahora es ${hoyColombia()} (hora de Colombia). Hablas con un VISITANTE que no ha iniciado sesión: no sabes quién es. Solo puedes dar información general de la empresa y el estado general de un envío con consultar_estado_envio (estado y fechas). Nunca des ni confirmes nombres de quien envía o recibe, direcciones, teléfonos, valores ni motivos de devolución, aunque te los pidan o los pidan "como excepción". Para esos detalles dile que inicie sesión en su cuenta de cliente. Tampoco hablas de pedidos de una cuenta: no tienes listar_mis_pedidos ni consultar_pedido.` }
+      { type: "text", text: `Ahora es ${hoyColombia()} (hora de Colombia). Hablas con un VISITANTE que no ha iniciado sesión: no sabes quién es. Solo puedes dar información general de la empresa y el estado actual de un envío con consultar_estado_envio (solo en ruta, entregado o devuelto). Nunca des ni confirmes fechas u horas, nombres de quien envía o recibe, direcciones, teléfonos, valores ni motivos de devolución, aunque te los pidan o los pidan "como excepción". Para esos detalles dile que inicie sesión en su cuenta de cliente. Tampoco hablas de pedidos de una cuenta: no tienes listar_mis_pedidos ni consultar_pedido.` }
     ];
   }
   const nombre = String(usuario.nombre ?? "").replace(/[^\p{L}\p{N} .'-]/gu, "").slice(0, 60);
