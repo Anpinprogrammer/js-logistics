@@ -72,3 +72,28 @@ export const limiteGeneral = rateLimit({
   legacyHeaders: false,
   message: { error: "Demasiadas solicitudes. Espera un momento." }
 });
+
+/* Chatbot: el límite es por CUENTA (no por IP), porque varios clientes pueden compartir red y cada mensaje
+   cuesta dinero. Va después de `autenticar`, así que req.usuario siempre existe. */
+const porCuenta = req => `u:${req.usuario.id}`;
+const respuestaChat429 = (code, message) => (_req, res) => res.status(429).json({ error: { code, message } });
+
+/** Ráfaga: pocos mensajes por minuto. */
+export const limiteChatMinuto = rateLimit({
+  windowMs: 60_000,
+  limit: env.CHATBOT_LIMITE_MINUTO,
+  keyGenerator: porCuenta,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: respuestaChat429("CHAT_DEMASIADO_RAPIDO", "Estás escribiendo muy rápido. Espera un momento e intenta de nuevo.")
+});
+
+/** Tope diario por cliente, para que una cuenta no gaste el presupuesto de todos. */
+export const limiteChatDia = rateLimit({
+  windowMs: 24 * 60 * 60_000,
+  limit: env.CHATBOT_LIMITE_DIA,
+  keyGenerator: porCuenta,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: respuestaChat429("CHAT_LIMITE_DIARIO", "Llegaste al límite de mensajes de hoy con el asistente. Escríbenos por WhatsApp y te atendemos.")
+});

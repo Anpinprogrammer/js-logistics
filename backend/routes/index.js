@@ -14,6 +14,7 @@ import caja from "./caja.routes.js";
 import cuentas from "./cuentas.routes.js";
 import jornadas from "./jornadas.routes.js";
 import sueldos from "./sueldos.routes.js";
+import chatbot from "./chatbot.routes.js";
 import datos from "./datos.routes.js";
 
 const r = Router();
@@ -38,6 +39,7 @@ r.use("/caja", caja);
 r.use("/cuentas", cuentas);
 r.use("/jornadas", jornadas);
 r.use("/sueldos", sueldos);
+r.use("/chatbot", chatbot);
 r.use(datos); // historial, papelera, respaldo, sincronizar y eventos
 
 export default r;
