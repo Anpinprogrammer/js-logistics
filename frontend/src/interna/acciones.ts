@@ -5,7 +5,7 @@
 import * as api from "../api/servicios";
 import type * as T from "../api/tipos";
 import { S, yo, type Pedido, type Medio, type Motivo, type Metodo, type TipoMov, type TipoPersonal, type Almacen, type CajaMov, type Liquidacion, hora } from "./motor";
-import { aPedido } from "./datos";
+import { aPedido, aPersona } from "./datos";
 import { DEMO } from "./demo";
 import { comprimir, firmaABlob, FOTO, MINI } from "../lib/imagen";
 
@@ -210,7 +210,9 @@ export async function quitarAdelanto(aid: string) {
 /* ---------- personal y accesos ---------- */
 export async function guardarPersona(mid: string | null, d: { nombre?: string; telefono?: string; tipo?: TipoPersonal; tarifa?: number }) {
   if (DEMO) { const k = mid || id(); return tocar(s => { s.mensajeros[k] = { ...(s.mensajeros[k] || { id: k, nombre: "", telefono: "", tipo: "mensajero", tarifa: 0 }), ...d }; }); }
-  await tras(mid ? api.mensajeros.actualizar(mid, d) : api.mensajeros.crear({ nombre: d.nombre || "", telefono: d.telefono || "", tipo: d.tipo || "mensajero", tarifa: d.tarifa || 0 }));
+  // El servidor responde con la ficha ya guardada: se deja en el almacén y la tabla se pinta al instante.
+  const m = mid ? await api.mensajeros.actualizar(mid, d) : await api.mensajeros.crear({ nombre: d.nombre || "", telefono: d.telefono || "", tipo: d.tipo || "mensajero", tarifa: d.tarifa || 0 });
+  tocar(s => { s.mensajeros[m.id] = aPersona(m); });
 }
 export async function quitarPersona(mid: string) {
   if (!DEMO) await api.mensajeros.eliminar(mid);

@@ -3,6 +3,7 @@ import { env } from "./config/env.js";
 import { pool } from "./config/db.js";
 import { crearApp } from "./app.js";
 import { marcarCierre } from "./controllers/salud.controller.js";
+import { cerrarCola } from "./queues/emailQueue.js";
 
 const app = crearApp();
 const servidor = app.listen(env.PORT, () => {
@@ -16,6 +17,7 @@ async function cerrar(senal) {
   console.log(`${senal} recibido: cerrando…`);
   marcarCierre();
   servidor.close(async () => {
+    await cerrarCola().catch(() => {});
     await pool.end().catch(() => {});
     process.exit(0);
   });

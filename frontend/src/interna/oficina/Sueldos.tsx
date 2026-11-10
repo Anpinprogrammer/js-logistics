@@ -23,7 +23,7 @@ export default function Sueldos({ pintar }: { pintar: () => void }) {
   const sem = (w: string) => { E.semA = w; pintar(); };
   // Un toque marca el día con el pago por día de la persona; otro toque lo quita
   const tocarDia = async (m: Persona, dia: string) => {
-    if (!Number(m.tarifa) && !jornada(m.id, dia)) return v.abrir(<PedirTarifa m={m} despues={() => ponerJornada(m.id, dia, Number(S.mensajeros[m.id]?.tarifa) || 0)} />);
+    if (!Number(m.tarifa) && !jornada(m.id, dia)) return v.abrir(<PedirTarifa m={m} despues={() => ponerJornada(m.id, dia, Number(S.mensajeros[m.id]?.tarifa) || 0)} />, "centrada-ancha");
     setOcupado(m.id + dia);
     try { await ponerJornada(m.id, dia, jornada(m.id, dia) ? 0 : Number(m.tarifa)); } catch (e) { fallo(v)(e); }
     setOcupado("");
@@ -41,12 +41,12 @@ export default function Sueldos({ pintar }: { pintar: () => void }) {
     </div>
     {R.filas.length ? <div className="tabla-env"><table><thead><tr><th>Persona</th>{R.dias.map((d, i) => <th className="n" key={d}>{DIAS_SEM[i]} {d.slice(8)}</th>)}<th className="n">Anterior</th><th className="n">Total</th><th className="n">Adelantos</th><th className="n">Pagado</th><th className="n">Neto</th><th></th></tr></thead><tbody>
       {R.filas.map(f => { const t = tipoDe(f.m), editable = PAGO_FIJO.includes(t); return <tr key={f.m.id}>
-        <td><b>{f.m.nombre}</b><br /><span className="sub" style={{ fontSize: ".8rem" }}>{TIPOS[t]}</span>{editable && <><br /><span className="sub" style={{ fontSize: ".8rem" }}>{f.m.tarifa ? <>{pesos(f.m.tarifa)} por día · {enlace("cambiar", () => v.abrir(<PedirTarifa m={f.m} />))} · {enlace("otro valor", () => v.abrir(<OtroValor m={f.m} dias={R.dias} />))}</> : enlace("Poner pago por día", () => v.abrir(<PedirTarifa m={f.m} />))}</span></>}</td>
+        <td><b>{f.m.nombre}</b><br /><span className="sub" style={{ fontSize: ".8rem" }}>{TIPOS[t]}</span>{editable && <><br /><span className="sub" style={{ fontSize: ".8rem" }}>{f.m.tarifa ? <>{pesos(f.m.tarifa)} por día · {enlace("cambiar", () => v.abrir(<PedirTarifa m={f.m} />, "centrada-ancha"))} · {enlace("otro valor", () => v.abrir(<OtroValor m={f.m} dias={R.dias} />, "centrada-ancha"))}</> : enlace("Poner pago por día", () => v.abrir(<PedirTarifa m={f.m} />, "centrada-ancha"))}</span></>}</td>
         {R.dias.map((d, i) => { const j = jornada(f.m.id, d); return <td className="n" key={d}>{editable ? <button className="dia-btn" aria-pressed={!!j} disabled={(d > hoyS && !j) || ocupado === f.m.id + d} aria-label={`${f.m.nombre} ${DIAS_SEM[i]} ${d.slice(8)}: ${j ? "trabajó" : "no trabajó"}`} onClick={() => tocarDia(f.m, d)}>{j ? "✓ " + pesos(j) : "—"}</button>
           : f.vals[i] ? <span className={f.vals[i] < 0 ? "neg" : ""}>{pesos(f.vals[i])}</span> : "—"}</td>; })}
-        <td className="n"><a href="#" className="enlace" title="Sueldo que llevaba antes de la app" onClick={e => { e.preventDefault(); v.abrir(<EditarPrevio m={f.m} sem={R.sem} />); }}>{f.previo ? pesos(f.previo) : "+"}</a></td>
+        <td className="n"><a href="#" className="enlace" title="Sueldo que llevaba antes de la app" onClick={e => { e.preventDefault(); v.abrir(<EditarPrevio m={f.m} sem={R.sem} />, "centrada-ancha"); }}>{f.previo ? pesos(f.previo) : "+"}</a></td>
         <td className="n"><b>{pesos(f.total)}</b></td><td className="n">{f.adel ? pesos(f.adel) : "—"}</td><td className="n">{f.pagado ? pesos(f.pagado) : "—"}</td><td className="n"><b className={f.neto < 0 ? "neg" : ""}>{pesos(f.neto)}</b></td>
-        <td><div className="acciones" style={{ margin: 0, flexWrap: "nowrap" }}><button className="btn sec chico" onClick={() => v.abrir(<MovCaja tipo="sale" pre={{ cat: "adelanto", personaId: f.m.id, semana: R.sem }} />)}>Adelanto</button>{f.neto > 0 && <button className="btn ok chico" onClick={() => v.abrir(<MovCaja tipo="sale" pre={{ cat: "sueldo", personaId: f.m.id, valor: f.neto, semana: R.sem }} />)}>Pagar</button>}</div></td></tr>; })}
+        <td><div className="acciones" style={{ margin: 0, flexWrap: "nowrap" }}><button className="btn sec chico" onClick={() => v.abrir(<MovCaja tipo="sale" pre={{ cat: "adelanto", personaId: f.m.id, semana: R.sem }} />, "centrada-ancha")}>Adelanto</button>{f.neto > 0 && <button className="btn ok chico" onClick={() => v.abrir(<MovCaja tipo="sale" pre={{ cat: "sueldo", personaId: f.m.id, valor: f.neto, semana: R.sem }} />, "centrada-ancha")}>Pagar</button>}</div></td></tr>; })}
       <tr><td><b>Total</b></td>{R.dias.map((d, i) => <td className="n" key={d}>{pesos(R.filas.reduce((a, f) => a + f.vals[i], 0))}</td>)}<td className="n">{pesos(R.filas.reduce((a, f) => a + f.previo, 0))}</td><td className="n"><b>{pesos(tot.total)}</b></td><td className="n">{pesos(tot.adel)}</td><td className="n">{pesos(tot.pagado)}</td><td className="n"><b>{pesos(tot.neto)}</b></td><td></td></tr>
     </tbody></table></div> : <div className="vacio">Registra tu personal en la pestaña Personal.</div>}
     <p className="sub" style={{ marginTop: 10 }}>Mensajeros: 70% de sus domicilios del día − {pesos(DESC_SUELDO)}. Patinadores, oficina y JS: toca cada día que trabajó (se marca con su pago por día); toca otra vez para quitarlo. Para un valor distinto, usa “otro valor”. Los domicilios de pedidos a nombre de oficina son 100% de JS y suman al sueldo de Javier.</p>
@@ -58,7 +58,7 @@ export default function Sueldos({ pintar }: { pintar: () => void }) {
     <h2>Adelantos de la semana</h2>
     {adelSem.length ? <div className="tabla-env"><table><thead><tr><th>Día</th><th>Persona</th><th>Medio</th><th>Detalle</th><th className="n">Valor</th><th></th></tr></thead><tbody>
       {adelSem.map(c => <tr key={c.id}><td>{hora(c.fecha)}</td><td>{c.nom}</td><td>{MEDIOS[c.medio as Medio] || ""}</td><td>{c.concepto || ""}</td><td className="n">{pesos(c.valor)}{Number(c.devuelto) ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>devolvió {pesos(c.devuelto || 0)}</span></> : null}</td>
-        <td>{valorAdel(c) > 0 ? <button className="btn sec chico" onClick={() => v.abrir(<QuitarAdelanto id={c.id} />)}>Devolvió / Quitar</button> : <span className="sub">Devuelto</span>}</td></tr>)}
+        <td>{valorAdel(c) > 0 ? <button className="btn sec chico" onClick={() => v.abrir(<QuitarAdelanto id={c.id} />, "centrada-ancha")}>Devolvió / Quitar</button> : <span className="sub">Devuelto</span>}</td></tr>)}
     </tbody></table></div> : <div className="vacio">Sin adelantos esta semana. Usa el botón “Adelanto” en cada persona.</div>}
   </>;
 }
@@ -78,18 +78,18 @@ function QuitarAdelanto({ id }: { id: string }) {
     if (!liq && yaContado(c.fecha)) return v.avisar("Ese adelanto ya se contó en un arqueo: si devolvió la plata, usa “Registrar devolución”.");
     if (liq && liquidacionesDe(c.personaId)[0]?.id !== liq.id) return v.avisar("Ya hay una liquidación más nueva de este mensajero: usa “Registrar devolución” cuando pague.");
     if (Number(c.devuelto)) return v.avisar("Este adelanto ya tiene una devolución registrada: no se puede quitar.");
-    if (!await v.confirmar("Quitar adelanto", `${m?.nombre || ""} · ${pesos(c.valor)}. ${liq ? "Vuelve a quedar debiéndolo como mensajero." : "La plata vuelve a la caja."}`, "Quitar")) return v.abrir(<QuitarAdelanto id={id} />);
+    if (!await v.confirmar("Quitar adelanto", `${m?.nombre || ""} · ${pesos(c.valor)}. ${liq ? "Vuelve a quedar debiéndolo como mensajero." : "La plata vuelve a la caja."}`, "Quitar")) return v.abrir(<QuitarAdelanto id={id} />, "centrada-ancha");
     try { await quitarAdelanto(id); v.avisar("Adelanto quitado"); } catch (e) { v.avisar("No se pudo quitar: " + motivoError(e)); }
   };
-  return <>
+  return <div className="form-modal form-doble">
     <Cab sub={<span className="sub">{hora(c.fecha)} · {pesos(c.valor)}{Number(c.devuelto) ? " · ya devolvió " + pesos(c.devuelto || 0) : ""}{c.concepto ? " · " + c.concepto : ""}</span>}><h2>Adelanto de {m?.nombre || ""}</h2></Cab>
     <h2>Devolvió la plata</h2><p className="sub">Entra hoy a la caja y se le deja de descontar del sueldo.</p>
     <div className="linea2"><div className="campo"><label htmlFor="adVal">Valor que devolvió</label><input id="adVal" type="number" inputMode="numeric" min="0" step="1000" value={val} onChange={e => setVal(e.target.value)} /></div>
       <div className="campo"><label htmlFor="adMedio">Medio</label><select id="adMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{MEDIOS_K.map(k => <option key={k} value={k}>{MEDIOS[k]}</option>)}</select></div></div>
-    <button className="btn ok" id="adDev" style={{ width: "100%" }} disabled={guardando} onClick={devolver}>Registrar devolución</button>
+    <button className="btn form-guardar" id="adDev" disabled={guardando} onClick={devolver}>Registrar devolución</button>
     <h2>Se registró por error</h2><p className="sub">{liq ? "Salió de una liquidación: se borra y lo que quedó debiendo vuelve a su cuenta de mensajero." : "Se borra y la plata vuelve a la caja en la fecha del adelanto."}</p>
-    <button className="btn peligro" id="adDel" style={{ width: "100%" }} onClick={quitar}>Quitar adelanto</button>
-  </>;
+    <button className="btn peligro form-peligro" id="adDel" onClick={quitar}>Quitar adelanto</button>
+  </div>;
 }
 
 /** Pago fijo por día (patinadores, oficina, JS): se guarda en Personal y se usa al marcar cada día. */
@@ -102,12 +102,12 @@ function PedirTarifa({ m, despues }: { m: Persona; despues?: () => Promise<unkno
     try { await guardarPersona(m.id, { tarifa: x }); v.cerrar(); v.avisar("Pago por día de " + m.nombre + ": " + pesos(x)); if (despues) await despues(); }
     catch (e) { setGuardando(false); fallo(v)(e); }
   };
-  return <>
+  return <div className="form-modal">
     <Cab><h2>Pago por día de {m.nombre}</h2></Cab>
     <p className="sub">Es lo que se marca cada vez que tocas un día en Sueldos. Cambiarlo no modifica los días ya marcados.</p>
     <div className="campo"><label htmlFor="tfVal">Valor por día</label><input id="tfVal" type="number" inputMode="numeric" min="0" step="1000" autoFocus value={val} onFocus={e => e.target.select()} onChange={e => setVal(e.target.value)} /></div>
-    <button className="btn" id="tfGuardar" style={{ width: "100%" }} disabled={guardando} onClick={guardar}>Guardar{despues ? " y marcar el día" : ""}</button>
-  </>;
+    <button className="btn form-guardar" id="tfGuardar" disabled={guardando} onClick={guardar}>Guardar{despues ? " y marcar el día" : ""}</button>
+  </div>;
 }
 
 /** Lo que ya llevaba ganado esa semana antes de registrarlo en la app. */
@@ -119,12 +119,12 @@ function EditarPrevio({ m, sem }: { m: Persona; sem: string }) {
     try { if (x > 0 || actual) await ponerJornada(m.id, sem, x, true); v.cerrar(); v.avisar("Sueldo anterior de " + m.nombre + ": " + pesos(x)); }
     catch (e) { setGuardando(false); fallo(v)(e); }
   };
-  return <>
+  return <div className="form-modal">
     <Cab sub={<span className="sub">Semana del {fechaLarga(sem)}</span>}><h2>Sueldo anterior de {m.nombre}</h2></Cab>
     <p className="sub">Lo que ya llevaba ganado esta semana antes de registrarlo en la app. Se suma al total de la semana. Déjalo en 0 para quitarlo.</p>
     <div className="campo"><label htmlFor="prVal">Valor</label><input id="prVal" type="number" inputMode="numeric" min="0" step="1000" autoFocus value={val} onFocus={e => e.target.select()} onChange={e => setVal(e.target.value)} /></div>
-    <button className="btn" id="prGuardar" style={{ width: "100%" }} disabled={guardando} onClick={guardar}>Guardar</button>
-  </>;
+    <button className="btn form-guardar" id="prGuardar" disabled={guardando} onClick={guardar}>Guardar</button>
+  </div>;
 }
 
 /** Días con un valor distinto al de siempre (medio día, horas extra…). Vacío o 0 = no trabajó. */
@@ -137,9 +137,9 @@ function OtroValor({ m, dias }: { m: Persona; dias: string[] }) {
     try { for (const d of dias) { const x = Number(vals[d]) || 0; if (x !== jornada(m.id, d)) await ponerJornada(m.id, d, x); } v.cerrar(); v.avisar("Días de " + m.nombre + " guardados"); }
     catch (e) { setGuardando(false); fallo(v)(e); }
   };
-  return <>
+  return <div className="form-modal form-doble">
     <Cab sub={<span className="sub">Valor de cada día de la semana</span>}><h2>{m.nombre}</h2></Cab>
     <div className="linea2">{dias.map((d, i) => <div className="campo" style={{ minWidth: 120 }} key={d}><label htmlFor={"ov_" + d}>{DIAS_SEM[i]} {d.slice(8)}</label><input id={"ov_" + d} type="number" inputMode="numeric" min="0" step="1000" placeholder="No trabajó" value={vals[d]} onChange={e => setVals({ ...vals, [d]: e.target.value })} /></div>)}</div>
-    <button className="btn" id="ovGuardar" style={{ width: "100%" }} disabled={guardando} onClick={guardar}>Guardar</button>
-  </>;
+    <button className="btn form-guardar" id="ovGuardar" disabled={guardando} onClick={guardar}>Guardar</button>
+  </div>;
 }

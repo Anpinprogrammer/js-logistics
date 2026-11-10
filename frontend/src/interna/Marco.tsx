@@ -104,7 +104,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
 
   return <>
     <aside className="lateral" id="lateral">
-      <div className="marca-lat"><img src="/logo.png" alt="" /><span>JS Logistics<small>Servir es nuestra labor</small></span></div>
+      <div className="marca-lat"><img src="/logo.png" alt="" /><div className="marca-lat-txt"><b className="marca-lat-nombre">JS Logistics</b><small className="marca-lat-eslogan">Servir es nuestra labor</small></div></div>
       <nav id="navLateral" aria-label="Menú principal">
         {SECCIONES.map(([titulo, claves]) => { const xs = items.filter(([k]) => claves.includes(k)); return xs.length ? <div className="lat-grupo" key={titulo}><span className="lat-titulo">{titulo}</span>{xs.map(boton)}</div> : null; })}
       </nav>

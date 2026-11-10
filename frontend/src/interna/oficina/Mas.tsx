@@ -1,16 +1,16 @@
 /* Oficina → Más: Resultados, Personal (con accesos), Historial, Papelera y Respaldo, igual al prototipo. */
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  S, yo, hoy, hora, pesos, diaDe, moverDia, fechaLarga, cerrado, servicio, totales, sueldosDia, saldoCliente, nombreCliente, listaOrdenada, tipoDe, esRepartidor, vinculosDe,
-  SUBMAS, TIPOS, ROLES, type TipoPersonal,
+  S, yo, hoy, hora, pesos, diaDe, moverDia, fechaLarga, cerrado, servicio, totales, sueldosDia, saldoCliente, nombreCliente, listaOrdenada, sinTildes, tipoDe, esRepartidor, vinculosDe,
+  SUBMAS, TIPOS, ROLES, type Persona, type TipoPersonal, type UsuarioS,
 } from "../motor";
-import { Cab, useVentana } from "../ui";
+import { Cab, IconoCargando, IconoCorreo, IconoCorreoMasivo, IconoEditar, IconoEnviar, IconoLiberar, IconoLlave, IconoQuitarUsuario, useVentana } from "../ui";
 import { E, guardarLocal } from "../estado";
 import { cambiarAcceso, cambiarClaveDe, crearAcceso, guardarPersona, quitarAcceso, quitarPersona } from "../acciones";
-import { motivoError } from "../datos";
+import { aUsuario, motivoError, useDatos } from "../datos";
 import { DEMO } from "../demo";
-import { useEscritorio } from "../../lib/pantalla";
+import { useEscritorio, usePorPaginaAccesos } from "../../lib/pantalla";
 import * as api from "../../api/servicios";
 import type { Cambio, EnPapelera, Rol } from "../../api/tipos";
 
@@ -73,13 +73,36 @@ function Resultados({ pintar }: { pintar: () => void }) {
 }
 
 /* ---------- Personal y accesos ---------- */
+type PersonalSubTab = "personal" | "acceso";
+
+/** Ventana flotante de los formularios de Personal; cierra con la X, Cancelar, Escape o clic afuera. */
+function Modal({ titulo, sub, alCerrar, children, compacto, ancha }: { titulo: string; sub?: React.ReactNode; alCerrar: () => void; children: React.ReactNode; compacto?: boolean; ancha?: boolean }) {
+  useEffect(() => {
+    const alTeclear = (e: KeyboardEvent) => { if (e.key === "Escape") alCerrar(); };
+    document.addEventListener("keydown", alTeclear);
+    return () => document.removeEventListener("keydown", alTeclear);
+  }, [alCerrar]);
+  return <div className="modal-fondo" onClick={(e: React.MouseEvent<HTMLDivElement>) => { if (e.target === e.currentTarget) alCerrar(); }}>
+    <div className={"modal-caja" + (compacto ? " modal-caja-personal" : "") + (ancha ? " modal-caja-ancha" : "")} role="dialog" aria-modal="true" aria-label={titulo}>
+      <button type="button" className="modal-cerrar" aria-label="Cerrar" onClick={alCerrar}>×</button>
+      <h2>{titulo}</h2>
+      {sub ? <div className="modal-sub">{sub}</div> : null}
+      {children}
+    </div>
+  </div>;
+}
+
 function Personal() {
   const v = useVentana();
+  const [tab, setTab] = useState<PersonalSubTab>("personal");
+  const [modalPersonal, setModalPersonal] = useState(false);
+  const [editando, setEditando] = useState<Persona | null>(null);
+  const [modalAcceso, setModalAcceso] = useState(false);
+  const [texto, setTexto] = useState(""), [tipoFiltro, setTipoFiltro] = useState<"" | TipoPersonal>("");
   const ms = listaOrdenada(S.mensajeros, "nombre").sort((a, b) => Object.keys(TIPOS).indexOf(tipoDe(a)) - Object.keys(TIPOS).indexOf(tipoDe(b)));
-  const [f, setF] = useState({ nombre: "", tel: "", tipo: "mensajero" as TipoPersonal, tarifa: "" });
+  const q = sinTildes(texto.trim());
+  const msVis = ms.filter(m => (!tipoFiltro || tipoDe(m) === tipoFiltro) && (!q || sinTildes(m.nombre + " " + (m.telefono || "")).includes(q)));
   const fallo = (e: unknown) => v.avisar("No se pudo guardar: " + motivoError(e));
-  const agregar = async () => { const n = f.nombre.trim(); if (!n) return v.avisar("Escribe el nombre");
-    try { await guardarPersona(null, { nombre: n, telefono: f.tel.trim(), tipo: f.tipo, tarifa: Number(f.tarifa) || 0 }); v.avisar(n + " agregado"); setF({ nombre: "", tel: "", tipo: "mensajero", tarifa: "" }); } catch (e) { fallo(e); } };
   const liberar = async (id: string) => {
     if (!await v.confirmar("Liberar a " + S.mensajeros[id].nombre, "Se desvincula de la cuenta actual. La próxima persona que elija este nombre quedará vinculada.", "Liberar")) return;
     try { for (const x of vinculosDe(id)) await cambiarAcceso(x.uid, { mensajeroId: null }); v.avisar("Nombre liberado"); } catch (e) { v.avisar("No se pudo liberar: " + motivoError(e)); }
@@ -90,38 +113,161 @@ function Personal() {
   };
   return <>
     <h1>Personal</h1><p className="sub">Mensajeros y el dueño entregan pedidos desde la app. Patinadores y la empresa (JS) solo aparecen en Sueldos. Cuando un mensajero elige su nombre por primera vez, queda vinculado a su cuenta; “Liberar” le permite elegir de nuevo (por ejemplo, si cambió de celular o de cuenta).</p>
-    <div className="linea2"><div className="campo"><label htmlFor="mNom">Nombre</label><input id="mNom" value={f.nombre} onChange={e => setF({ ...f, nombre: e.target.value })} /></div><div className="campo"><label htmlFor="mTel">Teléfono</label><input id="mTel" inputMode="tel" value={f.tel} onChange={e => setF({ ...f, tel: e.target.value })} /></div></div>
-    <div className="linea2"><div className="campo"><label htmlFor="mTipoP">Tipo</label><select id="mTipoP" value={f.tipo} onChange={e => setF({ ...f, tipo: e.target.value as TipoPersonal })}>{Object.entries(TIPOS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></div>
-      <div className="campo"><label htmlFor="mTar">Pago por día (patinadores y oficina)</label><input id="mTar" type="number" inputMode="numeric" step="1000" min="0" placeholder="70000" value={f.tarifa} onChange={e => setF({ ...f, tarifa: e.target.value })} /></div></div>
-    <button className="btn" id="mAdd" onClick={agregar}>Agregar</button>
-    <h2>{ms.length} {ms.length === 1 ? "registrado" : "registrados"}</h2>
-    {ms.length ? <div className="tabla-env"><table><thead><tr><th>Nombre</th><th>Teléfono</th><th>Tipo</th><th className="n">Pago por día</th><th>Cuenta</th><th></th></tr></thead><tbody>
-      {ms.map(m => { const vs = vinculosDe(m.id); return <tr key={m.id}><td><b>{m.nombre}</b></td><td>{m.telefono || ""}</td>
-        <td><select aria-label={"Tipo de " + m.nombre} value={tipoDe(m)} onChange={async e => { try { await guardarPersona(m.id, { tipo: e.target.value as TipoPersonal }); v.avisar("Tipo actualizado"); } catch (er) { fallo(er); } }}>{Object.entries(TIPOS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></td>
-        <td className="n">{["patinador", "oficina"].includes(tipoDe(m)) ? <input type="number" step="1000" min="0" defaultValue={Number(m.tarifa) || ""} style={{ width: 110 }} aria-label={"Pago por día de " + m.nombre} onChange={async e => { try { await guardarPersona(m.id, { tarifa: Number(e.target.value) || 0 }); v.avisar("Pago por día actualizado"); } catch (er) { fallo(er); } }} /> : "—"}</td>
-        <td>{!esRepartidor(m) ? "—" : vs.length ? <><span className="etq ent">Vinculado{vs.length > 1 ? " ×" + vs.length : ""}</span> <button className="btn sec chico" onClick={() => liberar(m.id)}>Liberar</button></> : <span className="sub">Sin vincular</span>}</td>
-        <td><button className="btn peligro chico" onClick={() => quitar(m.id)}>Quitar</button></td></tr>; })}
-    </tbody></table></div> : <div className="vacio">Agrega a tu personal para empezar.</div>}
-    {yo.esAdmin && <Accesos />}
+    <div className="cab-personal">
+      <div className="seg subtabs" role="tablist" aria-label="Secciones de Personal">
+        <button type="button" role="tab" id="tabPer-personal" aria-selected={tab === "personal"} aria-controls="panelPer-personal" onClick={() => setTab("personal")}>Personal JS</button>
+        <button type="button" role="tab" id="tabPer-acceso" aria-selected={tab === "acceso"} aria-controls="panelPer-acceso" onClick={() => setTab("acceso")}>Acceso</button>
+      </div>
+      {tab === "personal"
+        ? <button type="button" className="btn agregar" onClick={() => setModalPersonal(true)}>+ Agregar personal</button>
+        : yo.esAdmin ? <button type="button" className="btn agregar" onClick={() => setModalAcceso(true)}>+ Dar acceso</button> : null}
+    </div>
+
+    {tab === "personal" ? <div role="tabpanel" id="panelPer-personal" aria-labelledby="tabPer-personal">
+      <div className="lista-toolbar">
+        <label className="lista-buscar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+          <input type="search" placeholder="Buscar por nombre o teléfono…" aria-label="Buscar por nombre o teléfono" value={texto} onChange={e => setTexto(e.target.value)} />
+        </label>
+        <select className="lista-filtro" aria-label="Filtrar por tipo" value={tipoFiltro} onChange={e => setTipoFiltro(e.target.value as "" | TipoPersonal)}>
+          <option value="">Todos los tipos</option>
+          {Object.entries(TIPOS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}
+        </select>
+      </div>
+      <h2>{msVis.length} {msVis.length === 1 ? "registrado" : "registrados"}{msVis.length !== ms.length ? ` de ${ms.length}` : ""}</h2>
+      {msVis.length ? <div className="tabla-env con-acciones tabla-marco"><table className="tabla-personal"><thead><tr><th className="per-nombre">Nombre</th><th className="per-tel">Teléfono</th><th className="per-tipo">Tipo</th><th className="per-pago">Pago por día</th><th className="per-cuenta">Estado / Cuenta</th><th className="per-acciones">Acciones</th></tr></thead><tbody>
+        {msVis.map(m => { const vs = vinculosDe(m.id); return <tr key={m.id}><td className="per-nombre"><b>{m.nombre}</b></td><td className="per-tel">{m.telefono || ""}</td>
+          <td className="per-tipo"><select aria-label={"Tipo de " + m.nombre} value={tipoDe(m)} onChange={async e => { try { await guardarPersona(m.id, { tipo: e.target.value as TipoPersonal }); v.avisar("Tipo actualizado"); } catch (er) { fallo(er); } }}>{Object.entries(TIPOS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></td>
+          <td className="per-pago">{["patinador", "oficina"].includes(tipoDe(m)) ? <input type="number" step="1000" min="0" defaultValue={Number(m.tarifa) || ""} style={{ width: 110 }} aria-label={"Pago por día de " + m.nombre} onChange={async e => { try { await guardarPersona(m.id, { tarifa: Number(e.target.value) || 0 }); v.avisar("Pago por día actualizado"); } catch (er) { fallo(er); } }} /> : "—"}</td>
+          <td className="per-cuenta">{!esRepartidor(m) ? "—" : vs.length ? <span className="etq ent">Vinculado{vs.length > 1 ? " ×" + vs.length : ""}</span> : <span className="sub">Sin vincular</span>}</td>
+          <td className="per-acciones"><div className="acciones-celda">
+            <span className="accion-icono editar">
+              <button type="button" onClick={() => setEditando(m)} aria-label="Editar personal"><IconoEditar /></button>
+              <span className="accion-tip" role="tooltip"><i /><span>Editar personal</span></span>
+            </span>
+            {esRepartidor(m) && vs.length ? <span className="accion-icono ambar">
+              <button type="button" onClick={() => liberar(m.id)} aria-label="Liberar cuenta"><IconoLiberar /></button>
+              <span className="accion-tip" role="tooltip"><i /><span>Liberar cuenta</span></span>
+            </span> : null}
+            <span className="accion-icono peligro">
+              <button type="button" onClick={() => quitar(m.id)} aria-label="Quitar de personal"><IconoQuitarUsuario /></button>
+              <span className="accion-tip" role="tooltip"><i /><span>Quitar de personal</span></span>
+            </span>
+          </div></td></tr>; })}
+      </tbody></table></div> : <div className="vacio">{ms.length ? "No hay personal con esos filtros." : "Agrega a tu personal para empezar."}</div>}
+      {modalPersonal ? <ModalPersonal alCerrar={() => setModalPersonal(false)} /> : null}
+      {editando ? <ModalPersonal persona={editando} alCerrar={() => setEditando(null)} /> : null}
+    </div> : <div role="tabpanel" id="panelPer-acceso" aria-labelledby="tabPer-acceso">
+      {yo.esAdmin ? <Accesos modalAbierto={modalAcceso} alCerrar={() => setModalAcceso(false)} /> : <div className="vacio">Los accesos los maneja administración.</div>}
+    </div>}
   </>;
+}
+
+/** Agregar o editar una persona del personal (patinador, oficina, mensajero…). */
+function ModalPersonal({ alCerrar, persona }: { alCerrar: () => void; persona?: Persona }) {
+  const v = useVentana();
+  const [f, setF] = useState({ nombre: persona?.nombre || "", tel: persona?.telefono || "", tipo: (persona ? tipoDe(persona) : "mensajero") as TipoPersonal, tarifa: persona ? String(Number(persona.tarifa) || 0) : "70000" });
+  const [guardando, setGuardando] = useState(false);
+  const guardar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = f.nombre.trim();
+    if (!n) return v.avisar("Escribe el nombre");
+    setGuardando(true);
+    try {
+      await guardarPersona(persona ? persona.id : null, { nombre: n, telefono: f.tel.trim(), tipo: f.tipo, tarifa: Number(f.tarifa) || 0 });
+      v.avisar(persona ? "Cambios guardados" : n + " agregado");
+      alCerrar();
+    }
+    catch (er) { setGuardando(false); v.avisar("No se pudo guardar: " + motivoError(er)); }
+  };
+  return <Modal titulo={persona ? "Editar personal" : "Agregar personal"} sub={persona ? "Cambia el nombre, el teléfono, el tipo o el pago por día. Los cambios se aplican de inmediato." : "Los mensajeros y el dueño entregan pedidos desde la app; patinadores y la empresa (JS) solo aparecen en Sueldos."} alCerrar={alCerrar} compacto>
+    <form onSubmit={guardar}>
+      <div className="form-col">
+        <div className="campo"><label htmlFor="mNom">Nombre</label><input id="mNom" autoFocus value={f.nombre} onChange={e => setF({ ...f, nombre: e.target.value })} /></div>
+        <div className="campo"><label htmlFor="mTel">Teléfono</label><input id="mTel" inputMode="tel" value={f.tel} onChange={e => setF({ ...f, tel: e.target.value })} /></div>
+        <div className="campo"><label htmlFor="mTipoP">Tipo</label><select id="mTipoP" value={f.tipo} onChange={e => setF({ ...f, tipo: e.target.value as TipoPersonal })}>{Object.entries(TIPOS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></div>
+        <div className="campo"><label htmlFor="mTar">Pago por día (patinadores y oficina)</label><input id="mTar" type="number" inputMode="numeric" step="1000" min="0" placeholder="70000" value={f.tarifa} onChange={e => setF({ ...f, tarifa: e.target.value })} /></div>
+      </div>
+      <div className="modal-acciones"><button type="button" className="btn sec" onClick={alCerrar}>Cancelar</button><button type="submit" className="btn" disabled={guardando}>{persona ? "Guardar cambios" : "Agregar"}</button></div>
+    </form>
+  </Modal>;
 }
 
 const ROLES_EQUIPO = Object.entries(ROLES).filter(([k]) => k !== "cliente");
 const ROLES_AYUDA = "Mensajero: solo sus pedidos, su caja y su sueldo. Asistente: trabaja en Oficina (pedidos, clientes, saldos y recibos); no ve caja, sueldos ni personal. Cliente: solo ve sus pedidos, sus pruebas de entrega y su saldo, sin editar nada. Administración: todo.";
-function Accesos() {
-  const v = useVentana(), us = listaOrdenada(S.usuarios, "nombre"), reps = listaOrdenada(S.mensajeros, "nombre").filter(esRepartidor);
-  const [f, setF] = useState({ nombre: "", email: "", clave: "", rol: "mensajero" as Rol, men: "", cli: "" }), [creando, setCreando] = useState(false);
-  const cliente = f.rol === "cliente";
-  const crear = async () => {
-    const nombre = f.nombre.trim(), email = f.email.trim().toLowerCase(), clienteId = cliente ? f.cli : "", mensajeroId = cliente ? "" : f.men;
-    if (!nombre || !email) return v.avisar("Escribe el nombre y el correo"); if (f.clave.length < 6) return v.avisar("La contraseña debe tener al menos 6 caracteres");
-    if (cliente && !clienteId) return v.avisar("Elige a qué cliente corresponde este acceso");
-    if (mensajeroId && vinculosDe(mensajeroId).length) return v.avisar("Ese nombre ya está vinculado. Libéralo primero en la tabla de arriba.");
-    setCreando(true);
-    try { await crearAcceso({ email, clave: f.clave, nombre, rol: f.rol, mensajeroId, clienteId }); v.avisar("Acceso creado. Entrega a " + nombre + " su correo y contraseña."); setF({ nombre: "", email: "", clave: "", rol: "mensajero", men: "", cli: "" }); }
-    catch (e) { v.avisar("No se pudo crear el acceso: " + motivoError(e)); }
-    setCreando(false);
+const ROLES_CALLOUT = <div className="modal-ayuda">
+  <p><b>Mensajero:</b> solo sus pedidos, su caja y su sueldo.</p>
+  <p><b>Asistente:</b> trabaja en Oficina (pedidos, clientes, saldos y recibos); no ve caja, sueldos ni personal.</p>
+  <p><b>Cliente:</b> solo ve sus pedidos, sus pruebas de entrega y su saldo, sin editar nada.</p>
+  <p><b>Administración:</b> todo.</p>
+</div>;
+
+/** Una página de accesos en memoria (modo demo). */
+type PaginaAccesosUI = { usuarios: UsuarioS[]; pagina: number; porPagina: number; total: number; paginas: number };
+function paginaAccesosDemo(f: { buscar: string; rol: string }, pagina: number, porPagina: number): PaginaAccesosUI {
+  const q = sinTildes(f.buscar.trim());
+  const lista = listaOrdenada(S.usuarios, "nombre")
+    .filter(u => !f.rol || u.rol === f.rol)
+    .filter(u => !q || sinTildes(u.nombre + " " + u.email).includes(q));
+  const paginas = Math.max(1, Math.ceil(lista.length / porPagina));
+  const actual = Math.min(Math.max(1, pagina), paginas);
+  return { usuarios: lista.slice((actual - 1) * porPagina, actual * porPagina), pagina: actual, porPagina, total: lista.length, paginas };
+}
+
+function Accesos({ modalAbierto, alCerrar }: { modalAbierto: boolean; alCerrar: () => void }) {
+  const v = useVentana(), reps = listaOrdenada(S.mensajeros, "nombre").filter(esRepartidor);
+  // El servidor busca, filtra, cuenta y corta; en demo se imita con los datos en memoria.
+  const porPagina = usePorPaginaAccesos(), { version } = useDatos();
+  const [pagina, setPagina] = useState(E.paginaAcceso);
+  const [texto, setTexto] = useState(""), [buscar, setBuscar] = useState("");
+  const [rol, setRol] = useState<"" | Rol>("");
+  const tBuscar = useRef<number>(0), arriba = useRef<HTMLDivElement>(null);
+  const alBuscar = (x: string) => { setTexto(x); clearTimeout(tBuscar.current); tBuscar.current = window.setTimeout(() => { setBuscar(x); E.paginaAcceso = 1; setPagina(1); }, 300); };
+  const alRol = (r: "" | Rol) => { setRol(r); E.paginaAcceso = 1; setPagina(1); };
+  const qAcc = useQuery({
+    queryKey: ["accesos", buscar, rol, pagina, porPagina, version],
+    placeholderData: keepPreviousData,
+    queryFn: (): Promise<PaginaAccesosUI> => DEMO
+      ? Promise.resolve(paginaAccesosDemo({ buscar, rol }, pagina, porPagina))
+      : api.usuarios.pagina({ buscar: buscar.trim() || undefined, rol: rol || undefined }, pagina, porPagina).then(r => ({ ...r, usuarios: r.usuarios.map(aUsuario) }))
+  });
+  const pag = qAcc.data, us = pag?.usuarios ?? [];
+  const [enviando, setEnviando] = useState<string | null>(null);
+  // Selección del modal de restablecimiento masivo (no toca la tabla principal).
+  const [modalMasivo, setModalMasivo] = useState(false);
+  const [selMasivo, setSelMasivo] = useState<string[]>([]);
+  const [busMasivo, setBusMasivo] = useState("");
+  const [enviandoLote, setEnviandoLote] = useState(false);
+  const qMasivo = sinTildes(busMasivo.trim());
+  const usuariosMasivo = listaOrdenada(S.usuarios, "nombre").filter(u => !qMasivo
+    || sinTildes((u.nombre || "") + " " + (u.email || "") + " " + (S.mensajeros[u.mensajeroId]?.telefono || "")).includes(qMasivo));
+  const todosMasivo = usuariosMasivo.length > 0 && usuariosMasivo.every(u => selMasivo.includes(u.email));
+  const alternarTodosMasivo = () => setSelMasivo(s => todosMasivo ? s.filter(e => !usuariosMasivo.some(u => u.email === e)) : [...new Set([...s, ...usuariosMasivo.map(u => u.email)])]);
+  const alternarMasivo = (email: string) => setSelMasivo(s => s.includes(email) ? s.filter(e => e !== email) : [...s, email]);
+  const abrirMasivo = () => { setBusMasivo(""); setSelMasivo([]); setModalMasivo(true); };
+  const ir = (n: number) => { E.paginaAcceso = n; setPagina(n); arriba.current?.scrollIntoView({ block: "start", behavior: "smooth" }); };
+  const enviarLote = async () => {
+    if (!selMasivo.length) return;
+    const n = selMasivo.length;
+    setEnviandoLote(true);
+    try {
+      if (DEMO) await new Promise(r => setTimeout(r, 700));
+      else await api.usuarios.enviarResetMasivo(selMasivo);
+      v.avisar(`Iniciando envío masivo a ${n} usuarios en segundo plano.`);
+      setModalMasivo(false); setSelMasivo([]); setBusMasivo("");
+    } catch (e) { v.avisar("No se pudo encolar el envío: " + motivoError(e)); }
+    finally { setEnviandoLote(false); }
   };
+  const enviarReset = async (u: UsuarioS) => {
+    setEnviando(u.uid);
+    try {
+      if (DEMO) await new Promise(r => setTimeout(r, 600)); // en demo se imita lo que tarda el correo
+      else await api.usuarios.enviarReset({ usuarioId: u.uid });
+      v.avisar("Correo de restablecimiento enviado a " + u.email);
+    } catch (e) { v.avisar("No se pudo enviar el correo: " + motivoError(e)); }
+    finally { setEnviando(null); }
+  };
+  const desde = pag?.total ? (pag.pagina - 1) * pag.porPagina + 1 : 0, hasta = pag ? Math.min(pag.total, pag.pagina * pag.porPagina) : 0;
   const cambiarRol = async (uid: string, nuevo: Rol) => {
     const u = S.usuarios[uid];
     if (!await v.confirmar("Cambiar el rol de " + (u?.nombre || u?.email || ""), "Pasará a " + ROLES[nuevo] + ". El cambio se aplica la próxima vez que abra la app.", "Cambiar rol")) return;
@@ -139,20 +285,117 @@ function Accesos() {
   return <>
     <h2>Accesos a la app</h2>
     <p className="sub">Cada persona entra con su correo y contraseña. Si eliges su nombre de Personal, queda vinculada de una vez. {ROLES_AYUDA}</p>
-    <div className="linea2"><div className="campo"><label htmlFor="acNom">Nombre</label><input id="acNom" value={f.nombre} onChange={e => setF({ ...f, nombre: e.target.value })} /></div><div className="campo"><label htmlFor="acEmail">Correo</label><input id="acEmail" type="email" autoComplete="off" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div></div>
-    <div className="linea2"><div className="campo"><label htmlFor="acClave">Contraseña inicial (mínimo 6)</label><input id="acClave" type="text" autoComplete="off" minLength={6} value={f.clave} onChange={e => setF({ ...f, clave: e.target.value })} /></div>
-      <div className="campo"><label htmlFor="acRol">Rol</label><select id="acRol" value={f.rol} onChange={e => setF({ ...f, rol: e.target.value as Rol })}>{Object.entries(ROLES).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></div>
-      <div className={"campo " + (cliente ? "oculto" : "")} id="acMenC"><label htmlFor="acMen">Nombre en Personal</label><select id="acMen" value={f.men} onChange={e => setF({ ...f, men: e.target.value, nombre: f.nombre || S.mensajeros[e.target.value]?.nombre || "" })}><option value="">— Ninguno —</option>{reps.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div>
-      <div className={"campo " + (cliente ? "" : "oculto")} id="acCliC"><label htmlFor="acCli">Cliente</label><select id="acCli" value={f.cli} onChange={e => setF({ ...f, cli: e.target.value, nombre: f.nombre || S.clientes[e.target.value]?.nombre || "" })}><option value="">Elige…</option>{listaOrdenada(S.clientes, "nombre").map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></div></div>
-    <button className="btn" id="acCrear" disabled={creando} onClick={crear}>Crear acceso</button>
-    {us.length ? <div className="tabla-env" style={{ marginTop: 14 }}><table><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Personal</th><th></th></tr></thead><tbody>
-      {us.map(u => <tr key={u.uid}><td><b>{u.nombre || ""}</b>{u.uid === yo.uid ? <> <span className="etq ent">Tú</span></> : null}</td><td>{u.email || ""}</td>
-        <td>{u.uid === yo.uid || u.rol === "cliente" ? ROLES[u.rol] || u.rol || "" : <select aria-label={"Rol de " + (u.nombre || "")} value={u.rol} onChange={e => cambiarRol(u.uid, e.target.value as Rol)}>{ROLES_EQUIPO.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>}</td>
-        <td>{u.rol === "cliente" ? "Cliente: " + (S.clientes[u.clienteId]?.nombre || "(no existe)") : <select aria-label={"Nombre en Personal de " + (u.nombre || "")} value={S.vinculos[u.uid]?.mensajeroId || ""} onChange={e => vincular(u.uid, e.target.value)}><option value="">— Ninguno —</option>{reps.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select>}</td>
-        <td><button className="btn sec chico" onClick={() => v.abrir(<NuevaClave uid={u.uid} />)}>Cambiar contraseña</button>{u.uid !== yo.uid ? <> <button className="btn peligro chico" onClick={() => quitar(u.uid)}>Quitar acceso</button></> : null}</td></tr>)}
-    </tbody></table></div> : null}
+    <div ref={arriba} style={{ scrollMarginTop: 90 }} />
+    <div className="lista-toolbar">
+      <label className="lista-buscar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+        <input type="search" placeholder="Buscar por nombre o correo…" aria-label="Buscar por nombre o correo" value={texto} onChange={e => alBuscar(e.target.value)} />
+      </label>
+      <div className="lista-derecha">
+        <select className="lista-filtro" aria-label="Filtrar por rol" value={rol} onChange={e => alRol(e.target.value as "" | Rol)}>
+          <option value="">Todos los roles</option>
+          <option value="mensajero">Mensajero</option>
+          <option value="asistente">Asistente</option>
+          <option value="cliente">Cliente</option>
+          <option value="admin">Administración</option>
+        </select>
+        <button type="button" className="btn masivo" onClick={abrirMasivo}><IconoCorreoMasivo /> Restablecimiento masivo</button>
+      </div>
+    </div>
+    {qAcc.isError ? <div className="aviso alerta">No se pudieron traer los accesos: {motivoError(qAcc.error)} <button className="btn chico" onClick={() => qAcc.refetch()}>Intentar otra vez</button></div>
+      : !pag ? <div className="vacio">Cargando accesos…</div>
+      : us.length ? <>
+        <div className="tabla-env con-acciones tabla-marco" style={{ marginTop: 14 }} aria-busy={qAcc.isFetching}><table className="tabla-accesos"><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Personal</th><th className="acciones">Acciones</th></tr></thead><tbody>
+          {us.map(u => <tr key={u.uid}><td><b>{u.nombre || ""}</b>{u.uid === yo.uid ? <> <span className="etq ent">Tú</span></> : null}</td><td>{u.email || ""}</td>
+            <td>{u.uid === yo.uid || u.rol === "cliente" ? ROLES[u.rol] || u.rol || "" : <select aria-label={"Rol de " + (u.nombre || "")} value={u.rol} onChange={e => cambiarRol(u.uid, e.target.value as Rol)}>{ROLES_EQUIPO.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>}</td>
+            <td>{u.rol === "cliente" ? "Cliente: " + (S.clientes[u.clienteId]?.nombre || "(no existe)") : <select aria-label={"Nombre en Personal de " + (u.nombre || "")} value={S.vinculos[u.uid]?.mensajeroId || ""} onChange={e => vincular(u.uid, e.target.value)}><option value="">— Ninguno —</option>{reps.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select>}</td>
+            <td className="acciones"><div className="acciones-celda">
+              <span className="accion-icono correo">
+                <button type="button" onClick={() => enviarReset(u)} disabled={enviando === u.uid} aria-label="Enviar correo de restablecimiento">
+                  {enviando === u.uid ? <span className="girando"><IconoCargando /></span> : <IconoCorreo />}
+                </button>
+                <span className="accion-tip" role="tooltip"><i /><span>Enviar correo de restablecimiento</span></span>
+              </span>
+              <span className="accion-icono">
+                <button type="button" onClick={() => v.abrir(<NuevaClave uid={u.uid} />)} aria-label="Cambiar contraseña"><IconoLlave /></button>
+                <span className="accion-tip" role="tooltip"><i /><span>Cambiar contraseña</span></span>
+              </span>
+              {u.uid !== yo.uid ? <span className="accion-icono peligro">
+                <button type="button" onClick={() => quitar(u.uid)} aria-label="Quitar acceso"><IconoQuitarUsuario /></button>
+                <span className="accion-tip" role="tooltip"><i /><span>Quitar acceso</span></span>
+              </span> : null}
+            </div></td></tr>)}
+        </tbody></table></div>
+        <nav className="accesos-pie" aria-label="Paginación de accesos">
+          <span>Mostrando <b>{desde}</b> a <b>{hasta}</b> de <b>{pag.total}</b> {pag.total === 1 ? "acceso" : "accesos"}</span>
+          <span className="accesos-pag">
+            <button type="button" disabled={pag.pagina <= 1 || qAcc.isPlaceholderData} onClick={() => ir(pag.pagina - 1)}>Anterior</button>
+            <span>Página <b>{pag.pagina}</b> de {pag.paginas}</span>
+            <button type="button" disabled={pag.pagina >= pag.paginas || qAcc.isPlaceholderData} onClick={() => ir(pag.pagina + 1)}>Siguiente</button>
+          </span>
+        </nav>
+      </> : <div className="vacio">{buscar.trim() || rol ? "No hay accesos con esos filtros." : "Todavía no hay accesos."}</div>}
+    {modalAbierto ? <ModalAcceso alCerrar={alCerrar} /> : null}
+    {modalMasivo ? <Modal titulo="Envío masivo de restablecimiento" sub="Selecciona los usuarios a los que deseas enviar el correo de recuperación." alCerrar={() => setModalMasivo(false)} ancha>
+      <label className="lista-buscar masivo-buscar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+        <input type="search" placeholder="Buscar por nombre, correo o teléfono…" aria-label="Buscar usuario para el envío masivo" value={busMasivo} onChange={e => setBusMasivo(e.target.value)} />
+      </label>
+      <div className="masivo-master">
+        <label><input type="checkbox" className="acceso-check" checked={todosMasivo} onChange={alternarTodosMasivo} /> Seleccionar todos los visibles</label>
+        <span>{selMasivo.length} seleccionado{selMasivo.length === 1 ? "" : "s"}</span>
+      </div>
+      <div className="masivo-lista">
+        {usuariosMasivo.length ? usuariosMasivo.map(u => <label key={u.uid} className="masivo-item">
+          <span className="masivo-info">
+            <input type="checkbox" className="acceso-check" checked={selMasivo.includes(u.email)} onChange={() => alternarMasivo(u.email)} />
+            <span><b>{u.nombre || u.email}</b><small>{u.email}</small></span>
+          </span>
+          <span className="masivo-rol">{ROLES[u.rol] || u.rol}</span>
+        </label>) : <div className="vacio">No hay usuarios con esa búsqueda.</div>}
+      </div>
+      <div className="modal-acciones masivo-pie">
+        <button type="button" className="btn sec" onClick={() => setModalMasivo(false)}>Cancelar</button>
+        <button type="button" className="btn masivo-enviar" disabled={!selMasivo.length || enviandoLote} onClick={enviarLote}>
+          {enviandoLote ? <span className="girando"><IconoCargando /></span> : <IconoEnviar />} Enviar correos ({selMasivo.length})
+        </button>
+      </div>
+    </Modal> : null}
   </>;
 }
+
+/** Dar acceso a la app: correo, contraseña inicial, rol y vínculo con Personal o con un cliente. */
+function ModalAcceso({ alCerrar }: { alCerrar: () => void }) {
+  const v = useVentana();
+  const reps = listaOrdenada(S.mensajeros, "nombre").filter(esRepartidor), cs = listaOrdenada(S.clientes, "nombre");
+  const [f, setF] = useState({ nombre: "", email: "", clave: "", rol: "mensajero" as Rol, men: "", cli: "" });
+  const [guardando, setGuardando] = useState(false);
+  const cliente = f.rol === "cliente";
+  const guardar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const nombre = f.nombre.trim(), email = f.email.trim().toLowerCase(), clienteId = cliente ? f.cli : "", mensajeroId = cliente ? "" : f.men;
+    if (!nombre || !email) return v.avisar("Escribe el nombre y el correo");
+    if (f.clave.length < 6) return v.avisar("La contraseña debe tener al menos 6 caracteres");
+    if (cliente && !clienteId) return v.avisar("Elige a qué cliente corresponde este acceso");
+    if (mensajeroId && vinculosDe(mensajeroId).length) return v.avisar("Ese nombre ya está vinculado. Libéralo primero en la tabla de Personal.");
+    setGuardando(true);
+    try { await crearAcceso({ email, clave: f.clave, nombre, rol: f.rol, mensajeroId, clienteId }); v.avisar("Acceso creado. Entrega a " + nombre + " su correo y contraseña."); alCerrar(); }
+    catch (er) { setGuardando(false); v.avisar("No se pudo crear el acceso: " + motivoError(er)); }
+  };
+  return <Modal titulo="Dar acceso" sub={ROLES_CALLOUT} alCerrar={alCerrar}>
+    <form onSubmit={guardar}>
+      <div className="linea2"><div className="campo"><label htmlFor="acNom">Nombre</label><input id="acNom" autoFocus value={f.nombre} onChange={e => setF({ ...f, nombre: e.target.value })} /></div>
+        <div className="campo"><label htmlFor="acEmail">Correo</label><input id="acEmail" type="email" autoComplete="off" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div></div>
+      <div className="linea2"><div className="campo"><label htmlFor="acClave">Contraseña inicial (mínimo 6)</label><input id="acClave" type="text" autoComplete="off" minLength={6} value={f.clave} onChange={e => setF({ ...f, clave: e.target.value })} /></div>
+        <div className="campo"><label htmlFor="acRol">Rol</label><select id="acRol" value={f.rol} onChange={e => setF({ ...f, rol: e.target.value as Rol })}>{Object.entries(ROLES).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></div></div>
+      {cliente
+        ? <div className="campo"><label htmlFor="acCli">Cliente</label><select id="acCli" value={f.cli} onChange={e => setF({ ...f, cli: e.target.value, nombre: f.nombre || S.clientes[e.target.value]?.nombre || "" })}><option value="">Elige…</option>{cs.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></div>
+        : <div className="campo"><label htmlFor="acMen">Nombre en Personal</label><select id="acMen" value={f.men} onChange={e => setF({ ...f, men: e.target.value, nombre: f.nombre || S.mensajeros[e.target.value]?.nombre || "" })}><option value="">— Ninguno —</option>{reps.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div>}
+      <div className="modal-acciones"><button type="button" className="btn sec" onClick={alCerrar}>Cancelar</button><button type="submit" className="btn" disabled={guardando}>Guardar acceso</button></div>
+    </form>
+  </Modal>;
+}
+
 /** Administración le pone una contraseña nueva a la cuenta (el servidor no manda correos). */
 function NuevaClave({ uid }: { uid: string }) {
   const v = useVentana(), u = S.usuarios[uid], [clave, setClave] = useState("");

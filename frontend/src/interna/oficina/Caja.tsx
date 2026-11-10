@@ -30,7 +30,7 @@ export default function Caja({ pintar }: { pintar: () => void }) {
   const cajaDia = recsDia.reduce((a, r) => a + (Number(r.valor) || 0), 0);
   const porMedio: Record<string, number> = {}; recsDia.forEach(r => (porMedio[r.medio] = (porMedio[r.medio] || 0) + (Number(r.valor) || 0)));
   const liqs = Object.values(S.liquidaciones).sort((a, b) => b.fecha - a.fecha).slice(0, 25);
-  const base = (id: string) => (yo.esAdmin ? v.abrir(<MovCaja tipo="sale" pre={{ cat: "base", personaId: id }} />) : v.abrir(<BaseDesdeOficina mid={id} />));
+  const base = (id: string) => (yo.esAdmin ? v.abrir(<MovCaja tipo="sale" pre={{ cat: "base", personaId: id }} />, "centrada") : v.abrir(<BaseDesdeOficina mid={id} />, "centrada"));
   const quitarRec = async (id: string) => {
     const r = S.recaudos[id]; if (!r) return; if (yaContado(r.fecha)) return avisoContado(v);
     if (!await v.confirmar("Quitar dinero recibido", `${S.mensajeros[r.mensajeroId]?.nombre || ""} · ${pesos(r.valor)} · ${hora(r.fecha)}. Se quita de la caja y vuelve a sumarse a lo que debe.`, "Quitar")) return;
@@ -81,7 +81,7 @@ export default function Caja({ pintar }: { pintar: () => void }) {
       </div>
       <div style={{ height: 14 }} />
       {ids.length ? <div className="mgrid mgrid-mens">{ids.map(id => { const pm = pms[id], tt = totales(pm.ps); return <div className="mcard mcard-mens" key={id}>
-        <div className="mcard-top"><b>{S.mensajeros[id].nombre}</b><span className="acciones"><button className="btn sec chico" onClick={() => base(id)}>Dar base</button><button className="btn ok chico" onClick={() => v.abrir(<RecibirDinero mid={id} />)}>Recibir dinero</button></span></div>
+        <div className="mcard-top"><b>{S.mensajeros[id].nombre}</b><span className="acciones"><button className="btn sec chico" onClick={() => base(id)}>Dar base</button><button className="btn ok chico" onClick={() => v.abrir(<RecibirDinero mid={id} />, "centrada")}>Recibir dinero</button></span></div>
         <span className="sub mcard-periodo">Período desde {pm.ul ? hora(pm.ul.fecha) : "el inicio"}</span>
         <dl className="datos">
           <dt>Entregas / en ruta</dt><dd>{pm.ps.length} / {pendM[id] || 0}</dd>
@@ -94,15 +94,15 @@ export default function Caja({ pintar }: { pintar: () => void }) {
           <dt>Directo al cliente</dt><dd>{pesos(tt.transfCli)}</dd>
           {yo.esAdmin && <><dt>Sueldo del período</dt><dd>{sueldoTexto(id, pm.ps)}</dd></>}
         </dl>
-        <div className="liq"><span className={"liq-est " + (pm.ul && pm.ul.debe > 0 ? "neg" : "")}>{pm.ul ? "Última: " + textoLiq(pm.ul.debe) : "Sin liquidaciones"}</span>{yo.esAdmin && <button className="btn chico" onClick={() => v.abrir(<Liquidar mid={id} />)}>Liquidar</button>}</div>
+        <div className="liq"><span className={"liq-est " + (pm.ul && pm.ul.debe > 0 ? "neg" : "")}>{pm.ul ? "Última: " + textoLiq(pm.ul.debe) : "Sin liquidaciones"}</span>{yo.esAdmin && <button className="btn chico" onClick={() => v.abrir(<Liquidar mid={id} />, "centrada")}>Liquidar</button>}</div>
       </div>; })}</div> : <div className="vacio">No hay mensajeros con movimiento pendiente.</div>}
       <h2>Dinero recibido de mensajeros</h2>
       <div className="campo" style={{ maxWidth: 220 }}><label htmlFor="diaC">Día</label><input type="date" id="diaC" value={E.diaCaja} onChange={e => { E.diaCaja = e.target.value || hoy(); pintar(); }} /></div>
       <div className="cifras" style={{ marginBottom: 12 }}><div className="cifra fuerte"><span>Dinero recibido</span><b>{pesos(cajaDia)}</b><span>{Object.entries(porMedio).map(([m, x]) => `${MEDIOS[m as Medio] || m}: ${pesos(x)}`).join(" · ") || "Sin entregas de dinero este día"}</span></div></div>
       {recsDia.length ? <div className="tabla-env"><table><thead><tr><th>Hora</th><th>Mensajero</th><th>Medio</th><th>Nota</th><th className="n">Valor</th>{yo.esAdmin ? <th></th> : <th>Recibió</th>}</tr></thead><tbody>
         {recsDia.map(r => <tr key={r.id}><td>{hora(r.fecha)}</td><td>{S.mensajeros[r.mensajeroId]?.nombre || ""}</td><td>{MEDIOS[r.medio] || ""}{medioAntes(r)}</td><td>{r.nota || ""}</td><td className="n"><b>{pesos(r.valor)}</b></td>
-          {yo.esAdmin ? <td style={{ whiteSpace: "nowrap" }}><button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<EditarRecaudo id={r.id} />))}>Editar</button> <button className="btn peligro chico" onClick={() => quitarRec(r.id)}>Quitar</button></td>
-            : <td>{r.porNombre || ""}{puedoCambiarMedio(r) ? <> <button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<CambiarMedio col="recaudos" id={r.id} />))}>Cambiar medio</button></> : null}</td>}</tr>)}
+          {yo.esAdmin ? <td style={{ whiteSpace: "nowrap" }}><button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<EditarRecaudo id={r.id} />, "centrada"))}>Editar</button> <button className="btn peligro chico" onClick={() => quitarRec(r.id)}>Quitar</button></td>
+            : <td>{r.porNombre || ""}{puedoCambiarMedio(r) ? <> <button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<CambiarMedio col="recaudos" id={r.id} />, "centrada"))}>Cambiar medio</button></> : null}</td>}</tr>)}
       </tbody></table></div> : <div className="vacio">Toca “Recibir dinero” en un mensajero cada vez que te entregue plata.</div>}
       {!yo.esAdmin && recsDia.length ? <p className="sub" style={{ marginTop: 8 }}>Si algo quedó mal registrado, avísale al administrador para que lo corrija.</p> : null}
     </div>
@@ -115,7 +115,7 @@ export default function Caja({ pintar }: { pintar: () => void }) {
           {liqs.map(l => <tr key={l.id}><td>{hora(l.fecha)}</td><td>{S.mensajeros[l.mensajeroId]?.nombre || ""}</td><td className="n">{l.entregas || 0}</td><td className="n"><b>{pesos(l.recibido)}</b></td>
             <td>{l.debe > 0 ? <span className="etq sin">Por cobrar</span> : l.debe < 0 ? <span className="etq ent">A favor</span> : <span className="etq gris">Paz y salvo</span>}{l.adelanto ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>Adelanto {pesos(l.adelanto)}</span></> : null}</td>
             <td className={"n " + (l.debe > 0 ? "neg" : l.debe < 0 ? "pos" : "")}>{l.debe ? (l.debe > 0 ? "Falta " : "A favor ") + pesos(Math.abs(l.debe)) : "—"}</td>
-            <td><button className="btn sec chico" onClick={() => v.abrir(<VerLiquidacion id={l.id} />)}>Ver</button></td></tr>)}
+            <td><button className="btn sec chico" onClick={() => v.abrir(<VerLiquidacion id={l.id} />, "centrada")}>Ver</button></td></tr>)}
         </tbody></table></div> : <div className="vacio">Aún no has liquidado a ningún mensajero.</div>}
       </> : <div className="vacio">Las liquidaciones las maneja administración.</div>}
     </div>
@@ -144,7 +144,7 @@ function CierreDia({ pintar }: { pintar: () => void }) {
   const arquear = async () => {
     const y = pendientesCierre();
     if ((y.mens.length || y.ofisEf.length) && !await v.confirmar("Hacer arqueo con pendientes", `Todavía ${[y.mens.length ? `hay ${y.mens.length} ${pl(y.mens.length, "mensajero")} con plata` : "", y.ofisEf.length ? `hay ${y.ofisEf.length} ${pl(y.ofisEf.length, "caja")} de oficina con efectivo sin cerrar` : ""].filter(Boolean).join(" y ")}. No cuentes esa plata: la app todavía la tiene a nombre de ellos.`, "Hacer arqueo igual")) return;
-    v.abrir(<HacerArqueo />);
+    v.abrir(<HacerArqueo />, "centrada");
   };
   return <section className="cierre" id="cierreDia" aria-labelledby="cierreTitulo">
     <header className="cierre-cab">
@@ -155,18 +155,18 @@ function CierreDia({ pintar }: { pintar: () => void }) {
       <Paso n={1} titulo="Plata de los mensajeros" ok={!x.mens.length} detalle={x.mens.length
         ? <div className="fichas">{x.mens.map(({ m, debe }) => <div className="ficha" key={m.id}>
           <div className="ficha-info"><b>{m.nombre}</b><span className={debe > 0 ? "neg" : ""}>{pesos(debe)}</span></div>
-          <button className="btn chico recibir" onClick={() => v.abrir(<RecibirDinero mid={m.id} />)}>Recibir</button>
+          <button className="btn chico recibir" onClick={() => v.abrir(<RecibirDinero mid={m.id} />, "centrada")}>Recibir</button>
         </div>)}</div>
         : "Ningún mensajero tiene plata pendiente."} />
       <Paso n={2} titulo="Cajas de oficina" ok={!x.ofis.length} detalle={x.ofis.length
-        ? x.ofis.map(({ u, s }, i) => <span key={u.uid}>{i ? " · " : ""}{u.nombre || u.email}: {MEDIOS_K.filter(k => Math.round(s[k])).map(k => MEDIOS[k] + " " + pesos(s[k])).join(", ")} <button className="btn chico recibir" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="entrega" />)}>Recibir cierre</button></span>)
+        ? x.ofis.map(({ u, s }, i) => <span key={u.uid}>{i ? " · " : ""}{u.nombre || u.email}: {MEDIOS_K.filter(k => Math.round(s[k])).map(k => MEDIOS[k] + " " + pesos(s[k])).join(", ")} <button className="btn chico recibir" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="entrega" />, "centrada")}>Recibir cierre</button></span>)
         : "Todas en $ 0."} />
       <Paso n={3} titulo="Pedidos sin remitente" ok={!x.sinRem.length} detalle={x.sinRem.length ? `${x.sinRem.length} ${pl(x.sinRem.length, "guía")}: el saldo de esos clientes no está completo.` : "Todos tienen remitente."}
         boton={x.sinRem.length ? <button className="btn sec chico" onClick={() => aPedidos("sin")}>Asignar</button> : null} />
       <Paso n={4} titulo="Entregas sin valor de domicilio" ok={!x.sinServ.length} detalle={x.sinServ.length ? `${x.sinServ.length} ${pl(x.sinServ.length, "entrega")}: no se descuenta el domicilio ni suma al sueldo.` : "Todas tienen domicilio."}
         boton={x.sinServ.length ? <button className="btn sec chico" onClick={() => aPedidos("serv")}>Completar</button> : null} />
       <Paso n={5} titulo="Gastos, adelantos o pagos sin registrar" ok detalle="Regístralos ahora: después del arqueo ya no se pueden poner con fecha de días anteriores."
-        boton={<button className="btn sec chico" id="cdSalida" onClick={() => v.abrir(<MovCaja tipo="sale" />)}>Registrar salida</button>} />
+        boton={<button className="btn sec chico" id="cdSalida" onClick={() => v.abrir(<MovCaja tipo="sale" />, "centrada")}>Registrar salida</button>} />
       <Paso n={6} titulo="Arqueo" ok={x.arqueoHoy} detalle={(x.arqueoHoy && x.a ? `Hecho hoy a las ${horaCorta(x.a.fecha)}: ${resultadoArqueo(x.a)}.` : (x.mens.length || x.ofisEf.length ? "Primero recibe la plata de los pasos 1 y 2: si cuentas plata que la app todavía tiene en otra parte, el arqueo sale descuadrado." : "Cuenta efectivo, Nequi, Bancolombia y la Base de JS.") + (x.enRuta.length ? ` Hay ${x.enRuta.length} ${pl(x.enRuta.length, "pedido")} en ruta: esa plata todavía no ha llegado.` : ""))}
         boton={<button className={"btn " + (x.mens.length || x.ofisEf.length ? "sec" : "ok") + " chico"} id="cdArqueo" onClick={arquear}>Hacer arqueo</button>} />
     </div>
@@ -202,7 +202,7 @@ function CajaGeneral({ pintar }: { pintar: () => void }) {
       {A.length ? <div className="cifra"><span>Faltantes y sobrantes de arqueos</span><b className={falto + sobro < 0 ? "neg" : "pos"}>{falto || sobro ? (falto + sobro < 0 ? "− " : "+ ") + pesos(Math.abs(falto + sobro)) : "$ 0"}</b><span>Este mes · faltó {pesos(-falto)} · sobró {pesos(sobro)} · {A.length} {pl(A.length, "arqueo")}</span></div> : null}
       {R.sobrantes.n ? <div className="cifra"><span>Sobrantes de cajas de oficina</span><b className="pos">{pesos(R.sobrantes.mes)}</b><span>Este mes · {R.sobrantes.n} en total ({pesos(R.sobrantes.total)})</span></div> : null}
     </div>
-    <div className="acciones acciones-caja"><button className="btn" id="cjArqueo" onClick={() => v.abrir(<HacerArqueo />)}>Hacer arqueo</button><button className="btn ok" id="cjEntra" onClick={() => v.abrir(<MovCaja tipo="entra" />)}>Registrar entrada</button><button className="btn sec" id="cjSale" onClick={() => v.abrir(<MovCaja tipo="sale" />)}>Registrar salida o gasto</button></div>
+    <div className="acciones acciones-caja"><button className="btn" id="cjArqueo" onClick={() => v.abrir(<HacerArqueo />, "centrada")}>Hacer arqueo</button><button className="btn ok" id="cjEntra" onClick={() => v.abrir(<MovCaja tipo="entra" />, "centrada")}>Registrar entrada</button><button className="btn sec" id="cjSale" onClick={() => v.abrir(<MovCaja tipo="sale" />, "centrada")}>Registrar salida o gasto</button></div>
     <h2>Movimientos de caja</h2>
     <div className="campo" style={{ maxWidth: 220 }}><label htmlFor="diaL">Día</label><input type="date" id="diaL" value={E.diaLibro} onChange={e => { E.diaLibro = e.target.value || hoy(); pintar(); }} /></div>
     {delDia.length ? <div className="tabla-env"><table><thead><tr><th>Hora</th><th>Concepto</th><th>Tipo</th><th>Medio</th><th className="n">Valor</th><th></th></tr></thead><tbody>
@@ -280,7 +280,7 @@ export function MovCaja({ tipo, pre = {} }: { tipo: "entra" | "sale"; pre?: { ca
     try { await movCaja({ tipo, cat, personaId: conPersona ? per : "", valor, medio, concepto: con.trim(), fecha: fechaCaja(d), semana: conSemana ? sem : "" }); v.cerrar(); v.avisar((CATS[cat] || "Movimiento") + " registrado"); }
     catch (e) { setGuardando(false); noSePudo(v, "No se pudo guardar")(e); }
   };
-  return <>
+  return <div className="form-modal form-doble">
     <Cab><h2>{tipo === "entra" ? "Registrar entrada" : "Registrar salida"}</h2></Cab>
     <div className="linea2"><div className="campo"><label htmlFor="cjCat">Tipo</label><select id="cjCat" value={cat} onChange={e => setCat(e.target.value)}>{CATS_TIPO[tipo].map(k => <option key={k} value={k}>{CATS[k]}</option>)}</select></div>
       <div className={"campo " + (conPersona ? "" : "oculto")} id="cjPerC"><label htmlFor="cjPer">Persona</label><select id="cjPer" value={per} onChange={e => setPer(e.target.value)}><option value="">Elige…</option>{personas.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div></div>
@@ -289,8 +289,8 @@ export function MovCaja({ tipo, pre = {} }: { tipo: "entra" | "sale"; pre?: { ca
     <div className={"campo " + (conSemana ? "" : "oculto")} id="cjSemC"><label htmlFor="cjSem">Semana del sueldo</label><select id="cjSem" value={sem} onChange={e => setSem(e.target.value)}>{sems.map(([w, t]) => <option key={w} value={w}>{t}</option>)}</select></div>
     <div className="linea2"><div className="campo"><label htmlFor="cjDia">Día en que salió o entró la plata</label><input id="cjDia" type="date" value={dia} min={diaMinCaja()} max={hoy()} onChange={e => setDia(e.target.value)} /></div>
       <div className="campo"><label htmlFor="cjCon">Detalle (opcional)</label><input id="cjCon" placeholder="Ej: gasolina, arriendo de mayo" value={con} onChange={e => setCon(e.target.value)} /></div></div>
-    <button className={"btn " + (tipo === "entra" ? "ok" : "")} id="cjGuardar" style={{ width: "100%" }} disabled={guardando} onClick={guardar}>Guardar</button>
-  </>;
+    <button className="btn form-guardar" id="cjGuardar" disabled={guardando} onClick={guardar}>Guardar</button>
+  </div>;
 }
 
 /* ---------- Mensajeros: recibir dinero, liquidar ---------- */
@@ -305,15 +305,15 @@ export function RecibirDinero({ mid }: { mid: string }) {
       v.avisar(`Recibido ${pesos(valor)} de ${m.nombre}. ${falta > 0 ? "Le falta " + pesos(falta) : falta < 0 ? "Entregó " + pesos(-falta) + " de más" : "Quedó a paz y salvo"}`); }
     catch (e) { setGuardando(false); noSePudo(v, "No se pudo guardar")(e); }
   };
-  return <>
+  return <div className="recibir">
     <Cab sub={<span className="sub">{m.nombre}</span>}><h2>Recibir dinero</h2></Cab>
     <dl className="datos"><dt>Efectivo cobrado</dt><dd>{pesos(pm.efectivo)}</dd>{pm.base ? <><dt>Base para vueltos</dt><dd>{pesos(pm.base)}</dd></> : null}{pm.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(pm.gastos)}</dd></> : null}
       {pm.anterior ? <><dt>Pendiente anterior</dt><dd>{pesos(pm.anterior)}</dd></> : null}<FilaAjuste a={pm.ajuste} /><dt>Ya entregó</dt><dd>{pesos(pm.recibido)}</dd><dt>Debe</dt><dd className="neg">{pesos(pm.debe)}</dd></dl>
     <div className="linea2"><div className="campo"><label htmlFor="rVal">Valor que entrega</label><input id="rVal" type="number" inputMode="numeric" min="0" step="1000" autoFocus value={val} onFocus={e => e.target.select()} onChange={e => setVal(e.target.value)} /></div>
       <div className="campo"><label htmlFor="rMedio">Medio</label><select id="rMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{MEDIOS_K.map(k => <option key={k} value={k}>{MEDIOS[k]}</option>)}</select></div></div>
     <div className="campo"><label htmlFor="rNota">Nota (opcional)</label><input id="rNota" placeholder="Ej: primera entrega de la tarde" value={nota} onChange={e => setNota(e.target.value)} /></div>
-    <button className="btn ok" id="rGuardar" style={{ width: "100%" }} disabled={guardando} onClick={guardar}>Registrar entrega de dinero</button>
-  </>;
+    <button className="btn ok recibir-guardar" id="rGuardar" disabled={guardando} onClick={guardar}>Registrar entrega de dinero</button>
+  </div>;
 }
 
 function EditarRecaudo({ id }: { id: string }) {
@@ -372,7 +372,7 @@ function Liquidar({ mid }: { mid: string }) {
       const queda = pm.debe - valor, ad = adelanto(queda);
       const id = await liquidar({ mensajeroId: mid, desde: pm.desde, dia: hoy(), entregas: pm.ps.length, guias: pm.ps.map(p => p.guia), efectivo: t.efectivo, base: pm.base, gastos: pm.gastos, anterior: pm.anterior,
         recibidoAntes: pm.recibido, entregaFinal: valor, recibido: pm.recibido + valor, debe: queda - ad, adelanto: ad, ajuste: pm.ajuste, transfJs: t.transfJs, transfCli: t.transfCli, sueldo, enRuta, medio, semanaAdelanto: ad ? sem : "" });
-      v.avisar(`${m.nombre}: ${ad ? "adelanto de " + pesos(ad) + " en su sueldo" : textoLiq(queda).toLowerCase()}`); v.abrir(<VerLiquidacion id={id} />);
+      v.avisar(`${m.nombre}: ${ad ? "adelanto de " + pesos(ad) + " en su sueldo" : textoLiq(queda).toLowerCase()}`); v.abrir(<VerLiquidacion id={id} />, "centrada");
     } catch (e) { setGuardando(false); noSePudo(v, "No se pudo guardar")(e); }
   };
   return <>
@@ -438,8 +438,8 @@ function TarjetaCajaOficina({ u, dia }: { u: Pick<UsuarioS, "uid" | "nombre" | "
     try { await borrarDe("cajamovs", ref); v.avisar("Movimiento quitado"); } catch (e) { noSePudo(v, "No se pudo quitar")(e); }
   };
   return <div className="mcard-oficina"><div className="mcard-top"><b>{yo.esAdmin ? u.nombre || u.email : "Mi caja de oficina"}</b>
-    {yo.esAdmin ? <span className="acciones oficina-acciones"><button className="btn sec chico" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="base" />)}>Dar base</button><button className="btn ok chico" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="entrega" />)}>Recibir cierre</button></span>
-      : <span className="acciones oficina-acciones"><button className="btn sec chico" onClick={() => v.abrir(<BaseDesdeOficina />)}>Dar base a un mensajero</button></span>}</div>
+    {yo.esAdmin ? <span className="acciones oficina-acciones"><button className="btn sec chico" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="base" />, "centrada")}>Dar base</button><button className="btn ok chico" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="entrega" />, "centrada")}>Recibir cierre</button></span>
+      : <span className="acciones oficina-acciones"><button className="btn sec chico" onClick={() => v.abrir(<BaseDesdeOficina />, "centrada")}>Dar base a un mensajero</button></span>}</div>
     <span className="sub oficina-sub">{ahora ? "Lo que tiene ahora y debe entregar al cierre" : "Lo que tenía al final de ese día"}</span>
     <dl className="datos">{MEDIOS_K.map(k => <div className="dato" key={k}><dt>{MEDIOS[k]}</dt><dd className={hasta[k] < 0 ? "neg" : ""}>{pesos(hasta[k])}</dd></div>)}
       <div className="dato total"><dt>Total</dt><dd>{pesos(hasta.efectivo + hasta.nequi + hasta.bancolombia)}</dd></div></dl>

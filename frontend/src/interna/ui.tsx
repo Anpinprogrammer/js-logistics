@@ -40,9 +40,17 @@ export const IconoWhatsApp = () => svg(<><path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 
 export const IconoCalendario = () => svg(<><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M8 3v4M16 3v4M3.5 10h17" /></>);
 export const IconoInfo = () => svg(<><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 7.5v.01" /></>);
 export const IconoSalir = () => svg(<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" />);
+export const IconoLlave = () => svg(<><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.8 12.2 21 2M16.5 6.5l3 3M19.5 3.5l1.5 1.5" /></>);
+export const IconoQuitarUsuario = () => svg(<><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.5 3.3-5.5 6.5-5.5 1.2 0 2.3.3 3.3.8" /><path d="M16 15.5l5 5M21 15.5l-5 5" /></>);
+export const IconoLiberar = () => svg(<><rect x="4" y="11" width="14" height="10" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 7.6-1.7" /><path d="M11 15.5v2" /></>);
+export const IconoEditar = () => svg(<><path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3z" /><path d="M13.5 6.5l3 3" /></>);
+export const IconoCorreo = () => svg(<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3.5 6.5 12 13l8.5-6.5" /></>);
+export const IconoCargando = () => svg(<path d="M21 12a9 9 0 1 1-3.2-6.9" />);
+export const IconoEnviar = () => svg(<><path d="M21 3 10.5 13.5" /><path d="M21 3l-6.5 18-4-7.5L3 9.5 21 3z" /></>);
+export const IconoCorreoMasivo = () => svg(<><rect x="3" y="4.5" width="18" height="14" rx="2" /><path d="M3.5 6 12 12.5 20.5 6" /><path d="M15.5 17.5l1.8 1.8 3.2-3.8" /></>);
 
 /* ---------- diálogo, avisos y confirmación (una sola ventana, como el prototipo) ---------- */
-interface Ventana { abrir: (contenido: ReactNode) => void; cerrar: () => void; avisar: (msg: string) => void; confirmar: (titulo: string, msg: string, boton: string) => Promise<boolean>; ampliar: (src: string) => void }
+interface Ventana { abrir: (contenido: ReactNode, variante?: "drawer" | "drawer-ancho" | "centrada" | "centrada-ancha") => void; cerrar: () => void; avisar: (msg: string) => void; confirmar: (titulo: string, msg: string, boton: string) => Promise<boolean>; ampliar: (src: string) => void }
 const CtxV = createContext<Ventana | null>(null);
 export const useVentana = () => { const v = useContext(CtxV); if (!v) throw new Error("useVentana fuera de ProveedorVentana"); return v; };
 
@@ -55,10 +63,14 @@ export function ProveedorVentana({ children }: { children: ReactNode }) {
   const resolver = useRef<((x: boolean) => void) | null>(null);
 
   const cerrar = useCallback(() => { dlg.current?.close(); }, []);
-  const abrir = useCallback((c: ReactNode) => {
+  const abrir = useCallback((c: ReactNode, variante?: "drawer" | "drawer-ancho" | "centrada" | "centrada-ancha") => {
     if (resolver.current) { resolver.current(false); resolver.current = null; }
     setContenido(c); setClave(k => k + 1);
-    const d = dlg.current; if (d && !d.open) d.showModal();
+    const d = dlg.current;
+    if (d) {
+      if (variante) d.dataset.variante = variante; else delete d.dataset.variante;
+      if (!d.open) d.showModal();
+    }
     if (cont.current) cont.current.scrollTop = 0;
   }, []);
   const avisar = useCallback((msg: string) => {
@@ -85,7 +97,7 @@ export function ProveedorVentana({ children }: { children: ReactNode }) {
   };
   useEffect(() => {
     const d = dlg.current; if (!d) return;
-    const alCerrar = () => { if (resolver.current) { resolver.current(false); resolver.current = null; } setContenido(null); setVisor(""); };
+    const alCerrar = () => { if (resolver.current) { resolver.current(false); resolver.current = null; } setContenido(null); setVisor(""); if (dlg.current) delete dlg.current.dataset.variante; };
     d.addEventListener("close", alCerrar);
     return () => d.removeEventListener("close", alCerrar);
   }, []);

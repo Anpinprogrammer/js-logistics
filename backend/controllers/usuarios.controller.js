@@ -3,9 +3,11 @@ import * as Usuario from "../models/usuario.model.js";
 import * as Enlace from "../models/enlace.model.js";
 import * as Enlaces from "../servicios/enlaces.js";
 import * as Auditoria from "../models/auditoria.model.js";
+import * as Accesos from "../servicios/usuarios.js";
 import { hashClave } from "../helpers/claves.js";
 import { conflicto, noEncontrado, prohibido, correoFallo, correoNoConfigurado } from "../helpers/errores.js";
 import { publico } from "./auth.controller.js";
+import { responder } from "./accion.js";
 
 const estadoCorreo = r => (r.enviado ? { enviado: true } : { enviado: false, motivo: r.motivo });
 
@@ -16,10 +18,18 @@ function correoObligatorio(r) {
   throw correoFallo();
 }
 
+const paraLista = u => ({ ...publico(u), activo: u.activo, ultimoIngreso: u.ultimoIngreso });
+
 export async function listar(_req, res) {
   const usuarios = await Usuario.listar();
-  res.json({ usuarios: usuarios.map(u => ({ ...publico(u), activo: u.activo, ultimoIngreso: u.ultimoIngreso })) });
+  res.json({ usuarios: usuarios.map(paraLista) });
 }
+
+/** GET /usuarios/pagina: la misma lista, por páginas (5 en celular y 10 en computador). */
+export const listarPagina = responder(async (ctx, req) => {
+  const p = await Accesos.paginaAccesos(ctx, req.valido.query);
+  return { ...p, usuarios: p.usuarios.map(paraLista) };
+});
 
 export async function crear(req, res) {
   const { clave, ...datos } = req.valido.body;

@@ -75,8 +75,8 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
     </div>
     <div className="controles">
       <div className="barra-acciones">
-        <button className="btn ok" id="waMasivo" onClick={() => v.abrir(<EnvioMasivo tipo0={E.filtroCli === "pagar" ? "pagar" : "cobrar"} />)}><IconoWhatsApp />Enviar saldos por WhatsApp</button>
-        <button className="btn" id="nuevoCli" onClick={() => v.abrir(<FormCliente />)}>Registrar cliente</button>
+        <button className="btn ok" id="waMasivo" onClick={() => v.abrir(<EnvioMasivo tipo0={E.filtroCli === "pagar" ? "pagar" : "cobrar"} />, "drawer-ancho")}><IconoWhatsApp />Enviar saldos por WhatsApp</button>
+        <button className="btn" id="nuevoCli" onClick={() => v.abrir(<FormCliente />, "centrada")}>Registrar cliente</button>
       </div>
       <div className="toolbar">
         <div className="campo" role="search"><input id="buscarCli" type="search" placeholder="Buscar por nombre o número" value={buscar} autoComplete="off" aria-label="Buscar cliente por nombre o número"
@@ -191,7 +191,7 @@ export function AbrirCuenta({ cid }: { cid: string }) {
       <div className="campo"><label htmlFor="mVal">Valor</label><input id="mVal" type="number" inputMode="numeric" min="0" step="100" value={val} onChange={e => setVal(e.target.value)} /></div></div>
     <div className="linea2"><div className="campo"><label htmlFor="mMedio">Medio (para pagos)</label><select id="mMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{Object.entries(MEDIOS).map(([x, t]) => <option key={x} value={x}>{t}</option>)}</select></div>
       <div className="campo"><label htmlFor="mNota">Nota (opcional)</label><input id="mNota" placeholder="Ej: compra, transferencia Nequi" value={nota} onChange={e => setNota(e.target.value)} /></div></div>
-    <div className="acciones"><button className="btn ok" id="mReg" onClick={registrar}>Registrar</button><button className="btn sec" id="cEdit" onClick={() => v.abrir(<FormCliente id={cid} />)}>Editar cliente</button></div>
+    <div className="acciones"><button className="btn ok" id="mReg" onClick={registrar}>Registrar</button><button className="btn sec" id="cEdit" onClick={() => v.abrir(<FormCliente id={cid} />, "centrada")}>Editar cliente</button></div>
     <h2>Movimientos</h2>
     {rows.length ? <div className="tabla-env"><table><thead><tr><th>Fecha</th><th>Detalle</th><th className="n">Valor</th><th></th></tr></thead><tbody>
       {rows.map((r, i) => <tr key={(r.pid || r.mid || "") + i}><td>{hora(r.fecha)}</td><td>{r.det}</td><td className={"n " + (r.v < 0 ? "neg" : "pos")}>{pesos(r.v)}</td>
@@ -230,18 +230,18 @@ function EnvioMasivo({ tipo0 }: { tipo0: "cobrar" | "pagar" }) {
   const conTel = lista.filter(c => telWhatsApp(c.telefono)), sinTel = lista.filter(c => !telWhatsApp(c.telefono));
   const pend = conTel.filter(c => !env.has(c.id)), sig = pend[0];
   const tras = (cid: string) => { env.add(cid); guardarLocal(CLAVE_ENVIADOS(), JSON.stringify([...env])); setTimeout(() => setN(x => x + 1), 300); };
-  return <>
+  return <div className="envio-masivo">
     <Cab sub={<span className="sub">{conTel.length - pend.length} de {conTel.length} enviados hoy</span>}><h2>Enviar saldos por WhatsApp</h2></Cab>
     <div className="filtros">{([["cobrar", "Clientes que deben"], ["pagar", "Saldos a favor"]] as const).map(([k, t]) => <button key={k} aria-pressed={tipo === k} onClick={() => setTipo(k)}>{t}</button>)}</div>
     <p className="sub">Toca “Enviar al siguiente”: se abre el chat con el mensaje listo; envíalo en WhatsApp y vuelve aquí para el próximo.</p>
-    {sig ? <a className="btn ok" id="waSig" style={{ width: "100%" }} href={linkSaldo(sig.id)} target="_blank" rel="noopener" onClick={() => tras(sig.id)}>Enviar al siguiente: {sig.nombre} ({pesos(Math.abs(sig.s))})</a>
+    {sig ? <a className="btn ok envio-siguiente" id="waSig" href={linkSaldo(sig.id)} target="_blank" rel="noopener" onClick={() => tras(sig.id)}>Enviar al siguiente: {sig.nombre} ({pesos(Math.abs(sig.s))})</a>
       : <div className="vacio">{conTel.length ? "¡Listo! Ya se envió a todos." : "No hay clientes en esta lista."}</div>}
-    {conTel.length ? <div className="tabla-env" style={{ marginTop: 12 }}><table><thead><tr><th>Cliente</th><th className="n">Saldo</th><th></th></tr></thead><tbody>
-      {conTel.map(c => <tr key={c.id}><td><b>{c.nombre}</b></td><td className={"n " + (c.s < 0 ? "neg" : "pos")}>{pesos(Math.abs(c.s))}</td><td>{env.has(c.id) ? <><span className="etq ent">✓ Enviado</span> </> : null}<a className="btn sec chico" href={linkSaldo(c.id)} target="_blank" rel="noopener" onClick={() => tras(c.id)}>{env.has(c.id) ? "Reenviar" : "Enviar"}</a></td></tr>)}
+    {conTel.length ? <div className="envio-tabla"><table className="tabla-envio"><thead><tr><th className="col-cliente">Cliente</th><th className="col-saldo">Saldo</th><th className="col-accion">Acción</th></tr></thead><tbody>
+      {conTel.map(c => <tr key={c.id}><td className="col-cliente"><b className="envio-nombre">{c.nombre}</b></td><td className="col-saldo">{pesos(Math.abs(c.s))}</td><td className="col-accion">{env.has(c.id) ? <><span className="etq ent">✓ Enviado</span> </> : null}<a className="btn enviar-fila" href={linkSaldo(c.id)} target="_blank" rel="noopener" onClick={() => tras(c.id)}>{env.has(c.id) ? "Reenviar" : "Enviar"}</a></td></tr>)}
     </tbody></table></div> : null}
     {sinTel.length ? <div className="aviso" style={{ marginTop: 12 }}>Sin celular registrado: {sinTel.map(c => c.nombre).join(", ")}.</div> : null}
     {env.size ? <div className="acciones"><button className="btn sec chico" id="waReiniciar" onClick={() => { guardarLocal(CLAVE_ENVIADOS(), "[]"); setN(x => x + 1); }}>Volver a empezar la lista de hoy</button></div> : null}
-  </>;
+  </div>;
 }
 
 /** Clientes repetidos (mismo nombre o mismo número). Unirlos lo hace el servidor. */

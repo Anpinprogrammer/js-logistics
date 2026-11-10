@@ -24,3 +24,11 @@ export const actualizar = z.object({
 });
 
 export const nuevaClave = z.object({ clave });
+
+/** Sub-pestaña Acceso de Personal: búsqueda, rol, 5 filas en celular y 10 en computador. */
+export const paginaAccesos = z.object({
+  buscar: texto(80).optional(),
+  rol: z.enum(ROLES).optional(),
+  pagina: z.coerce.number().int().min(1).optional(),
+  porPagina: z.coerce.number().int().min(1).max(100).optional()
+});
