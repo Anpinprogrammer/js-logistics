@@ -22,7 +22,7 @@ export default function Ingreso() {
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
 
-  // Animación de entrada ("La ruta de entrega"): una vez por sesión del navegador y se salta con cualquier gesto.
+  // Animación de entrada ("La ruta de entrega"): sale en cada carga del ingreso y se salta con cualquier gesto.
   // Mientras corre, `intro` trae el estilo del cuadro actual para cada pieza; al terminar es `undefined` y el ingreso queda como siempre.
   const { activa, cuadro, saltar } = useIntroIngreso();
   const raiz = useRef<HTMLDivElement>(null), tarjeta = useRef<HTMLDivElement>(null), insignia = useRef<HTMLDivElement>(null);

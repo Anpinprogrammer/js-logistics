@@ -2,17 +2,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { FPS, TOTAL } from "./tiempos";
 
-const BANDERA = "jsl_intro_ingreso";
 const SIN_MOVIMIENTO = "(prefers-reduced-motion: reduce)";
 /** La marca blanca que nace en el choque: se pide antes de arrancar para que esté lista cuando le toca. */
 export const MARCA_BLANCA = "/marca-blanca.webp";
 
-/** Sale una vez por sesión del navegador, y nunca si la persona pidió reducir el movimiento. */
+/** Sale en cada carga del ingreso (no se guarda nada en el navegador), y nunca si la persona pidió reducir el movimiento. */
 function debeMostrarse() {
-  if (typeof window === "undefined") return false;
-  if (window.matchMedia?.(SIN_MOVIMIENTO).matches) return false;
-  // Safari en privado puede fallar al leer: en ese caso se muestra.
-  try { return sessionStorage.getItem(BANDERA) !== "1"; } catch { return true; }
+  return typeof window !== "undefined" && !window.matchMedia?.(SIN_MOVIMIENTO).matches;
 }
 
 export function useIntroIngreso() {
@@ -23,8 +19,6 @@ export function useIntroIngreso() {
 
   useEffect(() => {
     if (!activa) return;
-    try { sessionStorage.setItem(BANDERA, "1"); } catch { /* sin almacenamiento: saldrá otra vez al recargar */ }
-
     let raf = 0, inicio = -1, vivo = true;
     const paso = (ahora: number) => {
       if (inicio < 0) inicio = ahora;
