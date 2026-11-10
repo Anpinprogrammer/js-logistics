@@ -89,7 +89,7 @@ export default function Pedidos({ pintar }: { pintar: () => void }) {
     try {
       const hechas = await crearGuias(files, mid, v.avisar);
       v.avisar(hechas.length === 1 ? "Guía " + hechas[0] + " creada" : "Se crearon " + hechas.length + " guías");
-      if (hechas.length === 1) v.abrir(<AbrirPedido guia={hechas[0]} />);
+      if (hechas.length === 1) v.abrir(<AbrirPedido guia={hechas[0]} />, "drawer");
     } catch (e) { v.avisar("No se pudo crear la guía: " + motivoError(e) + "."); }
   };
 
@@ -127,7 +127,7 @@ export default function Pedidos({ pintar }: { pintar: () => void }) {
     {pag && (E.diaPedA || E.mensPedA) ? <p className="sub">{total} {pl(total, "pedido")}{E.mensPedA ? " de " + (S.mensajeros[E.mensPedA]?.nombre || "") : ""}{E.diaPedA ? " que salieron o se cerraron ese día" : ""}</p> : null}
     {q.isError ? <div className="aviso alerta">No se pudo traer la lista: {motivoError(q.error)} <button className="btn chico" onClick={() => q.refetch()}>Intentar otra vez</button></div>
       : !pag ? <div className="vacio">Cargando pedidos…</div>
-      : ps.length ? <><div className="lista" aria-busy={q.isFetching} style={q.isPlaceholderData ? { opacity: .6 } : undefined}>{ps.map(p => <FilaPedido key={p.guia} p={p} onClick={() => v.abrir(<AbrirPedido guia={p.guia} />)} />)}</div>
+      : ps.length ? <><div className="lista" aria-busy={q.isFetching} style={q.isPlaceholderData ? { opacity: .6 } : undefined}>{ps.map(p => <FilaPedido key={p.guia} p={p} onClick={() => v.abrir(<AbrirPedido guia={p.guia} />, "drawer")} />)}</div>
       <Paginador pagina={pag.pagina} paginas={pag.paginas} total={total} porPagina={pag.porPagina} ir={irA} cargando={q.isPlaceholderData} /></>
       : <div className="vacio">{f === "sin" ? "Todos los pedidos tienen remitente asignado." : f === "serv" ? "Todos los pedidos entregados tienen valor de servicio." : "No hay pedidos aquí."}</div>}
   </>;
@@ -147,7 +147,7 @@ export function AbrirPedido({ guia, cliElegido }: { guia: string; cliElegido?: s
   const p = S.pedidos[guia]; if (!p) return null;
   const vis = cs.filter(x => !q || sinTildes(x.nombre + " " + (x.telefono || "")).includes(sinTildes(q.trim())));
   const elegirCli = (id: string) => { setCli(id); const t = S.clientes[id]?.tarifa; if (t && !serv) setServ(String(t)); };
-  const conCambio = async (fn: () => Promise<void>, ok: string, cerrar = true) => { try { await fn(); v.avisar(ok); if (cerrar) v.cerrar(); else v.abrir(<AbrirPedido guia={guia} />); } catch (e) { v.avisar("No se pudo guardar: " + motivoError(e)); } };
+  const conCambio = async (fn: () => Promise<void>, ok: string, cerrar = true) => { try { await fn(); v.avisar(ok); if (cerrar) v.cerrar(); else v.abrir(<AbrirPedido guia={guia} />, "drawer"); } catch (e) { v.avisar("No se pudo guardar: " + motivoError(e)); } };
 
   const guardar = async () => {
     if (!cli) return v.avisar("Elige el remitente");
@@ -171,27 +171,28 @@ export function AbrirPedido({ guia, cliElegido }: { guia: string; cliElegido?: s
   };
   const borrar = async () => {
     if (cambiaLoContado(p, null)) return avisoContado(v);
-    if (!await v.confirmar("Eliminar la guía " + guia, "Se borran el pedido y sus fotos. No se puede deshacer.", "Eliminar")) return v.abrir(<AbrirPedido guia={guia} />);
+    if (!await v.confirmar("Eliminar la guía " + guia, "Se borran el pedido y sus fotos. No se puede deshacer.", "Eliminar")) return v.abrir(<AbrirPedido guia={guia} />, "drawer");
     await conCambio(() => eliminarPedido(guia), "Guía enviada a la papelera");
   };
   const reabrirG = async () => {
     if (cambiaLoContado(p, { ...p, estado: "pendiente", metodo: "" })) return avisoContado(v);
-    if (!await v.confirmar("Reabrir la guía " + guia, "El pedido volverá a por entregar. La foto y la firma de esta entrega se guardan en el pedido como “entrega anterior”.", "Reabrir")) return v.abrir(<AbrirPedido guia={guia} />);
+    if (!await v.confirmar("Reabrir la guía " + guia, "El pedido volverá a por entregar. La foto y la firma de esta entrega se guardan en el pedido como “entrega anterior”.", "Reabrir")) return v.abrir(<AbrirPedido guia={guia} />, "drawer");
     await conCambio(() => reabrir(guia), "Guía " + guia + " reabierta");
   };
   const cambioOk = async () => {
-    if (!await v.confirmar("Cambio de " + guia + " entregado", "Se marca que el cliente ya recibió la prenda de cambio.", "Marcar entregado")) return v.abrir(<AbrirPedido guia={guia} />);
+    if (!await v.confirmar("Cambio de " + guia + " entregado", "Se marca que el cliente ya recibió la prenda de cambio.", "Marcar entregado")) return v.abrir(<AbrirPedido guia={guia} />, "drawer");
     await conCambio(() => cambioEntregado(guia), "Cambio marcado como entregado", false);
   };
   const s = saldoPedido(p);
-  return <>
-    <Cab sub={<EtqEstado p={p} />}><h2 className="guia">{guia}</h2></Cab>
+  return <div className="pedido-drawer">
+    <div className="pedido-drawer-cab"><Cab sub={<EtqEstado p={p} />}><h2 className="guia">{guia}</h2></Cab></div>
+    <div className="pedido-drawer-cuerpo">
     <div className="linea2">
       <div className="campo"><label htmlFor="pCli">Remitente (cliente)</label><input id="pCliBuscar" type="search" placeholder="Buscar cliente…" autoComplete="off" aria-label="Buscar cliente" value={q}
         onChange={e => { setQ(e.target.value); const l = cs.filter(x => !e.target.value.trim() || sinTildes(x.nombre + " " + (x.telefono || "")).includes(sinTildes(e.target.value.trim()))); if (l.length === 1 && e.target.value.trim()) elegirCli(l[0].id); }} />
         <select id="pCli" value={cli} onChange={e => elegirCli(e.target.value)}><option value="">{vis.length ? (q ? vis.length + " " + pl(vis.length, "encontrado") + "…" : "Elige…") : "Ningún cliente con ese nombre"}</option>
           {(cli && !vis.some(x => x.id === cli) && S.clientes[cli] ? [S.clientes[cli], ...vis] : vis).map(x => <option key={x.id} value={x.id}>{x.nombre}</option>)}</select>
-        <button className="btn sec chico" id="pNuevoCli" type="button" style={{ alignSelf: "start" }} onClick={() => v.abrir(<FormCliente alGuardar={cid => v.abrir(<AbrirPedido guia={guia} cliElegido={cid} />)} nombre={q} />)}>+ Crear cliente nuevo</button></div>
+        <button className="btn sec chico" id="pNuevoCli" type="button" style={{ alignSelf: "start" }} onClick={() => v.abrir(<FormCliente alGuardar={cid => v.abrir(<AbrirPedido guia={guia} cliElegido={cid} />, "drawer")} nombre={q} />, "centrada")}>+ Crear cliente nuevo</button></div>
       <div className="campo"><label htmlFor="pServ">Valor del servicio</label><input id="pServ" type="number" inputMode="numeric" min="0" step="100" value={serv} onChange={e => setServ(e.target.value)} /></div>
     </div>
     <div className="campo"><label htmlFor="pCob">Valor a cobrar al destinatario (opcional)</label><input id="pCob" type="number" inputMode="numeric" min="0" step="100" value={cob} onChange={e => setCob(e.target.value)} placeholder="Lo que el mensajero debe recoger" /></div>
@@ -223,7 +224,8 @@ export function AbrirPedido({ guia, cliElegido }: { guia: string; cliElegido?: s
         <dt>Efecto en saldo</dt><dd className={s < 0 ? "neg" : "pos"}>{pesos(s)}</dd></>}
     </dl>
     <FotosGuia p={p} id="pFotos" conPrevias />
-    <div className="acciones">
+    </div>
+    <div className="acciones pedido-drawer-pie">
       {!cerrado(p) && tipoDe(S.mensajeros[p.mensajeroId]) === "oficina" && <button className="btn ok chico" id="pEntregar" onClick={() => abrirEntregaEn(v, guia)}>Marcar entregado</button>}
       {cerrado(p) ? (yo.esAdmin && <button className="btn sec chico" id="pReabrir" onClick={reabrirG}>Devolver a por entregar</button>)
         : <button className="btn sec chico" id="pNoEnt" onClick={() => v.abrir(<DlgDevolucion guia={guia} />)}>Registrar que no se pudo entregar</button>}
@@ -231,7 +233,7 @@ export function AbrirPedido({ guia, cliElegido }: { guia: string; cliElegido?: s
       {cambioPendiente(p) && <button className="btn sec chico" id="pCambioOk" onClick={cambioOk}>Cambio entregado al cliente</button>}
       {yo.esAdmin && <button className="btn peligro chico" id="pBorrar" onClick={borrar}>Eliminar pedido</button>}
     </div>
-  </>;
+  </div>;
 }
 const IntentoFila = ({ n, fecha, motivo, nota }: { n: number; fecha: number; motivo: string; nota: string }) =>
   <><dt>Intento {n}</dt><dd>{hora(fecha)} · {MOTIVOS[motivo as Motivo] || ""}{nota ? " · " + nota : ""}</dd></>;

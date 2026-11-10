@@ -1,7 +1,7 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
 import type { Archivo, TipoArchivo, Cliente, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
-  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos } from "./tipos";
+  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios } from "./tipos";
 import { FalloApi } from "./cliente";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
@@ -116,11 +116,20 @@ export const mensajeros = {
 
 export const usuarios = {
   listar: () => datos<{ usuarios: Usuario[] }>(api.get("/usuarios")).then(d => d.usuarios),
+  /** Sub-pestaña Acceso de Personal: búsqueda, rol y 5 filas en celular, 10 en computador. */
+  pagina: (f: { buscar?: string; rol?: Rol }, pagina: number, porPagina: number) =>
+    datos<PaginaUsuarios>(api.get("/usuarios/pagina", { params: { ...f, pagina, porPagina } })),
   crear: (d: { email: string; nombre: string; rol: Rol; clave: string; clienteId?: string | null; mensajeroId?: string | null }) =>
     datos<{ usuario: Usuario }>(api.post("/usuarios", d)).then(r => r.usuario),
   actualizar: (id: string, d: { nombre?: string; rol?: Rol; clienteId?: string | null; mensajeroId?: string | null; activo?: boolean }) =>
     datos<{ usuario: Usuario }>(api.patch(`/usuarios/${id}`, d)).then(r => r.usuario),
   cambiarClave: (id: string, clave: string) => api.put(`/usuarios/${id}/clave`, { clave }),
+  /** Manda a la cuenta el enlace de restablecimiento por correo (Resend). */
+  enviarReset: (d: { usuarioId?: string; email?: string }) =>
+    datos<{ enviado: boolean; email: string }>(api.post("/auth/send-reset-email", d)),
+  /** Encola el envío masivo de enlaces de restablecimiento (Redis/BullMQ o segundo plano local). */
+  enviarResetMasivo: (emails: string[]) =>
+    datos<{ mensaje: string; total: number; modo: "redis" | "memoria" }>(api.post("/auth/send-bulk-reset-emails", { emails })),
   eliminar: (id: string) => api.delete(`/usuarios/${id}`)
 };
 

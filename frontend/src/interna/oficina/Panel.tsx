@@ -78,7 +78,7 @@ export default function Panel({ pintar }: { pintar: () => void }) {
     <div className="dash">
       <section className="tarjeta c7"><h3>Últimos pedidos <button className="btn sec chico" onClick={() => ir("pedidos|todos")}>Ver todos</button></h3>
         {ultimos.length ? <div className="tabla-env"><table><thead><tr><th>Guía</th><th>Cliente</th><th className="solo-ancho">Mensajero</th><th>Estado</th><th className="n solo-ancho">Cobrado</th></tr></thead><tbody>
-          {ultimos.map(p => <tr key={p.guia} data-ped={p.guia} onClick={() => v.abrir(<AbrirPedido guia={p.guia} />)}><td className="guia">{p.guia}</td><td>{p.clienteId ? nombreCliente(p.clienteId) : <span className="etq sin">Sin remitente</span>}</td>
+          {ultimos.map(p => <tr key={p.guia} data-ped={p.guia} onClick={() => v.abrir(<AbrirPedido guia={p.guia} />, "drawer")}><td className="guia">{p.guia}</td><td>{p.clienteId ? nombreCliente(p.clienteId) : <span className="etq sin">Sin remitente</span>}</td>
             <td className="solo-ancho">{S.mensajeros[p.mensajeroId]?.nombre || ""}</td><td><EtqDash p={p} /></td><td className="n solo-ancho">{p.estado === "entregado" ? pesos(p.valorCobrado) : "—"}</td></tr>)}
         </tbody></table></div> : <div className="vacio">Todavía no hay pedidos.</div>}</section>
       <section className="tarjeta c5"><h3>Clientes que más envían <small>Últimos 30 días</small></h3>

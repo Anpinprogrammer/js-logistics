@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { email, token } from "./comunes.js";
+import { email, id, token } from "./comunes.js";
 import { CLAVE_MINIMA } from "../helpers/claves.js";
 
 export const ingreso = z.object({
@@ -14,6 +14,18 @@ export const cambiarMiClave = z.object({
 
 /** Pedir un enlace de recuperación. La respuesta es la misma exista o no la cuenta. */
 export const recuperar = z.object({ email });
+
+/** Administración: manda el enlace a una cuenta concreta (por id o por correo). */
+export const enviarReset = z.object({
+  usuarioId: id.optional(),
+  email: email.optional()
+}).refine(d => d.usuarioId || d.email, { message: "Indica el usuario o el correo", path: ["email"] });
+
+/** Administración: lote de correos de restablecimiento (máximo 100, sin repetidos). */
+export const enviarResetMasivo = z.object({
+  emails: z.array(email).min(1, "Selecciona al menos un correo").max(100, "Máximo 100 correos por lote")
+    .transform(lista => [...new Set(lista)])
+});
 
 const clave = z.string().min(CLAVE_MINIMA, `La contraseña debe tener al menos ${CLAVE_MINIMA} caracteres`).max(200);
 

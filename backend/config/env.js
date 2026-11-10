@@ -27,6 +27,8 @@ const esquema = z.object({
   STORAGE_BUCKET: z.string().default("pedidos"),
   // Correo transaccional con Resend (https://resend.com). Sin clave no se envían correos, pero la API funciona.
   RESEND_API_KEY: z.string().optional().transform(v => v || undefined),
+  // Redis para la cola de correos masivos (BullMQ). Opcional: sin esto, el envío masivo corre en segundo plano en el mismo proceso.
+  REDIS_URL: z.string().url("REDIS_URL debe ser una URL completa").optional().or(z.literal("")).transform(v => v || undefined),
   CORREO_REMITENTE: z.email("CORREO_REMITENTE debe ser un correo").default("no-responder@jslogistics.pro"),
   CORREO_NOMBRE: z.string().default("JS Logistics"),
   CORREO_RESPUESTA: z.email("CORREO_RESPUESTA debe ser un correo").optional().or(z.literal("")).transform(v => v || undefined),

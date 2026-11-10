@@ -148,6 +148,7 @@ La API funciona sin correo configurado: si falta `RESEND_API_KEY`, no se envía 
 | Variable | Para qué |
 |---|---|
 | `RESEND_API_KEY` | Llave de Resend (Dashboard → API Keys). Sin ella no se envían correos. |
+| `REDIS_URL` | Redis para la cola de correos masivos (BullMQ), por ejemplo `redis://default:clave@host:6379`. Opcional: sin ella el envío masivo se procesa en segundo plano en el mismo proceso. |
 | `CORREO_REMITENTE` | Correo que aparece como remitente. **Su dominio debe estar verificado en Resend** (Domains). Por defecto `no-responder@jslogistics.pro`. |
 | `CORREO_NOMBRE` | Nombre visible del remitente. Por defecto `JS Logistics`. |
 | `CORREO_LOGO_URL` | URL absoluta del logo del encabezado. Por defecto `https://app.jslogistics.pro/logo.png`. Usa PNG: Outlook 2016 no muestra WebP. |
@@ -161,6 +162,7 @@ Cómo funciona:
 
 - La plantilla está en `helpers/correo.js`: tablas con estilos inline, logo desde `CORREO_LOGO_URL` (PNG por Outlook) y enlace alternativo con `word-break: break-all`.
 - El token es aleatorio (32 bytes) y **solo se guarda su hash SHA-256** en la tabla `enlaces`; el token en claro viaja únicamente en el correo.
+- El **envío masivo** de restablecimientos entra a `resetEmailQueue` (BullMQ) y lo procesa un worker con concurrencia 5 y 3 intentos con espera exponencial. El mismo worker usa los enlaces de un solo uso de arriba; si Redis no está configurado o no responde, el lote se procesa en segundo plano en el proceso de la API para que la petición nunca se bloquee.
 - Cada enlace sirve una sola vez y, al usarlo, se cierran las sesiones abiertas de la cuenta.
 - Los enlaces de clientes apuntan a `URL_CLIENTES`; los de trabajadores, a `URL_EQUIPO`. Los dos portales deben tener las pantallas `/activar` y `/restablecer` (se implementan en cada frontend).
 - `POST /auth/recuperar` responde siempre `204`, exista o no el correo, para no revelar qué cuentas existen.
@@ -182,18 +184,21 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `GET /auth/yo` | con sesión | `{ usuario: { id, email, nombre, rol, clienteId, mensajeroId } }` |
 | `POST /auth/clave` | con sesión | Cambia la propia contraseña |
 | `POST /auth/recuperar` | público | `{ email }`: manda un enlace de activación o de contraseña. Responde siempre `204` |
+| `POST /auth/send-reset-email` | admin | `{ usuarioId }` o `{ email }`: manda a esa cuenta el enlace de restablecimiento con Resend. Responde `{ enviado, email }`; 404 si la cuenta no existe, 409 si está inactiva y 502/503 si el correo falla |
+| `POST /auth/send-bulk-reset-emails` | admin | `{ emails: string[] }` (1 a 100, sin repetidos): encola los enlaces en `resetEmailQueue` (BullMQ/Redis) y responde **202** `{ mensaje, total, modo }`. Sin `REDIS_URL` o si Redis no responde, el lote se procesa en segundo plano en el mismo proceso |
 | `GET /auth/enlace/:token` | público | Revisa el enlace: `{ enlace: { tipo, nombre, email (tapado), expira } }` |
 | `POST /auth/restablecer` | público | `{ token, clave }`: cambia la contraseña con el enlace del correo |
 | `POST /auth/activar` | público | `{ token, clave }`: crea la contraseña de una cuenta nueva |
 | `GET/POST /usuarios`, `PATCH/DELETE /usuarios/:id`, `PUT /usuarios/:id/clave` | admin | Accesos a la app. `POST /usuarios` acepta `clave` opcional: sin ella manda la activación |
 | `POST /usuarios/:id/activacion`, `POST /usuarios/:id/recuperacion` | admin | Reenvía la activación o manda el enlace de contraseña |
+| `GET /usuarios/pagina?buscar=&rol=&pagina=&porPagina=` | admin | Página de la sub-pestaña Acceso de Personal: `buscar` filtra por nombre o correo (sin tildes) y `rol` por `mensajero`, `asistente`, `cliente` o `admin`. Ordenada por nombre y correo. Devuelve `{ usuarios, pagina, porPagina, total, paginas }`. La app usa 5 en celular y 10 en computador; si la página ya no existe, responde la última |
 | `GET /clientes?buscar=` | oficina | Lista y busca |
 | `GET /clientes/:id` | oficina, o el propio cliente | Ficha |
 | `POST /clientes`, `PATCH /clientes/:id` | oficina | Crea (avisa de repetidos con 409 `POSIBLE_REPETIDO`) y edita |
 | `GET /clientes/:id/movimientos?desde=&hasta=` | oficina, o el propio cliente | `{ movimientos: [{ id, clienteId, tipo, valor, medio, nota, fecha, … }] }` |
 | `DELETE /clientes/:id` | admin | Borra (a la papelera) si no tiene pedidos ni movimientos |
 | `GET /mensajeros`, `GET /mensajeros/:id` | oficina; el mensajero solo su ficha | Personal |
-| `POST/PATCH/DELETE /mensajeros…` | admin | Cambia el personal |
+| `POST/PATCH/DELETE /mensajeros…` | admin | Cambia el personal. `PATCH /mensajeros/:id` acepta `nombre`, `telefono`, `tipo` (`mensajero`, `dueno`, `oficina`, `patinador`, `empresa`), `tarifa` (pago por día, entero ≥ 0) y `activo`; responde `{ mensajero }` o 404 si el id no existe |
 | `GET /pedidos?estado=&cerrados=&desde=&hasta=&entregadoDesde=&entregadoHasta=&buscar=&conDiferencia=&diferencia=&sinRemitente=&cambioPendiente=&sinServicio=&dia=&cursor=` | cada rol ve lo suyo | Lista por cursor: `{ pedidos, siguiente }` (`siguiente` es el cursor, o `null`). `buscar` mira guía, quien recibió, remitente y mensajero. `diferencia`: `todas` o `sinRevisar` (igual a `conDiferencia=true`). `dia=AAAA-MM-DD`: salió, se entregó o se devolvió ese día en hora de Colombia |
 | `GET /pedidos?pagina=&porPagina=&…` | cada rol ve lo suyo | **Paginador**, con los mismos filtros: `{ pedidos, pagina, porPagina, total, paginas }`. `porPagina` de 1 a 100 (20 por defecto; las pantallas usan 8 en el celular y 20 en el computador). Si la página ya no existe, responde la última y lo dice en `pagina`. No se mezcla con `cursor` (400) |
 | `GET /pedidos/:guia` | quien la puede ver | Detalle con intentos. Lista y detalle traen `mini`: URL firmada de la miniatura, o `null` |

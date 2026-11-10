@@ -25,4 +25,6 @@ export const E = {
   miMensajero: leer("js_mensajero"), actuarComo: false, diaPedM: "", diaEntM: hoy(), semM: semanaDe(hoy()), ultimaGuia: "",
   // Más → Resultados
   rangoPanel: "mes",
+  // Personal → Acceso
+  paginaAcceso: 1,
 };

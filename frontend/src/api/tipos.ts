@@ -206,6 +206,15 @@ export interface EnlaceCorreo {
   expira: string;
 }
 
+/** Una página de los accesos a la app (5 en celular, 10 en computador). */
+export interface PaginaUsuarios {
+  usuarios: Usuario[];
+  pagina: number;
+  porPagina: number;
+  total: number;
+  paginas: number;
+}
+
 /** Una página de los movimientos de las cuentas internas (5 en celular, 10 en computador). */
 export interface PaginaCajaMovimientos {
   movimientos: CajaMovimiento[];

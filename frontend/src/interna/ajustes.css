@@ -22,7 +22,11 @@
 @media (min-width:960px){
   .jsl .lateral{transition:width .3s ease,padding .3s ease}
   .jsl .barra,.jsl main{transition:margin-left .3s ease}
-  .jsl .marca-lat{padding:0 8px 18px;margin:0 -14px 14px;padding-left:22px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .jsl .marca-lat{display:flex;align-items:center;gap:12px;padding:0 8px 18px;margin:0 -14px 14px;padding-left:22px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .jsl .marca-lat img{width:36px;height:36px;border-radius:12px;flex:none;object-fit:contain}
+  .jsl .marca-lat-txt{display:flex;flex-direction:column;justify-content:center;min-width:0;line-height:1}
+  .jsl .marca-lat-txt b{font-size:1rem;font-weight:700;color:#fff;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jsl .marca-lat-txt small{display:block;margin-top:2px;font-size:10px;font-weight:600;color:var(--lateral-suave);text-transform:uppercase;letter-spacing:.12em;line-height:1.4;opacity:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .jsl #navLateral{gap:4px}
   .jsl .lat-grupo{display:flex;flex-direction:column;gap:1px}
   .jsl .lat-grupo + .lat-grupo{margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.07)}
@@ -43,7 +47,7 @@
   .jsl.menu-colapsado .lateral{width:76px;padding-left:10px;padding-right:10px}
   .jsl.menu-colapsado .barra,.jsl.menu-colapsado main{margin-left:76px}
   .jsl.menu-colapsado .marca-lat{justify-content:center;padding:0 0 16px;margin:0 0 12px;border-bottom:1px solid rgba(255,255,255,.08)}
-  .jsl.menu-colapsado .marca-lat span{display:none}
+  .jsl.menu-colapsado .marca-lat-txt{display:none}
   .jsl.menu-colapsado .lat-titulo{display:none}
   .jsl.menu-colapsado .lat-grupo + .lat-grupo{margin-top:8px;padding-top:8px}
   .jsl.menu-colapsado #navLateral button{position:relative;justify-content:center;padding:10px;border-left-width:0}
@@ -227,14 +231,11 @@
 }
 
 /* ---------- Cuentas: sub-pestañas, liquidez y filtros ---------- */
-/* Cabecera de Cuentas: sub-pestañas a la izquierda y "+ Nueva cuenta" a la derecha. */
-.jsl .cab-cuentas{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;width:100%;margin-bottom:18px}
+/* Cabecera de Cuentas: sub-pestañas a la izquierda y "+ Nueva cuenta" a la derecha, con el mismo botón de acción que Personal. */
+.jsl .cab-cuentas{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;width:100%;margin-bottom:24px}
 .jsl .cab-cuentas .subtabs{margin:0}
-.jsl .btn.nueva-cuenta{padding:8px 14px;font-size:.75rem;font-weight:600;border-radius:8px;background:var(--marca2);white-space:nowrap;box-shadow:0 1px 2px rgba(16,24,40,.2)}
-.jsl .btn.nueva-cuenta:hover{filter:brightness(1.08)}
 @media (max-width:600px){
   .jsl .cab-cuentas{flex-direction:column;align-items:stretch}
-  .jsl .btn.nueva-cuenta{justify-content:center}
 }
 
 /* Tarjetas de las cuentas internas: 1 / 2 / 3 columnas, todas del mismo ancho. */
@@ -399,3 +400,268 @@
   .jsl .filtro-dia.compacto .dia-pill{flex:1;min-width:0}
   .jsl .filtro-dia.compacto .dia-pill input{flex:1;min-width:0}
 }
+
+/* ---------- Personal: sub-pestañas y ventanas flotantes ---------- */
+.jsl .cab-personal{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;width:100%;margin-bottom:24px}
+.jsl .cab-personal .subtabs{margin:0}
+.jsl .btn.agregar{padding:10px 20px;border-radius:999px;background:var(--marca2);color:#fff;font-size:.875rem;font-weight:600;gap:8px;white-space:nowrap;box-shadow:0 4px 10px rgba(16,24,40,.18);transition:transform .08s ease,box-shadow .15s ease,filter .15s ease,background .15s ease}
+.jsl .btn.agregar:hover{filter:brightness(1.08);box-shadow:0 6px 16px rgba(16,24,40,.24)}
+.jsl .btn.agregar:active{transform:scale(.95);background:var(--marca)}
+@media (max-width:600px){
+  .jsl .cab-personal{flex-direction:column;align-items:stretch}
+  .jsl .btn.agregar{justify-content:center}
+}
+
+.jsl .modal-fondo{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(2,6,23,.72);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);animation:jsl-modal-fondo .15s ease-out}
+.jsl .modal-caja{position:relative;width:100%;max-width:520px;max-height:calc(100dvh - 32px);overflow-y:auto;background:var(--papel);border:1px solid var(--linea);border-radius:16px;padding:24px;box-shadow:0 24px 60px rgba(2,6,23,.45);animation:jsl-modal-caja .18s ease-out}
+.jsl .modal-caja h2{margin:0 0 6px;padding-right:32px;font-size:1.15rem}
+.jsl .modal-sub{margin:0 0 20px;font-size:.75rem;color:var(--suave);line-height:1.5}
+/* Callout de roles en "Dar acceso". */
+.jsl .modal-ayuda{padding:14px;border:1px solid var(--linea);border-radius:10px;background:var(--hueco);font-size:.75rem;color:var(--suave);line-height:1.5}
+.jsl .modal-ayuda p{margin:0}
+.jsl .modal-ayuda p + p{margin-top:6px}
+.jsl .modal-ayuda b{color:var(--tinta);font-weight:600}
+/* Campos: etiquetas y controles uniformes dentro de los modales. */
+.jsl .modal-caja .campo label{display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--suave);margin-bottom:6px}
+.jsl .modal-caja .campo input,.jsl .modal-caja .campo select{width:100%;background-color:var(--hueco);border:1px solid var(--linea);border-radius:8px;padding:10px 14px;font-size:.88rem;color:var(--tinta);transition:border-color .15s,box-shadow .15s,background .15s}
+.jsl .modal-caja .campo input::placeholder{color:var(--suave);opacity:.8}
+.jsl .modal-caja .campo input:focus,.jsl .modal-caja .campo select:focus{outline:none;border-color:var(--marca2);box-shadow:0 0 0 3px var(--mango-claro)}
+.jsl .modal-caja .campo select{appearance:none;-webkit-appearance:none;padding:10px 36px 10px 14px;background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:9px 9px;cursor:pointer}
+.jsl .modal-cerrar{position:absolute;top:12px;right:12px;width:34px;height:34px;border:0;border-radius:8px;background:none;color:var(--suave);font-size:1.4rem;line-height:1;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s}
+.jsl .modal-cerrar:hover{background:var(--hueco);color:var(--tinta)}
+/* Pie del modal: acciones alineadas a la derecha. */
+.jsl .modal-acciones{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:24px;padding-top:16px;border-top:1px solid var(--linea);flex-wrap:wrap}
+.jsl .modal-acciones .btn{padding:8px 16px;font-size:.75rem;font-weight:600;border-radius:8px;background:var(--marca2);color:#fff;box-shadow:0 1px 2px rgba(16,24,40,.2)}
+.jsl .modal-acciones .btn:hover{filter:brightness(1.08)}
+.jsl .modal-acciones .btn.sec{padding:8px 16px;font-size:.75rem;font-weight:500;color:var(--suave);background:var(--hueco);border:1px solid var(--linea);box-shadow:none}
+.jsl .modal-acciones .btn.sec:hover{color:var(--tinta);background:var(--papel);filter:none}
+@media (max-width:520px){.jsl .modal-acciones .btn{flex:1 1 auto;justify-content:center}}
+@keyframes jsl-modal-fondo{from{opacity:0}to{opacity:1}}
+@keyframes jsl-modal-caja{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+
+/* Modal compacto de una columna (Agregar personal). */
+.jsl .modal-caja-personal{max-width:448px;z-index:50}
+.jsl .form-col{display:flex;flex-direction:column;gap:16px;width:100%;margin:16px 0}
+.jsl .form-col .campo{margin:0;width:100%}
+.jsl .modal-caja-personal .campo input,.jsl .modal-caja-personal .campo select{border-radius:12px}
+.jsl .modal-caja-personal .modal-acciones{margin-top:8px}
+.jsl .modal-caja-personal .modal-acciones .btn{border-radius:12px}
+.jsl .modal-caja-personal .modal-acciones .btn:not(.sec){padding:8px 20px}
+
+/* Ventana lateral izquierda a pantalla completa (Enviar saldos por WhatsApp). */
+.jsl dialog[data-variante="drawer"]{position:fixed;inset:0 auto 0 0;margin:0;width:min(448px,100vw);max-width:100%;height:100dvh;max-height:100dvh;border-radius:0;overflow:hidden}
+.jsl dialog[data-variante="drawer"] .dlg{height:100%;max-height:100dvh;border-radius:0;display:flex;flex-direction:column;padding:20px;overflow-y:auto}
+.jsl dialog[data-variante="drawer"] .dlg::before{display:none}
+@media (max-width:600px){.jsl dialog[data-variante="drawer"]{width:100vw}}
+
+/* Modal centrado de ancho fijo (Nuevo cliente). */
+.jsl dialog[data-variante="centrada"]{position:fixed;inset:0;margin:auto;width:min(448px,calc(100vw - 24px));max-width:448px;max-height:calc(100dvh - 32px);height:fit-content;border-radius:16px}
+.jsl dialog[data-variante="centrada"] .dlg::before{display:none}
+@media (max-width:600px){
+  .jsl dialog[data-variante="centrada"]{margin:auto;width:calc(100vw - 24px);max-height:calc(100dvh - 24px);height:fit-content;border-radius:16px}
+  .jsl dialog[data-variante="centrada"] .dlg{max-height:calc(100dvh - 24px);padding:22px}
+}
+
+/* Recibir dinero: desglose, campos y botón del modal. */
+.jsl .recibir .datos{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 10px;margin:0 0 16px;font-size:.78rem}
+.jsl .recibir .datos dt,.jsl .recibir .datos dd{padding:5px 0;border-bottom:1px solid var(--linea)}
+.jsl .recibir .datos dt{color:var(--suave)}
+.jsl .recibir .datos dd{margin:0;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.jsl .recibir .datos dd.neg{color:var(--rojo);font-weight:700}
+.jsl .recibir .campo label{display:block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--suave);margin-bottom:6px}
+.jsl .recibir .campo input,.jsl .recibir .campo select{width:100%;background-color:var(--hueco);border:1px solid var(--linea);border-radius:12px;padding:10px 14px;font-size:.88rem;color:var(--tinta);transition:border-color .15s,box-shadow .15s}
+.jsl .recibir .campo input:focus,.jsl .recibir .campo select:focus{outline:none;border-color:var(--marca2);box-shadow:0 0 0 3px var(--mango-claro)}
+.jsl .recibir .campo select{appearance:none;-webkit-appearance:none;padding-right:36px;background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:9px 9px;cursor:pointer}
+.jsl .btn.recibir-guardar{width:100%;margin-top:16px;padding:10px 16px;border-radius:12px;background:var(--verde);color:#fff;font-weight:600;font-size:.875rem;box-shadow:0 4px 10px rgba(16,24,40,.18);transition:filter .15s}
+.jsl .btn.recibir-guardar:hover{filter:brightness(1.08)}
+
+/* Detalle del pedido en drawer: cabecera fija, cuerpo con scroll y acciones abajo. */
+.jsl dialog[data-variante="drawer"] .dlg:has(> .pedido-drawer){overflow:hidden}
+.jsl .pedido-drawer{display:flex;flex-direction:column;height:100%;min-height:0}
+.jsl .pedido-drawer-cab{flex:none;border-bottom:1px solid var(--linea);padding-bottom:10px}
+.jsl .pedido-drawer-cab header{margin-bottom:0}
+.jsl .pedido-drawer-cuerpo{flex:1 1 auto;min-height:0;overflow-y:auto;padding:0 2px 12px}
+.jsl .pedido-drawer-pie{flex:none;margin:0 -20px -20px;padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--linea);background:var(--papel);gap:8px;flex-wrap:wrap}
+
+/* Ventanas de Cuentas y Sueldos: una sola columna,
+   etiquetas pequeñas y campos oscuros, como los formularios de Caja. */
+.jsl .form-modal .linea2{display:flex;flex-direction:column;gap:0}
+.jsl .form-modal .campo{margin:0 0 14px}
+.jsl .form-modal .campo label{display:block;margin-bottom:6px;font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--suave)}
+.jsl .form-modal .campo input,.jsl .form-modal .campo select{width:100%;background-color:var(--hueco);border:1px solid var(--linea);border-radius:12px;padding:10px 14px;font-size:.88rem;color:var(--tinta);transition:border-color .15s,box-shadow .15s}
+.jsl .form-modal .campo input:focus,.jsl .form-modal .campo select:focus{outline:none;border-color:var(--marca2);box-shadow:0 0 0 3px var(--mango-claro)}
+.jsl .form-modal .campo select{appearance:none;-webkit-appearance:none;padding-right:36px;background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:9px 9px;cursor:pointer}
+.jsl .form-modal .campo input[type="search"]{padding-left:40px;border-radius:999px}
+.jsl .btn.form-guardar{width:100%;margin-top:2px;padding:11px 16px;border-radius:12px;background:var(--marca2);color:#fff;font-weight:600;font-size:.9rem;box-shadow:0 4px 10px rgba(16,24,40,.18);transition:filter .15s,transform .08s ease}
+.jsl .btn.form-guardar:hover{filter:brightness(1.08)}
+.jsl .btn.form-guardar:active{transform:scale(.98)}
+.jsl .form-modal input[type="number"]{-moz-appearance:textfield;appearance:textfield}
+.jsl .form-modal input[type="number"]::-webkit-inner-spin-button,.jsl .form-modal input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+
+/* Listas de Personal: toolbar de filtros (Acceso y Personal JS) y pie de paginación. */
+.jsl .lista-toolbar{display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;gap:12px;width:100%;margin:14px 0 16px;padding:12px;border:1px solid var(--linea);border-radius:12px;background:color-mix(in srgb,var(--papel) 55%,transparent)}
+.jsl .lista-buscar{position:relative;display:flex;align-items:center;width:100%}
+.jsl .lista-buscar svg{position:absolute;left:12px;width:15px;height:15px;color:var(--suave);pointer-events:none}
+.jsl .lista-buscar input{width:100%;padding:9px 14px 9px 34px;border:1px solid var(--linea);border-radius:12px;background:var(--hueco);color:var(--tinta);font-size:.78rem;transition:border-color .15s,box-shadow .15s}
+.jsl .lista-buscar input::placeholder{color:var(--suave)}
+.jsl .lista-buscar input:focus{outline:none;border-color:var(--marca2);box-shadow:0 0 0 3px var(--mango-claro)}
+.jsl .lista-filtro{width:100%;min-width:160px;padding:9px 34px 9px 14px;border:1px solid var(--linea);border-radius:12px;background-color:var(--hueco);color:var(--tinta);font-size:.78rem;font-weight:500;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:9px 9px;cursor:pointer}
+.jsl .lista-filtro:focus{outline:none;border-color:var(--marca2);box-shadow:0 0 0 3px var(--mango-claro)}
+.jsl .accesos-pie{display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:14px;margin-top:16px;padding:12px 8px 0;border-top:1px solid var(--linea);font-size:.75rem;color:var(--suave)}
+.jsl .accesos-pie b{color:var(--tinta)}
+.jsl .accesos-pag{display:flex;align-items:center;gap:10px}
+.jsl .accesos-pie button{padding:6px 12px;border:1px solid var(--linea);border-radius:8px;background:var(--papel);color:var(--tinta);font-size:.75rem;font-weight:600;transition:background .15s,color .15s,opacity .15s}
+.jsl .accesos-pie button:hover:not(:disabled){background:var(--hueco)}
+.jsl .accesos-pie button:disabled{opacity:.4;pointer-events:none}
+@media (min-width:640px){
+  .jsl .lista-toolbar{flex-direction:row;align-items:center}
+  .jsl .lista-buscar{width:min(320px,100%)}
+  .jsl .lista-filtro{width:auto}
+  .jsl .accesos-pie{flex-direction:row}
+}
+@media (min-width:1024px){
+  .jsl .lista-buscar{width:min(340px,100%)}
+}
+
+/* Personal → Acceso: acciones con íconos y burbuja de ayuda. */
+.jsl th.acciones,.jsl td.acciones{text-align:right}
+.jsl .acciones-celda{display:flex;align-items:center;justify-content:flex-end;gap:6px}
+.jsl .accion-icono{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.jsl .accion-icono>button{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border:1px solid transparent;border-radius:8px;background:none;color:var(--suave);transition:color .15s,background .15s,border-color .15s,transform .08s}
+.jsl .accion-icono>button svg{width:16px;height:16px}
+.jsl .accion-icono>button:hover,.jsl .accion-icono>button:focus-visible{color:var(--marca2);background:color-mix(in srgb,var(--marca2) 12%,transparent);border-color:color-mix(in srgb,var(--marca2) 22%,transparent)}
+.jsl .accion-icono>button:active{transform:scale(.95)}
+.jsl .accion-icono.peligro>button:hover,.jsl .accion-icono.peligro>button:focus-visible{color:var(--rojo);background:color-mix(in srgb,var(--rojo) 12%,transparent);border-color:color-mix(in srgb,var(--rojo) 22%,transparent)}
+.jsl .accion-tip{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:6px;z-index:30;display:none;flex-direction:column;align-items:center;pointer-events:none}
+.jsl .accion-icono:hover .accion-tip,.jsl .accion-icono:focus-within .accion-tip{display:flex}
+.jsl .accion-tip i{width:8px;height:8px;background:#1E293B;border-top:1px solid #334155;border-left:1px solid #334155;transform:rotate(45deg);margin-bottom:-5px}
+.jsl .accion-tip span{white-space:nowrap;background:#1E293B;color:#E2E8F0;font-size:11px;font-weight:500;padding:4px 10px;border-radius:6px;border:1px solid #334155;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+.jsl .accion-icono.peligro .accion-tip span{color:#FDA4AF}
+@media (min-width:960px){.jsl .tabla-env.con-acciones{overflow:visible}}
+
+/* Personal JS: columnas balanceadas y acciones con aire a la derecha. */
+.jsl .tabla-personal th{font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--suave)}
+.jsl .tabla-personal th.per-nombre{width:22%}
+.jsl .tabla-personal th.per-tel{width:18%}
+.jsl .tabla-personal th.per-tipo{width:20%}
+.jsl .tabla-personal th.per-pago{width:15%}
+.jsl .tabla-personal th.per-cuenta{width:15%}
+.jsl .tabla-personal th.per-acciones{width:10%}
+.jsl .tabla-personal th.per-nombre,.jsl .tabla-personal td.per-nombre,.jsl .tabla-personal th.per-tel,.jsl .tabla-personal td.per-tel,.jsl .tabla-personal th.per-tipo,.jsl .tabla-personal td.per-tipo,.jsl .tabla-personal th.per-pago,.jsl .tabla-personal td.per-pago{text-align:left}
+.jsl .tabla-personal th.per-acciones,.jsl .tabla-personal td.per-acciones{text-align:right}
+.jsl .tabla-personal th.per-cuenta,.jsl .tabla-personal td.per-cuenta{text-align:center}
+.jsl .tabla-personal td.per-nombre b{font-size:.9rem;font-weight:700;color:var(--tinta)}
+.jsl .tabla-personal td.per-pago{font-weight:500;color:var(--tinta);font-size:.9rem}
+.jsl .tabla-personal td{border-bottom:1px solid var(--linea)}
+.jsl .tabla-personal th.per-nombre,.jsl .tabla-personal td.per-nombre{padding-left:24px;padding-right:16px}
+.jsl .tabla-personal th.per-acciones,.jsl .tabla-personal td.per-acciones{padding-left:16px;padding-right:24px}
+.jsl .tabla-personal .per-acciones .acciones-celda{gap:8px;padding-right:4px}
+.jsl .accion-icono.ambar>button:hover,.jsl .accion-icono.ambar>button:focus-visible{color:var(--amarillo);background:color-mix(in srgb,var(--amarillo) 14%,transparent);border-color:color-mix(in srgb,var(--amarillo) 26%,transparent)}
+.jsl .accion-icono.ambar .accion-tip span{color:#FCD34D}
+.jsl .accion-icono:hover,.jsl .accion-icono:focus-within{z-index:40}
+.jsl .tabla-personal .per-tipo select{max-width:100%}
+/* Sueldos: pares de campos en dos columnas (Tipo/Persona, Valor/Medio, Día/Detalle). */
+.jsl .form-modal.form-doble .linea2{display:grid;grid-template-columns:1fr;gap:0 14px}
+@media (min-width:600px){.jsl .form-modal.form-doble .linea2{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.jsl .btn.form-peligro{width:100%;margin-top:10px;padding:11px 16px;border-radius:12px;font-weight:600;font-size:.9rem}
+
+/* Modal centrado ancho (Sueldos): 512 px en escritorio y el ancho de la pantalla en celular. */
+.jsl dialog[data-variante="centrada-ancha"]{position:fixed;inset:0;margin:auto;width:min(512px,calc(100vw - 24px));max-width:512px;max-height:calc(100dvh - 32px);height:fit-content;border-radius:16px}
+.jsl dialog[data-variante="centrada-ancha"] .dlg::before{display:none}
+@media (max-width:600px){
+  .jsl dialog[data-variante="centrada-ancha"]{margin:auto;width:calc(100vw - 24px);max-height:calc(100dvh - 24px);height:fit-content;border-radius:16px}
+  .jsl dialog[data-variante="centrada-ancha"] .dlg{max-height:calc(100dvh - 24px);padding:22px}
+}
+.jsl dialog:focus-visible{outline:none}
+
+/* Personal: marco redondeado de las tablas y columnas con el mismo aire. */
+.jsl .tabla-marco{border:1px solid var(--linea);border-radius:16px}
+.jsl .tabla-marco thead th:first-child{border-top-left-radius:16px}
+.jsl .tabla-marco thead th:last-child{border-top-right-radius:16px}
+.jsl .tabla-marco tbody tr:last-child td:first-child{border-bottom-left-radius:16px}
+.jsl .tabla-marco tbody tr:last-child td:last-child{border-bottom-right-radius:16px}
+.jsl .tabla-personal th,.jsl .tabla-accesos th{padding:14px 24px}
+.jsl .tabla-personal td,.jsl .tabla-accesos td{padding:16px 24px}
+.jsl .tabla-personal td.per-pago input{text-align:left;font-variant-numeric:tabular-nums}
+.jsl .tabla-personal td.per-pago input{appearance:textfield;-moz-appearance:textfield}
+.jsl .tabla-personal td.per-pago input::-webkit-inner-spin-button,.jsl .tabla-personal td.per-pago input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.jsl .accion-icono.editar .accion-tip span{color:#7DD3FC}
+.jsl .accion-icono.correo>button:hover,.jsl .accion-icono.correo>button:focus-visible{color:var(--verde);background:color-mix(in srgb,var(--verde) 14%,transparent);border-color:color-mix(in srgb,var(--verde) 26%,transparent)}
+.jsl .accion-icono.correo .accion-tip span{color:#6EE7B7}
+.jsl .accion-icono>button:disabled{opacity:.5;pointer-events:none}
+.jsl .girando{display:inline-flex;animation:girar 1s linear infinite}
+@keyframes girar{to{transform:rotate(360deg)}}
+
+/* Acceso: botón y modal de restablecimiento masivo. */
+.jsl .lista-derecha{display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%}
+.jsl .btn.masivo{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:8px 14px;border:1px solid var(--linea);border-radius:12px;background:var(--hueco);color:var(--tinta);font-size:.75rem;font-weight:600;box-shadow:0 1px 2px rgba(16,24,40,.08);transition:background .15s,transform .08s ease,filter .15s}
+.jsl .btn.masivo:hover{background:color-mix(in srgb,var(--tinta) 8%,var(--hueco));filter:none}
+.jsl .btn.masivo:active{transform:scale(.95)}
+.jsl .btn.masivo svg{width:15px;height:15px}
+.jsl .acceso-check{width:16px;height:16px;border-radius:4px;accent-color:var(--marca2);cursor:pointer;flex:none}
+.jsl .modal-caja-ancha{max-width:576px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column}
+.jsl .masivo-buscar{margin:2px 0 10px}
+.jsl .masivo-master{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 4px;margin-bottom:8px;border-bottom:1px solid var(--linea);font-size:.75rem;color:var(--suave)}
+.jsl .masivo-master label{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.jsl .masivo-lista{flex:1 1 auto;min-height:0;max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding-right:4px}
+.jsl .masivo-item{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:12px;border:1px solid var(--linea);border-radius:12px;background:color-mix(in srgb,var(--hueco) 70%,transparent);cursor:pointer;transition:background .15s}
+.jsl .masivo-item:hover{background:color-mix(in srgb,var(--tinta) 6%,var(--hueco))}
+.jsl .masivo-info{display:flex;align-items:center;gap:10px;min-width:0}
+.jsl .masivo-info>span{display:flex;flex-direction:column;min-width:0}
+.jsl .masivo-info b{font-size:.85rem;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jsl .masivo-info small{font-size:.72rem;color:var(--suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jsl .masivo-rol{flex:none;padding:3px 8px;border:1px solid var(--linea);border-radius:999px;background:var(--papel);font-size:.68rem;font-weight:600;color:var(--suave);white-space:nowrap}
+.jsl .modal-caja-ancha .modal-acciones{margin-top:16px}
+.jsl .btn.masivo-enviar{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border:0;border-radius:12px;background:var(--verde);color:#fff;font-size:.75rem;font-weight:600;box-shadow:0 3px 8px rgba(16,24,40,.2);transition:filter .15s,transform .08s ease}
+.jsl .btn.masivo-enviar:hover{filter:brightness(1.08)}
+.jsl .btn.masivo-enviar:active{transform:scale(.95)}
+.jsl .btn.masivo-enviar:disabled{opacity:.4;pointer-events:none}
+.jsl .btn.masivo-enviar svg{width:15px;height:15px}
+@media (min-width:640px){.jsl .lista-derecha{width:auto}}
+@media (max-width:639px){
+  .jsl .lista-derecha{flex-direction:column;align-items:stretch}
+  .jsl .lista-derecha .lista-filtro,.jsl .lista-derecha .btn.masivo{width:100%}
+}
+
+/* Enviar saldos por WhatsApp: drawer ancho y tabla interna sin cortes. */
+.jsl dialog[data-variante="drawer-ancho"]{position:fixed;inset:0 auto 0 0;margin:0;width:100vw;max-width:100%;height:100dvh;max-height:100dvh;border-radius:0;overflow:hidden}
+@media (min-width:640px){.jsl dialog[data-variante="drawer-ancho"]{width:450px}}
+@media (min-width:768px){.jsl dialog[data-variante="drawer-ancho"]{width:500px}}
+@media (min-width:1024px){.jsl dialog[data-variante="drawer-ancho"]{width:540px}}
+.jsl dialog[data-variante="drawer-ancho"] .dlg{height:100%;max-height:100dvh;border-radius:0;display:flex;flex-direction:column;padding:20px;overflow-y:auto}
+.jsl dialog[data-variante="drawer-ancho"] .dlg::before{display:none}
+.jsl .envio-masivo{width:100%}
+.jsl .btn.envio-siguiente{display:flex;align-items:center;justify-content:center;width:100%;padding:12px 16px;border-radius:12px;font-size:.8rem;font-weight:600;text-align:center;box-shadow:0 4px 10px rgba(16,24,40,.2);transition:filter .15s,transform .08s ease}
+.jsl .btn.envio-siguiente:hover{filter:brightness(1.08)}
+.jsl .btn.envio-siguiente:active{transform:scale(.98)}
+@media (min-width:640px){.jsl .btn.envio-siguiente{font-size:.875rem}}
+.jsl .envio-tabla{width:100%;overflow-x:auto;margin:12px 0}
+.jsl .tabla-envio{width:100%;border-collapse:collapse}
+.jsl .tabla-envio th{font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--suave);background:var(--hueco)}
+.jsl .tabla-envio .col-cliente{text-align:left;padding:12px 8px 12px 16px}
+.jsl .tabla-envio .col-saldo{text-align:right;padding:12px;white-space:nowrap}
+.jsl .tabla-envio .col-accion{text-align:right;padding:12px 16px 12px 8px}
+.jsl .tabla-envio td{border-bottom:1px solid var(--linea)}
+.jsl .tabla-envio tr:last-child td{border-bottom:0}
+.jsl .envio-nombre{display:block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem;font-weight:700;color:var(--tinta)}
+.jsl .tabla-envio td.col-saldo{font-size:.8rem;font-weight:600;color:var(--amarillo);white-space:nowrap}
+.jsl .tabla-envio td.col-accion{white-space:nowrap}
+.jsl .btn.enviar-fila{display:inline-flex;align-items:center;padding:6px 12px;border:1px solid var(--linea);border-radius:8px;background:var(--hueco);color:var(--tinta);font-size:.75rem;font-weight:500;white-space:nowrap;box-shadow:none;transition:background .15s}
+.jsl .btn.enviar-fila:hover{background:color-mix(in srgb,var(--tinta) 8%,var(--hueco));filter:none}
+.jsl .tabla-personal th.per-tel,.jsl .tabla-personal td.per-tel,
+.jsl .tabla-personal th.per-tipo,.jsl .tabla-personal td.per-tipo,
+.jsl .tabla-personal th.per-pago,.jsl .tabla-personal td.per-pago,
+.jsl .tabla-personal th.per-cuenta,.jsl .tabla-personal td.per-cuenta{padding-left:16px;padding-right:16px}
+
+/* Personal JS: título de Acciones centrado sobre los íconos. */
+.jsl .tabla-personal th.per-acciones{text-align:center}
+/* Acceso: encabezados en mayúsculas, como en Personal JS. */
+.jsl .tabla-accesos th{font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+
+/* Acceso: el título Acciones va centrado sobre el grupo de íconos. */
+.jsl .tabla-accesos th.acciones{text-align:center}
+/* La clase global .acciones es flex; en la tabla debe seguir siendo una celda. */
+.jsl .tabla-accesos th.acciones,.jsl .tabla-accesos td.acciones{display:table-cell}
+/* Acceso: mismos tamaños de fuente que Personal JS y acciones centradas bajo su título. */
+.jsl .tabla-accesos th{font-size:.7rem}
+.jsl .tabla-accesos td.acciones .acciones-celda{justify-content:center;padding-right:0}

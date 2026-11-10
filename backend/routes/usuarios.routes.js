@@ -10,6 +10,7 @@ const r = Router();
 r.use(permitir("admin"));
 
 r.get("/", C.listar);
+r.get("/pagina", validar({ query: V.paginaAccesos }), C.listarPagina);
 r.post("/", validar({ body: V.crear }), C.crear);
 r.patch("/:id", validar({ params: paramId, body: V.actualizar }), C.actualizar);
 r.put("/:id/clave", validar({ params: paramId, body: V.nuevaClave }), C.cambiarClave);

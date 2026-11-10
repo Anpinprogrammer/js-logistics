@@ -36,3 +36,10 @@ export function usePorPaginaInternos() {
   const esComputador = useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false);
   return esComputador ? POR_PAGINA_INTERNOS.computador : POR_PAGINA_INTERNOS.celular;
 }
+
+/** Personal → Acceso: 5 filas en celular y 10 en computador. */
+export const POR_PAGINA_ACCESOS = { celular: 5, computador: 10 } as const;
+export function usePorPaginaAccesos() {
+  const esComputador = useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false);
+  return esComputador ? POR_PAGINA_ACCESOS.computador : POR_PAGINA_ACCESOS.celular;
+}

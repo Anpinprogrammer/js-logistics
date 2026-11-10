@@ -2,10 +2,12 @@
 import * as Usuario from "../models/usuario.model.js";
 import * as Enlace from "../models/enlace.model.js";
 import * as Enlaces from "../servicios/enlaces.js";
+import * as Auditoria from "../models/auditoria.model.js";
+import { encolarCorreosReset } from "../queues/emailQueue.js";
 import { compararClave, hashClave } from "../helpers/claves.js";
 import { firmarToken } from "../helpers/jwt.js";
 import { ponerSesion, quitarSesion } from "../helpers/cookies.js";
-import { noAutenticado, invalido } from "../helpers/errores.js";
+import { noAutenticado, invalido, noEncontrado, conflicto, correoNoConfigurado, correoFallo } from "../helpers/errores.js";
 
 /** Lo que el frontend necesita saber de la cuenta (nunca el hash ni la versión de sesión). */
 export const publico = u => ({
@@ -84,6 +86,36 @@ export async function activar(req, res) {
   const { token, clave } = req.valido.body;
   await Enlaces.consumir({ token, clave, tipo: "activacion" });
   res.status(204).end();
+}
+
+/**
+ * Administración manda el enlace de restablecimiento a una cuenta concreta, por id o por correo.
+ * Usa el mismo token de un solo uso (guardado como hash en `enlaces`) que el resto de correos.
+ */
+export async function enviarReset(req, res) {
+  const { usuarioId, email } = req.valido.body;
+  const u = usuarioId ? await Usuario.buscarParaEnlacePorId(usuarioId) : await Usuario.buscarParaEnlace(email);
+  if (!u) throw noEncontrado("La cuenta no existe");
+  if (!u.activo) throw conflicto("Activa la cuenta primero", "CUENTA_INACTIVA");
+  const correo = await Enlaces.crearYEnviar({ usuario: u, tipo: u.tieneClave ? "clave" : "activacion", origen: "admin", creadoPor: req.usuario.id });
+  if (!correo.enviado) {
+    if (correo.motivo === "SIN_CONFIGURAR") throw correoNoConfigurado();
+    throw correoFallo();
+  }
+  await Auditoria.registrar({ uid: req.usuario.id, accion: `Envió el enlace de contraseña a ${u.email}`, tabla: "usuarios", registro: u.id });
+  res.json({ enviado: true, email: u.email });
+}
+
+/** Administración: encola el envío masivo y responde de inmediato (el worker manda los correos). */
+export async function enviarResetsMasivo(req, res) {
+  const { emails } = req.valido.body;
+  const r = await encolarCorreosReset({ emails, porUid: req.usuario.id });
+  await Auditoria.registrar({ uid: req.usuario.id, accion: `Encoló el restablecimiento de contraseña para ${emails.length} cuentas`, tabla: "usuarios" });
+  res.status(202).json({
+    mensaje: `Procesando el envío masivo de ${r.total} correos en segundo plano.`,
+    total: r.total,
+    modo: r.modo
+  });
 }
 
 /** Revisa el enlace antes de mostrar el formulario. Devuelve el correo tapado, no el completo. */

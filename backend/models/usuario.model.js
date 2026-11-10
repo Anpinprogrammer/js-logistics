@@ -32,6 +32,16 @@ export async function buscarParaEnlace(email) {
   return filaAObjeto(rows[0]);
 }
 
+/** Igual que buscarParaEnlace pero por id: dice si la cuenta ya tiene contraseña. */
+export async function buscarParaEnlacePorId(id) {
+  const { rows } = await query(
+    `SELECT ${COLUMNAS}, (clave_hash IS NOT NULL) AS tiene_clave
+       FROM usuarios WHERE id = $1`,
+    [id]
+  );
+  return filaAObjeto(rows[0]);
+}
+
 export async function listar() {
   const { rows } = await query(`SELECT ${COLUMNAS} FROM usuarios ORDER BY lower(nombre), lower(email)`);
   return rows.map(filaAObjeto);
