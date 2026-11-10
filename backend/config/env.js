@@ -54,6 +54,12 @@ const esquema = z.object({
   // Límites por cliente (por cuenta, no por IP)
   CHATBOT_LIMITE_MINUTO: z.coerce.number().int().min(1).default(8),
   CHATBOT_LIMITE_DIA: z.coerce.number().int().min(1).default(100),
+  // Chat público (visitantes sin sesión): solo info general y estado de un envío, sin nombres ni dinero.
+  // Los límites van por IP y hay un tope global por día, porque cualquiera en internet puede llamarlo.
+  CHATBOT_PUBLICO_ACTIVO: z.enum(["true", "false"]).default("true").transform(v => v === "true"),
+  CHATBOT_PUBLICO_MINUTO: z.coerce.number().int().min(1).default(5),
+  CHATBOT_PUBLICO_DIA: z.coerce.number().int().min(1).default(30),
+  CHATBOT_PUBLICO_DIA_TOTAL: z.coerce.number().int().min(1).default(500),
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1)
 });
 

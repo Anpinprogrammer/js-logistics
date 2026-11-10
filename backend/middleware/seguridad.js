@@ -97,3 +97,29 @@ export const limiteChatDia = rateLimit({
   legacyHeaders: false,
   handler: respuestaChat429("CHAT_LIMITE_DIARIO", "Llegaste al límite de mensajes de hoy con el asistente. Escríbenos por WhatsApp y te atendemos.")
 });
+
+/* Chat público (sin sesión): por IP, y un tope global por día para que nadie pueda vaciar el presupuesto.
+   Cada mensaje cuesta dinero y cualquiera en internet puede llamarlo, así que los límites son más estrictos
+   que los del cliente con sesión. */
+export const limitePublicoMinuto = rateLimit({
+  windowMs: 60_000,
+  limit: env.CHATBOT_PUBLICO_MINUTO,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: respuestaChat429("CHAT_DEMASIADO_RAPIDO", "Estás escribiendo muy rápido. Espera un momento e intenta de nuevo.")
+});
+export const limitePublicoDia = rateLimit({
+  windowMs: 24 * 60 * 60_000,
+  limit: env.CHATBOT_PUBLICO_DIA,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: respuestaChat429("CHAT_LIMITE_DIARIO", "Llegaste al límite de mensajes de hoy. Escríbenos por WhatsApp o inicia sesión para seguir.")
+});
+export const limitePublicoGlobal = rateLimit({
+  windowMs: 24 * 60 * 60_000,
+  limit: env.CHATBOT_PUBLICO_DIA_TOTAL,
+  keyGenerator: () => "global",
+  standardHeaders: false,
+  legacyHeaders: false,
+  handler: respuestaChat429("CHAT_SATURADO", "El asistente tiene mucha demanda hoy. Escríbenos por WhatsApp y te atendemos.")
+});

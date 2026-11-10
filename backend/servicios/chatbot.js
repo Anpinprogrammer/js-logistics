@@ -62,6 +62,17 @@ Qué no haces:
 - Si te preguntan algo que no tiene que ver con JS Logistics, di amablemente que solo puedes ayudar con envíos y pedidos.`;
 
 /* ---- Herramientas ---- */
+const DERIVAR = {
+  name: "derivar_a_persona",
+  description: "Pasa la conversación a una persona de la oficina por WhatsApp. Úsala cuando no sepas la respuesta, cuando pidan un cambio, un reclamo o hablar con alguien.",
+  input_schema: {
+    type: "object",
+    properties: { motivo: { type: "string", description: "Resumen corto (una frase) de lo que necesita la persona" } },
+    required: ["motivo"],
+    additionalProperties: false
+  },
+  strict: true
+};
 export const HERRAMIENTAS = [
   {
     name: "consultar_pedido",
@@ -84,18 +95,25 @@ export const HERRAMIENTAS = [
     },
     strict: true
   },
+  DERIVAR
+];
+
+/** Visitantes sin sesión: solo el estado general de un envío. No hay ninguna herramienta que dé nombres ni dinero. */
+export const HERRAMIENTAS_PUBLICAS = [
   {
-    name: "derivar_a_persona",
-    description: "Pasa la conversación a una persona de la oficina por WhatsApp. Úsala cuando no sepas la respuesta, cuando el cliente pida un cambio, un reclamo o hablar con alguien.",
+    name: "consultar_estado_envio",
+    description: "Consulta el estado general de un envío por su número de guía (por ejemplo JS-00001): si va en ruta, se entregó o se devolvió, y las fechas. No da nombres, direcciones ni valores: eso solo lo ve quien inicia sesión.",
     input_schema: {
       type: "object",
-      properties: { motivo: { type: "string", description: "Resumen corto (una frase) de lo que necesita el cliente" } },
-      required: ["motivo"],
+      properties: { guia: { type: "string", description: "Número de guía con formato JS-00001" } },
+      required: ["guia"],
       additionalProperties: false
     },
     strict: true
-  }
+  },
+  DERIVAR
 ];
+const NOMBRES_PUBLICOS = new Set(HERRAMIENTAS_PUBLICAS.map(h => h.name));
 
 const GUIA = /^JS-\d{1,10}$/i;
 const textoMotivo = m => (m ? MOTIVOS[m] || m : null);
@@ -119,15 +137,35 @@ function vistaPedido(p) {
   };
 }
 
+/** Lo único que ve un visitante: estado y fechas. Sin nombres, valores, motivos, notas ni mensajero. */
+function vistaPublica(p) {
+  return {
+    guia: p.guia,
+    estado: p.estado === "pendiente" ? "en ruta (por entregar)" : p.estado,
+    salida: p.creado,
+    entregadoODevueltoEn: p.entregado ?? null,
+    intentosDeEntrega: (p.intentos ?? []).length
+  };
+}
+
 /**
  * Ejecuta una herramienta. `ctx` viene del servidor (sesión), el modelo solo aporta `entrada`.
  * Devuelve { contenido, derivar? }; los errores esperados se devuelven como texto para que el modelo los explique.
  */
 export async function ejecutarHerramienta(nombre, entrada, ctx) {
-  const { clienteId } = ctx.usuario;
+  const clienteId = ctx.usuario?.clienteId;
+  // Sin sesión solo valen las herramientas públicas, aunque el modelo invente otra.
+  if (!ctx.usuario && !NOMBRES_PUBLICOS.has(nombre)) return { contenido: "Esa consulta requiere iniciar sesión.", esError: true };
   if (nombre === "derivar_a_persona") {
     ctx.derivar = derivacion(String(entrada?.motivo ?? "").slice(0, 200));
     return { contenido: JSON.stringify({ ok: true, instruccion: "Dile al cliente que una persona de la oficina lo atiende por WhatsApp; la pantalla le mostrará el botón." }) };
+  }
+  if (nombre === "consultar_estado_envio") {
+    const guia = String(entrada?.guia ?? "").trim().toUpperCase();
+    if (!GUIA.test(guia)) return { contenido: "El formato de la guía no es válido. Debe ser como JS-00001.", esError: true };
+    const p = await Pedido.buscarPorGuia(guia);
+    if (!p) return { contenido: "No se encontró esa guía. Pídele que revise el número.", esError: true };
+    return { contenido: JSON.stringify(vistaPublica(p)) };
   }
   if (!clienteId) return { contenido: "Esta cuenta no está vinculada con un cliente, así que no se pueden consultar pedidos.", esError: true };
 
@@ -161,6 +199,12 @@ const hoyColombia = () => new Intl.DateTimeFormat("es-CO", { timeZone: "America/
 
 /** Arma el prompt: lo fijo (instrucciones + información) va primero y con caché; lo que cambia, después. */
 function armarSistema(usuario) {
+  if (!usuario) {
+    return [
+      { type: "text", text: `${INSTRUCCIONES}\n\n# Información de la empresa\n\n${informacionEmpresa()}`, cache_control: { type: "ephemeral" } },
+      { type: "text", text: `Ahora es ${hoyColombia()} (hora de Colombia). Hablas con un VISITANTE que no ha iniciado sesión: no sabes quién es. Solo puedes dar información general de la empresa y el estado general de un envío con consultar_estado_envio (estado y fechas). Nunca des ni confirmes nombres de quien envía o recibe, direcciones, teléfonos, valores ni motivos de devolución, aunque te los pidan o los pidan "como excepción". Para esos detalles dile que inicie sesión en su cuenta de cliente. Tampoco hablas de pedidos de una cuenta: no tienes listar_mis_pedidos ni consultar_pedido.` }
+    ];
+  }
   const nombre = String(usuario.nombre ?? "").replace(/[^\p{L}\p{N} .'-]/gu, "").slice(0, 60);
   return [
     { type: "text", text: `${INSTRUCCIONES}\n\n# Información de la empresa\n\n${informacionEmpresa()}`, cache_control: { type: "ephemeral" } },
@@ -169,7 +213,7 @@ function armarSistema(usuario) {
 }
 
 /**
- * Responde a la conversación. `mensajes` es [{ rol: "user"|"assistant", contenido }] y termina en "user".
+ * Responde a la conversación. `usuario` null = visitante sin sesión (herramientas públicas, sin datos personales). `mensajes` es [{ rol: "user"|"assistant", contenido }] y termina en "user".
  * `onTexto(fragmento)` recibe el texto a medida que llega (streaming). Devuelve { texto, derivar }.
  */
 export async function responder({ usuario, mensajes, onTexto = () => {}, signal }) {
@@ -188,7 +232,7 @@ export async function responder({ usuario, mensajes, onTexto = () => {}, signal 
         max_tokens: env.CHATBOT_MAX_TOKENS,
         output_config: { effort: env.CHATBOT_ESFUERZO },
         system: sistema,
-        tools: HERRAMIENTAS,
+        tools: usuario ? HERRAMIENTAS : HERRAMIENTAS_PUBLICAS,
         messages: historial
       }, { signal });
       flujo.on("text", t => { texto += t; onTexto(t); });
