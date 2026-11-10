@@ -16,6 +16,8 @@ export interface Usuario {
   mensajeroId: string | null;
   activo?: boolean;
   ultimoIngreso?: string | null;
+  /** Derivado en el servidor: sin contraseña = pendiente de activación. */
+  status?: "pending_activation" | "active" | "disabled";
 }
 
 export interface Cliente {
@@ -195,7 +197,19 @@ export interface CuentaInterna { id: string; nombre: string; tipo: "socio" | "ba
 
 /** Registro de cambios (historial) y papelera. */
 export interface Cambio { id: string; fecha: string; quien: string; op: string; col: string; docId: string; resumen: string }
+/** Una página del historial (5 en celular y 13 en computador). */
+export interface PaginaHistorial { cambios: Cambio[]; pagina: number; porPagina: number; total: number; paginas: number }
+/** Una página de liquidaciones recientes (5 en celular y 9 en computador). */
+export interface PaginaLiquidaciones { liquidaciones: Liquidacion[]; pagina: number; porPagina: number; total: number; paginas: number }
 export interface EnPapelera { id: string; col: string; docId: string; resumen: string; fecha: string; quien: string }
+
+/** Respuesta de POST /usuarios al crear un acceso pendiente de activación. */
+export interface AccesoCreado {
+  message: string;
+  usuario: Usuario;
+  user: { id: string; nombre: string; email: string; telefono: string; activationUrl: string; status?: Usuario["status"] };
+  correo?: { enviado: boolean; motivo?: string };
+}
 
 /** Enlace que llega por correo para activar una cuenta o cambiar la contraseña. */
 export interface EnlaceCorreo {
@@ -205,6 +219,9 @@ export interface EnlaceCorreo {
   email: string;
   expira: string;
 }
+
+/** Una página de Personal JS (4 en celular, 7 en computador). */
+export interface PaginaPersonal { mensajeros: Mensajero[]; pagina: number; porPagina: number; total: number; paginas: number }
 
 /** Una página de los accesos a la app (5 en celular, 10 en computador). */
 export interface PaginaUsuarios {

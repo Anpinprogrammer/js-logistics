@@ -23,5 +23,6 @@ r.post("/recuperar", limiteCorreo, validar({ body: V.recuperar }), C.recuperar);
 r.get("/enlace/:token", limiteEnlace, validar({ params: V.paramToken }), C.verEnlace);
 r.post("/restablecer", limiteEnlace, validar({ body: V.restablecer }), C.restablecer);
 r.post("/activar", limiteEnlace, validar({ body: V.activar }), C.activar);
+r.post("/activate-account", limiteEnlace, validar({ body: V.activarCuenta }), C.activarCuenta);
 
 export default r;

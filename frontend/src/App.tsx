@@ -19,7 +19,7 @@ export default function App() {
   // Los enlaces del correo abren su pantalla aunque haya una sesión abierta en el mismo navegador.
   const publica =
     pathname === "/recuperar" ? <Recuperar />
-      : pathname === "/restablecer" || pathname === "/activar" ? <Restablecer />
+      : pathname === "/restablecer" || pathname === "/activar" || pathname === "/activar-cuenta" ? <Restablecer />
         : null;
   if (publica) return <Suspense fallback={cargandoVista}>{publica}</Suspense>;
 

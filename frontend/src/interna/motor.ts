@@ -46,7 +46,7 @@ export interface CajaMov {
   nivel?: boolean; arqueoId?: string; esperado?: Record<string, number>; contado?: Record<string, number>; medioAntes?: string;
 }
 export interface Cuenta { id: string; nombre: string; tipo: "socio" | "base" }
-export interface UsuarioS { uid: string; email: string; nombre: string; rol: string; clienteId: string; mensajeroId: string; activo: boolean }
+export interface UsuarioS { uid: string; email: string; nombre: string; rol: string; clienteId: string; mensajeroId: string; activo: boolean; status?: "pending_activation" | "active" | "disabled" }
 export interface Vinculo { uid: string; mensajeroId: string }
 
 export interface Almacen {

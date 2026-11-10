@@ -665,3 +665,104 @@
 /* Acceso: mismos tamaños de fuente que Personal JS y acciones centradas bajo su título. */
 .jsl .tabla-accesos th{font-size:.7rem}
 .jsl .tabla-accesos td.acciones .acciones-celda{justify-content:center;padding-right:0}
+
+/* Dar acceso: nota de invitación, combobox de clientes y botón de creación. */
+.jsl .acceso-nota{margin:0 0 4px;font-size:.78rem;line-height:1.5}
+.jsl .combo-cliente{position:relative}
+.jsl .combo-buscar{position:relative;display:flex;align-items:center}
+.jsl .combo-buscar svg{position:absolute;left:14px;z-index:10;width:16px;height:16px;color:var(--suave);pointer-events:none}
+.jsl .combo-buscar input{padding-left:40px;border-radius:12px}
+.jsl .combo-lista{position:absolute;top:100%;left:0;width:100%;margin-top:4px;z-index:50;max-height:224px;overflow-y:auto;padding:4px 0;border:1px solid var(--linea);border-radius:12px;background:var(--papel);box-shadow:0 20px 40px rgba(2,6,23,.35)}
+.jsl .combo-opcion{display:flex;flex-direction:column;gap:2px;width:100%;padding:10px 14px;border:0;background:none;color:var(--tinta);font-size:.8rem;text-align:left;cursor:pointer;transition:background .15s,color .15s}
+.jsl .combo-opcion:hover{background:color-mix(in srgb,var(--tinta) 7%,transparent)}
+.jsl .combo-opcion small{font-size:.7rem;color:var(--suave)}
+.jsl .combo-opcion.crear{display:flex;flex-direction:row;align-items:center;gap:8px;border-bottom:1px solid var(--linea);color:var(--marca2);font-weight:600}
+.jsl .combo-opcion.crear svg{width:15px;height:15px;flex:none}
+.jsl .combo-vacio{display:block;padding:10px 14px;font-size:.78rem;color:var(--suave)}
+.jsl .combo-chip{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border:1px solid color-mix(in srgb,var(--marca2) 25%,var(--linea));border-radius:12px;background:color-mix(in srgb,var(--marca2) 7%,var(--hueco))}
+.jsl .combo-chip span{display:flex;flex-direction:column;min-width:0}
+.jsl .combo-chip b{font-size:.82rem;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jsl .combo-chip small{font-size:.7rem;color:var(--suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jsl .combo-chip button{flex:none;padding:4px 8px;border:0;border-radius:7px;background:none;color:var(--marca2);font-size:.72rem;font-weight:600;cursor:pointer}
+.jsl .combo-chip button:hover{background:color-mix(in srgb,var(--marca2) 12%,transparent)}
+.jsl .btn.acceso-crear{padding:10px 20px;border-radius:12px;background:var(--marca2);color:#fff;font-size:.75rem;font-weight:600;box-shadow:0 1px 2px rgba(16,24,40,.2)}
+.jsl .btn.acceso-crear:hover{filter:brightness(1.08)}
+.jsl .etq.pend{background:var(--amarillo-claro);color:var(--amarillo)}
+
+/* Acceso creado: ofrecer el enlace de activación por WhatsApp. */
+.jsl .modal-fondo.wa-fondo{z-index:60}
+.jsl .wa-caja{max-width:448px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.jsl .wa-icono{display:flex;align-items:center;justify-content:center;width:48px;height:48px;margin-bottom:12px;border:1px solid color-mix(in srgb,var(--verde) 30%,transparent);border-radius:50%;background:color-mix(in srgb,var(--verde) 12%,transparent);color:var(--verde)}
+.jsl .wa-icono svg{width:24px;height:24px}
+.jsl .wa-caja h2{margin:0 0 8px;padding-right:0;font-size:1rem;font-weight:700;color:var(--tinta)}
+.jsl .wa-texto{margin:0 0 16px;font-size:.8rem;line-height:1.55;color:var(--suave)}
+.jsl .wa-texto b{color:var(--tinta)}
+.jsl .wa-aviso{margin:0 0 14px;font-size:.78rem;text-align:left}
+.jsl .btn.wa-enviar{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px 16px;border-radius:12px;background:var(--verde);color:#fff;font-size:.8rem;font-weight:600;box-shadow:0 4px 10px rgba(16,24,40,.2);transition:filter .15s,transform .08s ease}
+.jsl .btn.wa-enviar:hover{filter:brightness(1.08)}
+.jsl .btn.wa-enviar:active{transform:scale(.95)}
+.jsl .btn.wa-enviar:disabled{opacity:.4;pointer-events:none}
+.jsl .btn.wa-enviar svg{width:17px;height:17px}
+.jsl .btn.wa-copiar{width:100%;margin-top:8px;padding:8px 12px;border:1px solid var(--linea);border-radius:12px;background:var(--hueco);color:var(--tinta);font-size:.75rem;font-weight:500}
+.jsl .btn.wa-copiar:hover{background:color-mix(in srgb,var(--tinta) 7%,var(--hueco))}
+.jsl .btn.wa-omitir{width:100%;margin-top:8px;padding:8px;border:0;background:none;color:var(--suave);font-size:.75rem}
+.jsl .btn.wa-omitir:hover{color:var(--tinta);background:none;filter:none}
+.jsl .modal-acciones.acceso-pie{flex-direction:column;align-items:stretch}
+.jsl .acceso-pie .btn{width:100%}
+.jsl .btn.acceso-crear{width:100%}
+.jsl .modal-caja .combo-buscar input{padding-left:40px;border-radius:12px}
+/* Liquidaciones recientes: cabecera con título a la izquierda y filtros compactos a la derecha. */
+.jsl .liq-cab{display:flex;flex-direction:column;gap:16px;width:100%;margin:0 0 22px}
+.jsl .liq-cab-txt{min-width:0;flex:1 1 auto}
+.jsl .liq-cab-txt h2{margin:0}
+.jsl .liq-cab-txt .sub{margin:4px 0 0}
+.jsl .liq-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.jsl .fecha-picker{position:relative}
+.jsl .fecha-btn{display:flex;flex-direction:column;justify-content:center;min-width:150px;padding:8px 20px;border:1px solid var(--linea);border-radius:999px;background:var(--papel);box-shadow:0 1px 2px rgba(16,24,40,.06);text-align:left;cursor:pointer;transition:border-color .15s}
+.jsl .fecha-btn:hover{border-color:var(--suave)}
+.jsl .fecha-etq{font-size:9px;font-weight:700;line-height:1;letter-spacing:.08em;text-transform:uppercase;color:var(--suave)}
+.jsl .fecha-valor{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;font-size:.75rem;font-weight:600;line-height:1.2;color:var(--tinta);white-space:nowrap}
+.jsl .fecha-valor svg{width:14px;height:14px;color:var(--suave)}
+.jsl .fecha-pop{position:absolute;right:0;top:100%;margin-top:8px;width:288px;padding:20px;z-index:50;border:1px solid var(--linea);border-radius:16px;background:var(--papel);box-shadow:0 20px 40px rgba(2,6,23,.28);animation:jsl-modal-caja .15s ease-out}
+.jsl .fecha-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px;padding:0 4px}
+.jsl .fecha-nav{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:4px;border:0;border-radius:8px;background:none;color:var(--suave);cursor:pointer;transition:background .15s,color .15s}
+.jsl .fecha-nav:hover{background:var(--hueco);color:var(--tinta)}
+.jsl .fecha-nav svg{width:16px;height:16px}
+.jsl .fecha-mes{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta)}
+.jsl .fecha-semana{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px;text-align:center}
+.jsl .fecha-semana span{font-size:10px;font-weight:700;color:var(--suave);text-transform:uppercase}
+.jsl .fecha-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.jsl .fecha-dia{display:flex;align-items:center;justify-content:center;width:32px;height:32px;margin:0 auto;border:1px solid transparent;border-radius:50%;background:none;color:var(--tinta);font-size:.75rem;font-weight:600;cursor:pointer;transition:background .15s,color .15s,transform .1s}
+.jsl .fecha-dia:hover{background:var(--hueco);color:var(--tinta)}
+.jsl .fecha-dia.hoy{border-color:color-mix(in srgb,var(--marca2) 50%,transparent);color:var(--marca2)}
+.jsl .fecha-dia.sel{background:var(--marca2);color:#fff;font-weight:700;border-color:transparent;box-shadow:0 2px 6px rgba(16,24,40,.25);transform:scale(1.05)}
+.jsl .fecha-limpiar{width:100%;margin-top:12px;border:0;background:none;color:var(--suave);font-size:11px;font-weight:500;text-decoration:underline;cursor:pointer}
+.jsl .fecha-limpiar:hover{color:var(--tinta)}
+.jsl .liq-select{appearance:none;-webkit-appearance:none;padding:10px 36px 10px 20px;border:1px solid var(--linea);border-radius:999px;background-color:var(--papel);color:var(--tinta);font-size:.75rem;font-weight:600;cursor:pointer;box-shadow:0 1px 2px rgba(16,24,40,.06);background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 14px center;background-size:9px 9px;transition:border-color .15s}
+.jsl .liq-select:hover{border-color:var(--suave)}
+.jsl .liq-select:focus,.jsl .liq-buscar input:focus{outline:none;border-color:var(--marca2);box-shadow:0 0 0 3px var(--mango-claro)}
+.jsl .liq-buscar{position:relative;display:flex;align-items:center}
+.jsl .liq-buscar svg{position:absolute;left:16px;width:16px;height:16px;color:var(--suave);pointer-events:none}
+.jsl .liq-buscar input{width:192px;padding:10px 20px 10px 40px;border:1px solid var(--linea);border-radius:999px;background:var(--papel);color:var(--tinta);font-size:.75rem;font-weight:600;box-shadow:0 1px 2px rgba(16,24,40,.06)}
+.jsl .liq-buscar input::placeholder{color:var(--suave)}
+.jsl .liq-limpiar{height:38px;border-radius:999px}
+@media (min-width:1024px){
+  .jsl .liq-cab{flex-direction:row;align-items:flex-end;justify-content:space-between;gap:16px}
+  .jsl .liq-toolbar{justify-content:flex-end;flex-wrap:nowrap;flex:none}
+  .jsl .liq-buscar input{width:224px}
+}
+@media (max-width:639px){
+  .jsl .liq-toolbar{width:100%}
+  .jsl .liq-toolbar .fecha-picker{flex:0 0 150px}
+  .jsl .liq-toolbar .fecha-btn{width:150px;min-width:0;padding-left:16px;padding-right:16px}
+  .jsl .fecha-pop{right:auto;left:0}
+  .jsl .liq-select{flex:1 1 auto;min-width:0;padding-left:14px;padding-right:26px;font-size:.7rem;background-position:right 10px center}
+  .jsl .liq-buscar{flex:1 1 100%}
+  .jsl .liq-buscar input{width:100%}
+}
+
+/* Movimientos de las cuentas: extremos con aire y columna de acciones. */
+.jsl .tabla-internas th{font-size:.7rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.jsl .tabla-internas .col-fecha{padding-left:24px}
+.jsl .tabla-internas .col-acciones{text-align:right;padding-left:16px;padding-right:24px}
+.jsl .tabla-internas td.col-acciones{white-space:nowrap}

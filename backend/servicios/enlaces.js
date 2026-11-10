@@ -18,7 +18,7 @@ const baseDelPortal = usuario =>
 
 /** Arma la URL que abre el portal correcto (clientes o equipo) en su pantalla de activar o restablecer. */
 export function urlDeEnlace(usuario, tipo, token) {
-  const ruta = tipo === "activacion" ? "/activar" : "/restablecer";
+  const ruta = tipo === "activacion" ? "/activar-cuenta" : "/restablecer";
   return `${baseDelPortal(usuario)}${ruta}?token=${encodeURIComponent(token)}`;
 }
 
@@ -37,14 +37,14 @@ export async function crearYEnviar({ usuario, tipo, creadoPor = null, origen = "
     console.info(`[correo] Sin RESEND_API_KEY. Enlace de ${tipo} para ${usuario.email}: ${enlace}`);
   }
   try {
-    return await Correo.enviar(Correo.correoDeEnlace({ usuario, tipo, enlace, origen }));
+    return { ...(await Correo.enviar(Correo.correoDeEnlace({ usuario, tipo, enlace, origen }))), url: enlace };
   } catch (e) {
     console.error(`No se pudo enviar el correo de ${tipo} a ${usuario.email}:`, e.message);
     // En desarrollo, un dominio sin verificar no debe bloquear la prueba: el enlace queda en la consola.
     if (env.NODE_ENV === "development") {
       console.info(`[correo] Enlace de ${tipo} para ${usuario.email} (no se pudo enviar): ${enlace}`);
     }
-    return { enviado: false, motivo: "FALLO_ENVIO" };
+    return { enviado: false, motivo: "FALLO_ENVIO", url: enlace };
   }
 }
 

@@ -209,18 +209,33 @@ export async function quitarAdelanto(aid: string) {
 
 /* ---------- personal y accesos ---------- */
 export async function guardarPersona(mid: string | null, d: { nombre?: string; telefono?: string; tipo?: TipoPersonal; tarifa?: number }) {
-  if (DEMO) { const k = mid || id(); return tocar(s => { s.mensajeros[k] = { ...(s.mensajeros[k] || { id: k, nombre: "", telefono: "", tipo: "mensajero", tarifa: 0 }), ...d }; }); }
+  if (DEMO) {
+    const k = mid || id();
+    tocar(s => { s.mensajeros[k] = { ...(s.mensajeros[k] || { id: k, nombre: "", telefono: "", tipo: "mensajero", tarifa: 0 }), ...d }; });
+    return k;
+  }
   // El servidor responde con la ficha ya guardada: se deja en el almacén y la tabla se pinta al instante.
   const m = mid ? await api.mensajeros.actualizar(mid, d) : await api.mensajeros.crear({ nombre: d.nombre || "", telefono: d.telefono || "", tipo: d.tipo || "mensajero", tarifa: d.tarifa || 0 });
   tocar(s => { s.mensajeros[m.id] = aPersona(m); });
+  return m.id;
 }
 export async function quitarPersona(mid: string) {
   if (!DEMO) await api.mensajeros.eliminar(mid);
   tocar(s => { delete s.mensajeros[mid]; });
 }
-export async function crearAcceso(d: { email: string; clave: string; nombre: string; rol: T.Rol; mensajeroId: string; clienteId: string }) {
-  if (DEMO) { const k = id(); return tocar(s => { s.usuarios[k] = { uid: k, email: d.email, nombre: d.nombre, rol: d.rol, clienteId: d.clienteId, mensajeroId: d.mensajeroId, activo: true }; if (d.mensajeroId) s.vinculos[k] = { uid: k, mensajeroId: d.mensajeroId }; }); }
-  await tras(api.usuarios.crear({ ...d, mensajeroId: d.mensajeroId || null, clienteId: d.clienteId || null }));
+export interface AccesoWhatsApp { nombre: string; email: string; telefono: string; activationUrl: string }
+/** Crea la cuenta sin contraseña: el servidor toma el nombre de la ficha vinculada y manda la invitación. */
+export async function crearAcceso(d: { email: string; rol: T.Rol; entityId: string }): Promise<{ user: AccesoWhatsApp; correo?: { enviado: boolean; motivo?: string } }> {
+  if (DEMO) {
+    const k = id(), esCliente = d.rol === "cliente";
+    const nombre = (esCliente ? S.clientes[d.entityId]?.nombre : S.mensajeros[d.entityId]?.nombre) || "";
+    const telefono = (esCliente ? S.clientes[d.entityId]?.telefono : S.mensajeros[d.entityId]?.telefono) || "";
+    tocar(s => { s.usuarios[k] = { uid: k, email: d.email, nombre, rol: d.rol, clienteId: esCliente ? d.entityId : "", mensajeroId: esCliente ? "" : d.entityId, activo: true, status: "pending_activation" as const }; if (!esCliente) s.vinculos[k] = { uid: k, mensajeroId: d.entityId }; });
+    return { user: { nombre, email: d.email, telefono, activationUrl: `${window.location.origin}/activar-cuenta?token=demo-${k}` }, correo: { enviado: true } };
+  }
+  const r = await api.usuarios.crear({ email: d.email, role: d.rol, entityId: d.entityId });
+  await recargar();
+  return { user: r.user, correo: r.correo };
 }
 export async function cambiarAcceso(uid: string, d: { rol?: T.Rol; mensajeroId?: string | null }) {
   if (DEMO) return tocar(s => { const u = s.usuarios[uid]; if (d.rol) u.rol = d.rol; if (d.mensajeroId !== undefined) { u.mensajeroId = d.mensajeroId || ""; if (d.mensajeroId) s.vinculos[uid] = { uid, mensajeroId: d.mensajeroId }; else delete s.vinculos[uid]; } });

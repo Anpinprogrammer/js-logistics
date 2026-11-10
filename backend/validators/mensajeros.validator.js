@@ -16,3 +16,11 @@ export const actualizar = z.object({
   tarifa: pesos.optional(),
   activo: z.boolean().optional()
 });
+
+/** Personal JS: búsqueda, tipo y página (7 en escritorio, 4 en celular). */
+export const paginaPersonal = z.object({
+  buscar: texto(80).optional(),
+  tipo: z.enum(TIPOS_PERSONAL).optional(),
+  pagina: z.coerce.number().int().min(1).optional(),
+  porPagina: z.coerce.number().int().min(1).max(100).optional()
+});

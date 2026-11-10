@@ -16,7 +16,8 @@ export const publico = u => ({
   nombre: u.nombre,
   rol: u.rol,
   clienteId: u.clienteId ?? null,
-  mensajeroId: u.mensajeroId ?? null
+  mensajeroId: u.mensajeroId ?? null,
+  status: u.status || (u.activo === false ? "disabled" : "active")
 });
 
 export async function ingresar(req, res) {
@@ -85,6 +86,13 @@ export async function restablecer(req, res) {
 export async function activar(req, res) {
   const { token, clave } = req.valido.body;
   await Enlaces.consumir({ token, clave, tipo: "activacion" });
+  res.status(204).end();
+}
+
+/** Alias con los nombres de la API nueva: { token, newPassword }. Mismo enlace y misma regla. */
+export async function activarCuenta(req, res) {
+  const { token, newPassword } = req.valido.body;
+  await Enlaces.consumir({ token, clave: newPassword, tipo: "activacion" });
   res.status(204).end();
 }
 

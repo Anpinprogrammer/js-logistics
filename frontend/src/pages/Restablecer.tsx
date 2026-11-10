@@ -63,7 +63,7 @@ export default function Restablecer() {
     setEnviando(true);
     try {
       if (!DEMO) {
-        if (enlace?.tipo === "activacion") await auth.activar(token, clave);
+        if (enlace?.tipo === "activacion") await auth.activarCuenta(token, clave);
         else await auth.restablecer(token, clave);
       }
       // El servidor cierra las sesiones al cambiar la contraseña: se limpia la sesión local si había una.

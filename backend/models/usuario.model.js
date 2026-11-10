@@ -4,7 +4,7 @@ import { filaAObjeto, armarSet } from "../helpers/sql.js";
 import { nuevoId } from "../helpers/ids.js";
 
 // Nunca se devuelve clave_hash fuera del modelo, salvo en buscarParaIngreso.
-const COLUMNAS = `id, email, nombre, rol, cliente_id, mensajero_id, activo, version_sesion, ultimo_ingreso, creado, actualizado`;
+const COLUMNAS = `id, email, nombre, rol, cliente_id, mensajero_id, activo, version_sesion, ultimo_ingreso, creado, actualizado, status`;
 
 export async function buscarPorId(id, db = { query }) {
   const { rows } = await db.query(`SELECT ${COLUMNAS} FROM usuarios WHERE id = $1`, [id]);

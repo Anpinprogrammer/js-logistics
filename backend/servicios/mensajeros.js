@@ -9,6 +9,29 @@ import { calculosDe, exigirAdmin, exigirOficina, esMio, valorPositivo, medioVali
 import { totales, ganaPorcentaje, sueldoPedidos, tipoDe } from "../helpers/calculos.js";
 
 const COLS_PERIODO = ["pedidos", "recaudos", "cajamovs", "liquidaciones", "mensajeros"];
+
+/** GET /liquidaciones/pagina: cierres recientes filtrados, de a 9 en escritorio y 5 en celular. */
+export async function paginaLiquidaciones(ctx, { pagina, porPagina, dia, estado = "todos", buscar = "" } = {}) {
+  exigirAdmin(ctx.actor);
+  const params = [], cond = [];
+  if (dia) { params.push(dia); cond.push(`l.dia = $${params.length}`); }
+  if (buscar) { params.push(`%${texto(buscar, 80)}%`); cond.push(`m.nombre ILIKE $${params.length}`); }
+  if (estado === "cobrar") cond.push("l.debe > 0");
+  else if (estado === "favor") cond.push("l.debe < 0");
+  else if (estado === "paz") cond.push("l.debe = 0");
+  const where = cond.length ? "WHERE " + cond.join(" AND ") : "";
+  const total = (await ctx.db.query(`SELECT count(*)::int AS total FROM liquidaciones l JOIN mensajeros m ON m.id = l.mensajero_id ${where}`, params)).rows[0]?.total || 0;
+  const tam = Math.max(1, Math.min(100, Number(porPagina) || 9));
+  const paginas = Math.max(1, Math.ceil(total / tam));
+  const actual = Math.min(Math.max(1, Number(pagina) || 1), paginas);
+  const valores = [...params, tam, (actual - 1) * tam];
+  const filas = (await ctx.db.query(
+    `SELECT l.* FROM liquidaciones l JOIN mensajeros m ON m.id = l.mensajero_id ${where}
+     ORDER BY l.fecha DESC, l.id DESC LIMIT $${valores.length - 1} OFFSET $${valores.length}`,
+    valores
+  )).rows.map(f => Liquidaciones.aDocumento(f));
+  return { liquidaciones: filas, pagina: actual, porPagina: tam, total, paginas };
+}
 const COLS_SUELDO = ["pedidos", "recaudos", "cajamovs", "liquidaciones", "mensajeros", "jornadas", "movimientos"];
 
 function vistaPeriodo(calc, mid) {

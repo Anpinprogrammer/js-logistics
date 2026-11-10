@@ -10,6 +10,12 @@ export async function listar(req, res) {
   res.json({ mensajeros: await Mensajero.listar({ incluirInactivos }) });
 }
 
+export async function pagina(req, res) {
+  const p = await Mensajero.paginar(req.valido.query);
+  // El modelo pagina con `filas`; la API expone `mensajeros` (mismo nombre que GET /mensajeros).
+  res.json({ mensajeros: p.filas, pagina: p.pagina, porPagina: p.porPagina, total: p.total, paginas: p.paginas });
+}
+
 export async function obtener(req, res) {
   const { id } = req.valido.params;
   if (!esOficina(req.usuario) && req.usuario.mensajeroId !== id) throw prohibido();
