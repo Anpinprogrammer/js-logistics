@@ -79,7 +79,7 @@ Nunca apuntes `TEST_DATABASE_URL` ni `db:demo` a la base de producción.
 - [`backend/README.md`](backend/README.md): instalación, Supabase, Render y la tabla de endpoints.
 - [`frontend/README.md`](frontend/README.md): instalación y despliegue del frontend.
 - [`backend/db/schema.sql`](backend/db/schema.sql): el esquema de datos real.
-- [`animacion-ingreso/`](animacion-ingreso/): animación de entrada del ingreso en Remotion (aprobada, sin implementar). Cómo pasarla a `frontend/`: [`animacion-ingreso/IMPLEMENTAR.md`](animacion-ingreso/IMPLEMENTAR.md).
+- [`animacion-ingreso/`](animacion-ingreso/): animación de entrada del ingreso en Remotion (la referencia aprobada). Ya está implementada en `frontend/src/pages/intro/` (decisión 15 de `docs/ESTADO.md`); [`animacion-ingreso/IMPLEMENTAR.md`](animacion-ingreso/IMPLEMENTAR.md) explica las reglas y cómo compararla con los videos.
 - [`docs/migracion-firestore.md`](docs/migracion-firestore.md): exportar Firebase e importarlo (y sincronizarlo) en Postgres.
 - [`docs/fotos-borrado-automatico.md`](docs/fotos-borrado-automatico.md): diseño (sin implementar) del borrado de fotos viejas.
 - [`docs/datos.md`](docs/datos.md) y [`ARCHITECTURE.md`](ARCHITECTURE.md): el sistema viejo (Firestore) y el diagnóstico que llevó a la migración.
@@ -87,5 +87,4 @@ Nunca apuntes `TEST_DATABASE_URL` ni `db:demo` a la base de producción.
 ## Qué falta (para no duplicar trabajo)
 
 - Backend: `Idempotency-Key` para la cola sin señal. Los saldos, la caja, los arqueos (con el bloqueo de lo ya contado), las liquidaciones, los sueldos, las cuentas internas, el historial, la papelera y el tiempo real (SSE en `GET /api/eventos`) ya están en `backend/servicios/`.
-- Frontend: implementar la animación de entrada del ingreso según `animacion-ingreso/IMPLEMENTAR.md`.
 - Frontend: los saldos, la caja y los sueldos todavía se calculan en el navegador (`frontend/src/interna/motor.ts`); el backend ya los da (`/caja/resumen`, `/clientes/saldos`, `/mensajeros/:id/periodo`, `/sueldos/semana`). Pasar el cierre de caja de oficina, la devolución y el quitar adelanto a las rutas de una sola acción. Tiquetes, descargas de Excel y respaldo; funcionamiento sin señal para el mensajero (PWA y cola).

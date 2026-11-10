@@ -1,5 +1,7 @@
 # Cómo implementar la animación de entrada en la app (para el agente)
 
+> **Estado: implementada** en `frontend/src/pages/intro/` (ver la decisión 15 de `docs/ESTADO.md`). Este documento queda como referencia de las reglas, la línea de tiempo y la forma de compararla con los videos. Una diferencia con lo sugerido abajo: en vez de componentes `motion` con `delay`, la app usa un solo reloj y evalúa las mismas fórmulas de `src/Intro.tsx` cuadro a cuadro, porque así queda idéntica al video.
+
 Este documento es para el agente de IA (opencode u otro) que va a llevar la animación de esta carpeta a la app de oficina y mensajeros. El dueño **ya aprobó** los videos de `referencia/`. El trabajo es reproducirlos en `frontend/` con Framer Motion, **sin cambiar cómo queda el ingreso al final**.
 
 Antes de empezar, lee `CLAUDE.md` (raíz), `docs/ESTADO.md` (en especial las decisiones 1, 2 y 6) y `frontend/CLAUDE.md`. Ellos mandan si algo de aquí choca con ellos. Si hay una contradicción que no puedes resolver, pregúntale a la persona.

@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { useSesion } from "../auth/Sesion";
 import { mensajeDe } from "../api/cliente";
@@ -6,12 +6,14 @@ import {
   MarcoAcceso, CabeceraAcceso, BotonAcceso, AvisoError,
   TARJETA, ENTRADA, ICONO, ENLACE, IcCorreo, IcCandado, IcOjo, IcOjoTachado
 } from "./AccesoComun";
-import CapaIntro from "./intro/CapaIntro";
 import { useIntroIngreso } from "./intro/useIntroIngreso";
+import { escenaIntro } from "./intro/escena";
+import { medir, type Medidas } from "./intro/medidas";
+
+const TITULO = "JS Logistics";
 
 export default function Ingreso() {
   const { ingresar } = useSesion();
-  const intro = useIntroIngreso();
   const idCorreo = useId();
   const idClave = useId();
   const [email, setEmail] = useState("");
@@ -20,24 +22,47 @@ export default function Ingreso() {
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
 
+  // Animación de entrada ("La ruta de entrega"): sale en cada carga del ingreso y se salta con cualquier gesto.
+  // Mientras corre, `intro` trae el estilo del cuadro actual para cada pieza; al terminar es `undefined` y el ingreso queda como siempre.
+  const { activa, cuadro, saltar } = useIntroIngreso();
+  const raiz = useRef<HTMLDivElement>(null), tarjeta = useRef<HTMLDivElement>(null), insignia = useRef<HTMLDivElement>(null);
+  const placa = useRef<HTMLDivElement>(null), tituloRef = useRef<HTMLHeadingElement>(null), boton = useRef<HTMLButtonElement>(null);
+  const refs = useMemo(() => ({ raiz, tarjeta, insignia, placa, titulo: tituloRef, boton }), []);
+  const [medidas, setMedidas] = useState<Medidas | null>(null);
+  useLayoutEffect(() => {
+    if (!activa) return;
+    const tomar = () => {
+      const p = { raiz: raiz.current, tarjeta: tarjeta.current, insignia: insignia.current, placa: placa.current, titulo: tituloRef.current, boton: boton.current };
+      if (p.raiz && p.tarjeta && p.insignia && p.placa && p.titulo && p.boton) setMedidas(medir(p as Parameters<typeof medir>[0]));
+    };
+    tomar();
+    // Si cambia el tamaño de la ventana o llega la letra (Poppins) a mitad de la animación, se mide otra vez.
+    let vivo = true;
+    window.addEventListener("resize", tomar);
+    document.fonts?.ready.then(() => { if (vivo) tomar(); });
+    return () => { vivo = false; window.removeEventListener("resize", tomar); };
+  }, [activa]);
+  const intro = activa ? escenaIntro(cuadro, medidas, refs, TITULO) : undefined;
+
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
+    saltar();
     setError(""); setEnviando(true);
     try { await ingresar(email.trim(), clave); }
     catch (err) { setError(mensajeDe(err)); setEnviando(false); }
   };
 
-  return <>
-    <MarcoAcceso intro={intro.activa}>
-      <form onSubmit={enviar} className={TARJETA} data-intro-card>
+  return (
+    <MarcoAcceso intro={intro?.marco}>
+      <form onSubmit={enviar} className={TARJETA} style={intro?.formulario}>
         <CabeceraAcceso
-          intro={intro.activa}
-          titulo="JS Logistics"
+          titulo={TITULO}
           descripcion="Ingresa con el correo y la contraseña que te dio administración."
+          intro={intro?.cabecera}
         />
 
         <div className="space-y-3 sm:space-y-4">
-          <div className={intro.activa ? "jsl-intro-campo jsl-intro-campo-1" : undefined}>
+          <div style={intro?.campos[0].estilo}>
             <label htmlFor={idCorreo} className="mb-1.5 block text-sm font-medium text-slate-300">Correo</label>
             <div className="relative">
               <input
@@ -45,11 +70,12 @@ export default function Ingreso() {
                 value={email} onChange={e => setEmail(e.target.value)} required disabled={enviando}
                 className={`${ENTRADA} pr-4`}
               />
+              {intro?.campos[0].escaner}
               <span className={ICONO}><IcCorreo /></span>
             </div>
           </div>
 
-          <div className={intro.activa ? "jsl-intro-campo jsl-intro-campo-2" : undefined}>
+          <div style={intro?.campos[1].estilo}>
             <label htmlFor={idClave} className="mb-1.5 block text-sm font-medium text-slate-300">Contraseña</label>
             <div className="relative">
               <input
@@ -57,6 +83,7 @@ export default function Ingreso() {
                 value={clave} onChange={e => setClave(e.target.value)} required disabled={enviando}
                 className={`${ENTRADA} pr-12`}
               />
+              {intro?.campos[1].escaner}
               <span className={ICONO}><IcCandado /></span>
               <button
                 type="button" onClick={() => setVer(v => !v)}
@@ -71,13 +98,13 @@ export default function Ingreso() {
 
         {error && <AvisoError>{error}</AvisoError>}
 
-        <BotonAcceso cargando={enviando} cargandoTexto="Ingresando…" intro={intro.activa}>Ingresar</BotonAcceso>
+        {intro?.barra}
+        <BotonAcceso cargando={enviando} cargandoTexto="Ingresando…" intro={intro?.boton}>Ingresar</BotonAcceso>
 
-        <p className={"text-center text-xs leading-relaxed text-slate-400" + (intro.activa ? " jsl-intro-enlace" : "")}>
+        <p className="text-center text-xs leading-relaxed text-slate-400" style={intro?.enlace}>
           <Link to="/recuperar" className={ENLACE}>¿Olvidaste tu contraseña?</Link>
         </p>
       </form>
     </MarcoAcceso>
-    {intro.activa ? <CapaIntro /> : null}
-  </>;
+  );
 }
