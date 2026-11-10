@@ -3,16 +3,17 @@ import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, moverDia, fechaLarga, cerrado, servicio, totales, sueldosDia, saldoCliente, nombreCliente, listaOrdenada, sinTildes, tipoDe, esRepartidor, vinculosDe,
-  SUBMAS, TIPOS, ROLES, type Persona, type TipoPersonal, type UsuarioS,
+  SUBMAS, TIPOS, ROLES, telWhatsApp, type Persona, type TipoPersonal, type UsuarioS,
 } from "../motor";
-import { Cab, IconoCargando, IconoCorreo, IconoCorreoMasivo, IconoEditar, IconoEnviar, IconoLiberar, IconoLlave, IconoQuitarUsuario, useVentana } from "../ui";
+import { Cab, IconoCargando, IconoCorreo, IconoCorreoMasivo, IconoEditar, IconoEnviar, IconoLiberar, IconoLlave, IconoQuitarUsuario, IconoWhatsApp, Paginador, useVentana } from "../ui";
 import { E, guardarLocal } from "../estado";
-import { cambiarAcceso, cambiarClaveDe, crearAcceso, guardarPersona, quitarAcceso, quitarPersona } from "../acciones";
-import { aUsuario, motivoError, useDatos } from "../datos";
+import { cambiarAcceso, cambiarClaveDe, crearAcceso, guardarPersona, quitarAcceso, quitarPersona, type AccesoWhatsApp } from "../acciones";
+import { aPersona, aUsuario, motivoError, useDatos } from "../datos";
 import { DEMO } from "../demo";
-import { useEscritorio, usePorPaginaAccesos } from "../../lib/pantalla";
+import { useEscritorio, usePorPaginaAccesos, usePorPaginaHistorial, usePorPaginaPersonal } from "../../lib/pantalla";
 import * as api from "../../api/servicios";
-import type { Cambio, EnPapelera, Rol } from "../../api/tipos";
+import type { Cambio, EnPapelera, PaginaHistorial, PaginaPersonal, Rol } from "../../api/tipos";
+import { FormCliente } from "./Clientes";
 
 export default function Mas({ pintar }: { pintar: () => void }) {
   // En el escritorio cada sub-pestaña es un acceso directo del menú lateral; en el celular siguen aquí.
@@ -92,16 +93,44 @@ function Modal({ titulo, sub, alCerrar, children, compacto, ancha }: { titulo: s
   </div>;
 }
 
+type PaginaPersonalUI = { filas: Persona[]; pagina: number; porPagina: number; total: number; paginas: number };
+/** Personal en memoria (modo demo) con los mismos filtros y paginación del servidor. */
+function paginaPersonalDemo(f: { buscar: string; tipo: string }, pagina: number, porPagina: number): PaginaPersonalUI {
+  const q = sinTildes(f.buscar.trim());
+  const lista = listaOrdenada(S.mensajeros, "nombre")
+    .sort((a, b) => Object.keys(TIPOS).indexOf(tipoDe(a)) - Object.keys(TIPOS).indexOf(tipoDe(b)))
+    .filter(m => !f.tipo || tipoDe(m) === f.tipo)
+    .filter(m => !q || sinTildes(m.nombre + " " + (m.telefono || "")).includes(q));
+  const paginas = Math.max(1, Math.ceil(lista.length / porPagina));
+  const actual = Math.min(Math.max(1, pagina), paginas);
+  return { filas: lista.slice((actual - 1) * porPagina, actual * porPagina), pagina: actual, porPagina, total: lista.length, paginas };
+}
+
 function Personal() {
   const v = useVentana();
   const [tab, setTab] = useState<PersonalSubTab>("personal");
   const [modalPersonal, setModalPersonal] = useState(false);
   const [editando, setEditando] = useState<Persona | null>(null);
   const [modalAcceso, setModalAcceso] = useState(false);
-  const [texto, setTexto] = useState(""), [tipoFiltro, setTipoFiltro] = useState<"" | TipoPersonal>("");
+  const [texto, setTexto] = useState(""), [buscar, setBuscar] = useState("");
+  const [tipoFiltro, setTipoFiltro] = useState<"" | TipoPersonal>("");
+  const [pagina, setPagina] = useState(E.paginaPersonal);
+  const porPagina = usePorPaginaPersonal(), { version } = useDatos();
+  const tBuscar = useRef<number>(0), arribaPer = useRef<HTMLDivElement>(null);
   const ms = listaOrdenada(S.mensajeros, "nombre").sort((a, b) => Object.keys(TIPOS).indexOf(tipoDe(a)) - Object.keys(TIPOS).indexOf(tipoDe(b)));
-  const q = sinTildes(texto.trim());
-  const msVis = ms.filter(m => (!tipoFiltro || tipoDe(m) === tipoFiltro) && (!q || sinTildes(m.nombre + " " + (m.telefono || "")).includes(q)));
+  const alBuscar = (x: string) => { setTexto(x); clearTimeout(tBuscar.current); tBuscar.current = window.setTimeout(() => { setBuscar(x); E.paginaPersonal = 1; setPagina(1); }, 300); };
+  const alTipo = (t: "" | TipoPersonal) => { setTipoFiltro(t); E.paginaPersonal = 1; setPagina(1); };
+  const hayFiltros = !!(buscar.trim() || tipoFiltro);
+  const qPer = useQuery({
+    queryKey: ["personal", "pagina", buscar, tipoFiltro, pagina, porPagina, version],
+    enabled: tab === "personal",
+    placeholderData: keepPreviousData,
+    queryFn: (): Promise<PaginaPersonalUI> => DEMO
+      ? Promise.resolve(paginaPersonalDemo({ buscar, tipo: tipoFiltro }, pagina, porPagina))
+      : api.mensajeros.pagina({ buscar: buscar.trim() || undefined, tipo: tipoFiltro || undefined }, pagina, porPagina).then((r: PaginaPersonal) => ({ ...r, filas: (r.mensajeros ?? []).map(aPersona) }))
+  });
+  const pag = qPer.data, lista = Array.isArray(pag?.filas) ? pag.filas : [];
+  const ir = (n: number) => { E.paginaPersonal = n; setPagina(n); arribaPer.current?.scrollIntoView({ block: "start", behavior: "smooth" }); };
   const fallo = (e: unknown) => v.avisar("No se pudo guardar: " + motivoError(e));
   const liberar = async (id: string) => {
     if (!await v.confirmar("Liberar a " + S.mensajeros[id].nombre, "Se desvincula de la cuenta actual. La próxima persona que elija este nombre quedará vinculada.", "Liberar")) return;
@@ -127,16 +156,20 @@ function Personal() {
       <div className="lista-toolbar">
         <label className="lista-buscar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-          <input type="search" placeholder="Buscar por nombre o teléfono…" aria-label="Buscar por nombre o teléfono" value={texto} onChange={e => setTexto(e.target.value)} />
+          <input type="search" placeholder="Buscar por nombre o teléfono…" aria-label="Buscar por nombre o teléfono" value={texto} onChange={e => alBuscar(e.target.value)} />
         </label>
-        <select className="lista-filtro" aria-label="Filtrar por tipo" value={tipoFiltro} onChange={e => setTipoFiltro(e.target.value as "" | TipoPersonal)}>
+        <select className="lista-filtro" aria-label="Filtrar por tipo" value={tipoFiltro} onChange={e => alTipo(e.target.value as "" | TipoPersonal)}>
           <option value="">Todos los tipos</option>
           {Object.entries(TIPOS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}
         </select>
       </div>
-      <h2>{msVis.length} {msVis.length === 1 ? "registrado" : "registrados"}{msVis.length !== ms.length ? ` de ${ms.length}` : ""}</h2>
-      {msVis.length ? <div className="tabla-env con-acciones tabla-marco"><table className="tabla-personal"><thead><tr><th className="per-nombre">Nombre</th><th className="per-tel">Teléfono</th><th className="per-tipo">Tipo</th><th className="per-pago">Pago por día</th><th className="per-cuenta">Estado / Cuenta</th><th className="per-acciones">Acciones</th></tr></thead><tbody>
-        {msVis.map(m => { const vs = vinculosDe(m.id); return <tr key={m.id}><td className="per-nombre"><b>{m.nombre}</b></td><td className="per-tel">{m.telefono || ""}</td>
+      <h2>{pag?.total ?? 0} {(pag?.total ?? 0) === 1 ? "registrado" : "registrados"}{hayFiltros ? ` de ${ms.length}` : ""}</h2>
+      <div ref={arribaPer} style={{ scrollMarginTop: 90 }} />
+      {qPer.isError ? <div className="aviso alerta">No se pudo traer el personal: {motivoError(qPer.error)} <button className="btn chico" onClick={() => qPer.refetch()}>Intentar otra vez</button></div>
+        : !pag ? <div className="vacio">Cargando personal…</div>
+        : lista.length ? <>
+        <div className="tabla-env con-acciones tabla-marco" aria-busy={qPer.isFetching} style={qPer.isPlaceholderData ? { opacity: .6 } : undefined}><table className="tabla-personal"><thead><tr><th className="per-nombre">Nombre</th><th className="per-tel">Teléfono</th><th className="per-tipo">Tipo</th><th className="per-pago">Pago por día</th><th className="per-cuenta">Estado / Cuenta</th><th className="per-acciones">Acciones</th></tr></thead><tbody>
+        {lista.map(m => { const vs = vinculosDe(m.id); return <tr key={m.id}><td className="per-nombre"><b>{m.nombre}</b></td><td className="per-tel">{m.telefono || ""}</td>
           <td className="per-tipo"><select aria-label={"Tipo de " + m.nombre} value={tipoDe(m)} onChange={async e => { try { await guardarPersona(m.id, { tipo: e.target.value as TipoPersonal }); v.avisar("Tipo actualizado"); } catch (er) { fallo(er); } }}>{Object.entries(TIPOS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></td>
           <td className="per-pago">{["patinador", "oficina"].includes(tipoDe(m)) ? <input type="number" step="1000" min="0" defaultValue={Number(m.tarifa) || ""} style={{ width: 110 }} aria-label={"Pago por día de " + m.nombre} onChange={async e => { try { await guardarPersona(m.id, { tarifa: Number(e.target.value) || 0 }); v.avisar("Pago por día actualizado"); } catch (er) { fallo(er); } }} /> : "—"}</td>
           <td className="per-cuenta">{!esRepartidor(m) ? "—" : vs.length ? <span className="etq ent">Vinculado{vs.length > 1 ? " ×" + vs.length : ""}</span> : <span className="sub">Sin vincular</span>}</td>
@@ -154,7 +187,9 @@ function Personal() {
               <span className="accion-tip" role="tooltip"><i /><span>Quitar de personal</span></span>
             </span>
           </div></td></tr>; })}
-      </tbody></table></div> : <div className="vacio">{ms.length ? "No hay personal con esos filtros." : "Agrega a tu personal para empezar."}</div>}
+      </tbody></table></div>
+        <Paginador pagina={pag.pagina} paginas={pag.paginas} total={pag.total} porPagina={pag.porPagina} ir={ir} cargando={qPer.isPlaceholderData} />
+        </> : <div className="vacio">{hayFiltros ? "No hay personal con esos filtros." : "Agrega a tu personal para empezar."}</div>}
       {modalPersonal ? <ModalPersonal alCerrar={() => setModalPersonal(false)} /> : null}
       {editando ? <ModalPersonal persona={editando} alCerrar={() => setEditando(null)} /> : null}
     </div> : <div role="tabpanel" id="panelPer-acceso" aria-labelledby="tabPer-acceso">
@@ -164,9 +199,9 @@ function Personal() {
 }
 
 /** Agregar o editar una persona del personal (patinador, oficina, mensajero…). */
-function ModalPersonal({ alCerrar, persona }: { alCerrar: () => void; persona?: Persona }) {
+function ModalPersonal({ alCerrar, persona, nombreInicial, tipoInicial, alGuardar }: { alCerrar: () => void; persona?: Persona; nombreInicial?: string; tipoInicial?: TipoPersonal; alGuardar?: (id: string) => void }) {
   const v = useVentana();
-  const [f, setF] = useState({ nombre: persona?.nombre || "", tel: persona?.telefono || "", tipo: (persona ? tipoDe(persona) : "mensajero") as TipoPersonal, tarifa: persona ? String(Number(persona.tarifa) || 0) : "70000" });
+  const [f, setF] = useState({ nombre: persona?.nombre || nombreInicial || "", tel: persona?.telefono || "", tipo: (persona ? tipoDe(persona) : tipoInicial || "mensajero") as TipoPersonal, tarifa: persona ? String(Number(persona.tarifa) || 0) : "70000" });
   const [guardando, setGuardando] = useState(false);
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,9 +209,9 @@ function ModalPersonal({ alCerrar, persona }: { alCerrar: () => void; persona?: 
     if (!n) return v.avisar("Escribe el nombre");
     setGuardando(true);
     try {
-      await guardarPersona(persona ? persona.id : null, { nombre: n, telefono: f.tel.trim(), tipo: f.tipo, tarifa: Number(f.tarifa) || 0 });
+      const id = await guardarPersona(persona ? persona.id : null, { nombre: n, telefono: f.tel.trim(), tipo: f.tipo, tarifa: Number(f.tarifa) || 0 });
       v.avisar(persona ? "Cambios guardados" : n + " agregado");
-      alCerrar();
+      if (alGuardar) alGuardar(id); else alCerrar();
     }
     catch (er) { setGuardando(false); v.avisar("No se pudo guardar: " + motivoError(er)); }
   };
@@ -306,7 +341,7 @@ function Accesos({ modalAbierto, alCerrar }: { modalAbierto: boolean; alCerrar: 
       : !pag ? <div className="vacio">Cargando accesos…</div>
       : us.length ? <>
         <div className="tabla-env con-acciones tabla-marco" style={{ marginTop: 14 }} aria-busy={qAcc.isFetching}><table className="tabla-accesos"><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Personal</th><th className="acciones">Acciones</th></tr></thead><tbody>
-          {us.map(u => <tr key={u.uid}><td><b>{u.nombre || ""}</b>{u.uid === yo.uid ? <> <span className="etq ent">Tú</span></> : null}</td><td>{u.email || ""}</td>
+          {us.map(u => <tr key={u.uid}><td><b>{u.nombre || ""}</b>{u.uid === yo.uid ? <> <span className="etq ent">Tú</span></> : null}{u.status === "pending_activation" ? <> <span className="etq pend">Pendiente</span></> : null}</td><td>{u.email || ""}</td>
             <td>{u.uid === yo.uid || u.rol === "cliente" ? ROLES[u.rol] || u.rol || "" : <select aria-label={"Rol de " + (u.nombre || "")} value={u.rol} onChange={e => cambiarRol(u.uid, e.target.value as Rol)}>{ROLES_EQUIPO.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>}</td>
             <td>{u.rol === "cliente" ? "Cliente: " + (S.clientes[u.clienteId]?.nombre || "(no existe)") : <select aria-label={"Nombre en Personal de " + (u.nombre || "")} value={S.vinculos[u.uid]?.mensajeroId || ""} onChange={e => vincular(u.uid, e.target.value)}><option value="">— Ninguno —</option>{reps.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select>}</td>
             <td className="acciones"><div className="acciones-celda">
@@ -364,36 +399,118 @@ function Accesos({ modalAbierto, alCerrar }: { modalAbierto: boolean; alCerrar: 
   </>;
 }
 
-/** Dar acceso a la app: correo, contraseña inicial, rol y vínculo con Personal o con un cliente. */
+/** Dar acceso a la app en 3 pasos: rol, persona/cliente y correo (el nombre sale de la ficha). */
 function ModalAcceso({ alCerrar }: { alCerrar: () => void }) {
   const v = useVentana();
-  const reps = listaOrdenada(S.mensajeros, "nombre").filter(esRepartidor), cs = listaOrdenada(S.clientes, "nombre");
-  const [f, setF] = useState({ nombre: "", email: "", clave: "", rol: "mensajero" as Rol, men: "", cli: "" });
-  const [guardando, setGuardando] = useState(false);
+  const personal = listaOrdenada(S.mensajeros, "nombre"), cs = listaOrdenada(S.clientes, "nombre");
+  const [f, setF] = useState({ email: "", rol: "mensajero" as Rol, men: "", cli: "" });
+  const [busEnt, setBusEnt] = useState(""), [comboAbierto, setComboAbierto] = useState(false);
+  const comboRef = useRef<HTMLDivElement>(null);
+  const [creandoPersonal, setCreandoPersonal] = useState(false), [guardando, setGuardando] = useState(false);
+  const [creado, setCreado] = useState<{ user: AccesoWhatsApp; correo?: { enviado: boolean; motivo?: string } } | null>(null);
+  useEffect(() => {
+    const fuera = (e: MouseEvent) => { if (comboRef.current && !comboRef.current.contains(e.target as Node)) setComboAbierto(false); };
+    document.addEventListener("mousedown", fuera);
+    return () => document.removeEventListener("mousedown", fuera);
+  }, []);
   const cliente = f.rol === "cliente";
+  const usuarios = Object.values(S.usuarios);
+  const entidades = cliente
+    ? cs.map(c => ({ id: c.id, nombre: c.nombre, telefono: c.telefono || "", email: usuarios.find(u => u.clienteId === c.id)?.email || "" }))
+    : personal.map(m => ({ id: m.id, nombre: m.nombre, telefono: m.telefono || "", email: usuarios.find(u => u.mensajeroId === m.id)?.email || "" }));
+  const linkedId = cliente ? f.cli : f.men;
+  const linked = entidades.find(e => e.id === linkedId) || null;
+  const q = sinTildes(busEnt.trim());
+  const filtradas = entidades.filter(e => !q || sinTildes(e.nombre + " " + e.telefono + " " + e.email).includes(q));
+  const seleccionar = (e: { id: string; nombre: string; email: string }) => {
+    setF(x => ({ ...x, email: e.email, ...(cliente ? { cli: e.id } : { men: e.id }) }));
+    setBusEnt(e.nombre); setComboAbierto(false);
+  };
+  const limpiar = () => { setF({ ...f, men: "", cli: "", email: "" }); setBusEnt(""); setComboAbierto(true); };
+  const cambiarRol = (rol: Rol) => { setF({ ...f, rol, men: "", cli: "", email: "" }); setBusEnt(""); setComboAbierto(false); };
+  const crearEntidad = () => {
+    setComboAbierto(false);
+    if (cliente) {
+      v.abrir(<FormCliente nombre={busEnt.trim()} alGuardar={cid => {
+        const c = S.clientes[cid];
+        if (c) seleccionar({ id: c.id, nombre: c.nombre, email: usuarios.find(u => u.clienteId === c.id)?.email || "" });
+        v.cerrar();
+      }} />, "centrada");
+    } else setCreandoPersonal(true);
+  };
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
-    const nombre = f.nombre.trim(), email = f.email.trim().toLowerCase(), clienteId = cliente ? f.cli : "", mensajeroId = cliente ? "" : f.men;
-    if (!nombre || !email) return v.avisar("Escribe el nombre y el correo");
-    if (f.clave.length < 6) return v.avisar("La contraseña debe tener al menos 6 caracteres");
-    if (cliente && !clienteId) return v.avisar("Elige a qué cliente corresponde este acceso");
+    const email = f.email.trim().toLowerCase(), mensajeroId = cliente ? "" : linkedId;
+    if (!linkedId) return v.avisar(cliente ? "Elige o crea el cliente" : "Elige o crea la persona en Personal");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return v.avisar("Escribe un correo válido");
     if (mensajeroId && vinculosDe(mensajeroId).length) return v.avisar("Ese nombre ya está vinculado. Libéralo primero en la tabla de Personal.");
     setGuardando(true);
-    try { await crearAcceso({ email, clave: f.clave, nombre, rol: f.rol, mensajeroId, clienteId }); v.avisar("Acceso creado. Entrega a " + nombre + " su correo y contraseña."); alCerrar(); }
+    try { setCreado(await crearAcceso({ email, rol: f.rol, entityId: linkedId })); }
     catch (er) { setGuardando(false); v.avisar("No se pudo crear el acceso: " + motivoError(er)); }
   };
-  return <Modal titulo="Dar acceso" sub={ROLES_CALLOUT} alCerrar={alCerrar}>
-    <form onSubmit={guardar}>
-      <div className="linea2"><div className="campo"><label htmlFor="acNom">Nombre</label><input id="acNom" autoFocus value={f.nombre} onChange={e => setF({ ...f, nombre: e.target.value })} /></div>
-        <div className="campo"><label htmlFor="acEmail">Correo</label><input id="acEmail" type="email" autoComplete="off" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></div></div>
-      <div className="linea2"><div className="campo"><label htmlFor="acClave">Contraseña inicial (mínimo 6)</label><input id="acClave" type="text" autoComplete="off" minLength={6} value={f.clave} onChange={e => setF({ ...f, clave: e.target.value })} /></div>
-        <div className="campo"><label htmlFor="acRol">Rol</label><select id="acRol" value={f.rol} onChange={e => setF({ ...f, rol: e.target.value as Rol })}>{Object.entries(ROLES).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></div></div>
-      {cliente
-        ? <div className="campo"><label htmlFor="acCli">Cliente</label><select id="acCli" value={f.cli} onChange={e => setF({ ...f, cli: e.target.value, nombre: f.nombre || S.clientes[e.target.value]?.nombre || "" })}><option value="">Elige…</option>{cs.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}</select></div>
-        : <div className="campo"><label htmlFor="acMen">Nombre en Personal</label><select id="acMen" value={f.men} onChange={e => setF({ ...f, men: e.target.value, nombre: f.nombre || S.mensajeros[e.target.value]?.nombre || "" })}><option value="">— Ninguno —</option>{reps.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div>}
-      <div className="modal-acciones"><button type="button" className="btn sec" onClick={alCerrar}>Cancelar</button><button type="submit" className="btn" disabled={guardando}>Guardar acceso</button></div>
+  return <>
+  <Modal titulo="Dar acceso" sub={ROLES_CALLOUT} alCerrar={alCerrar} compacto>
+    <form onSubmit={guardar} noValidate>
+      <div className="aviso acceso-nota"><b>Invitación automática.</b> La cuenta queda pendiente de activación: se enviará un correo con un enlace para que la persona cree su contraseña. No escribas una contraseña aquí.</div>
+      <div className="form-col">
+        <div className="campo"><label htmlFor="acRol">Rol de acceso</label><select id="acRol" value={f.rol} onChange={e => cambiarRol(e.target.value as Rol)}>{(["mensajero", "asistente", "cliente", "admin"] as Rol[]).map(k => <option key={k} value={k}>{ROLES[k]}</option>)}</select></div>
+        <div className="campo">
+          <label htmlFor="acEnt">{cliente ? "Vincular con cliente" : "Vincular con Personal JS"}</label>
+          <div className="combo-cliente" ref={comboRef}>
+            {linked
+              ? <div className="combo-chip"><span><b>{linked.nombre}</b><small>{linked.telefono || linked.email || ""}</small></span><button type="button" onClick={limpiar}>Cambiar</button></div>
+              : <>
+                  <div className="combo-buscar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+                    <input id="acEnt" type="text" autoComplete="off" placeholder={cliente ? "Buscar cliente por nombre o teléfono…" : "Buscar en Personal por nombre o teléfono…"} value={busEnt}
+                      onFocus={() => setComboAbierto(true)} onChange={e => { setBusEnt(e.target.value); setComboAbierto(true); }} />
+                  </div>
+                  {comboAbierto ? <div className="combo-lista" role="listbox">
+                    <button type="button" className="combo-opcion crear" onClick={crearEntidad}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                      Crear {cliente ? "cliente" : "personal"} {q ? `"${busEnt.trim()}"` : "nuevo"}
+                    </button>
+                    {filtradas.map(e => <button type="button" key={e.id} role="option" aria-selected={false} className="combo-opcion" onClick={() => seleccionar(e)}>{e.nombre}{e.telefono || e.email ? <small>{e.telefono || e.email}</small> : null}</button>)}
+                    {!filtradas.length && q ? <span className="combo-vacio">No se encontraron resultados coincidentes.</span> : null}
+                    {!filtradas.length && !q ? <span className="combo-vacio">Escribe para buscar.</span> : null}
+                  </div> : null}
+                </>}
+          </div>
+        </div>
+        <div className="campo"><label htmlFor="acEmail">Correo electrónico (invitación)</label><input id="acEmail" type="email" autoComplete="off" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} placeholder="persona@correo.com" /></div>
+      </div>
+      <div className="modal-acciones acceso-pie"><button type="submit" className="btn acceso-crear" disabled={!linkedId || !f.email.trim() || guardando}>Crear acceso y enviar invitación</button><button type="button" className="btn sec" onClick={alCerrar}>Cancelar</button></div>
     </form>
-  </Modal>;
+  </Modal>
+  {creandoPersonal ? <ModalPersonal nombreInicial={busEnt.trim()} tipoInicial={f.rol === "mensajero" ? "mensajero" : f.rol === "asistente" ? "oficina" : "dueno"} alCerrar={() => setCreandoPersonal(false)} alGuardar={mid => { const m = S.mensajeros[mid]; if (m) seleccionar({ id: mid, nombre: m.nombre, email: "" }); setCreandoPersonal(false); }} /> : null}
+  {creado ? <ModalWhatsApp datos={creado} alCerrar={alCerrar} /> : null}
+  </>;
+}
+
+/** Tras crear el acceso: ofrece mandar el enlace de activación por WhatsApp. */
+function ModalWhatsApp({ datos, alCerrar }: { datos: { user: AccesoWhatsApp; correo?: { enviado: boolean } }; alCerrar: () => void }) {
+  const v = useVentana(), u = datos.user;
+  const wa = telWhatsApp(u.telefono), valido = wa.replace(/\D/g, "").length >= 11;
+  const mensaje = `Hola *${u.nombre}*, ¡bienvenido/a a JS Logistics! 🚚\n\nSe ha creado tu cuenta de acceso en nuestra plataforma. Por favor, ingresa al siguiente enlace para activar tu cuenta y crear tu contraseña:\n\n🔗 ${u.activationUrl}\n\nSi tienes alguna duda, responde a este mensaje.`;
+  const enviar = () => { window.open(`https://wa.me/${wa}?text=${encodeURIComponent(mensaje)}`, "_blank"); alCerrar(); };
+  const copiar = async () => {
+    try { await navigator.clipboard.writeText(u.activationUrl); v.avisar("Enlace de activación copiado."); }
+    catch { v.avisar("No se pudo copiar. Selecciona el enlace y cópialo a mano."); }
+  };
+  return <div className="modal-fondo wa-fondo" onClick={e => { if (e.target === e.currentTarget) alCerrar(); }}>
+    <div className="modal-caja wa-caja" role="dialog" aria-modal="true" aria-label="Enviar activación por WhatsApp">
+      <button type="button" className="modal-cerrar" aria-label="Cerrar" onClick={alCerrar}>×</button>
+      <div className="wa-icono"><IconoWhatsApp /></div>
+      <h2>¡Acceso creado con éxito!</h2>
+      <p className="wa-texto">{datos.correo?.enviado === false
+        ? <>No se pudo enviar el correo a <b>{u.email}</b>. Puedes enviar el enlace por WhatsApp o copiarlo.</>
+        : <>Se envió el correo de invitación a <b>{u.email}</b>.</>} ¿Deseas enviar también el enlace directo de activación por WhatsApp a <b>{u.nombre}</b>{u.telefono ? <> (<b>{u.telefono}</b>)</> : null}?</p>
+      {!valido ? <div className="aviso alerta wa-aviso">No hay un número de celular válido registrado. Copia el enlace y envíalo por el medio que prefieras.</div> : null}
+      <button type="button" className="btn wa-enviar" disabled={!valido} onClick={enviar}><IconoWhatsApp /> Enviar activación por WhatsApp</button>
+      <button type="button" className="btn wa-copiar" onClick={copiar}>Copiar enlace de activación</button>
+      <button type="button" className="btn wa-omitir" onClick={alCerrar}>Solo enviar por correo</button>
+    </div>
+  </div>;
 }
 
 /** Administración le pone una contraseña nueva a la cuenta (el servidor no manda correos). */
@@ -415,20 +532,46 @@ const historialDemo = (desde: string): Cambio[] => Object.values(S.pedidos).flat
   ...(p.entregado ? [{ id: p.guia + "e", fecha: new Date(p.entregado).toISOString(), quien: S.mensajeros[p.mensajeroId]?.nombre || "", op: "editar", col: "pedidos", docId: p.guia, resumen: (p.estado === "devuelto" ? "Marcó como no entregada la guía " : "Entregó la guía ") + p.guia + (p.destinatario ? " a " + p.destinatario : "") }] : []),
 ]).filter(e => diaDe(new Date(e.fecha).getTime()) >= desde).sort((a, b) => b.fecha.localeCompare(a.fecha));
 
+/** Historial en memoria para el modo demo, con la misma paginación del servidor. */
+function paginaHistorialDemo(desde: string, buscar: string, pagina: number, porPagina: number): PaginaHistorial {
+  const q = sinTildes(buscar.trim());
+  const lista = historialDemo(desde).filter(e => !q || sinTildes(e.resumen + " " + e.quien).includes(q));
+  const paginas = Math.max(1, Math.ceil(lista.length / porPagina));
+  const actual = Math.min(Math.max(1, pagina), paginas);
+  return { cambios: lista.slice((actual - 1) * porPagina, actual * porPagina), pagina: actual, porPagina, total: lista.length, paginas };
+}
+
 function Historial() {
-  const [dias, setDias] = useState(7), [buscar, setBuscar] = useState("");
+  const [dias, setDias] = useState(7), [texto, setTexto] = useState(""), [buscar, setBuscar] = useState("");
+  const [pagina, setPagina] = useState(E.paginaHist);
+  const porPagina = usePorPaginaHistorial(), { version } = useDatos();
+  const tBuscar = useRef<number>(0), arriba = useRef<HTMLDivElement>(null);
   const desde = moverDia(hoy(), -(dias - 1));
-  const q = useQuery({ queryKey: ["historial", desde], queryFn: () => (DEMO ? Promise.resolve(historialDemo(desde)) : api.historial.listar(desde)) });
-  const b = buscar.toLowerCase(), lista = (q.data || []).filter(e => !b || (e.resumen + " " + e.quien).toLowerCase().includes(b)).slice(0, 600);
+  const ir = (n: number) => { E.paginaHist = n; setPagina(n); arriba.current?.scrollIntoView({ block: "start", behavior: "smooth" }); };
+  const cambiarDias = (d: number) => { setDias(d); E.paginaHist = 1; setPagina(1); };
+  const alBuscar = (x: string) => { setTexto(x); clearTimeout(tBuscar.current); tBuscar.current = window.setTimeout(() => { setBuscar(x); E.paginaHist = 1; setPagina(1); }, 300); };
+  const q = useQuery({
+    queryKey: ["historial", desde, buscar, pagina, porPagina, version],
+    placeholderData: keepPreviousData,
+    queryFn: (): Promise<PaginaHistorial> => DEMO
+      ? Promise.resolve(paginaHistorialDemo(desde, buscar, pagina, porPagina))
+      : api.historial.pagina(desde, buscar, pagina, porPagina)
+  });
+  const pag = q.data, lista = pag?.cambios ?? [];
   return <>
     <h1>Historial</h1><p className="sub">Quién hizo qué y cuándo: pedidos, entregas, devoluciones, caja, clientes, sueldos y personal.</p>
-    <div className="linea2" style={{ alignItems: "end" }}><div className="campo" style={{ maxWidth: 200 }}><label htmlFor="hDias">Período</label><select id="hDias" value={dias} onChange={e => setDias(Number(e.target.value))}>{[[1, "Hoy"], [7, "Últimos 7 días"], [30, "Últimos 30 días"], [90, "Últimos 90 días"]].map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></div>
-      <div className="campo"><label htmlFor="hBus">Buscar</label><input id="hBus" type="search" value={buscar} placeholder="Guía, persona, cliente…" onChange={e => setBuscar(e.target.value)} /></div>
+    <div className="linea2" style={{ alignItems: "end" }}><div className="campo" style={{ maxWidth: 200 }}><label htmlFor="hDias">Período</label><select id="hDias" value={dias} onChange={e => cambiarDias(Number(e.target.value))}>{[[1, "Hoy"], [7, "Últimos 7 días"], [30, "Últimos 30 días"], [90, "Últimos 90 días"]].map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></div>
+      <div className="campo"><label htmlFor="hBus">Buscar</label><input id="hBus" type="search" value={texto} placeholder="Guía, persona, cliente…" onChange={e => alBuscar(e.target.value)} /></div>
       <div className="campo" style={{ flex: "none", minWidth: 0 }}><button className="btn sec" id="hRec" onClick={() => q.refetch()}>Actualizar</button></div></div>
-    {q.isLoading ? <div className="vacio">Cargando…</div> : q.isError ? <div className="vacio">No se pudo cargar el historial: {motivoError(q.error)}</div>
-      : lista.length ? <div className="tabla-env"><table><thead><tr><th>Fecha</th><th>Quién</th><th>Qué hizo</th></tr></thead><tbody>
-        {lista.map(e => <tr key={e.id}><td>{hora(new Date(e.fecha).getTime())}</td><td>{e.quien || "Administración"}</td><td style={{ whiteSpace: "normal", minWidth: 260 }}>{e.resumen}</td></tr>)}
-      </tbody></table></div> : <div className="vacio">Sin registros en este período.</div>}
+    <div ref={arriba} style={{ scrollMarginTop: 90 }} />
+    {q.isError ? <div className="vacio">No se pudo cargar el historial: {motivoError(q.error)}</div>
+      : !pag ? <div className="vacio">Cargando…</div>
+      : lista.length ? <>
+        <div className="tabla-env" aria-busy={q.isFetching} style={q.isPlaceholderData ? { opacity: .6 } : undefined}><table><thead><tr><th>Fecha</th><th>Quién</th><th>Qué hizo</th></tr></thead><tbody>
+          {lista.map(e => <tr key={e.id}><td>{hora(new Date(e.fecha).getTime())}</td><td>{e.quien || "Administración"}</td><td style={{ whiteSpace: "normal", minWidth: 260 }}>{e.resumen}</td></tr>)}
+        </tbody></table></div>
+        <Paginador pagina={pag.pagina} paginas={pag.paginas} total={pag.total} porPagina={pag.porPagina} ir={ir} cargando={q.isPlaceholderData} />
+      </> : <div className="vacio">Sin registros en este período.</div>}
   </>;
 }
 

@@ -83,7 +83,7 @@ export function ProveedorVentana({ children }: { children: ReactNode }) {
       <header><h2>{titulo}</h2><button className="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
       <p>{msg}</p>
       <div className="acciones"><button className="btn peligro" data-si>{boton}</button><button className="btn sec" data-cerrar>Cancelar</button></div>
-    </>);
+    </>, "centrada");
     resolver.current = ok;
   }), [abrir]);
 

@@ -6,6 +6,7 @@ import { permitir, EQUIPO } from "../middleware/autorizar.js";
 
 const r = Router();
 r.get("/", permitir(EQUIPO), C.listar);
+r.get("/pagina", permitir("admin"), validar({ query: V.liquidacionesPagina }), C.pagina);
 r.post("/", permitir("admin"), validar({ body: V.liquidacion }), C.crear);
 r.patch("/:id", permitir("admin"), validar({ params: V.paramId, body: V.ajusteLiquidacion }), C.ajustar); // compatibilidad: no cambia nada
 r.delete("/:id", permitir("admin"), validar({ params: V.paramId }), C.reabrir);

@@ -32,5 +32,7 @@ const clave = z.string().min(CLAVE_MINIMA, `La contraseña debe tener al menos $
 /** Cambiar la contraseña con el token del correo (recuperación) o crearla (activación). */
 export const restablecer = z.object({ token, clave });
 export const activar = z.object({ token, clave });
+/** Activación con los nombres de la API nueva (`newPassword`); comparte el mismo enlace de un solo uso. */
+export const activarCuenta = z.object({ token, newPassword: clave });
 
 export const paramToken = z.object({ token });

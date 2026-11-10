@@ -5,7 +5,7 @@ import {
   S, yo, hoy, hora, pesos, diaDe, listaOrdenada, textoCuenta, yaContado, mueveCaja, esPago, nombreCliente, saldoCliente, sinTildes, cajaOficina, puedoCambiarMedio,
   fechaCaja, fechaDia, diaMinCaja, MEDIOS, MOVS, MOVS_OFICINA, TIPOS_CUENTA, resumenCaja, MEDIOS_CAJA, moverDia, type Medio, type Movimiento, type TipoMov, type CajaMov,
 } from "../motor";
-import { Cab, FiltroDia, IconoCalendario, Paginador, useVentana } from "../ui";
+import { Cab, FiltroDia, Icono, IconoCalendario, Paginador, useVentana } from "../ui";
 import { E, guardarLocal } from "../estado";
 import { borrarDe, crearCuenta, guardarMovimiento, movCaja } from "../acciones";
 import { aCaja, aMov, motivoError, useDatos } from "../datos";
@@ -186,9 +186,14 @@ export default function Cuentas({ pintar }: { pintar: () => void }) {
       {qInt.isError ? <div className="aviso alerta">No se pudieron traer los movimientos: {motivoError(qInt.error)} <button className="btn chico" onClick={() => qInt.refetch()}>Intentar otra vez</button></div>
         : !pagInt ? <div className="vacio">Cargando movimientos…</div>
         : movs.length ? <>
-          <div className="tabla-env" aria-busy={qInt.isFetching} style={qInt.isPlaceholderData ? { opacity: .6 } : undefined}><table><thead><tr><th>Fecha</th><th>Cuenta</th><th>Motivo</th><th>Medio</th><th className="n">Valor</th>{yo.esAdmin && <th></th>}</tr></thead><tbody>
-            {movs.map(c => <tr key={c.id}><td>{hora(c.fecha)}</td><td>{S.cuentas[c.cuentaId || ""]?.nombre || "—"}</td><td>{c.concepto || ""}</td><td>{MEDIOS[c.medio as Medio] || ""}</td><td className={"n " + (c.tipo === "entra" ? "pos" : "neg")}>{c.tipo === "entra" ? "+ " : "− "}{pesos(c.valor)}</td>
-              {yo.esAdmin && <td><button className="btn peligro chico" onClick={() => quitarCu(c.id)}>Quitar</button></td>}</tr>)}
+          <div className="tabla-env con-acciones" aria-busy={qInt.isFetching} style={qInt.isPlaceholderData ? { opacity: .6 } : undefined}><table className="tabla-internas"><thead><tr><th className="col-fecha">Fecha</th><th>Cuenta</th><th>Motivo</th><th>Medio</th><th className="n">Valor</th>{yo.esAdmin && <th className="col-acciones">Acciones</th>}</tr></thead><tbody>
+            {movs.map(c => <tr key={c.id}><td className="col-fecha">{hora(c.fecha)}</td><td>{S.cuentas[c.cuentaId || ""]?.nombre || "—"}</td><td>{c.concepto || ""}</td><td>{MEDIOS[c.medio as Medio] || ""}</td><td className={"n " + (c.tipo === "entra" ? "pos" : "neg")}>{c.tipo === "entra" ? "+ " : "− "}{pesos(c.valor)}</td>
+              {yo.esAdmin && <td className="col-acciones"><div className="acciones-celda">
+                <span className="accion-icono peligro">
+                  <button type="button" onClick={() => quitarCu(c.id)} aria-label="Quitar movimiento"><Icono n="papelera" /></button>
+                  <span className="accion-tip" role="tooltip"><i /><span>Quitar movimiento</span></span>
+                </span>
+              </div></td>}</tr>)}
           </tbody></table></div>
           <Paginador pagina={pagInt.pagina} paginas={pagInt.paginas} total={pagInt.total} porPagina={pagInt.porPagina} ir={irInt} cargando={qInt.isPlaceholderData} />
         </> : <div className="vacio">Sin movimientos con esos filtros.</div>}

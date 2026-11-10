@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { enviarReset, enviarResetMasivo } = await import("../validators/auth.validator.js");
+const { enviarReset, enviarResetMasivo, activarCuenta } = await import("../validators/auth.validator.js");
 
 test("acepta usuarioId o email", () => {
   assert.deepEqual(enviarReset.parse({ usuarioId: "u-123" }), { usuarioId: "u-123" });
@@ -25,4 +25,11 @@ test("el lote masivo exige entre 1 y 100 correos válidos", () => {
   assert.throws(() => enviarResetMasivo.parse({ emails: [] }));
   assert.throws(() => enviarResetMasivo.parse({ emails: ["no-es-correo"] }));
   assert.throws(() => enviarResetMasivo.parse({ emails: Array.from({ length: 101 }, (_, i) => `p${i}@js.co`) }));
+});
+
+test("la activación nueva (token + newPassword) exige una clave válida", () => {
+  const r = activarCuenta.parse({ token: "x".repeat(43), newPassword: "una-clave-larga" });
+  assert.equal(r.newPassword, "una-clave-larga");
+  assert.throws(() => activarCuenta.parse({ token: "x".repeat(43), newPassword: "corta" }));
+  assert.throws(() => activarCuenta.parse({ newPassword: "una-clave-larga" }));
 });

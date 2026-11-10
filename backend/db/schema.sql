@@ -48,6 +48,14 @@ CREATE TABLE IF NOT EXISTS usuarios (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS usuarios_email_uq ON usuarios (lower(email));
 
+-- Estado del acceso sin duplicar datos: si no tiene contraseña está pendiente de activación.
+-- El token de activación no vive aquí: se guarda hasheado y con su expiración en `enlaces`.
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS status TEXT GENERATED ALWAYS AS (
+  CASE WHEN NOT activo THEN 'disabled'
+       WHEN clave_hash IS NULL THEN 'pending_activation'
+       ELSE 'active' END
+) STORED;
+
 -- Enlaces de un solo uso que se mandan por correo (activar la cuenta y reiniciar la contraseña).
 -- Se guarda solo el hash del token: el token en claro viaja únicamente en el correo.
 CREATE TABLE IF NOT EXISTS enlaces (

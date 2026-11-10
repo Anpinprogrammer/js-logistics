@@ -7,13 +7,17 @@ const clave = z.string().min(CLAVE_MINIMA, `La contraseña debe tener al menos $
 
 export const crear = z.object({
   email,
+  // Nombre manual (compatibilidad); con entityId el servidor lo toma de la ficha vinculada.
   nombre: texto(120).default(""),
-  rol: z.enum(ROLES),
+  rol: z.enum(ROLES).optional(),
+  role: z.enum(ROLES).optional(),
   // Opcional: sin contraseña la cuenta queda pendiente y se manda un enlace de activación.
   clave: clave.optional(),
   clienteId: id.nullish(),
-  mensajeroId: id.nullish()
-}).refine(d => d.rol !== "cliente" || d.clienteId, { message: "Una cuenta de cliente necesita el cliente", path: ["clienteId"] });
+  mensajeroId: id.nullish(),
+  entityId: id.nullish()
+}).refine(d => d.rol || d.role, { message: "Elige el rol", path: ["rol"] })
+  .refine(d => (d.rol || d.role) !== "cliente" || d.clienteId || d.entityId, { message: "Una cuenta de cliente necesita el cliente", path: ["entityId"] });
 
 export const actualizar = z.object({
   nombre: texto(120).optional(),

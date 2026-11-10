@@ -58,14 +58,25 @@ export async function sincronizar(ctx) {
 /* ---------- historial ---------- */
 const opDe = txt => (/^Creó /.test(txt) ? "crear" : /^Eliminó /.test(txt) ? "borrar" : "editar");
 /** Cambios desde un día (AAAA-MM-DD en Colombia), lo más nuevo primero. Administración ve todo; los demás, lo suyo. */
-export async function historial(ctx, { desde, limite = 600 } = {}) {
+export async function historial(ctx, { desde, buscar = "", limite = 600, pagina, porPagina } = {}) {
   const a = ctx.actor;
   exigirEquipo(a);
   const dia = desde || hoy();
   if (!esDia(dia)) throw datosInvalidos("El día no es válido (AAAA-MM-DD).");
-  const n = Math.min(5000, Math.max(1, Number(limite) || 600));
-  const filas = await Historial.listar(ctx.db, { desde: Date.parse(dia + "T00:00:00-05:00"), uid: a.esAdmin ? null : a.uid, limite: n });
-  return filas.map(f => ({ id: String(f.id), fecha: f.fecha, quien: f.quien || "", op: opDe(f.accion), col: f.tabla || "", docId: f.registro || "", resumen: f.accion }));
+  // Con pagina/porPagina se pagina en PostgreSQL; sin ellos se mantiene el tope antiguo de 600.
+  const paginado = pagina !== undefined || porPagina !== undefined;
+  const tam = paginado ? Math.min(100, Math.max(1, Number(porPagina) || 13)) : Math.min(5000, Math.max(1, Number(limite) || 600));
+  const p = await Historial.paginar(ctx.db, {
+    desde: Date.parse(dia + "T00:00:00-05:00"),
+    uid: a.esAdmin ? null : a.uid,
+    buscar: texto(buscar, 80),
+    pagina: paginado ? pagina : 1,
+    porPagina: tam
+  });
+  return {
+    cambios: p.filas.map(f => ({ id: String(f.id), fecha: f.fecha, quien: f.quien || "", op: opDe(f.accion), col: f.tabla || "", docId: f.registro || "", resumen: f.accion })),
+    pagina: p.pagina, porPagina: p.porPagina, total: p.total, paginas: p.paginas
+  };
 }
 /** Anotaciones que la app hace directamente (por ejemplo, "Envió saldo por WhatsApp a …"). */
 export async function anotar(ctx, { texto: txt }) {

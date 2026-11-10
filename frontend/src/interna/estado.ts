@@ -16,7 +16,7 @@ export const E = {
   filtroCli: "todos", buscarCli: "", diaCliF: "", paginaCli: 1,
   // Oficina → Caja y Sueldos
   tabCaja: (tabCajaGuardada === "mensajeros" || tabCajaGuardada === "liquidaciones" || tabCajaGuardada === "arqueos" ? tabCajaGuardada : "caja") as "caja" | "mensajeros" | "liquidaciones" | "arqueos",
-  diaCaja: hoy(), diaLibro: hoy(), semA: semanaDe(hoy()),
+  diaCaja: hoy(), diaLibro: hoy(), semA: semanaDe(hoy()), paginaLiq: 1, diaLiq: "", estadoLiq: "todos" as "todos" | "cobrar" | "favor" | "paz", buscarLiq: "",
   // Oficina → Cuentas
   tabCuentas: (tabCuentasGuardada === "movimientos" || tabCuentasGuardada === "ganancias" ? tabCuentasGuardada : "cuentas") as "cuentas" | "movimientos" | "ganancias",
   buscarCue: "", buscarGan: "", diaInternos: "", medioInternos: "" as "" | "efectivo" | "nequi" | "bancolombia", paginaInternos: 1, tipoCue: "todos" as "todos" | "pagos" | "compras" | "ganancias", paginaCue: 1, paginaGan: 1,
@@ -25,6 +25,8 @@ export const E = {
   miMensajero: leer("js_mensajero"), actuarComo: false, diaPedM: "", diaEntM: hoy(), semM: semanaDe(hoy()), ultimaGuia: "",
   // Más → Resultados
   rangoPanel: "mes",
-  // Personal → Acceso
-  paginaAcceso: 1,
+  // Más → Historial
+  paginaHist: 1,
+  // Personal
+  paginaPersonal: 1, paginaAcceso: 1,
 };

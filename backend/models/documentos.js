@@ -110,6 +110,21 @@ export function crearModelo({ col, tabla = col, pk, campos, extra = false, actua
       if (limite) { params.push(limite); sql += ` LIMIT $${params.length}`; }
       return (await c.query(sql, params)).rows.map(aDocumento);
     },
+    /** Una página con el total del filtro: COUNT + LIMIT/OFFSET, sin traer todo a memoria. */
+    async paginar(c, { filtro, orden, pagina = 1, porPagina = 20 } = {}) {
+      const params = [];
+      const where = `WHERE true${fijo}` + construirDonde(filtro, params);
+      const total = (await c.query(`SELECT count(*)::int AS total FROM ${tabla} ${where}`, params)).rows[0]?.total || 0;
+      const tam = Math.max(1, Math.min(5000, Number(porPagina) || 20));
+      const paginas = Math.max(1, Math.ceil(total / tam));
+      const actual = Math.min(Math.max(1, Number(pagina) || 1), paginas);
+      const offset = (actual - 1) * tam;
+      let sql = `SELECT * FROM ${tabla} ${where}`;
+      if (orden) { const [k, dir] = orden.split(" "); sql += ` ORDER BY ${porCampo[k].columna}${dir === "desc" ? " DESC" : ""}`; }
+      const valores = [...params, tam, offset];
+      sql += ` LIMIT $${valores.length - 1} OFFSET $${valores.length}`;
+      return { filas: (await c.query(sql, valores)).rows.map(aDocumento), total, pagina: actual, porPagina: tam, paginas };
+    },
     async existe(c, id) {
       return (await c.query(`SELECT 1 FROM ${tabla} WHERE ${pkCol} = $1${fijo}`, [id])).rowCount > 0;
     },
@@ -332,6 +347,26 @@ export const Historial = {
     params.push(limite);
     sql += ` ORDER BY h.fecha DESC, h.id DESC LIMIT $${params.length}`;
     return (await c.query(sql, params)).rows;
+  },
+  /** Una página del historial con el total del filtro, para no traer todo a la vez. */
+  async paginar(c, { desde, uid, buscar = "", pagina = 1, porPagina = 20 } = {}) {
+    const params = [new Date(desde)], cond = ["h.fecha >= $1"];
+    if (uid) { params.push(uid); cond.push(`h.uid = $${params.length}`); }
+    if (buscar) { params.push(`%${buscar}%`); cond.push(`h.accion ILIKE $${params.length}`); }
+    const where = cond.join(" AND ");
+    const total = (await c.query(`SELECT count(*)::int AS total FROM historial h WHERE ${where}`, params)).rows[0]?.total || 0;
+    const tam = Math.max(1, Math.min(5000, Number(porPagina) || 20));
+    const paginas = Math.max(1, Math.ceil(total / tam));
+    const actual = Math.min(Math.max(1, Number(pagina) || 1), paginas);
+    const offset = (actual - 1) * tam;
+    const filas = (await c.query(
+      `SELECT h.id, h.fecha, h.uid, h.accion, h.tabla, h.registro, h.datos->>'rol' AS rol, h.datos->>'mensajeroId' AS mensajero_id,
+        COALESCE(NULLIF(u.nombre, ''), u.email, '') AS quien
+       FROM historial h LEFT JOIN usuarios u ON u.id = h.uid WHERE ${where}
+       ORDER BY h.fecha DESC, h.id DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, tam, offset]
+    )).rows;
+    return { filas, total, pagina: actual, porPagina: tam, paginas };
   }
 };
 

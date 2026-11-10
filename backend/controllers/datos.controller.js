@@ -3,7 +3,7 @@ import * as D from "../servicios/datos.js";
 import { eventos } from "../servicios/eventos.js";
 import { responder, ctxDe } from "./accion.js";
 
-export const historial = responder((ctx, req) => D.historial(ctx, req.valido.query), { clave: "cambios" });
+export const historial = responder((ctx, req) => D.historial(ctx, req.valido.query));
 export const anotar = responder((ctx, req) => D.anotar(ctx, req.valido.body), { status: 201 });
 
 export const papelera = responder(ctx => D.papelera(ctx), { clave: "papelera" });

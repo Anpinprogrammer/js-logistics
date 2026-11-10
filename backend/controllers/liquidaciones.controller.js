@@ -5,6 +5,7 @@ import { leerDe } from "../servicios/datos.js";
 import { responder } from "./accion.js";
 
 export const listar = responder(ctx => leerDe(ctx, "liquidaciones"), { clave: "liquidaciones" });
+export const pagina = responder((ctx, req) => M.paginaLiquidaciones(ctx, req.valido.query));
 /** Lo que manda la app interna (sus totales, el adelanto que calculó) no se usa: el servidor vuelve a calcular todo.
     Solo cuenta: mensajero, entrega final, medio, si lo que queda debiendo pasa a adelanto y a qué semana. */
 export const crear = responder((ctx, req) => {

@@ -122,6 +122,7 @@ SELECT column_name, data_type FROM information_schema.columns
 
 1. Crea el proyecto y copia la cadena de conexión: *Project Settings → Database → Connection string*. Desde Render conviene el **pooler** (Supavisor).
 2. `DATABASE_SSL=true`. Para verificar el certificado, descarga el de *Database Settings → SSL* y ponlo en `DATABASE_CA`.
+   El esquema incluye `usuarios.clave_hash NULL` para las cuentas pendientes y una columna generada `usuarios.status` (`pending_activation`, `active`, `disabled`). Los tokens de activación/contraseña se guardan hasheados en `enlaces`, no en `usuarios`. Después de actualizar el código, corre `npm run db:migrar` para agregar esa columna antes de desplegar.
 3. `npm run db:migrar`. El esquema activa **RLS sin políticas** en todas las tablas: así la Data API pública de Supabase (la anon key) no puede leer nada, y todo pasa por esta API.
 4. **Storage:** crea un bucket **privado** llamado `pedidos` y pon `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` (*Project Settings → API*). La service role key es secreta: solo va en el backend, nunca en el frontend.
 5. Usa un proyecto de Supabase para pruebas y otro para producción.
@@ -190,7 +191,8 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `GET /auth/enlace/:token` | público | Revisa el enlace: `{ enlace: { tipo, nombre, email (tapado), expira } }` |
 | `POST /auth/restablecer` | público | `{ token, clave }`: cambia la contraseña con el enlace del correo |
 | `POST /auth/activar` | público | `{ token, clave }`: crea la contraseña de una cuenta nueva |
-| `GET/POST /usuarios`, `PATCH/DELETE /usuarios/:id`, `PUT /usuarios/:id/clave` | admin | Accesos a la app. `POST /usuarios` acepta `clave` opcional: sin ella manda la activación |
+| `POST /auth/activate-account` | público | `{ token, newPassword }`: alias de la activación con los nombres de la API nueva; consume el mismo enlace |
+| `GET/POST /usuarios`, `PATCH/DELETE /usuarios/:id`, `PUT /usuarios/:id/clave` | admin | Accesos a la app. `POST /usuarios` acepta `{ role, entityId, email }` (el nombre sale de la ficha de Personal o del cliente) o la forma antigua con `nombre` y vínculos; `clave` es opcional y sin ella manda la activación. Responde `201 { message, usuario, user: { id, nombre, email, telefono, activationUrl, status }, correo }` |
 | `POST /usuarios/:id/activacion`, `POST /usuarios/:id/recuperacion` | admin | Reenvía la activación o manda el enlace de contraseña |
 | `GET /usuarios/pagina?buscar=&rol=&pagina=&porPagina=` | admin | Página de la sub-pestaña Acceso de Personal: `buscar` filtra por nombre o correo (sin tildes) y `rol` por `mensajero`, `asistente`, `cliente` o `admin`. Ordenada por nombre y correo. Devuelve `{ usuarios, pagina, porPagina, total, paginas }`. La app usa 5 en celular y 10 en computador; si la página ya no existe, responde la última |
 | `GET /clientes?buscar=` | oficina | Lista y busca |
@@ -199,6 +201,7 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `GET /clientes/:id/movimientos?desde=&hasta=` | oficina, o el propio cliente | `{ movimientos: [{ id, clienteId, tipo, valor, medio, nota, fecha, … }] }` |
 | `DELETE /clientes/:id` | admin | Borra (a la papelera) si no tiene pedidos ni movimientos |
 | `GET /mensajeros`, `GET /mensajeros/:id` | oficina; el mensajero solo su ficha | Personal |
+| `GET /mensajeros/pagina?buscar=&tipo=&pagina=&porPagina=` | oficina | Personal JS paginado (7 en escritorio, 4 en celular). Devuelve `{ mensajeros, pagina, porPagina, total, paginas }` |
 | `POST/PATCH/DELETE /mensajeros…` | admin | Cambia el personal. `PATCH /mensajeros/:id` acepta `nombre`, `telefono`, `tipo` (`mensajero`, `dueno`, `oficina`, `patinador`, `empresa`), `tarifa` (pago por día, entero ≥ 0) y `activo`; responde `{ mensajero }` o 404 si el id no existe |
 | `GET /pedidos?estado=&cerrados=&desde=&hasta=&entregadoDesde=&entregadoHasta=&buscar=&conDiferencia=&diferencia=&sinRemitente=&cambioPendiente=&sinServicio=&dia=&cursor=` | cada rol ve lo suyo | Lista por cursor: `{ pedidos, siguiente }` (`siguiente` es el cursor, o `null`). `buscar` mira guía, quien recibió, remitente y mensajero. `diferencia`: `todas` o `sinRevisar` (igual a `conDiferencia=true`). `dia=AAAA-MM-DD`: salió, se entregó o se devolvió ese día en hora de Colombia |
 | `GET /pedidos?pagina=&porPagina=&…` | cada rol ve lo suyo | **Paginador**, con los mismos filtros: `{ pedidos, pagina, porPagina, total, paginas }`. `porPagina` de 1 a 100 (20 por defecto; las pantallas usan 8 en el celular y 20 en el computador). Si la página ya no existe, responde la última y lo dice en `pagina`. No se mezcla con `cursor` (400) |
@@ -245,6 +248,7 @@ Lo ya contado en un arqueo no se cambia: responde `409 YA_CONTADO` con el texto 
 | `GET /mensajeros/resumen` | oficina | Período abierto de cada repartidor |
 | `GET /mensajeros/:id/periodo` | oficina; el mensajero, el suyo | `{ periodo: { debe, efectivo, base, gastos, recibido, entregas, … } }` |
 | `GET /liquidaciones` | equipo (el mensajero, las suyas) | `{ liquidaciones }` |
+| `GET /liquidaciones/pagina?dia=&estado=&buscar=&pagina=&porPagina=` | admin | Cierres recientes filtrados por día (`AAAA-MM-DD`), estado (`todos`, `cobrar`, `favor`, `paz`) y nombre del mensajero. Devuelve `{ liquidaciones, pagina, porPagina, total, paginas }`; la app usa 9 en computador y 5 en celular |
 | `POST /liquidaciones` | admin | `{ mensajeroId, entregaFinal, medio, pasarAdelanto?, semana? }` (también acepta `adelanto` y `semanaAdelanto` de la app interna). El servidor calcula todo. → `{ liquidacion, adelanto, queda }` |
 | `DELETE /liquidaciones/:id` | admin | Reabre la última: borra la liquidación y su adelanto; el dinero recibido queda |
 | `PATCH /liquidaciones/:id` | admin | Solo compatibilidad: `{ debe, adelanto: 0 }` antes de quitar su adelanto. No cambia nada |
@@ -267,7 +271,7 @@ Lo ya contado en un arqueo no se cambia: responde `409 YA_CONTADO` con el texto 
 | `PUT /jornadas/:id`, `DELETE /jornadas/:id` | admin | `{ personaId, dia, valor, previo? }`. El ID lo arma el servidor |
 | `GET /sueldos/semana?semana=` | admin | Planilla de la semana |
 | `GET /sueldos/mensajeros/:id?semana=` | admin; el mensajero, el suyo | "Mi sueldo" |
-| `GET /historial?desde=AAAA-MM-DD&limite=` | equipo (admin todo; los demás, lo suyo) | `{ cambios: [{ id, fecha, quien, op, col, docId, resumen }] }` |
+| `GET /historial?desde=&buscar=&pagina=&porPagina=` | equipo (admin todo; los demás, lo suyo) | Página del historial. Devuelve `{ cambios: [{ id, fecha, quien, op, col, docId, resumen }], pagina, porPagina, total, paginas }`; la app usa 5 en celular y 13 en computador. Sin `pagina`/`porPagina` mantiene el tope antiguo (`limite`, 600) |
 | `POST /historial` | equipo | `{ texto }`: anota algo (por ejemplo, "Envió saldo por WhatsApp") |
 | `GET /papelera`, `POST /papelera/:id/restaurar`, `DELETE /papelera/:id`, `DELETE /papelera` | admin | Papelera. Un pedido vuelve con sus intentos y sus fotos |
 | `GET /respaldo/exportar`, `GET /respaldo/espacio` | admin | Copia en JSON y espacio usado |

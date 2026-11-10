@@ -1,7 +1,7 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
 import type { Archivo, TipoArchivo, Cliente, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
-  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios } from "./tipos";
+  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal } from "./tipos";
 import { FalloApi } from "./cliente";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
@@ -17,7 +17,8 @@ export const auth = {
   enlace: (token: string) =>
     datos<{ enlace: EnlaceCorreo }>(api.get(`/auth/enlace/${encodeURIComponent(token)}`)).then(d => d.enlace),
   restablecer: (token: string, clave: string) => api.post("/auth/restablecer", { token, clave }),
-  activar: (token: string, clave: string) => api.post("/auth/activar", { token, clave })
+  activar: (token: string, clave: string) => api.post("/auth/activar", { token, clave }),
+  activarCuenta: (token: string, newPassword: string) => api.post("/auth/activate-account", { token, newPassword })
 };
 
 export interface FiltrosPedidos {
@@ -107,6 +108,9 @@ export const clientes = {
 
 export const mensajeros = {
   listar: (inactivos = false) => datos<{ mensajeros: Mensajero[] }>(api.get("/mensajeros", { params: inactivos ? { inactivos: "true" } : {} })).then(d => d.mensajeros),
+  /** Personal JS paginado y filtrado en el servidor: 4 en celular y 7 en computador. */
+  pagina: (f: { buscar?: string; tipo?: string }, pagina: number, porPagina: number) =>
+    opcional(datos<PaginaPersonal>(api.get("/mensajeros/pagina", { params: { ...f, pagina, porPagina } })), { mensajeros: [], pagina: 1, porPagina, total: 0, paginas: 1 }),
   obtener: (id: string) => datos<{ mensajero: Mensajero }>(api.get(`/mensajeros/${id}`)).then(d => d.mensajero),
   crear: (d: { nombre: string; telefono: string; tipo: TipoPersonal; tarifa: number }) =>
     datos<{ mensajero: Mensajero }>(api.post("/mensajeros", d)).then(r => r.mensajero),
@@ -119,8 +123,8 @@ export const usuarios = {
   /** Sub-pestaña Acceso de Personal: búsqueda, rol y 5 filas en celular, 10 en computador. */
   pagina: (f: { buscar?: string; rol?: Rol }, pagina: number, porPagina: number) =>
     datos<PaginaUsuarios>(api.get("/usuarios/pagina", { params: { ...f, pagina, porPagina } })),
-  crear: (d: { email: string; nombre: string; rol: Rol; clave: string; clienteId?: string | null; mensajeroId?: string | null }) =>
-    datos<{ usuario: Usuario }>(api.post("/usuarios", d)).then(r => r.usuario),
+  crear: (d: { email: string; role?: Rol; entityId?: string; nombre?: string; rol?: Rol; clave?: string; clienteId?: string | null; mensajeroId?: string | null }) =>
+    datos<AccesoCreado>(api.post("/usuarios", d)),
   actualizar: (id: string, d: { nombre?: string; rol?: Rol; clienteId?: string | null; mensajeroId?: string | null; activo?: boolean }) =>
     datos<{ usuario: Usuario }>(api.patch(`/usuarios/${id}`, d)).then(r => r.usuario),
   cambiarClave: (id: string, clave: string) => api.put(`/usuarios/${id}/clave`, { clave }),
@@ -160,7 +164,12 @@ export const movimientos = {
     datos<PaginaGanancias>(api.get("/movimientos/ganancias", { params: limpio({ ...f, pagina, porPagina }) }))
 };
 export const recaudos = coleccion<Recaudo, Sin<Recaudo>>("/recaudos", "recaudos", "recaudo");
-export const liquidaciones = coleccion<Liquidacion, Partial<Liquidacion>>("/liquidaciones", "liquidaciones", "liquidacion");
+export const liquidaciones = {
+  ...coleccion<Liquidacion, Partial<Liquidacion>>("/liquidaciones", "liquidaciones", "liquidacion"),
+  /** Cierres recientes filtrados y paginados: 5 en celular y 9 en computador. */
+  pagina: (f: { dia?: string; estado?: string; buscar?: string }, pagina: number, porPagina: number) =>
+    opcional(datos<PaginaLiquidaciones>(api.get("/liquidaciones/pagina", { params: { ...f, pagina, porPagina } })), { liquidaciones: [], pagina: 1, porPagina, total: 0, paginas: 1 })
+};
 export const cajaMovimientos = coleccion<CajaMovimiento, Partial<CajaMovimiento>>("/caja/movimientos", "movimientos", "movimiento");
 export const cuentasInternas = coleccion<CuentaInterna, Omit<CuentaInterna, "id">>("/cuentas", "cuentas", "cuenta");
 export const jornadas = {
@@ -185,6 +194,9 @@ export const caja = {
 export const historial = {
   /** Cambios desde `desde` (día YYYY-MM-DD en Colombia), los más nuevos primero. */
   listar: (desde: string) => opcional(datos<{ cambios: Cambio[] }>(api.get("/historial", { params: { desde, limite: 600 } })).then(d => d.cambios), [] as Cambio[]),
+  /** Historial paginado en el servidor: 5 en celular y 13 en computador. */
+  pagina: (desde: string, buscar: string, pagina: number, porPagina: number) =>
+    opcional(datos<PaginaHistorial>(api.get("/historial", { params: { desde, buscar: buscar || undefined, pagina, porPagina } })), { cambios: [], pagina: 1, porPagina, total: 0, paginas: 1 }),
   papelera: () => opcional(datos<{ papelera: EnPapelera[] }>(api.get("/papelera")).then(d => d.papelera), [] as EnPapelera[]),
   restaurar: (id: string) => api.post(`/papelera/${id}/restaurar`),
   eliminarDefinitivo: (id: string) => api.delete(`/papelera/${id}`)

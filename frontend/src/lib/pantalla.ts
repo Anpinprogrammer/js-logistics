@@ -43,3 +43,24 @@ export function usePorPaginaAccesos() {
   const esComputador = useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false);
   return esComputador ? POR_PAGINA_ACCESOS.computador : POR_PAGINA_ACCESOS.celular;
 }
+
+/** Más → Historial: 5 filas en celular y 13 en computador. */
+export const POR_PAGINA_HISTORIAL = { celular: 5, computador: 13 } as const;
+export function usePorPaginaHistorial() {
+  const esComputador = useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false);
+  return esComputador ? POR_PAGINA_HISTORIAL.computador : POR_PAGINA_HISTORIAL.celular;
+}
+
+/** Caja → Liquidaciones recientes: 5 filas en celular y 9 en computador. */
+export const POR_PAGINA_LIQUIDACIONES = { celular: 5, computador: 9 } as const;
+export function usePorPaginaLiquidaciones() {
+  const esComputador = useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false);
+  return esComputador ? POR_PAGINA_LIQUIDACIONES.computador : POR_PAGINA_LIQUIDACIONES.celular;
+}
+
+/** Personal → Personal JS: 4 filas en celular y 7 en computador. */
+export const POR_PAGINA_PERSONAL = { celular: 4, computador: 7 } as const;
+export function usePorPaginaPersonal() {
+  const esComputador = useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false);
+  return esComputador ? POR_PAGINA_PERSONAL.computador : POR_PAGINA_PERSONAL.celular;
+}

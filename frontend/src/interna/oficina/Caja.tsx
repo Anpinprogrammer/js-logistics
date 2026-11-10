@@ -1,15 +1,21 @@
 /* Oficina → Caja: cierre del día, caja general, mensajeros, cajas de oficina, dinero recibido y liquidaciones (igual al prototipo). */
 import { useEffect, useRef, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, horaCorta, listaOrdenada, periodoMensajero, totales, tipoDe, esRepartidor, sueldoTexto, textoLiq, ajusteTxt, ganaPorcentaje, sueldoPedidos,
   sueldoPersonaSemana, semanasAdelanto, semanasSueldo, liquidacionesDe, asistentes, cajaOficina, sumaMedios, yaContado, puedoCambiarMedio, yaLiquidado, resumenCaja, arqueosCaja,
-  netoArqueo, resultadoArqueo, pendientesCierre, esperadoArqueo, sinServicio, diaMinCaja, fechaCaja, nombreCliente,
-  MEDIOS, MEDIOS_CAJA, CATS, CATS_TIPO, CATS_PERSONA, CATS_SEMANA, type Medio, type UsuarioS, type CajaMov,
+  netoArqueo, resultadoArqueo, pendientesCierre, esperadoArqueo, sinServicio, diaMinCaja, fechaCaja, nombreCliente, sinTildes,
+  MEDIOS, MEDIOS_CAJA, CATS, CATS_TIPO, CATS_PERSONA, CATS_SEMANA, type Medio, type UsuarioS, type CajaMov, type Liquidacion as LiqS,
 } from "../motor";
-import { Cab, TablaEntregas, pl, useVentana } from "../ui";
+import { Cab, Paginador, TablaEntregas, pl, useVentana } from "../ui";
 import { E, guardarLocal } from "../estado";
+import { usePorPaginaLiquidaciones } from "../../lib/pantalla";
+import { liquidaciones as apiLiquidaciones } from "../../api/servicios";
+import { SelectorFecha } from "../Calendario";
+
 import { borrarDe, cambiarMedio, cierreOficina, deshacerArqueo, quitarDevolucion, liquidar, movCaja, reabrirLiquidacion, recibirDinero, arqueo } from "../acciones";
-import { motivoError, useDatos } from "../datos";
+import { aLiq, motivoError, useDatos } from "../datos";
+import { DEMO } from "../demo";
 import { avisoContado, EnBloque } from "./Pedidos";
 import { diaAntesDelArqueo } from "./Clientes";
 
@@ -18,6 +24,19 @@ const noSePudo = (v: Ventana, que: string) => (e: unknown) => v.avisar(que + ": 
 const MEDIOS_K = Object.keys(MEDIOS) as Medio[];
 const medioAntes = (x: { medio: string; medioAntes?: string }) => x.medioAntes && x.medioAntes !== x.medio ? <> <span className="sub" style={{ fontSize: ".8rem" }}>(antes {MEDIOS[x.medioAntes as Medio] || x.medioAntes})</span></> : null;
 const FilaAjuste = ({ a }: { a: number }) => a ? <><dt>Correcciones a liquidaciones cerradas</dt><dd className={a > 0 ? "neg" : "pos"}>{ajusteTxt(a)}</dd></> : null;
+/** Liquidaciones en memoria (modo demo) con la misma paginación del servidor. */
+type PaginaLiqUI = { liquidaciones: LiqS[]; pagina: number; porPagina: number; total: number; paginas: number };
+function paginaLiquidacionesDemo(f: { dia: string; estado: string; buscar: string }, pagina: number, porPagina: number): PaginaLiqUI {
+  const q = sinTildes(f.buscar.trim());
+  const lista = Object.values(S.liquidaciones)
+    .filter(l => !f.dia || diaDe(l.fecha) === f.dia)
+    .filter(l => f.estado === "todos" || (f.estado === "cobrar" ? l.debe > 0 : f.estado === "favor" ? l.debe < 0 : l.debe === 0))
+    .filter(l => !q || sinTildes(S.mensajeros[l.mensajeroId]?.nombre || "").includes(q))
+    .sort((a, b) => b.fecha - a.fecha);
+  const paginas = Math.max(1, Math.ceil(lista.length / porPagina));
+  const actual = Math.min(Math.max(1, pagina), paginas);
+  return { liquidaciones: lista.slice((actual - 1) * porPagina, actual * porPagina), pagina: actual, porPagina, total: lista.length, paginas };
+}
 
 export default function Caja({ pintar }: { pintar: () => void }) {
   const v = useVentana();
@@ -29,7 +48,6 @@ export default function Caja({ pintar }: { pintar: () => void }) {
   const recsDia = Object.values(S.recaudos).filter(r => diaDe(r.fecha) === E.diaCaja).sort((a, b) => a.fecha - b.fecha);
   const cajaDia = recsDia.reduce((a, r) => a + (Number(r.valor) || 0), 0);
   const porMedio: Record<string, number> = {}; recsDia.forEach(r => (porMedio[r.medio] = (porMedio[r.medio] || 0) + (Number(r.valor) || 0)));
-  const liqs = Object.values(S.liquidaciones).sort((a, b) => b.fecha - a.fecha).slice(0, 25);
   const base = (id: string) => (yo.esAdmin ? v.abrir(<MovCaja tipo="sale" pre={{ cat: "base", personaId: id }} />, "centrada") : v.abrir(<BaseDesdeOficina mid={id} />, "centrada"));
   const quitarRec = async (id: string) => {
     const r = S.recaudos[id]; if (!r) return; if (yaContado(r.fecha)) return avisoContado(v);
@@ -45,6 +63,27 @@ export default function Caja({ pintar }: { pintar: () => void }) {
     if (b && el) b.scrollLeft = Math.max(0, el.offsetLeft - (b.clientWidth - el.offsetWidth) / 2);
   }, [E.tabCaja]);
   const ir = (t: typeof E.tabCaja) => { E.tabCaja = t; guardarLocal("js_caja", t); pintar(); };
+  // Liquidaciones recientes: el servidor entrega solo la página que se necesita.
+  const porPaginaLiq = usePorPaginaLiquidaciones(), { version } = useDatos();
+  const [paginaLiq, setPaginaLiq] = useState(E.paginaLiq), arribaLiq = useRef<HTMLDivElement>(null);
+  const [diaLiq, setDiaLiq] = useState(E.diaLiq), [estadoLiq, setEstadoLiq] = useState(E.estadoLiq);
+  const [textoBusqLiq, setTextoBusqLiq] = useState(E.buscarLiq), [buscarLiq, setBuscarLiq] = useState(E.buscarLiq);
+  const tBuscarLiq = useRef<number>(0);
+  const alBuscarLiq = (x: string) => { setTextoBusqLiq(x); clearTimeout(tBuscarLiq.current); tBuscarLiq.current = window.setTimeout(() => { setBuscarLiq(x); E.buscarLiq = x; E.paginaLiq = 1; setPaginaLiq(1); }, 300); };
+  const cambiarDiaLiq = (d: string) => { setDiaLiq(d); E.diaLiq = d; E.paginaLiq = 1; setPaginaLiq(1); };
+  const cambiarEstadoLiq = (e: typeof estadoLiq) => { setEstadoLiq(e); E.estadoLiq = e; E.paginaLiq = 1; setPaginaLiq(1); };
+  const limpiarLiq = () => { setDiaLiq(""); setEstadoLiq("todos"); setTextoBusqLiq(""); setBuscarLiq(""); Object.assign(E, { diaLiq: "", estadoLiq: "todos", buscarLiq: "", paginaLiq: 1 }); setPaginaLiq(1); };
+  const hayFiltrosLiq = !!(diaLiq || buscarLiq || estadoLiq !== "todos");
+  const qLiq = useQuery({
+    queryKey: ["liquidaciones", "pagina", diaLiq, estadoLiq, buscarLiq, paginaLiq, porPaginaLiq, version],
+    enabled: yo.esAdmin && E.tabCaja === "liquidaciones",
+    placeholderData: keepPreviousData,
+    queryFn: (): Promise<PaginaLiqUI> => DEMO
+      ? Promise.resolve(paginaLiquidacionesDemo({ dia: diaLiq, estado: estadoLiq, buscar: buscarLiq }, paginaLiq, porPaginaLiq))
+      : apiLiquidaciones.pagina({ dia: diaLiq || undefined, estado: estadoLiq, buscar: buscarLiq.trim() || undefined }, paginaLiq, porPaginaLiq).then(r => ({ ...r, liquidaciones: r.liquidaciones.map(aLiq) }))
+  });
+  const pagLiq = qLiq.data, liqs = pagLiq?.liquidaciones ?? [];
+  const irLiq = (n: number) => { E.paginaLiq = n; setPaginaLiq(n); arribaLiq.current?.scrollIntoView({ block: "start", behavior: "smooth" }); };
   // Flechas, Inicio y Fin para pasar de pestaña, como un tablist de verdad.
   const alTeclear = (e: React.KeyboardEvent) => {
     const i = tabs.findIndex(([k]) => k === E.tabCaja);
@@ -109,14 +148,35 @@ export default function Caja({ pintar }: { pintar: () => void }) {
 
     <div role="tabpanel" id="panelCaja-liquidaciones" aria-labelledby="tabCaja-liquidaciones" hidden={E.tabCaja !== "liquidaciones"}>
       {yo.esAdmin ? <>
-        <h2>Liquidaciones recientes</h2>
-        <p className="sub">Los cierres de período ya hechos: cuánto entregó cada mensajero, cómo quedó y el detalle completo.</p>
-        {liqs.length ? <div className="tabla-env"><table><thead><tr><th>Liquidado</th><th>Mensajero</th><th className="n">Entregas</th><th className="n">Monto liquidado</th><th>Estado</th><th className="n">Faltante / sobrante</th><th></th></tr></thead><tbody>
-          {liqs.map(l => <tr key={l.id}><td>{hora(l.fecha)}</td><td>{S.mensajeros[l.mensajeroId]?.nombre || ""}</td><td className="n">{l.entregas || 0}</td><td className="n"><b>{pesos(l.recibido)}</b></td>
-            <td>{l.debe > 0 ? <span className="etq sin">Por cobrar</span> : l.debe < 0 ? <span className="etq ent">A favor</span> : <span className="etq gris">Paz y salvo</span>}{l.adelanto ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>Adelanto {pesos(l.adelanto)}</span></> : null}</td>
-            <td className={"n " + (l.debe > 0 ? "neg" : l.debe < 0 ? "pos" : "")}>{l.debe ? (l.debe > 0 ? "Falta " : "A favor ") + pesos(Math.abs(l.debe)) : "—"}</td>
-            <td><button className="btn sec chico" onClick={() => v.abrir(<VerLiquidacion id={l.id} />, "centrada")}>Ver</button></td></tr>)}
-        </tbody></table></div> : <div className="vacio">Aún no has liquidado a ningún mensajero.</div>}
+        <div className="liq-cab">
+          <div className="liq-cab-txt">
+            <h2>Liquidaciones recientes</h2>
+            <p className="sub">Los cierres de período ya hechos: cuánto entregó cada mensajero, cómo quedó y el detalle completo.</p>
+          </div>
+          <div className="liq-toolbar">
+            <SelectorFecha valor={diaLiq} alCambiar={cambiarDiaLiq} vacio="Todas las fechas" />
+            <select id="liqEstado" className="liq-select" aria-label="Filtrar por estado" value={estadoLiq} onChange={e => cambiarEstadoLiq(e.target.value as typeof estadoLiq)}>
+              <option value="todos">Todos los estados</option><option value="cobrar">Por cobrar</option><option value="favor">A favor</option><option value="paz">Paz y salvo</option>
+            </select>
+            <div className="liq-buscar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+              <input id="liqBus" type="search" placeholder="Buscar mensajero…" aria-label="Buscar por mensajero" value={textoBusqLiq} onChange={e => alBuscarLiq(e.target.value)} />
+            </div>
+            {hayFiltrosLiq ? <button type="button" className="btn sec chico liq-limpiar" onClick={limpiarLiq}>Limpiar</button> : null}
+          </div>
+        </div>
+        <div ref={arribaLiq} style={{ scrollMarginTop: 90 }} />
+        {qLiq.isError ? <div className="aviso alerta">No se pudieron traer las liquidaciones: {motivoError(qLiq.error)} <button className="btn chico" onClick={() => qLiq.refetch()}>Intentar otra vez</button></div>
+          : !pagLiq ? <div className="vacio">Cargando liquidaciones…</div>
+          : liqs.length ? <>
+            <div className="tabla-env" aria-busy={qLiq.isFetching} style={qLiq.isPlaceholderData ? { opacity: .6 } : undefined}><table><thead><tr><th>Liquidado</th><th>Mensajero</th><th className="n">Entregas</th><th className="n">Monto liquidado</th><th>Estado</th><th className="n">Faltante / sobrante</th><th></th></tr></thead><tbody>
+              {liqs.map(l => <tr key={l.id}><td>{hora(l.fecha)}</td><td>{S.mensajeros[l.mensajeroId]?.nombre || ""}</td><td className="n">{l.entregas || 0}</td><td className="n"><b>{pesos(l.recibido)}</b></td>
+                <td>{l.debe > 0 ? <span className="etq sin">Por cobrar</span> : l.debe < 0 ? <span className="etq ent">A favor</span> : <span className="etq gris">Paz y salvo</span>}{l.adelanto ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>Adelanto {pesos(l.adelanto)}</span></> : null}</td>
+                <td className={"n " + (l.debe > 0 ? "neg" : l.debe < 0 ? "pos" : "")}>{l.debe ? (l.debe > 0 ? "Falta " : "A favor ") + pesos(Math.abs(l.debe)) : "—"}</td>
+                <td><button className="btn sec chico" onClick={() => v.abrir(<VerLiquidacion id={l.id} />, "centrada")}>Ver</button></td></tr>)}
+            </tbody></table></div>
+            <Paginador pagina={pagLiq.pagina} paginas={pagLiq.paginas} total={pagLiq.total} porPagina={pagLiq.porPagina} ir={irLiq} cargando={qLiq.isPlaceholderData} />
+          </> : <div className="vacio">{hayFiltrosLiq ? "No hay liquidaciones con esos filtros." : "Aún no has liquidado a ningún mensajero."}</div>}
       </> : <div className="vacio">Las liquidaciones las maneja administración.</div>}
     </div>
 

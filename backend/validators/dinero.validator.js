@@ -39,6 +39,13 @@ export const liquidacion = z.looseObject({
   pasarAdelanto: z.boolean().optional(), semanaAdelanto: z.string().max(10).optional(), semana: z.string().max(10).optional()
 });
 export const ajusteLiquidacion = z.object({ debe: valor, adelanto: valor });
+export const liquidacionesPagina = z.object({
+  pagina: z.coerce.number().int().min(1).optional(),
+  porPagina: z.coerce.number().int().min(1).max(100).optional(),
+  dia: dia.optional(),
+  estado: z.enum(["todos", "cobrar", "favor", "paz"]).default("todos"),
+  buscar: texto(80).optional()
+});
 
 export const cajaMov = z.looseObject({
   tipo: z.string().max(20), cat: z.string().max(20).optional(), valor: valor.optional(), medio: z.string().max(20).nullish(),
@@ -68,5 +75,11 @@ export const cuadre = z.object({ dia: dia.optional(), clienteId: id.optional() }
 export const unir = z.object({ otros: z.array(id).min(1).max(100) });
 export const pagarSaldos = z.object({ clienteIds: z.array(id).min(1).max(1000), medio: z.string().max(20) });
 
-export const historial = z.object({ desde: dia.optional(), limite: z.coerce.number().int().min(1).max(5000).default(600) });
+export const historial = z.object({
+  desde: dia.optional(),
+  buscar: texto(80).optional(),
+  limite: z.coerce.number().int().min(1).max(5000).default(600),
+  pagina: z.coerce.number().int().min(1).optional(),
+  porPagina: z.coerce.number().int().min(1).max(100).optional()
+});
 export const nota = z.object({ texto: texto(1000) });

@@ -4,6 +4,8 @@ import * as Enlace from "../models/enlace.model.js";
 import * as Enlaces from "../servicios/enlaces.js";
 import * as Auditoria from "../models/auditoria.model.js";
 import * as Accesos from "../servicios/usuarios.js";
+import * as Mensajero from "../models/mensajero.model.js";
+import * as Cliente from "../models/cliente.model.js";
 import { hashClave } from "../helpers/claves.js";
 import { conflicto, noEncontrado, prohibido, correoFallo, correoNoConfigurado } from "../helpers/errores.js";
 import { publico } from "./auth.controller.js";
@@ -32,14 +34,37 @@ export const listarPagina = responder(async (ctx, req) => {
 });
 
 export async function crear(req, res) {
-  const { clave, ...datos } = req.valido.body;
-  if (await Usuario.buscarPorEmail(datos.email)) throw conflicto("Ese correo ya tiene una cuenta", "EMAIL_EN_USO");
-  const u = await Usuario.crear({ ...datos, claveHash: clave ? await hashClave(clave) : null });
+  const b = req.valido.body;
+  const rol = b.rol || b.role;
+  let nombre = b.nombre?.trim() || "", clienteId = b.clienteId || null, mensajeroId = b.mensajeroId || null, ficha = null;
+
+  // La API nueva manda { role, entityId, email }: el nombre sale de la ficha vinculada.
+  if (b.entityId) {
+    if (rol === "cliente") {
+      ficha = await Cliente.buscarPorId(b.entityId);
+      if (!ficha) throw noEncontrado("El cliente no existe");
+      clienteId = ficha.id; mensajeroId = null; nombre = ficha.nombre;
+    } else {
+      ficha = await Mensajero.buscarPorId(b.entityId);
+      if (!ficha) throw noEncontrado("La persona no existe");
+      mensajeroId = ficha.id; clienteId = null; nombre = ficha.nombre;
+    }
+  }
+
+  if (await Usuario.buscarPorEmail(b.email)) throw conflicto("Ese correo ya tiene una cuenta", "EMAIL_EN_USO");
+  const u = await Usuario.crear({ email: b.email, nombre, rol, clienteId, mensajeroId, claveHash: b.clave ? await hashClave(b.clave) : null });
   await Auditoria.registrar({ uid: req.usuario.id, accion: `Creó el acceso de ${u.email} (${u.rol})`, tabla: "usuarios", registro: u.id });
 
   // La cuenta ya quedó creada aunque el correo falle: administración puede reenviar la activación.
   const correo = await Enlaces.crearYEnviar({ usuario: u, tipo: "activacion", creadoPor: req.usuario.id });
-  res.status(201).json({ usuario: publico(u), correo: estadoCorreo(correo) });
+  // El teléfono sale de su ficha en Personal o del cliente, para ofrecer el envío por WhatsApp.
+  const fichaFinal = ficha || (u.mensajeroId ? await Mensajero.buscarPorId(u.mensajeroId) : u.clienteId ? await Cliente.buscarPorId(u.clienteId) : null);
+  res.status(201).json({
+    message: "Acceso creado correctamente",
+    usuario: publico(u),
+    user: { ...publico(u), telefono: fichaFinal?.telefono || "", activationUrl: correo.url || "" },
+    correo: estadoCorreo(correo)
+  });
 }
 
 export async function actualizar(req, res) {
