@@ -14,6 +14,7 @@ import caja from "./caja.routes.js";
 import cuentas from "./cuentas.routes.js";
 import jornadas from "./jornadas.routes.js";
 import sueldos from "./sueldos.routes.js";
+import chatbotPublico from "./chatbot-publico.routes.js";
 import chatbot from "./chatbot.routes.js";
 import datos from "./datos.routes.js";
 
@@ -25,6 +26,7 @@ r.head("/health", vivo);
 r.get("/ready", listo);
 r.head("/ready", listo);
 r.use("/auth", auth);
+r.use("/chatbot/publico", chatbotPublico); // visitantes sin sesión: solo info general (ver el controlador)
 
 // Desde aquí, todo exige sesión
 r.use(autenticar);

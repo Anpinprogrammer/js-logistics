@@ -1,9 +1,11 @@
 /* Esquemas del chat. El historial lo guarda el navegador y lo manda completo; el servidor solo lo valida. */
 import { z } from "zod";
+import { limpiarTexto } from "../helpers/textoSeguro.js";
 
 const mensaje = z.object({
   rol: z.enum(["user", "assistant"]),
-  contenido: z.string().trim().min(1, "El mensaje no puede estar vacío").max(2000, "El mensaje es muy largo (máximo 2000 caracteres)")
+  // Se quitan los caracteres invisibles ANTES de medir y de llegar al modelo (instrucciones escondidas)
+  contenido: z.string().max(8000).transform(limpiarTexto).pipe(z.string().trim().min(1, "El mensaje no puede estar vacío").max(2000, "El mensaje es muy largo (máximo 2000 caracteres)"))
 });
 
 export const mensajes = z.object({
