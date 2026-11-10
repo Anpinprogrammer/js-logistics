@@ -26,6 +26,29 @@ export interface Cliente {
   creado: string;
 }
 
+/** Cliente con su saldo calculado por el servidor y, si se pidió un día, lo movido ese día. */
+export interface ClienteConSaldo {
+  id: string;
+  nombre: string;
+  telefono: string;
+  tarifa: number;
+  saldo: number;
+  delDia?: number;
+}
+
+/** Una página de la pestaña Clientes (8 en celular, 20 en computador). */
+export interface PaginaClientes {
+  clientes: ClienteConSaldo[];
+  pagina: number;
+  porPagina: number;
+  total: number;
+  paginas: number;
+  totalClientes: number;
+  porCobrar: { total: number; clientes: number };
+  porPagar: { total: number; clientes: number };
+  repetidos?: number;
+}
+
 export interface Mensajero {
   id: string;
   nombre: string;

@@ -1,51 +1,104 @@
 /* Oficina → Clientes, la cuenta de un cliente, el formulario y el envío de saldos por WhatsApp, igual al prototipo. */
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, listaOrdenada, saldoCliente, filasCuenta, sinTildes, normNom, normTel, parecidos, gruposRepetidos, telWhatsApp, linkSaldo, textoSaldo,
   nombreCliente, servicio, gastoDe, cargoEnvio, cambiaLoContado, yaContado, mueveCaja, esPago, fechaCaja, fechaDia, diaMinCaja, fechaLarga,
   MOVS, MOVS_OFICINA, MEDIOS, type Medio, type TipoMov,
 } from "../motor";
-import { Cab, FiltroDia, pl, useVentana } from "../ui";
+import { Cab, FiltroDia, Paginador, pl, useVentana } from "../ui";
 import { E, guardarLocal } from "../estado";
 import { actualizarPedido, borrarDe, guardarCliente, guardarMovimiento, unirClientes } from "../acciones";
 import { motivoError, useDatos } from "../datos";
+import { DEMO } from "../demo";
+import { clientes as apiClientes } from "../../api/servicios";
+import { usePorPagina } from "../../lib/pantalla";
+import type { ClienteConSaldo, PaginaClientes } from "../../api/tipos";
 import { avisoContado } from "./Pedidos";
 
 type Ventana = ReturnType<typeof useVentana>;
 /** La caja ya se contó ese día: no se registran movimientos de días anteriores al arqueo. */
 export const diaAntesDelArqueo = (v: Ventana, dia: string) => { const m = diaMinCaja(); if (m && dia < m) { v.avisar("La caja ya se contó el " + fechaLarga(m) + ": no se pueden registrar movimientos de días anteriores."); return true; } return false; };
 
+/** La misma página que arma el servidor, calculada con los datos en memoria (modo demo). */
+function paginaClientesDemo(filtro: string, dia: string, buscar: string, pagina: number, porPagina: number): PaginaClientes {
+  const cs: ClienteConSaldo[] = listaOrdenada(S.clientes, "nombre").map(c => ({
+    ...c,
+    saldo: saldoCliente(c.id),
+    ...(dia ? { delDia: filasCuenta(c.id).filter(r => diaDe(r.fecha) === dia).reduce((a, r) => a + r.v, 0) } : {})
+  }));
+  const k = (c: ClienteConSaldo) => (dia ? c.delDia ?? 0 : c.saldo);
+  const cobrar = cs.filter(c => k(c) < 0), pagar = cs.filter(c => k(c) > 0);
+  const q = sinTildes(buscar.trim()), qt = buscar.replace(/\D/g, "");
+  const pasa = (c: ClienteConSaldo) => {
+    const bus = sinTildes(c.nombre) + " " + normTel(c.telefono);
+    return !q || bus.includes(q) || (qt.length >= 3 && bus.includes(qt));
+  };
+  const base = filtro === "cobrar" ? cobrar : filtro === "pagar" ? pagar : dia ? cs.filter(c => c.delDia) : cs;
+  const filtrados = base.filter(pasa);
+  const total = filtrados.length, paginas = Math.max(1, Math.ceil(total / porPagina)), actual = Math.min(Math.max(1, pagina), paginas);
+  return {
+    clientes: filtrados.slice((actual - 1) * porPagina, actual * porPagina),
+    pagina: actual, porPagina, total, paginas, totalClientes: cs.length,
+    porCobrar: { total: cobrar.reduce((a, c) => a - k(c), 0), clientes: cobrar.length },
+    porPagar: { total: pagar.reduce((a, c) => a + k(c), 0), clientes: pagar.length },
+    repetidos: yo.esAdmin ? gruposRepetidos().length : undefined
+  };
+}
+
 export default function Clientes({ pintar }: { pintar: () => void }) {
   const v = useVentana();
+  const { version } = useDatos();
+  const porPagina = usePorPagina();
   const [buscar, setBuscar] = useState(E.buscarCli);
-  const d = E.diaCliF;
-  const cs = listaOrdenada(S.clientes, "nombre").map(c => ({ ...c, s: saldoCliente(c.id), d: d ? filasCuenta(c.id).filter(r => diaDe(r.fecha) === d).reduce((a, r) => a + r.v, 0) : 0 }));
-  const k = (c: { s: number; d: number }) => (d ? c.d : c.s);
-  const cobrar = cs.filter(c => k(c) < 0), pagar = cs.filter(c => k(c) > 0);
-  const totC = cobrar.reduce((a, c) => a - k(c), 0), totP = pagar.reduce((a, c) => a + k(c), 0);
-  const vis = E.filtroCli === "cobrar" ? cobrar : E.filtroCli === "pagar" ? pagar : d ? cs.filter(c => c.d) : cs;
-  // el buscador filtra las filas, por nombre (sin tildes) o por número
-  const q = sinTildes(buscar.trim()), qt = buscar.replace(/\D/g, "");
-  const pasa = (c: { nombre: string; telefono: string }) => { const bus = sinTildes(c.nombre) + " " + normTel(c.telefono); return !q || bus.includes(q) || (qt.length >= 3 && bus.includes(qt)); };
-  const filas = vis.filter(pasa), reps = yo.esAdmin ? gruposRepetidos() : [];
+  const tBuscar = useRef<number>(0);
+  const arriba = useRef<HTMLDivElement>(null);
+  const dia = E.diaCliF;
+
+  // La página, el filtro, el día y la búsqueda los resuelve el servidor; en demo se imitan en memoria.
+  const q = useQuery({
+    queryKey: ["clientes", "pagina", E.filtroCli, dia, E.buscarCli, E.paginaCli, porPagina, version],
+    placeholderData: keepPreviousData,
+    queryFn: () => DEMO
+      ? Promise.resolve(paginaClientesDemo(E.filtroCli, dia, E.buscarCli, E.paginaCli, porPagina))
+      : apiClientes.pagina({ filtro: E.filtroCli, dia, buscar: E.buscarCli }, E.paginaCli, porPagina)
+  });
+  const pag = q.data, filas = pag?.clientes ?? [], reps = pag?.repetidos ?? 0;
+  const poner = (cambio: Partial<typeof E>) => { Object.assign(E, cambio); pintar(); };
+  const irA = (n: number) => { E.paginaCli = n; pintar(); arriba.current?.scrollIntoView({ block: "start", behavior: "smooth" }); };
+
   return <>
     <h1>Clientes</h1><p className="sub">Saldo de cada cliente = lo cobrado menos el valor del servicio.</p>
     <div className="cifras" style={{ marginBottom: 14 }}>
-      <div className="cifra"><span>{d ? "Ese día te quedaron debiendo" : "Cuentas por cobrar (te deben)"}</span><b className="neg">{pesos(totC)}</b><span>{cobrar.length} {pl(cobrar.length, "cliente")}</span></div>
-      <div className="cifra"><span>{d ? "Ese día les quedaste debiendo" : "Cuentas por pagar (les debes)"}</span><b className="pos">{pesos(totP)}</b><span>{pagar.length} {pl(pagar.length, "cliente")}</span></div>
+      <div className="cifra"><span>{dia ? "Ese día te quedaron debiendo" : "Cuentas por cobrar (te deben)"}</span><b className="neg">{pesos(pag?.porCobrar.total ?? 0)}</b><span>{pag?.porCobrar.clientes ?? 0} {pl(pag?.porCobrar.clientes ?? 0, "cliente")}</span></div>
+      <div className="cifra"><span>{dia ? "Ese día les quedaste debiendo" : "Cuentas por pagar (les debes)"}</span><b className="pos">{pesos(pag?.porPagar.total ?? 0)}</b><span>{pag?.porPagar.clientes ?? 0} {pl(pag?.porPagar.clientes ?? 0, "cliente")}</span></div>
     </div>
     <div className="acciones" style={{ marginBottom: 16 }}><button className="btn" id="nuevoCli" onClick={() => v.abrir(<FormCliente />)}>Registrar cliente</button><button className="btn ok" id="waMasivo" onClick={() => v.abrir(<EnvioMasivo tipo0={E.filtroCli === "pagar" ? "pagar" : "cobrar"} />)}>Enviar saldos por WhatsApp</button></div>
-    <div className="filtros">{[["todos", "Todos"], ["cobrar", "Por cobrar"], ["pagar", "Por pagar"]].map(([x, t]) => <button key={x} aria-pressed={E.filtroCli === x} onClick={() => { E.filtroCli = x; pintar(); }}>{t}</button>)}</div>
-    <FiltroDia d={d} poner={x => { E.diaCliF = x; pintar(); }} />{d && <p className="sub">Clientes con movimiento ese día: lo que les quedó de ese día y, al lado, su saldo total de hoy.</p>}
-    {reps.length ? <div className="aviso">{reps.length === 1 ? "Hay 1 cliente que parece repetido" : "Hay " + reps.length + " clientes que parecen repetidos"} (mismo nombre o mismo número). <button className="btn sec chico" id="cliRep" onClick={() => v.abrir(<Repetidos />)}>Revisar y unir</button></div> : null}
-    <div className="campo" style={{ maxWidth: 360, marginTop: 10 }}><input id="buscarCli" type="search" placeholder="Buscar cliente por nombre o número" value={buscar} autoComplete="off" aria-label="Buscar cliente" onChange={e => { setBuscar(e.target.value); E.buscarCli = e.target.value; }} /></div>
-    <div className={"vacio " + (q && !filas.length && vis.length ? "" : "oculto")} id="cliSinRes">Ningún cliente con ese nombre o número en esta lista.</div>
-    {vis.length ? <div className="tabla-env"><table><thead><tr><th>Cliente</th><th>Número</th><th>Cuenta</th>{d && <th className="n">Ese día</th>}<th className="n">Saldo</th><th></th></tr></thead><tbody>
-      {filas.map(c => <tr key={c.id}><td><b>{c.nombre}</b>{Number(c.tarifa) ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>Domicilio {pesos(c.tarifa)}</span></> : null}</td><td>{c.telefono || ""}</td>
-        <td>{c.s < 0 ? <span className="etq sin">Por cobrar</span> : c.s > 0 ? <span className="etq ent">Por pagar</span> : <span className="sub">Paz y salvo</span>}</td>
-        {d && <td className={"n " + (c.d < 0 ? "neg" : "pos")}>{c.d < 0 ? "Debe " : "A favor "}{pesos(Math.abs(c.d))}</td>}
-        <td className={"n " + (c.s < 0 ? "neg" : c.s > 0 ? "pos" : "")}>{pesos(Math.abs(c.s))}</td><td><button className="btn sec chico" onClick={() => v.abrir(<AbrirCuenta cid={c.id} />)}>Ver cuenta</button></td></tr>)}
-    </tbody></table></div> : <div className="vacio">{cs.length ? "No hay clientes en esta lista." : "Registra tus clientes (los remitentes) para llevar su saldo."}</div>}
+    <div className="filtros">{[["todos", "Todos"], ["cobrar", "Por cobrar"], ["pagar", "Por pagar"]].map(([x, t]) => <button key={x} aria-pressed={E.filtroCli === x} onClick={() => poner({ filtroCli: x, paginaCli: 1 })}>{t}</button>)}</div>
+    <FiltroDia d={dia} poner={x => poner({ diaCliF: x, paginaCli: 1 })} />{dia && <p className="sub">Clientes con movimiento ese día: lo que les quedó de ese día y, al lado, su saldo total de hoy.</p>}
+    {reps > 0 ? <div className="aviso">{reps === 1 ? "Hay 1 cliente que parece repetido" : "Hay " + reps + " clientes que parecen repetidos"} (mismo nombre o mismo número). <button className="btn sec chico" id="cliRep" onClick={() => v.abrir(<Repetidos />)}>Revisar y unir</button></div> : null}
+    <div className="campo" style={{ maxWidth: 360, marginTop: 10 }}><input id="buscarCli" type="search" placeholder="Buscar cliente por nombre o número" value={buscar} autoComplete="off" aria-label="Buscar cliente"
+      onChange={e => {
+        const x = e.target.value;
+        setBuscar(x);
+        clearTimeout(tBuscar.current);
+        tBuscar.current = window.setTimeout(() => poner({ buscarCli: x, paginaCli: 1 }), 300);
+      }} /></div>
+    <div ref={arriba} style={{ scrollMarginTop: 90 }} />
+    {q.isError ? <div className="aviso alerta">No se pudo traer la lista de clientes: {motivoError(q.error)} <button className="btn chico" onClick={() => q.refetch()}>Intentar otra vez</button></div>
+      : !pag ? <div className="vacio">Cargando clientes…</div>
+      : filas.length ? <>
+        <div className="tabla-env" aria-busy={q.isFetching} style={q.isPlaceholderData ? { opacity: .6 } : undefined}><table><thead><tr><th>Cliente</th><th>Número</th><th>Cuenta</th>{dia && <th className="n">Ese día</th>}<th className="n">Saldo</th><th></th></tr></thead><tbody>
+          {filas.map(c => <tr key={c.id}><td><b>{c.nombre}</b>{Number(c.tarifa) ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>Domicilio {pesos(c.tarifa)}</span></> : null}</td><td>{c.telefono || ""}</td>
+            <td>{c.saldo < 0 ? <span className="etq sin">Por cobrar</span> : c.saldo > 0 ? <span className="etq ent">Por pagar</span> : <span className="sub">Paz y salvo</span>}</td>
+            {dia && <td className={"n " + ((c.delDia ?? 0) < 0 ? "neg" : "pos")}>{(c.delDia ?? 0) < 0 ? "Debe " : "A favor "}{pesos(Math.abs(c.delDia ?? 0))}</td>}
+            <td className={"n " + (c.saldo < 0 ? "neg" : c.saldo > 0 ? "pos" : "")}>{pesos(Math.abs(c.saldo))}</td><td><button className="btn sec chico" onClick={() => v.abrir(<AbrirCuenta cid={c.id} />)}>Ver cuenta</button></td></tr>)}
+        </tbody></table></div>
+        <Paginador pagina={pag.pagina} paginas={pag.paginas} total={pag.total} porPagina={pag.porPagina} ir={irA} cargando={q.isPlaceholderData} />
+      </>
+      : <div className="vacio">{!buscar.trim() && E.filtroCli === "todos" && !dia && pag.totalClientes === 0
+        ? "Registra tus clientes (los remitentes) para llevar su saldo."
+        : buscar.trim() ? "Ningún cliente con ese nombre o número en esta lista." : "No hay clientes en esta lista."}</div>}
   </>;
 }
 
