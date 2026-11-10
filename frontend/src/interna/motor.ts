@@ -114,7 +114,7 @@ export const CATS_TIPO = { entra: ["otro_entra"], sale: ["gasto", "base", "arrie
 /** Movimientos de caja a nombre de una persona, y los que se descuentan del sueldo de la semana que se elige. */
 export const CATS_PERSONA = ["adelanto", "sueldo", "base"];
 export const CATS_SEMANA = ["adelanto", "sueldo"];
-export const SUBMAS: [string, string][] = [["panel", "Resultados"], ["personal", "Personal"], ["historial", "Historial"], ["papelera", "Papelera"], ["respaldo", "Respaldo y espacio"]];
+export const SUBMAS: [string, string][] = [["resultados", "Resultados"], ["personal", "Personal"], ["historial", "Historial"], ["papelera", "Papelera"], ["respaldo", "Respaldo y espacio"]];
 export const TIPOS: Record<TipoPersonal, string> = { mensajero: "Mensajero", dueno: "Dueño (Javier)", oficina: "Oficina (JS)", patinador: "Patinador", empresa: "Empresa (JS)" };
 export const TIPOS_CUENTA = { socio: "Empresa o tienda (presta y devuelve)", base: "Base de la empresa" };
 export const ROLES: Record<string, string> = { mensajero: "Mensajero", asistente: "Asistente", admin: "Administración", cliente: "Cliente" };

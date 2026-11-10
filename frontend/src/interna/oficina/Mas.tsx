@@ -10,12 +10,15 @@ import { E, guardarLocal } from "../estado";
 import { cambiarAcceso, cambiarClaveDe, crearAcceso, guardarPersona, quitarAcceso, quitarPersona } from "../acciones";
 import { motivoError } from "../datos";
 import { DEMO } from "../demo";
+import { useEscritorio } from "../../lib/pantalla";
 import * as api from "../../api/servicios";
 import type { Cambio, EnPapelera, Rol } from "../../api/tipos";
 
 export default function Mas({ pintar }: { pintar: () => void }) {
+  // En el escritorio cada sub-pestaña es un acceso directo del menú lateral; en el celular siguen aquí.
+  const escritorio = useEscritorio();
   return <>
-    <div className="filtros" style={{ marginBottom: 16 }}>{SUBMAS.map(([k, t]) => <button key={k} aria-pressed={E.subMas === k} onClick={() => { E.subMas = k; pintar(); }}>{t}</button>)}</div>
+    {!escritorio && <div className="filtros" style={{ marginBottom: 16 }}>{SUBMAS.map(([k, t]) => <button key={k} aria-pressed={E.subMas === k} onClick={() => { E.subMas = k; pintar(); }}>{t}</button>)}</div>}
     {E.subMas === "personal" ? <Personal /> : E.subMas === "historial" ? <Historial /> : E.subMas === "papelera" ? <Papelera /> : E.subMas === "respaldo" ? <Respaldo /> : <Resultados pintar={pintar} />}
   </>;
 }

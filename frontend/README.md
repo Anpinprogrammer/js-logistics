@@ -4,13 +4,13 @@ App de operación y administración en **React 19 + TypeScript + Tailwind CSS 4*
 
 ## Qué hay
 
-Con sesión, la app muestra **lo mismo que el prototipo** (`app/` del sistema viejo), con sus estilos, sus KPIs y sus pestañas, reescrito en React y TypeScript. El ingreso (`pages/Ingreso.tsx`) es el rediseño nuevo: siempre oscuro, con el logo en un badge claro (ver [`../docs/ESTADO.md`](../docs/ESTADO.md)). Desde el ingreso se puede pedir un enlace de recuperación (`/recuperar`), y los correos abren las pantallas públicas `/restablecer` y `/activar` (crear o cambiar la contraseña).
+Con sesión, la app muestra **lo mismo que el prototipo** (`app/` del sistema viejo), con sus estilos, sus KPIs y sus pestañas, reescrito en React y TypeScript. El ingreso (`pages/Ingreso.tsx`) es el rediseño nuevo: siempre oscuro, con el logo en un badge claro (ver [`../docs/ESTADO.md`](../docs/ESTADO.md)). Desde el ingreso se puede pedir un enlace de recuperación (`/recuperar`), y los correos abren las pantallas públicas `/restablecer` y `/activar` (crear o cambiar la contraseña). En el header de escritorio, junto al avatar, hay un botón para cambiar entre modo claro y oscuro; en el celular, la misma opción está en el menú. La elección se guarda en el navegador.
 
 | Rol | Pantallas |
 |---|---|
 | Mensajero (celular) | **Inicio** (KPIs, recomendaciones, efectividad, entregas por día, motivos, tus números), **Nuevo**, **Por entregar** (entregar con foto y firma, no entregado), **Mi caja**, **Mi sueldo**, **Entregados**. |
 | Asistente | **Inicio** (panel de control), **Pedidos**, **Clientes** (saldos, WhatsApp), **Caja** (recibir dinero de mensajeros, su caja de oficina), **Cuentas** (pagos, compras y ganancias de clientes). |
-| Administración | Todo lo anterior, más cierre del día, caja general y arqueos, liquidaciones, **Sueldos** y **Más** (Resultados, Personal y accesos, Historial, Papelera). Puede pasar a modo Mensajero. |
+| Administración | Todo lo anterior, más cierre del día, caja general y arqueos, liquidaciones, **Sueldos** y **Más** (Resultados, Personal y accesos, Historial, Papelera y Respaldo). En el escritorio, Resultados, Personal, Historial, Papelera y Respaldo son accesos directos del menú lateral; en el celular siguen dentro de **Más**. Puede pasar a modo Mensajero. |
 
 Los saldos, la caja y los sueldos se calculan en el navegador con las mismas reglas de `app/js/app.js` (en `src/interna/motor.ts`) mientras el backend no los calcule. Lo que todavía no está: tiquetes para imprimir, descargas de Excel y respaldo (llegan después).
 
