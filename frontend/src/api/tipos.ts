@@ -125,6 +125,35 @@ export interface Movimiento {
   medioAntes?: string | null;
 }
 
+/** Una página de la pestaña Movimientos de Cuentas (6 en celular, 15 en computador). */
+export interface PaginaMovimientos {
+  movimientos: Movimiento[];
+  pagina: number;
+  porPagina: number;
+  total: number;
+  paginas: number;
+  totales: { recibido: number; pagado: number; compras: number; ganancia: number };
+}
+
+/** Ganancia (y pagos/compras de contexto) de un cliente en el rango elegido. */
+export interface GananciaCliente {
+  clienteId: string;
+  nombre: string;
+  recibido: number;
+  compras: number;
+  ganancia: number;
+}
+
+/** Una página de la pestaña Ganancias de Cuentas. */
+export interface PaginaGanancias {
+  clientes: GananciaCliente[];
+  pagina: number;
+  porPagina: number;
+  total: number;
+  paginas: number;
+  totalGanancia: number;
+}
+
 export interface ErrorApi {
   code: string;
   message: string;
@@ -175,4 +204,13 @@ export interface EnlaceCorreo {
   /** Correo tapado por el servidor, por ejemplo c******@js.co. */
   email: string;
   expira: string;
+}
+
+/** Una página de los movimientos de las cuentas internas (5 en celular, 10 en computador). */
+export interface PaginaCajaMovimientos {
+  movimientos: CajaMovimiento[];
+  pagina: number;
+  porPagina: number;
+  total: number;
+  paginas: number;
 }

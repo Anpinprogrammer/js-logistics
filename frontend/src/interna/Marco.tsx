@@ -1,5 +1,5 @@
 /* Marco de la app interna, igual al prototipo: menú lateral en computador, barra arriba y pestañas abajo en el celular. */
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSesion, useUsuario } from "../auth/Sesion";
 import { ProveedorDatos, useDatos } from "./datos";
 import { ProveedorVentana, Icono, IconoSalir, useVentana } from "./ui";
@@ -32,20 +32,23 @@ const SECCIONES: [string, string[]][] = [
 const iconoTema = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
 const IconoSol = () => <svg {...iconoTema}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg>;
 const IconoLuna = () => <svg {...iconoTema}><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8z" /></svg>;
+const IconoContraer = () => <svg {...iconoTema}><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" /></svg>;
+const IconoExpandir = () => <svg {...iconoTema}><path d="M13 17l5-5-5-5M6 17l5-5-5-5" /></svg>;
 
 export default function AppInterna() {
   const usuario = useUsuario();
   const { tema, oscuro, cambiar } = useTema();
+  const [menuColapsado, setMenuColapsado] = useState(false);
   return (
-    <div className="jsl" data-theme={tema === "sistema" ? undefined : tema}>
+    <div className={"jsl" + (menuColapsado ? " menu-colapsado" : "")} data-theme={tema === "sistema" ? undefined : tema}>
       <ProveedorDatos usuario={usuario}>
-        <ProveedorVentana><Marco oscuro={oscuro} cambiarTema={cambiar} /></ProveedorVentana>
+        <ProveedorVentana><Marco oscuro={oscuro} cambiarTema={cambiar} colapsado={menuColapsado} alternarMenu={() => setMenuColapsado(v => !v)} /></ProveedorVentana>
       </ProveedorDatos>
     </div>
   );
 }
 
-function Marco({ oscuro, cambiarTema }: { oscuro: boolean; cambiarTema: () => void }) {
+function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boolean; cambiarTema: () => void; colapsado: boolean; alternarMenu: () => void }) {
   const { usuario, salir } = useSesion();
   const { version, tocar, error, cargado } = useDatos();
   const ventana = useVentana();
@@ -73,7 +76,7 @@ function Marco({ oscuro, cambiarTema }: { oscuro: boolean; cambiarTema: () => vo
   }
   const ir = (k: string) => { elegir(k); pintar(); scrollTo(0, 0); };
   const boton = ([k, t, n]: ItemNav) => (
-    <button key={k} aria-current={actual === k ? "page" : undefined} onClick={() => ir(k)}><Icono n={k} /><span className="t">{t}</span>{n ? <span className="num">{n}</span> : null}</button>
+    <button key={k} aria-current={actual === k ? "page" : undefined} aria-label={t} title={t} onClick={() => ir(k)}><Icono n={k} /><span className="t">{t}</span>{n ? <span className="num">{n}</span> : null}</button>
   );
   const cabe = items.length <= 5, vis = cabe ? items : items.slice(0, 4), resto = cabe ? [] : items.slice(4);
   const enResto = resto.find(([k]) => k === actual), nResto = resto.reduce((a, [, , n]) => a + (n || 0), 0);
@@ -105,6 +108,11 @@ function Marco({ oscuro, cambiarTema }: { oscuro: boolean; cambiarTema: () => vo
       <nav id="navLateral" aria-label="Menú principal">
         {SECCIONES.map(([titulo, claves]) => { const xs = items.filter(([k]) => claves.includes(k)); return xs.length ? <div className="lat-grupo" key={titulo}><span className="lat-titulo">{titulo}</span>{xs.map(boton)}</div> : null; })}
       </nav>
+      <div className="lat-pie">
+        <button type="button" className="plegar" onClick={alternarMenu} aria-label={colapsado ? "Expandir menú" : "Colapsar menú"} title={colapsado ? "Expandir menú" : "Colapsar menú"}>
+          {colapsado ? <IconoExpandir /> : <><span>Colapsar menú</span><IconoContraer /></>}
+        </button>
+      </div>
     </aside>
     <header className="barra">
       <div className="marca"><img src="/logo.png" alt="" /><span>JS Logistics<small>Servir es nuestra labor</small></span></div>

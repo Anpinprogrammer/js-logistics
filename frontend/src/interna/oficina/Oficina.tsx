@@ -32,7 +32,7 @@ export default function Oficina({ pintar }: { pintar: () => void }) {
     <AvisoDemo />
     <Suspense fallback={<div className="vacio" role="status">Cargando…</div>}>
       {t === "pedidos" ? <Pedidos pintar={pintar} /> : t === "clientes" ? <Clientes pintar={pintar} /> : t === "caja" ? <Caja pintar={pintar} />
-        : t === "cuentas" ? <Cuentas /> : t === "sueldos" ? <Sueldos pintar={pintar} /> : t === "mas" ? <Mas pintar={pintar} /> : <Panel pintar={pintar} />}
+        : t === "cuentas" ? <Cuentas pintar={pintar} /> : t === "sueldos" ? <Sueldos pintar={pintar} /> : t === "mas" ? <Mas pintar={pintar} /> : <Panel pintar={pintar} />}
     </Suspense>
   </>;
 }

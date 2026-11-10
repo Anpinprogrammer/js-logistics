@@ -1,8 +1,11 @@
 /* Estado de la interfaz que se conserva al cambiar de pestaña (como las variables globales del prototipo). */
-import { hoy, semanaDe } from "./motor";
+import { hoy, moverDia, semanaDe } from "./motor";
 
 const leer = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
 export const guardarLocal = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } };
+
+const tabCajaGuardada = leer("js_caja");
+const tabCuentasGuardada = leer("js_cuentas");
 
 export const E = {
   rol: (leer("js_rol") || "admin") as "mensajero" | "admin",
@@ -12,7 +15,12 @@ export const E = {
   // Oficina → Clientes
   filtroCli: "todos", buscarCli: "", diaCliF: "", paginaCli: 1,
   // Oficina → Caja y Sueldos
-  diaCaja: hoy(), diaLibro: hoy(), cierreAbierto: null as boolean | null, semA: semanaDe(hoy()),
+  tabCaja: (tabCajaGuardada === "mensajeros" || tabCajaGuardada === "liquidaciones" || tabCajaGuardada === "arqueos" ? tabCajaGuardada : "caja") as "caja" | "mensajeros" | "liquidaciones" | "arqueos",
+  diaCaja: hoy(), diaLibro: hoy(), semA: semanaDe(hoy()),
+  // Oficina → Cuentas
+  tabCuentas: (tabCuentasGuardada === "movimientos" || tabCuentasGuardada === "ganancias" ? tabCuentasGuardada : "cuentas") as "cuentas" | "movimientos" | "ganancias",
+  buscarCue: "", buscarGan: "", diaInternos: "", medioInternos: "" as "" | "efectivo" | "nequi" | "bancolombia", paginaInternos: 1, tipoCue: "todos" as "todos" | "pagos" | "compras" | "ganancias", paginaCue: 1, paginaGan: 1,
+  desdeCue: moverDia(hoy(), -30), hastaCue: hoy(),
   // Mensajero
   miMensajero: leer("js_mensajero"), actuarComo: false, diaPedM: "", diaEntM: hoy(), semM: semanaDe(hoy()), ultimaGuia: "",
   // Más → Resultados

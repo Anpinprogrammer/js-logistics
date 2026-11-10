@@ -220,6 +220,8 @@ Lo ya contado en un arqueo no se cambia: responde `409 YA_CONTADO` con el texto 
 | `POST/DELETE /pedidos/:guia/pago-domicilio` | oficina | `{ medio, valor }`: el cliente pagó el domicilio aparte |
 | `POST /pedidos/:guia/diferencia-revisada` | oficina | Marca revisada la diferencia de cobro |
 | `GET /movimientos` | oficina | `{ movimientos }` de todos los clientes |
+| `GET /movimientos/pagina?buscar=&tipo=&desde=&hasta=&pagina=&porPagina=` | oficina | Página de la pestaña Movimientos de Cuentas: solo los tipos de oficina. `tipo`: `todos`, `pagos` (recibidos y pagados), `compras` o `ganancias`; fechas `AAAA-MM-DD`. Devuelve `{ movimientos, pagina, porPagina, total, paginas, totales: { recibido, pagado, compras, ganancia } }`. La app usa 6 en celular y 15 en computador |
+| `GET /movimientos/ganancias?buscar=&desde=&hasta=&pagina=&porPagina=` | oficina | Pestaña Ganancias de Cuentas: por cliente `{ clienteId, nombre, recibido, compras, ganancia }` ordenado por ganancia. Devuelve `{ clientes, pagina, porPagina, total, paginas, totalGanancia }` |
 | `POST /movimientos` | oficina (el asistente: pagos, compras y ganancias) | `{ clienteId, tipo, valor, medio, nota, dia? \| fecha? }`. El pago del asistente queda con la hora del momento |
 | `PATCH /movimientos/:id` | `{ medio }`: el asistente, lo suyo en 24 h; lo demás: admin | Cambia el medio (queda `medioAntes`) o edita |
 | `DELETE /movimientos/:id` | oficina | Quita un pago (si ya se contó, registra el reverso) |
@@ -243,6 +245,7 @@ Lo ya contado en un arqueo no se cambia: responde `409 YA_CONTADO` con el texto 
 | `GET /caja/resumen`, `/caja/libro?dia=`, `/caja/cierre-del-dia` | admin | Caja general, libro y lo que falta para cerrar el día |
 | `GET /caja/corte` | oficina | `{ corte }`: hora del último arqueo (lo de antes ya está contado) |
 | `GET /caja/movimientos` | equipo (cada rol, lo suyo) | `{ movimientos }` de caja |
+| `GET /caja/movimientos/pagina?dia=&medio=&pagina=&porPagina=` | oficina | Movimientos de las cuentas internas (`cat: "interna"`), filtrados por día (`AAAA-MM-DD`) y medio (`efectivo`, `nequi`, `bancolombia`). Devuelve `{ movimientos, pagina, porPagina, total, paginas }`. La app usa 5 en celular y 10 en computador |
 | `POST /caja/movimientos` | oficina | Según `cat`: `interna` (cuenta interna), `devolucion` con `adelantoId`, `oficina`/`sobrante` (piezas del cierre de una caja de oficina), `base` del asistente, o una entrada o salida de admin (`gasto`, `base`, `arriendo`, `adelanto`, `sueldo`, `otro`, `otro_entra`) |
 | `PATCH /caja/movimientos/:id` | admin | Solo `{ devuelto }` de un adelanto, cuando coincide con lo que calcula el servidor (compatibilidad) |
 | `DELETE /caja/movimientos/:id` | admin | Quita (un adelanto de liquidación devuelve la deuda; una devolución resta de `devuelto`) |

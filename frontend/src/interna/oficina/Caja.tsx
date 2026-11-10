@@ -1,5 +1,5 @@
 /* Oficina → Caja: cierre del día, caja general, mensajeros, cajas de oficina, dinero recibido y liquidaciones (igual al prototipo). */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   S, yo, hoy, hora, pesos, diaDe, horaCorta, listaOrdenada, periodoMensajero, totales, tipoDe, esRepartidor, sueldoTexto, textoLiq, ajusteTxt, ganaPorcentaje, sueldoPedidos,
   sueldoPersonaSemana, semanasAdelanto, semanasSueldo, liquidacionesDe, asistentes, cajaOficina, sumaMedios, yaContado, puedoCambiarMedio, yaLiquidado, resumenCaja, arqueosCaja,
@@ -7,7 +7,7 @@ import {
   MEDIOS, MEDIOS_CAJA, CATS, CATS_TIPO, CATS_PERSONA, CATS_SEMANA, type Medio, type UsuarioS, type CajaMov,
 } from "../motor";
 import { Cab, TablaEntregas, pl, useVentana } from "../ui";
-import { E } from "../estado";
+import { E, guardarLocal } from "../estado";
 import { borrarDe, cambiarMedio, cierreOficina, deshacerArqueo, quitarDevolucion, liquidar, movCaja, reabrirLiquidacion, recibirDinero, arqueo } from "../acciones";
 import { motivoError, useDatos } from "../datos";
 import { avisoContado, EnBloque } from "./Pedidos";
@@ -37,56 +37,106 @@ export default function Caja({ pintar }: { pintar: () => void }) {
     try { await borrarDe("recaudos", id); v.avisar("Entrega de dinero quitada"); } catch (e) { noSePudo(v, "No se pudo quitar")(e); }
   };
   // El asistente solo ve lo de los mensajeros y registra lo que le entregan; la caja de la empresa, los sueldos y las liquidaciones son de administración
+  const tabs = [["caja", "Caja"], ["mensajeros", "Mensajeros"], ["liquidaciones", "Liquidaciones recientes"], ["arqueos", "Arqueos"]] as const;
+  const barraTabs = useRef<HTMLDivElement>(null);
+  // En el celular la barra se desplaza: deja siempre visible la pestaña activa.
+  useEffect(() => {
+    const b = barraTabs.current, el = document.getElementById("tabCaja-" + E.tabCaja);
+    if (b && el) b.scrollLeft = Math.max(0, el.offsetLeft - (b.clientWidth - el.offsetWidth) / 2);
+  }, [E.tabCaja]);
+  const ir = (t: typeof E.tabCaja) => { E.tabCaja = t; guardarLocal("js_caja", t); pintar(); };
+  // Flechas, Inicio y Fin para pasar de pestaña, como un tablist de verdad.
+  const alTeclear = (e: React.KeyboardEvent) => {
+    const i = tabs.findIndex(([k]) => k === E.tabCaja);
+    const j = e.key === "ArrowRight" ? (i + 1) % tabs.length : e.key === "ArrowLeft" ? (i - 1 + tabs.length) % tabs.length : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : -1;
+    if (j < 0) return;
+    e.preventDefault();
+    ir(tabs[j][0]);
+    requestAnimationFrame(() => document.getElementById("tabCaja-" + tabs[j][0])?.focus());
+  };
+
   return <>
-    <h1>Caja</h1>
-    {yo.esAdmin && <><CierreDia pintar={pintar} /><CajaGeneral pintar={pintar} /></>}
-    <h2>Mensajeros</h2><p className="sub">{yo.esAdmin ? "Cada mensajero lleva un período abierto que se cierra cuando lo liquidas. Lo que entregue después cuenta para el siguiente período." : "Lo que cada mensajero debe entregar. Toca “Recibir dinero” cada vez que te entregue plata."}</p>
-    <div className="cifras">
-      <div className="cifra fuerte"><span>Pendiente por entregar (todos)</span><b>{pesos(tot.debe)}</b></div>
-      <div className="cifra"><span>Efectivo cobrado en períodos abiertos</span><b>{pesos(tot.ef)}</b></div>
-      <div className="cifra"><span>Transferencias a JS (verificar en banco)</span><b>{pesos(tot.tj)}</b></div>
-      <div className="cifra"><span>Pagado directo a clientes</span><b>{pesos(tot.tc)}</b></div>
+    <header className="caja-cab">
+      <div className="caja-cab-txt">
+        <h1>Caja</h1>
+        <p className="sub">El cierre del día, la plata de los mensajeros y las liquidaciones, cada cosa en su pestaña.</p>
+      </div>
+      <div className="seg subtabs" role="tablist" aria-label="Secciones de Caja" ref={barraTabs}>
+        {tabs.map(([k, t]) => <button key={k} id={"tabCaja-" + k} type="button" role="tab" aria-selected={E.tabCaja === k} aria-controls={"panelCaja-" + k} tabIndex={E.tabCaja === k ? 0 : -1} onClick={() => ir(k)} onKeyDown={alTeclear}>{t}</button>)}
+      </div>
+    </header>
+
+    <div role="tabpanel" id="panelCaja-caja" aria-labelledby="tabCaja-caja" hidden={E.tabCaja !== "caja"}>
+      {yo.esAdmin && <><CierreDia pintar={pintar} /><CajaGeneral pintar={pintar} /></>}
+      <BloqueCajaOficina />
     </div>
-    <div style={{ height: 14 }} />
-    {ids.length ? <div className="mgrid mgrid-mens">{ids.map(id => { const pm = pms[id], tt = totales(pm.ps); return <div className="mcard mcard-mens" key={id}>
-      <div className="mcard-top"><b>{S.mensajeros[id].nombre}</b><span className="acciones"><button className="btn sec chico" onClick={() => base(id)}>Dar base</button><button className="btn ok chico" onClick={() => v.abrir(<RecibirDinero mid={id} />)}>Recibir dinero</button></span></div>
-      <span className="sub" style={{ fontSize: ".85rem" }}>Período desde {pm.ul ? hora(pm.ul.fecha) : "el inicio"}</span>
-      <dl className="datos">
-        <dt>Entregas / en ruta</dt><dd>{pm.ps.length} / {pendM[id] || 0}</dd>
-        <dt>Efectivo cobrado</dt><dd>{pesos(tt.efectivo)}</dd>
-        {pm.base ? <><dt>Base para vueltos</dt><dd>{pesos(pm.base)}</dd></> : null}{pm.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(pm.gastos)}</dd></> : null}
-        {pm.anterior ? <><dt>Pendiente anterior</dt><dd>{pesos(pm.anterior)}</dd></> : null}<FilaAjuste a={pm.ajuste} />
-        <dt>Ya entregó</dt><dd>{pesos(pm.recibido)}</dd>
-        <div className="debe" style={{ display: "contents" }}><dt>Debe</dt><dd>{pesos(pm.debe)}</dd></div>
-        <dt>Transf. a JS</dt><dd>{pesos(tt.transfJs)}</dd>
-        <dt>Directo al cliente</dt><dd>{pesos(tt.transfCli)}</dd>
-        {yo.esAdmin && <><dt>Sueldo del período</dt><dd>{sueldoTexto(id, pm.ps)}</dd></>}
-      </dl>
-      <div className="liq"><span className={"liq-est " + (pm.ul && pm.ul.debe > 0 ? "neg" : "")}>{pm.ul ? "Última: " + textoLiq(pm.ul.debe) : "Sin liquidaciones"}</span>{yo.esAdmin && <button className="btn chico" onClick={() => v.abrir(<Liquidar mid={id} />)}>Liquidar</button>}</div>
-    </div>; })}</div> : <div className="vacio">No hay mensajeros con movimiento pendiente.</div>}
-    <BloqueCajaOficina />
-    <h2>Dinero recibido de mensajeros</h2>
-    <div className="campo" style={{ maxWidth: 220 }}><label htmlFor="diaC">Día</label><input type="date" id="diaC" value={E.diaCaja} onChange={e => { E.diaCaja = e.target.value || hoy(); pintar(); }} /></div>
-    <div className="cifras" style={{ marginBottom: 12 }}><div className="cifra fuerte"><span>Dinero recibido</span><b>{pesos(cajaDia)}</b><span>{Object.entries(porMedio).map(([m, x]) => `${MEDIOS[m as Medio] || m}: ${pesos(x)}`).join(" · ") || "Sin entregas de dinero este día"}</span></div></div>
-    {recsDia.length ? <div className="tabla-env"><table><thead><tr><th>Hora</th><th>Mensajero</th><th>Medio</th><th>Nota</th><th className="n">Valor</th>{yo.esAdmin ? <th></th> : <th>Recibió</th>}</tr></thead><tbody>
-      {recsDia.map(r => <tr key={r.id}><td>{hora(r.fecha)}</td><td>{S.mensajeros[r.mensajeroId]?.nombre || ""}</td><td>{MEDIOS[r.medio] || ""}{medioAntes(r)}</td><td>{r.nota || ""}</td><td className="n"><b>{pesos(r.valor)}</b></td>
-        {yo.esAdmin ? <td style={{ whiteSpace: "nowrap" }}><button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<EditarRecaudo id={r.id} />))}>Editar</button> <button className="btn peligro chico" onClick={() => quitarRec(r.id)}>Quitar</button></td>
-          : <td>{r.porNombre || ""}{puedoCambiarMedio(r) ? <> <button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<CambiarMedio col="recaudos" id={r.id} />))}>Cambiar medio</button></> : null}</td>}</tr>)}
-    </tbody></table></div> : <div className="vacio">Toca “Recibir dinero” en un mensajero cada vez que te entregue plata.</div>}
-    {yo.esAdmin && <h2>Liquidaciones recientes</h2>}
-    {!yo.esAdmin ? (recsDia.length ? <p className="sub" style={{ marginTop: 8 }}>Si algo quedó mal registrado, avísale al administrador para que lo corrija.</p> : null)
-      : liqs.length ? <div className="tabla-env"><table><thead><tr><th>Liquidado</th><th>Mensajero</th><th className="n">Entregas</th><th className="n">Entregó</th><th>Resultado</th><th></th></tr></thead><tbody>
-        {liqs.map(l => <tr key={l.id}><td>{hora(l.fecha)}</td><td>{S.mensajeros[l.mensajeroId]?.nombre || ""}</td><td className="n">{l.entregas || 0}</td><td className="n">{pesos(l.recibido)}</td><td className={l.debe > 0 ? "neg" : "pos"}>{textoLiq(l.debe)}</td><td><button className="btn sec chico" onClick={() => v.abrir(<VerLiquidacion id={l.id} />)}>Ver</button></td></tr>)}
-      </tbody></table></div> : <div className="vacio">Aún no has liquidado a ningún mensajero.</div>}
+
+    <div role="tabpanel" id="panelCaja-mensajeros" aria-labelledby="tabCaja-mensajeros" hidden={E.tabCaja !== "mensajeros"}>
+      <h2>Mensajeros</h2><p className="sub">{yo.esAdmin ? "Cada mensajero lleva un período abierto que se cierra cuando lo liquidas. Lo que entregue después cuenta para el siguiente período." : "Lo que cada mensajero debe entregar. Toca “Recibir dinero” cada vez que te entregue plata."}</p>
+      <div className="cifras">
+        <div className="cifra fuerte"><span>Pendiente por entregar (todos)</span><b>{pesos(tot.debe)}</b></div>
+        <div className="cifra"><span>Efectivo cobrado en períodos abiertos</span><b>{pesos(tot.ef)}</b></div>
+        <div className="cifra"><span>Transferencias a JS (verificar en banco)</span><b>{pesos(tot.tj)}</b></div>
+        <div className="cifra"><span>Pagado directo a clientes</span><b>{pesos(tot.tc)}</b></div>
+      </div>
+      <div style={{ height: 14 }} />
+      {ids.length ? <div className="mgrid mgrid-mens">{ids.map(id => { const pm = pms[id], tt = totales(pm.ps); return <div className="mcard mcard-mens" key={id}>
+        <div className="mcard-top"><b>{S.mensajeros[id].nombre}</b><span className="acciones"><button className="btn sec chico" onClick={() => base(id)}>Dar base</button><button className="btn ok chico" onClick={() => v.abrir(<RecibirDinero mid={id} />)}>Recibir dinero</button></span></div>
+        <span className="sub mcard-periodo">Período desde {pm.ul ? hora(pm.ul.fecha) : "el inicio"}</span>
+        <dl className="datos">
+          <dt>Entregas / en ruta</dt><dd>{pm.ps.length} / {pendM[id] || 0}</dd>
+          <dt>Efectivo cobrado</dt><dd>{pesos(tt.efectivo)}</dd>
+          {pm.base ? <><dt>Base para vueltos</dt><dd>{pesos(pm.base)}</dd></> : null}{pm.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(pm.gastos)}</dd></> : null}
+          {pm.anterior ? <><dt>Pendiente anterior</dt><dd>{pesos(pm.anterior)}</dd></> : null}<FilaAjuste a={pm.ajuste} />
+          <dt>Ya entregó</dt><dd>{pesos(pm.recibido)}</dd>
+          <div className="debe" style={{ display: "contents" }}><dt>Debe</dt><dd>{pesos(pm.debe)}</dd></div>
+          <dt>Transf. a JS</dt><dd>{pesos(tt.transfJs)}</dd>
+          <dt>Directo al cliente</dt><dd>{pesos(tt.transfCli)}</dd>
+          {yo.esAdmin && <><dt>Sueldo del período</dt><dd>{sueldoTexto(id, pm.ps)}</dd></>}
+        </dl>
+        <div className="liq"><span className={"liq-est " + (pm.ul && pm.ul.debe > 0 ? "neg" : "")}>{pm.ul ? "Última: " + textoLiq(pm.ul.debe) : "Sin liquidaciones"}</span>{yo.esAdmin && <button className="btn chico" onClick={() => v.abrir(<Liquidar mid={id} />)}>Liquidar</button>}</div>
+      </div>; })}</div> : <div className="vacio">No hay mensajeros con movimiento pendiente.</div>}
+      <h2>Dinero recibido de mensajeros</h2>
+      <div className="campo" style={{ maxWidth: 220 }}><label htmlFor="diaC">Día</label><input type="date" id="diaC" value={E.diaCaja} onChange={e => { E.diaCaja = e.target.value || hoy(); pintar(); }} /></div>
+      <div className="cifras" style={{ marginBottom: 12 }}><div className="cifra fuerte"><span>Dinero recibido</span><b>{pesos(cajaDia)}</b><span>{Object.entries(porMedio).map(([m, x]) => `${MEDIOS[m as Medio] || m}: ${pesos(x)}`).join(" · ") || "Sin entregas de dinero este día"}</span></div></div>
+      {recsDia.length ? <div className="tabla-env"><table><thead><tr><th>Hora</th><th>Mensajero</th><th>Medio</th><th>Nota</th><th className="n">Valor</th>{yo.esAdmin ? <th></th> : <th>Recibió</th>}</tr></thead><tbody>
+        {recsDia.map(r => <tr key={r.id}><td>{hora(r.fecha)}</td><td>{S.mensajeros[r.mensajeroId]?.nombre || ""}</td><td>{MEDIOS[r.medio] || ""}{medioAntes(r)}</td><td>{r.nota || ""}</td><td className="n"><b>{pesos(r.valor)}</b></td>
+          {yo.esAdmin ? <td style={{ whiteSpace: "nowrap" }}><button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<EditarRecaudo id={r.id} />))}>Editar</button> <button className="btn peligro chico" onClick={() => quitarRec(r.id)}>Quitar</button></td>
+            : <td>{r.porNombre || ""}{puedoCambiarMedio(r) ? <> <button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<CambiarMedio col="recaudos" id={r.id} />))}>Cambiar medio</button></> : null}</td>}</tr>)}
+      </tbody></table></div> : <div className="vacio">Toca “Recibir dinero” en un mensajero cada vez que te entregue plata.</div>}
+      {!yo.esAdmin && recsDia.length ? <p className="sub" style={{ marginTop: 8 }}>Si algo quedó mal registrado, avísale al administrador para que lo corrija.</p> : null}
+    </div>
+
+    <div role="tabpanel" id="panelCaja-liquidaciones" aria-labelledby="tabCaja-liquidaciones" hidden={E.tabCaja !== "liquidaciones"}>
+      {yo.esAdmin ? <>
+        <h2>Liquidaciones recientes</h2>
+        <p className="sub">Los cierres de período ya hechos: cuánto entregó cada mensajero, cómo quedó y el detalle completo.</p>
+        {liqs.length ? <div className="tabla-env"><table><thead><tr><th>Liquidado</th><th>Mensajero</th><th className="n">Entregas</th><th className="n">Monto liquidado</th><th>Estado</th><th className="n">Faltante / sobrante</th><th></th></tr></thead><tbody>
+          {liqs.map(l => <tr key={l.id}><td>{hora(l.fecha)}</td><td>{S.mensajeros[l.mensajeroId]?.nombre || ""}</td><td className="n">{l.entregas || 0}</td><td className="n"><b>{pesos(l.recibido)}</b></td>
+            <td>{l.debe > 0 ? <span className="etq sin">Por cobrar</span> : l.debe < 0 ? <span className="etq ent">A favor</span> : <span className="etq gris">Paz y salvo</span>}{l.adelanto ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>Adelanto {pesos(l.adelanto)}</span></> : null}</td>
+            <td className={"n " + (l.debe > 0 ? "neg" : l.debe < 0 ? "pos" : "")}>{l.debe ? (l.debe > 0 ? "Falta " : "A favor ") + pesos(Math.abs(l.debe)) : "—"}</td>
+            <td><button className="btn sec chico" onClick={() => v.abrir(<VerLiquidacion id={l.id} />)}>Ver</button></td></tr>)}
+        </tbody></table></div> : <div className="vacio">Aún no has liquidado a ningún mensajero.</div>}
+      </> : <div className="vacio">Las liquidaciones las maneja administración.</div>}
+    </div>
+
+    <div role="tabpanel" id="panelCaja-arqueos" aria-labelledby="tabCaja-arqueos" hidden={E.tabCaja !== "arqueos"}>
+      {yo.esAdmin ? <Arqueos /> : <div className="vacio">Los arqueos los maneja administración.</div>}
+    </div>
   </>;
 }
 
-/* ---------- Cierre del día: lo que hay que dejar listo antes del arqueo, en orden ---------- */
+/* ---------- Cierre del día: lo que hay que dejar listo antes del arqueo, en tarjetas ---------- */
+/** Cada paso del cierre: badge de estado, título, detalle y la acción a la derecha. */
+function Paso({ n, titulo, ok, detalle, boton }: { n: number; titulo: string; ok: boolean; detalle?: React.ReactNode; boton?: React.ReactNode }) {
+  return <section className="paso">
+    <div className="paso-cab"><span className={"paso-tag " + (ok ? "ok" : "pend")}>Paso {n}</span><b>{titulo}</b>{boton ? <span className="paso-accion">{boton}</span> : null}</div>
+    {detalle ? <div className="paso-detalle">{detalle}</div> : null}
+  </section>;
+}
+
 function CierreDia({ pintar }: { pintar: () => void }) {
   const v = useVentana(), x = pendientesCierre(), listo = !x.mens.length && !x.ofis.length && !x.sinRem.length && !x.sinServ.length;
-  const abierto = E.cierreAbierto === null ? !listo || !x.arqueoHoy : E.cierreAbierto;
-  const paso = (ok: boolean, titulo: string, detalle: React.ReactNode, boton?: React.ReactNode) => <div style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 0", borderBottom: "1px solid var(--borde,#ddd)" }}>
-    <b className={ok ? "pos" : "neg"} style={{ fontSize: "1.1rem", minWidth: 22 }}>{ok ? "✓" : "•"}</b><div style={{ flex: 1 }}><b>{titulo}</b>{detalle ? <div className="sub" style={{ fontSize: ".85rem", marginTop: 2 }}>{detalle}</div> : null}</div>{boton || null}</div>;
   const aPedidos = (f: "sin" | "serv") => {
     E.tabA = "pedidos"; E.filtroA = f; E.buscarA = ""; E.mensPedA = ""; E.diaPedA = ""; E.paginaA = 1; pintar(); scrollTo(0, 0);
     const ps = Object.values(S.pedidos).filter(f === "sin" ? p => !p.clienteId : sinServicio).sort((a, b) => b.creado - a.creado); if (ps.length) v.abrir(<EnBloque modo={f} lista={ps} />);
@@ -96,21 +146,31 @@ function CierreDia({ pintar }: { pintar: () => void }) {
     if ((y.mens.length || y.ofisEf.length) && !await v.confirmar("Hacer arqueo con pendientes", `Todavía ${[y.mens.length ? `hay ${y.mens.length} ${pl(y.mens.length, "mensajero")} con plata` : "", y.ofisEf.length ? `hay ${y.ofisEf.length} ${pl(y.ofisEf.length, "caja")} de oficina con efectivo sin cerrar` : ""].filter(Boolean).join(" y ")}. No cuentes esa plata: la app todavía la tiene a nombre de ellos.`, "Hacer arqueo igual")) return;
     v.abrir(<HacerArqueo />);
   };
-  return <details className="mcard" id="cierreDia" open={abierto} onToggle={e => { E.cierreAbierto = (e.target as HTMLDetailsElement).open; }} style={{ marginBottom: 16 }}>
-    <summary style={{ cursor: "pointer" }}><b>Cierre del día</b> <span className="sub">{listo ? (x.arqueoHoy ? "· todo listo y contado hoy" : "· listo para el arqueo") : "· hay pendientes antes del arqueo"}</span></summary>
-    {paso(!x.mens.length, "1. Plata de los mensajeros", x.mens.length
-      ? <div className="fichas">{x.mens.map(({ m, debe }) => <div className="ficha" key={m.id}>
-        <div className="ficha-info"><b>{m.nombre}</b><span className={debe > 0 ? "neg" : ""}>{pesos(debe)}</span></div>
-        <button className="btn ok chico" onClick={() => v.abrir(<RecibirDinero mid={m.id} />)}>Recibir</button>
-      </div>)}</div>
-      : "Ningún mensajero tiene plata pendiente.")}
-    {paso(!x.ofis.length, "2. Cajas de oficina", x.ofis.length ? x.ofis.map(({ u, s }, i) => <span key={u.uid}>{i ? " · " : ""}{u.nombre || u.email}: {MEDIOS_K.filter(k => Math.round(s[k])).map(k => MEDIOS[k] + " " + pesos(s[k])).join(", ")} <button className="btn ok chico" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="entrega" />)}>Recibir cierre</button></span>) : "Todas en $ 0.")}
-    {paso(!x.sinRem.length, "3. Pedidos sin remitente", x.sinRem.length ? `${x.sinRem.length} ${pl(x.sinRem.length, "guía")}: el saldo de esos clientes no está completo.` : "Todos tienen remitente.", x.sinRem.length ? <button className="btn sec chico" onClick={() => aPedidos("sin")}>Asignar</button> : null)}
-    {paso(!x.sinServ.length, "4. Entregas sin valor de domicilio", x.sinServ.length ? `${x.sinServ.length} ${pl(x.sinServ.length, "entrega")}: no se descuenta el domicilio ni suma al sueldo.` : "Todas tienen domicilio.", x.sinServ.length ? <button className="btn sec chico" onClick={() => aPedidos("serv")}>Completar</button> : null)}
-    {paso(true, "5. Gastos, adelantos o pagos que hayan quedado sin registrar", "Regístralos ahora: después del arqueo ya no se pueden poner con fecha de días anteriores.", <button className="btn sec chico" id="cdSalida" onClick={() => v.abrir(<MovCaja tipo="sale" />)}>Registrar salida</button>)}
-    {paso(x.arqueoHoy, "6. Arqueo", x.arqueoHoy && x.a ? `Hecho hoy a las ${horaCorta(x.a.fecha)}: ${resultadoArqueo(x.a)}.` : (x.mens.length || x.ofisEf.length ? "Primero recibe la plata de los pasos 1 y 2: si cuentas plata que la app todavía tiene en otra parte, el arqueo sale descuadrado." : "Cuenta efectivo, Nequi, Bancolombia y la Base de JS.") + (x.enRuta.length ? ` Hay ${x.enRuta.length} ${pl(x.enRuta.length, "pedido")} en ruta: esa plata todavía no ha llegado.` : ""),
-      <button className={"btn " + (x.mens.length || x.ofisEf.length ? "sec" : "ok") + " chico"} id="cdArqueo" onClick={arquear}>Hacer arqueo</button>)}
-  </details>;
+  return <section className="cierre" id="cierreDia" aria-labelledby="cierreTitulo">
+    <header className="cierre-cab">
+      <div><h2 id="cierreTitulo">Cierre del día</h2><p className="sub">Lo que hay que dejar listo antes del arqueo, en orden.</p></div>
+      <span className={"etq " + (listo ? (x.arqueoHoy ? "ent" : "ruta") : "pend")}>{listo ? (x.arqueoHoy ? "Todo listo y contado hoy" : "Listo para el arqueo") : "Hay pendientes antes del arqueo"}</span>
+    </header>
+    <div className="pasos">
+      <Paso n={1} titulo="Plata de los mensajeros" ok={!x.mens.length} detalle={x.mens.length
+        ? <div className="fichas">{x.mens.map(({ m, debe }) => <div className="ficha" key={m.id}>
+          <div className="ficha-info"><b>{m.nombre}</b><span className={debe > 0 ? "neg" : ""}>{pesos(debe)}</span></div>
+          <button className="btn chico recibir" onClick={() => v.abrir(<RecibirDinero mid={m.id} />)}>Recibir</button>
+        </div>)}</div>
+        : "Ningún mensajero tiene plata pendiente."} />
+      <Paso n={2} titulo="Cajas de oficina" ok={!x.ofis.length} detalle={x.ofis.length
+        ? x.ofis.map(({ u, s }, i) => <span key={u.uid}>{i ? " · " : ""}{u.nombre || u.email}: {MEDIOS_K.filter(k => Math.round(s[k])).map(k => MEDIOS[k] + " " + pesos(s[k])).join(", ")} <button className="btn chico recibir" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="entrega" />)}>Recibir cierre</button></span>)
+        : "Todas en $ 0."} />
+      <Paso n={3} titulo="Pedidos sin remitente" ok={!x.sinRem.length} detalle={x.sinRem.length ? `${x.sinRem.length} ${pl(x.sinRem.length, "guía")}: el saldo de esos clientes no está completo.` : "Todos tienen remitente."}
+        boton={x.sinRem.length ? <button className="btn sec chico" onClick={() => aPedidos("sin")}>Asignar</button> : null} />
+      <Paso n={4} titulo="Entregas sin valor de domicilio" ok={!x.sinServ.length} detalle={x.sinServ.length ? `${x.sinServ.length} ${pl(x.sinServ.length, "entrega")}: no se descuenta el domicilio ni suma al sueldo.` : "Todas tienen domicilio."}
+        boton={x.sinServ.length ? <button className="btn sec chico" onClick={() => aPedidos("serv")}>Completar</button> : null} />
+      <Paso n={5} titulo="Gastos, adelantos o pagos sin registrar" ok detalle="Regístralos ahora: después del arqueo ya no se pueden poner con fecha de días anteriores."
+        boton={<button className="btn sec chico" id="cdSalida" onClick={() => v.abrir(<MovCaja tipo="sale" />)}>Registrar salida</button>} />
+      <Paso n={6} titulo="Arqueo" ok={x.arqueoHoy} detalle={(x.arqueoHoy && x.a ? `Hecho hoy a las ${horaCorta(x.a.fecha)}: ${resultadoArqueo(x.a)}.` : (x.mens.length || x.ofisEf.length ? "Primero recibe la plata de los pasos 1 y 2: si cuentas plata que la app todavía tiene en otra parte, el arqueo sale descuadrado." : "Cuenta efectivo, Nequi, Bancolombia y la Base de JS.") + (x.enRuta.length ? ` Hay ${x.enRuta.length} ${pl(x.enRuta.length, "pedido")} en ruta: esa plata todavía no ha llegado.` : ""))}
+        boton={<button className={"btn " + (x.mens.length || x.ofisEf.length ? "sec" : "ok") + " chico"} id="cdArqueo" onClick={arquear}>Hacer arqueo</button>} />
+    </div>
+  </section>;
 }
 
 /* ---------- Caja general (solo administración) ---------- */
@@ -121,7 +181,6 @@ function CajaGeneral({ pintar }: { pintar: () => void }) {
   const a0 = arqueosCaja()[0], mes = hoy().slice(0, 7), A = arqueosCaja().filter(a => diaDe(a.fecha).startsWith(mes));
   // solo cuenta lo que faltó o sobró en total; el reacomodo entre medios no es pérdida ni ganancia
   const falto = A.reduce((x, a) => x + Math.min(0, netoArqueo(a)), 0), sobro = A.reduce((x, a) => x + Math.max(0, netoArqueo(a)), 0);
-  const ultimos = arqueosCaja().slice(0, 10);
   const quitar = async (ref: string) => {
     const [col, id] = ref.split("|") as ["recaudos" | "cajamovs", string], x = col === "recaudos" ? S.recaudos[id] : S.cajamovs[id]; if (!x) return;
     if (yaContado(x.fecha)) return avisoContado(v);
@@ -130,11 +189,6 @@ function CajaGeneral({ pintar }: { pintar: () => void }) {
       if (col === "cajamovs" && (x as CajaMov).cat === "devolucion") await quitarDevolucion(id); else await borrarDe(col, id);
       v.avisar("Movimiento quitado");
     } catch (e) { noSePudo(v, "No se pudo quitar")(e); }
-  };
-  const deshacer = async (id: string) => {
-    const a = arqueosCaja().find(x => x.id === id); if (!a) return;
-    if (!await v.confirmar("Deshacer el arqueo del " + hora(a.fecha), "Se quitan el conteo y su faltante o sobrante. La caja vuelve a quedar abierta hasta el arqueo anterior.", "Deshacer")) return;
-    try { await deshacerArqueo(id); v.avisar("Arqueo deshecho"); } catch (e) { noSePudo(v, "No se pudo deshacer")(e); }
   };
   return <>
     <div className="cifras cifras-caja">
@@ -148,18 +202,37 @@ function CajaGeneral({ pintar }: { pintar: () => void }) {
       {A.length ? <div className="cifra"><span>Faltantes y sobrantes de arqueos</span><b className={falto + sobro < 0 ? "neg" : "pos"}>{falto || sobro ? (falto + sobro < 0 ? "− " : "+ ") + pesos(Math.abs(falto + sobro)) : "$ 0"}</b><span>Este mes · faltó {pesos(-falto)} · sobró {pesos(sobro)} · {A.length} {pl(A.length, "arqueo")}</span></div> : null}
       {R.sobrantes.n ? <div className="cifra"><span>Sobrantes de cajas de oficina</span><b className="pos">{pesos(R.sobrantes.mes)}</b><span>Este mes · {R.sobrantes.n} en total ({pesos(R.sobrantes.total)})</span></div> : null}
     </div>
-    <div className="acciones" style={{ margin: "14px 0" }}><button className="btn" id="cjArqueo" onClick={() => v.abrir(<HacerArqueo />)}>Hacer arqueo</button><button className="btn ok" id="cjEntra" onClick={() => v.abrir(<MovCaja tipo="entra" />)}>Registrar entrada</button><button className="btn sec" id="cjSale" onClick={() => v.abrir(<MovCaja tipo="sale" />)}>Registrar salida o gasto</button></div>
+    <div className="acciones acciones-caja"><button className="btn" id="cjArqueo" onClick={() => v.abrir(<HacerArqueo />)}>Hacer arqueo</button><button className="btn ok" id="cjEntra" onClick={() => v.abrir(<MovCaja tipo="entra" />)}>Registrar entrada</button><button className="btn sec" id="cjSale" onClick={() => v.abrir(<MovCaja tipo="sale" />)}>Registrar salida o gasto</button></div>
     <h2>Movimientos de caja</h2>
     <div className="campo" style={{ maxWidth: 220 }}><label htmlFor="diaL">Día</label><input type="date" id="diaL" value={E.diaLibro} onChange={e => { E.diaLibro = e.target.value || hoy(); pintar(); }} /></div>
     {delDia.length ? <div className="tabla-env"><table><thead><tr><th>Hora</th><th>Concepto</th><th>Tipo</th><th>Medio</th><th className="n">Valor</th><th></th></tr></thead><tbody>
       {delDia.map((x, i) => <tr key={(x.ref || "") + i}><td>{hora(x.fecha)}</td><td>{x.concepto}</td><td>{x.cat}</td><td>{MEDIOS_CAJA[x.medio] || ""}</td><td className={"n " + (x.valor < 0 ? "neg" : "pos")}>{pesos(x.valor)}</td><td>{x.ref ? <button className="btn peligro chico" onClick={() => quitar(x.ref!)}>Quitar</button> : null}</td></tr>)}
       <tr><td></td><td><b>Entradas {pesos(ent)} · Salidas {pesos(sal)}</b></td><td></td><td></td><td className="n"><b>{pesos(ent - sal)}</b></td><td></td></tr>
     </tbody></table></div> : <div className="vacio">Sin movimientos de caja este día.</div>}
-    {ultimos.length ? <><h2>Arqueos</h2><div className="tabla-env"><table><thead><tr><th>Fecha</th>{MEDIOS_K.map(k => <th className="n" key={k}>{MEDIOS[k]}<br /><small>contado / esperado</small></th>)}<th>Resultado</th><th>Contó</th><th></th></tr></thead><tbody>
+  </>;
+}
+
+/* ---------- Arqueos recientes (administración), en la pestaña de liquidaciones ---------- */
+function Arqueos() {
+  const v = useVentana(), ultimos = arqueosCaja().slice(0, 10);
+  const deshacer = async (id: string) => {
+    const a = arqueosCaja().find(x => x.id === id); if (!a) return;
+    if (!await v.confirmar("Deshacer el arqueo del " + hora(a.fecha), "Se quitan el conteo y su faltante o sobrante. La caja vuelve a quedar abierta hasta el arqueo anterior.", "Deshacer")) return;
+    try { await deshacerArqueo(id); v.avisar("Arqueo deshecho"); } catch (e) { noSePudo(v, "No se pudo deshacer")(e); }
+  };
+  if (!ultimos.length) return <>
+    <h2>Arqueos recientes</h2>
+    <p className="sub">El conteo real contra lo que esperaba la app. Solo el último se puede deshacer.</p>
+    <div className="vacio">Todavía no se ha hecho ningún arqueo.</div>
+  </>;
+  return <>
+    <h2>Arqueos recientes</h2>
+    <p className="sub">El conteo real contra lo que esperaba la app. Solo el último se puede deshacer.</p>
+    <div className="tabla-env"><table><thead><tr><th>Fecha</th>{MEDIOS_K.map(k => <th className="n" key={k}>{MEDIOS[k]}<br /><small>contado / esperado</small></th>)}<th>Resultado</th><th>Contó</th><th></th></tr></thead><tbody>
       {ultimos.map((a, i) => <tr key={a.id}><td>{hora(a.fecha)}{a.nota ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>{a.nota}</span></> : null}</td>
         {MEDIOS_K.map(k => <td className="n" key={k}>{a.contado ? pesos(a.contado[k]) : "—"}<br /><span className="sub" style={{ fontSize: ".8rem" }}>{a.esperado ? pesos(a.esperado[k]) : ""}</span></td>)}
         <td className={netoArqueo(a) < 0 ? "neg" : "pos"}>{resultadoArqueo(a)}</td><td>{a.por || ""}</td><td>{i === 0 ? <button className="btn sec chico" onClick={() => deshacer(a.id)}>Deshacer</button> : null}</td></tr>)}
-    </tbody></table></div></> : null}
+    </tbody></table></div>
   </>;
 }
 
@@ -364,24 +437,24 @@ function TarjetaCajaOficina({ u, dia }: { u: Pick<UsuarioS, "uid" | "nombre" | "
     if (!await v.confirmar("Quitar movimiento de la caja de oficina", "Se quita la base o el cierre registrado.", "Quitar")) return;
     try { await borrarDe("cajamovs", ref); v.avisar("Movimiento quitado"); } catch (e) { noSePudo(v, "No se pudo quitar")(e); }
   };
-  return <div className="mcard"><div className="mcard-top"><b>{yo.esAdmin ? u.nombre || u.email : "Mi caja de oficina"}</b>
-    {yo.esAdmin ? <span className="acciones" style={{ margin: 0, gap: 6 }}><button className="btn sec chico" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="base" />)}>Dar base</button><button className="btn ok chico" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="entrega" />)}>Recibir cierre</button></span>
-      : <span className="acciones" style={{ margin: 0 }}><button className="btn sec chico" onClick={() => v.abrir(<BaseDesdeOficina />)}>Dar base a un mensajero</button></span>}</div>
-    <span className="sub" style={{ fontSize: ".85rem" }}>{ahora ? "Lo que tiene ahora y debe entregar al cierre" : "Lo que tenía al final de ese día"}</span>
-    <dl className="datos">{MEDIOS_K.map(k => <span key={k} style={{ display: "contents" }}><dt>{MEDIOS[k]}</dt><dd className={hasta[k] < 0 ? "neg" : ""}>{pesos(hasta[k])}</dd></span>)}
-      <div className="debe" style={{ display: "contents" }}><dt>Total</dt><dd>{pesos(hasta.efectivo + hasta.nequi + hasta.bancolombia)}</dd></div></dl>
-    {delDia.length ? <div className="tabla-env" style={{ marginTop: 8 }}><table><tbody>{delDia.map((x, i) => <tr key={i}><td>{horaCorta(x.fecha)}</td><td>{x.concepto}</td><td>{MEDIOS[x.medio]}</td><td className={"n " + (x.valor < 0 ? "neg" : "pos")}>{x.valor < 0 ? "− " : "+ "}{pesos(Math.abs(x.valor))}</td>
-      {yo.esAdmin && x.ref ? <td><button className="btn peligro chico" onClick={() => quitar(x.ref!)}>Quitar</button></td> : yo.esAdmin ? <td></td> : null}</tr>)}</tbody></table></div> : <p className="sub">Sin movimientos este día.</p>}
+  return <div className="mcard-oficina"><div className="mcard-top"><b>{yo.esAdmin ? u.nombre || u.email : "Mi caja de oficina"}</b>
+    {yo.esAdmin ? <span className="acciones oficina-acciones"><button className="btn sec chico" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="base" />)}>Dar base</button><button className="btn ok chico" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="entrega" />)}>Recibir cierre</button></span>
+      : <span className="acciones oficina-acciones"><button className="btn sec chico" onClick={() => v.abrir(<BaseDesdeOficina />)}>Dar base a un mensajero</button></span>}</div>
+    <span className="sub oficina-sub">{ahora ? "Lo que tiene ahora y debe entregar al cierre" : "Lo que tenía al final de ese día"}</span>
+    <dl className="datos">{MEDIOS_K.map(k => <div className="dato" key={k}><dt>{MEDIOS[k]}</dt><dd className={hasta[k] < 0 ? "neg" : ""}>{pesos(hasta[k])}</dd></div>)}
+      <div className="dato total"><dt>Total</dt><dd>{pesos(hasta.efectivo + hasta.nequi + hasta.bancolombia)}</dd></div></dl>
+    <div className="oficina-pie">{delDia.length ? <div className="tabla-env"><table><tbody>{delDia.map((x, i) => <tr key={i}><td>{horaCorta(x.fecha)}</td><td>{x.concepto}</td><td>{MEDIOS[x.medio]}</td><td className={"n " + (x.valor < 0 ? "neg" : "pos")}>{x.valor < 0 ? "− " : "+ "}{pesos(Math.abs(x.valor))}</td>
+      {yo.esAdmin && x.ref ? <td><button className="btn peligro chico" onClick={() => quitar(x.ref!)}>Quitar</button></td> : yo.esAdmin ? <td></td> : null}</tr>)}</tbody></table></div> : <p className="sub">Sin movimientos este día.</p>}</div>
   </div>;
 }
 function BloqueCajaOficina() {
   if (yo.esAdmin) {
     const as = asistentes(); if (!as.length) return null;
     return <><h2>Caja de oficina</h2><p className="sub">Lo que maneja cada asistente en efectivo, Nequi y Bancolombia: la base que le das, más lo que recibe (mensajeros, pagos de clientes, domicilios), menos las bases que da a los mensajeros, las compras que paga y lo que les paga a los clientes, menos lo que te entrega al cierre.</p>
-      <div className="mgrid">{as.map(u => <TarjetaCajaOficina key={u.uid} u={u} dia={E.diaCaja} />)}</div></>;
+      <div className="mgrid-oficina">{as.map(u => <TarjetaCajaOficina key={u.uid} u={u} dia={E.diaCaja} />)}</div></>;
   }
   if (yo.esAsistente && yo.uid) return <><h2>Mi caja de oficina</h2><p className="sub">Tu base más lo que recibes, menos las bases que das a los mensajeros y lo que les pagas a los clientes. Al final del día entrega a administración lo que dice cada medio.</p>
-    <div className="mgrid"><TarjetaCajaOficina u={{ uid: yo.uid, nombre: yo.nombre, email: "" }} dia={E.diaCaja} /></div></>;
+    <div className="mgrid-oficina"><TarjetaCajaOficina u={{ uid: yo.uid, nombre: yo.nombre, email: "" }} dia={E.diaCaja} /></div></>;
   return null;
 }
 /** Dar base a un asistente o recibir su cierre. Al cierre, lo que pasa de lo que debía tener en efectivo es sobrante; en Nequi y Bancolombia se deja en $ 0. */

@@ -55,7 +55,7 @@ export default function Panel({ pintar }: { pintar: () => void }) {
         : <Kpi ico="plata" lbl="Deben los mensajeros" val={pesos(enMens)} pie={<small>Lo que falta por recibir</small>} onClick={() => ir("caja")} cls="oscuro" />}
     </div>
     <div className="dash">
-      <section className="tarjeta c5"><h3>Pedidos de hoy <small>{diaCorto(h)}</small></h3>
+      <section className="tarjeta c5 tarjeta-dona"><h3>Pedidos de hoy <small>{diaCorto(h)}</small></h3>
         <Dona segs={[{ t: "Entregados", n: entHoy.length, c: COLOR_ESTADO.entregado }, { t: "En ruta", n: enRuta.length, c: COLOR_ESTADO.ruta }, { t: "Devueltos", n: devHoy.length, c: COLOR_ESTADO.devuelto }]}
           centro={entHoy.length + enRuta.length + devHoy.length} sub="pedidos" /></section>
       <section className="tarjeta c7"><h3>Mensajeros en ruta <button className="btn sec chico" onClick={() => ir("caja")}>Ir a Caja</button></h3>

@@ -26,10 +26,10 @@ export const aPedido = (p: T.Pedido): Pedido => ({
 });
 const aCliente = (c: T.Cliente): Cliente => ({ id: c.id, nombre: c.nombre, telefono: c.telefono || "", tarifa: c.tarifa || 0 });
 const aPersona = (m: T.Mensajero): Persona => ({ id: m.id, nombre: m.nombre, telefono: m.telefono || "", tipo: m.tipo || "mensajero", tarifa: m.tarifa || 0 });
-const aMov = (m: T.Movimiento): Movimiento => ({ id: m.id, clienteId: m.clienteId, tipo: m.tipo, valor: m.valor || 0, medio: m.medio || "", nota: m.nota || "", fecha: ms(m.fecha), porUid: m.porUid || "", porNombre: m.porNombre || "", medioAntes: m.medioAntes || undefined });
+export const aMov = (m: T.Movimiento): Movimiento => ({ id: m.id, clienteId: m.clienteId, tipo: m.tipo, valor: m.valor || 0, medio: m.medio || "", nota: m.nota || "", fecha: ms(m.fecha), porUid: m.porUid || "", porNombre: m.porNombre || "", medioAntes: m.medioAntes || undefined });
 const aRec = (r: T.Recaudo): Recaudo => ({ id: r.id, mensajeroId: r.mensajeroId, valor: r.valor || 0, medio: r.medio || "efectivo", nota: r.nota || "", fecha: ms(r.fecha), porUid: r.porUid || "", porNombre: r.porNombre || "", medioAntes: r.medioAntes || undefined });
 const aLiq = (l: T.Liquidacion): Liquidacion => ({ ...l, fecha: ms(l.fecha), desde: ms(l.desde), guias: l.guias ?? undefined });
-const aCaja = (c: T.CajaMovimiento): CajaMov => ({
+export const aCaja = (c: T.CajaMovimiento): CajaMov => ({
   id: c.id, tipo: c.tipo, cat: c.cat, valor: c.valor || 0, medio: (c.medio || "") as CajaMov["medio"], concepto: c.concepto || "", fecha: ms(c.fecha),
   personaId: c.personaId || "", personaUid: c.personaUid || "", cuentaId: c.cuentaId || "", semana: c.semana || "", porUid: c.porUid || "", porNombre: c.porNombre || "",
   devuelto: c.devuelto || 0, adelantoId: c.adelantoId || "", deLiquidacion: c.deLiquidacion || "", inicial: !!c.inicial, nivel: !!c.nivel,

@@ -350,3 +350,26 @@ export async function confirmarQuitarAdelanto(ctx, id, { debe, adelanto }) {
   if (Number(adelanto) !== 0 || Math.round(numero(debe)) !== esperado) throw conflicto("Las liquidaciones no se editan: reábrela o quita su adelanto.");
   return l;
 }
+
+/* ---------- movimientos de las cuentas internas (pestaña Cuentas), por páginas ---------- */
+/** Filtra los movimientos internos (cat "interna") por día y medio, y arma una página. */
+export function armarPaginaInternos(movs, { dia, medio, pagina, porPagina } = {}) {
+  const lista = movs
+    .filter(m => m.cat === "interna")
+    .filter(m => !dia || diaDe(m.fecha) === dia)
+    .filter(m => !medio || m.medio === medio)
+    .sort((a, b) => b.fecha - a.fecha);
+  const tam = Math.max(1, Math.min(100, Number(porPagina) || 10));
+  const paginas = Math.max(1, Math.ceil(lista.length / tam));
+  const actual = Math.min(Math.max(1, Number(pagina) || 1), paginas);
+  return { movimientos: lista.slice((actual - 1) * tam, actual * tam), pagina: actual, porPagina: tam, total: lista.length, paginas };
+}
+
+/** GET /caja/movimientos/pagina: los movimientos de las cuentas internas, filtrados y por páginas. */
+export async function paginaInternos(ctx, { dia, medio, pagina, porPagina } = {}) {
+  exigirOficina(ctx.actor);
+  if (dia && !esDia(dia)) throw datosInvalidos("El día no es válido (AAAA-MM-DD).");
+  if (medio && !MEDIOS[medio]) throw datosInvalidos("El medio no es válido.");
+  const movs = await Cajamovs.listar(ctx.db);
+  return armarPaginaInternos(movs, { dia, medio, pagina, porPagina });
+}

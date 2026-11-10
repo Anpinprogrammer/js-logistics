@@ -11,6 +11,7 @@ r.get("/cierre-del-dia", permitir("admin"), C.cierreDelDia);
 r.get("/corte", permitir(OFICINA), C.corte);
 
 r.get("/movimientos", permitir(EQUIPO), C.listar);
+r.get("/movimientos/pagina", permitir(OFICINA), validar({ query: V.movimientosCuentaPagina }), C.paginaInternos);
 r.post("/movimientos", permitir(OFICINA), validar({ body: V.cajaMov }), C.crear);
 r.patch("/movimientos/:id", permitir("admin"), validar({ ...id, body: V.devuelto }), C.actualizar);
 r.delete("/movimientos/:id", permitir("admin"), validar(id), C.eliminar);

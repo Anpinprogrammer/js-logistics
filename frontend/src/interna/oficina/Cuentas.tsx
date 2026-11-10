@@ -1,29 +1,81 @@
 /* Oficina → Cuentas: cuentas internas (JS Envíos, MT, Base de JS) y pagos, compras y ganancias de clientes, igual al prototipo. */
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, listaOrdenada, textoCuenta, yaContado, mueveCaja, esPago, nombreCliente, saldoCliente, sinTildes, cajaOficina, puedoCambiarMedio,
-  fechaCaja, fechaDia, diaMinCaja, MEDIOS, MOVS, MOVS_OFICINA, TIPOS_CUENTA, type Medio, type Movimiento, type TipoMov,
+  fechaCaja, fechaDia, diaMinCaja, MEDIOS, MOVS, MOVS_OFICINA, TIPOS_CUENTA, resumenCaja, MEDIOS_CAJA, moverDia, type Medio, type Movimiento, type TipoMov, type CajaMov,
 } from "../motor";
-import { Cab, useVentana } from "../ui";
+import { Cab, FiltroDia, IconoCalendario, Paginador, useVentana } from "../ui";
+import { E, guardarLocal } from "../estado";
 import { borrarDe, crearCuenta, guardarMovimiento, movCaja } from "../acciones";
-import { motivoError } from "../datos";
+import { aCaja, aMov, motivoError, useDatos } from "../datos";
+import { DEMO } from "../demo";
+import { caja as apiCaja, movimientos as apiMovimientos } from "../../api/servicios";
+import { usePorPaginaCuentas, usePorPaginaInternos } from "../../lib/pantalla";
+import type { GananciaCliente, PaginaCajaMovimientos, PaginaGanancias, PaginaMovimientos } from "../../api/tipos";
 import { avisoContado } from "./Pedidos";
 import { diaAntesDelArqueo, FormCliente } from "./Clientes";
 import { CambiarMedio } from "./Caja";
 
 type Ventana = ReturnType<typeof useVentana>;
+type FiltrosCuentas = { tipo: string; buscar: string; desde: string; hasta: string };
+/** La página que usa la pantalla: los movimientos ya vienen con las fechas en milisegundos. */
+type PaginaMovsUI = Omit<PaginaMovimientos, "movimientos"> & { movimientos: Movimiento[] };
+type PaginaInternosUI = Omit<PaginaCajaMovimientos, "movimientos"> & { movimientos: CajaMov[] };
+
+const delTipo = (tipo: string, filtro: string) => filtro === "todos" || (filtro === "pagos" ? tipo === "pago_de_cliente" || tipo === "pago_a_cliente" : filtro === "compras" ? tipo === "compra_cliente" : tipo === "ganancia");
+const cortar = <T,>(lista: T[], pagina: number, porPagina: number) => {
+  const paginas = Math.max(1, Math.ceil(lista.length / porPagina)), actual = Math.min(Math.max(1, pagina), paginas);
+  return { items: lista.slice((actual - 1) * porPagina, actual * porPagina), pagina: actual, total: lista.length, paginas };
+};
+const dentro = (m: Movimiento, f: FiltrosCuentas) => { const d = diaDe(m.fecha); return (!f.desde || d >= f.desde) && (!f.hasta || d <= f.hasta); };
+const busca = (m: Movimiento, q: string) => !q || sinTildes(nombreCliente(m.clienteId) + " " + (m.nota || "")).includes(q);
+
+/** La misma página que arma el servidor, con los datos en memoria (modo demo). */
+function paginaMovsDemo(f: FiltrosCuentas, pagina: number, porPagina: number): PaginaMovsUI {
+  const q = sinTildes(f.buscar.trim());
+  const lista = Object.values(S.movimientos).filter(m => MOVS_OFICINA.includes(m.tipo)).filter(m => dentro(m, f)).filter(m => delTipo(m.tipo, f.tipo)).filter(m => busca(m, q)).sort((a, b) => b.fecha - a.fecha);
+  const suma = (t: TipoMov) => lista.filter(m => m.tipo === t).reduce((a, m) => a + (Number(m.valor) || 0), 0);
+  const p = cortar(lista, pagina, porPagina);
+  return { movimientos: p.items, pagina: p.pagina, porPagina, total: p.total, paginas: p.paginas, totales: { recibido: suma("pago_de_cliente"), pagado: suma("pago_a_cliente"), compras: suma("compra_cliente"), ganancia: suma("ganancia") } };
+}
+
+/** Movimientos de las cuentas internas en memoria (modo demo). */
+function paginaInternosDemo(f: { dia: string; medio: string }, pagina: number, porPagina: number): PaginaInternosUI {
+  const lista = Object.values(S.cajamovs).filter(m => m.cat === "interna").filter(m => !f.dia || diaDe(m.fecha) === f.dia).filter(m => !f.medio || m.medio === f.medio).sort((a, b) => b.fecha - a.fecha);
+  const p = cortar(lista, pagina, porPagina);
+  return { movimientos: p.items, pagina: p.pagina, porPagina, total: p.total, paginas: p.paginas };
+}
+
+/** Ganancias por cliente en memoria (modo demo). */
+function paginaGananciasDemo(f: FiltrosCuentas, pagina: number, porPagina: number): PaginaGanancias {
+  const q = sinTildes(f.buscar.trim());
+  const filtrados = Object.values(S.movimientos).filter(m => MOVS_OFICINA.includes(m.tipo)).filter(m => dentro(m, f)).filter(m => busca(m, q));
+  const por = new Map<string, GananciaCliente>();
+  for (const m of filtrados) {
+    if (!m.clienteId) continue;
+    const x = por.get(m.clienteId) ?? { clienteId: m.clienteId, nombre: nombreCliente(m.clienteId) || "(eliminado)", recibido: 0, compras: 0, ganancia: 0 };
+    const val = Number(m.valor) || 0;
+    if (m.tipo === "pago_de_cliente") x.recibido += val; else if (m.tipo === "compra_cliente") x.compras += val; else if (m.tipo === "ganancia") x.ganancia += val;
+    por.set(m.clienteId, x);
+  }
+  const lista = [...por.values()].sort((a, b) => b.ganancia - a.ganancia || b.compras - a.compras || b.recibido - a.recibido);
+  const totalGanancia = filtrados.filter(m => m.tipo === "ganancia").reduce((a, m) => a + (Number(m.valor) || 0), 0);
+  const p = cortar(lista, pagina, porPagina);
+  return { clientes: p.items, pagina: p.pagina, porPagina, total: p.total, paginas: p.paginas, totalGanancia };
+}
 const MEDIOS_K = Object.keys(MEDIOS) as Medio[];
 const medioAntes = (x: { medio: string; medioAntes?: string }) => x.medioAntes && x.medioAntes !== x.medio ? <> <span className="sub" style={{ fontSize: ".8rem" }}>(antes {MEDIOS[x.medioAntes as Medio] || x.medioAntes})</span></> : null;
 
 /** Un pago ya contado en un arqueo no se borra: se registra hoy un pago contrario por el mismo valor. */
 const reversarPago = (m: Movimiento) => yaContado(m.fecha) ? guardarMovimiento(null, { clienteId: m.clienteId, tipo: m.tipo === "pago_a_cliente" ? "pago_de_cliente" : "pago_a_cliente", valor: Number(m.valor) || 0, medio: m.medio || "efectivo", nota: "Reverso del pago del " + hora(m.fecha), fecha: Date.now() }) : borrarDe("movimientos", m.id);
 
-export default function Cuentas() {
+export default function Cuentas({ pintar }: { pintar: () => void }) {
   const v = useVentana();
   const cs = listaOrdenada(S.cuentas, "nombre");
-  const movs = Object.values(S.cajamovs).filter(c => c.cat === "interna").sort((a, b) => b.fecha - a.fecha).slice(0, 60);
-  const extra = Object.values(S.movimientos).filter(m => MOVS_OFICINA.includes(m.tipo)).sort((a, b) => b.fecha - a.fecha).slice(0, 40);
+  const R = resumenCaja();
   const [creando, setCreando] = useState(false);
+  const poner = (cambio: Partial<typeof E>) => { Object.assign(E, cambio); pintar(); };
   const semilla = async () => {
     setCreando(true);
     try { for (const [n, t] of [["JS Envíos", "socio"], ["MT (tienda de ropa)", "socio"], ["Base de JS", "base"]] as const) await crearCuenta(n, t); v.avisar("Cuentas creadas"); }
@@ -44,25 +96,160 @@ export default function Cuentas() {
     try { await borrarDe("movimientos", m.id); v.avisar("Movimiento quitado"); } catch (e) { v.avisar("No se pudo quitar: " + motivoError(e)); }
   };
   const tipoTxt = (m: Movimiento) => m.tipo === "pago_de_cliente" ? `Pago · ${MEDIOS[m.medio as Medio] || ""}` : m.tipo === "pago_a_cliente" ? `Le pagó · ${MEDIOS[m.medio as Medio] || ""}` : m.tipo === "ganancia" ? "Ganancia JS" : "Compra" + (m.medio ? ` · ${MEDIOS[m.medio as Medio] || ""}` : "");
+
+  const tabs = [["cuentas", "Cuentas"], ["movimientos", "Movimientos"], ["ganancias", "Ganancias"]] as const;
+  const ir = (t: typeof E.tabCuentas) => { E.tabCuentas = t; guardarLocal("js_cuentas", t); pintar(); };
+  // Flechas, Inicio y Fin para pasar de pestaña.
+  const alTeclear = (e: React.KeyboardEvent) => {
+    const i = tabs.findIndex(([k]) => k === E.tabCuentas);
+    const j = e.key === "ArrowRight" ? (i + 1) % tabs.length : e.key === "ArrowLeft" ? (i - 1 + tabs.length) % tabs.length : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : -1;
+    if (j < 0) return;
+    e.preventDefault();
+    ir(tabs[j][0]);
+    requestAnimationFrame(() => document.getElementById("tabCue-" + tabs[j][0])?.focus());
+  };
+
+  // El servidor filtra, cuenta y corta; en demo se imita con los datos en memoria.
+  const porPagina = usePorPaginaCuentas();
+  const { version } = useDatos();
+  const [buscar, setBuscar] = useState(E.buscarCue);
+  const [buscarGan, setBuscarGan] = useState(E.buscarGan);
+  const tBuscar = useRef<number>(0), tBuscarGan = useRef<number>(0);
+  const arribaMovs = useRef<HTMLDivElement>(null), arribaGan = useRef<HTMLDivElement>(null);
+  const alBuscar = (x: string) => { setBuscar(x); clearTimeout(tBuscar.current); tBuscar.current = window.setTimeout(() => poner({ buscarCue: x, paginaCue: 1 }), 300); };
+  const alBuscarGan = (x: string) => { setBuscarGan(x); clearTimeout(tBuscarGan.current); tBuscarGan.current = window.setTimeout(() => poner({ buscarGan: x, paginaGan: 1 }), 300); };
+  const qMovs = useQuery({
+    queryKey: ["movimientos", "cuentas", E.tipoCue, E.buscarCue, E.desdeCue, E.hastaCue, E.paginaCue, porPagina, version],
+    enabled: E.tabCuentas === "movimientos",
+    placeholderData: keepPreviousData,
+    queryFn: (): Promise<PaginaMovsUI> => DEMO
+      ? Promise.resolve(paginaMovsDemo({ tipo: E.tipoCue, buscar: E.buscarCue, desde: E.desdeCue, hasta: E.hastaCue }, E.paginaCue, porPagina))
+      : apiMovimientos.pagina({ tipo: E.tipoCue, buscar: E.buscarCue, desde: E.desdeCue, hasta: E.hastaCue }, E.paginaCue, porPagina).then(r => ({ ...r, movimientos: r.movimientos.map(aMov) }))
+  });
+  const pag = qMovs.data, filas = pag?.movimientos ?? [];
+  const tot = pag?.totales ?? { recibido: 0, pagado: 0, compras: 0, ganancia: 0 };
+  const qGan = useQuery({
+    queryKey: ["movimientos", "ganancias", E.buscarGan, E.desdeCue, E.hastaCue, E.paginaGan, porPagina, version],
+    enabled: E.tabCuentas === "ganancias",
+    placeholderData: keepPreviousData,
+    queryFn: () => DEMO
+      ? Promise.resolve(paginaGananciasDemo({ tipo: "todos", buscar: E.buscarGan, desde: E.desdeCue, hasta: E.hastaCue }, E.paginaGan, porPagina))
+      : apiMovimientos.ganancias({ buscar: E.buscarGan, desde: E.desdeCue, hasta: E.hastaCue }, E.paginaGan, porPagina)
+  });
+  const pagGan = qGan.data, ganFilas = pagGan?.clientes ?? [];
+  const porPaginaInt = usePorPaginaInternos();
+  const arribaInt = useRef<HTMLDivElement>(null);
+  const qInt = useQuery({
+    queryKey: ["cajamovs", "interna", E.diaInternos, E.medioInternos, E.paginaInternos, porPaginaInt, version],
+    enabled: E.tabCuentas === "cuentas",
+    placeholderData: keepPreviousData,
+    queryFn: (): Promise<PaginaInternosUI> => DEMO
+      ? Promise.resolve(paginaInternosDemo({ dia: E.diaInternos, medio: E.medioInternos }, E.paginaInternos, porPaginaInt))
+      : apiCaja.movimientosPagina({ dia: E.diaInternos, medio: E.medioInternos }, E.paginaInternos, porPaginaInt).then(r => ({ ...r, movimientos: r.movimientos.map(aCaja) }))
+  });
+  const pagInt = qInt.data, movs = pagInt?.movimientos ?? [];
+  const irInt = (n: number) => { poner({ paginaInternos: n }); arribaInt.current?.scrollIntoView({ block: "start", behavior: "smooth" }); };
+  const irMovs = (n: number) => { poner({ paginaCue: n }); arribaMovs.current?.scrollIntoView({ block: "start", behavior: "smooth" }); };
+  const irGan = (n: number) => { poner({ paginaGan: n }); arribaGan.current?.scrollIntoView({ block: "start", behavior: "smooth" }); };
+  const conRango = E.desdeCue || E.hastaCue;
   return <>
-    <h1>Cuentas</h1><p className="sub">Entradas y salidas de JS Envíos, MT y la base de JS. Mueven la caja; no tocan clientes ni sueldos.</p>
-    {cs.length ? <div className="mgrid">{cs.map(cu => { const t = textoCuenta(cu); return <div className="mcard" key={cu.id}><div className="mcard-top"><b>{cu.nombre}</b><span className="acciones" style={{ margin: 0, gap: 6 }}><button className="btn ok chico" onClick={() => v.abrir(<MovCuenta id={cu.id} tipo="entra" />)}>Entrada</button><button className="btn sec chico" onClick={() => v.abrir(<MovCuenta id={cu.id} tipo="sale" />)}>Salida</button></span></div>
-      <span className="sub" style={{ fontSize: ".85rem" }}>{TIPOS_CUENTA[cu.tipo] || ""}</span><dl className="datos"><dt>{t.txt}</dt><dd className={t.cls}>{t.val}</dd></dl></div>; })}</div>
-      : <div className="vacio">{yo.esAdmin ? <>Todavía no hay cuentas. <button className="btn chico" id="cuSemilla" disabled={creando} onClick={semilla}>Crear JS Envíos, MT y Base de JS</button></> : "El administrador todavía no ha creado las cuentas."}</div>}
-    {yo.esAdmin && <div className="acciones"><button className="btn sec chico" id="cuNueva" onClick={() => v.abrir(<NuevaCuenta />)}>+ Nueva cuenta</button></div>}
-    <h2>Movimientos de las cuentas</h2>
-    {movs.length ? <div className="tabla-env"><table><thead><tr><th>Fecha</th><th>Cuenta</th><th>Motivo</th><th>Medio</th><th className="n">Valor</th>{yo.esAdmin && <th></th>}</tr></thead><tbody>
-      {movs.map(c => <tr key={c.id}><td>{hora(c.fecha)}</td><td>{S.cuentas[c.cuentaId || ""]?.nombre || "—"}</td><td>{c.concepto || ""}</td><td>{MEDIOS[c.medio as Medio] || ""}</td><td className={"n " + (c.tipo === "entra" ? "pos" : "neg")}>{c.tipo === "entra" ? "+ " : "− "}{pesos(c.valor)}</td>
-        {yo.esAdmin && <td><button className="btn peligro chico" onClick={() => quitarCu(c.id)}>Quitar</button></td>}</tr>)}
-    </tbody></table></div> : <div className="vacio">Sin movimientos.</div>}
-    <h2>Pagos, compras y ganancias de clientes</h2>
-    <p className="sub">El pago de un cliente entra a la caja (efectivo, Nequi o Bancolombia) y se descuenta de lo que debe. Pagarle a un cliente es entregarle su saldo a favor: sale de la caja. La compra sale de la caja y queda como deuda del cliente; al entregar se compensa con lo cobrado. La ganancia ocasional se le carga al cliente y suma al sueldo de JS.</p>
-    <div className="acciones"><button className="btn ok" id="cuPago" onClick={() => v.abrir(<MovClienteOficina tipo="pago_de_cliente" />)}>Pago de un cliente</button><button className="btn" id="cuPagoA" onClick={() => v.abrir(<MovClienteOficina tipo="pago_a_cliente" />)}>Pagarle a un cliente</button><button className="btn" id="cuCompra" onClick={() => v.abrir(<MovClienteOficina tipo="compra_cliente" />)}>Compra para un cliente</button><button className="btn sec" id="cuGanancia" onClick={() => v.abrir(<MovClienteOficina tipo="ganancia" />)}>Ganancia ocasional</button></div>
-    {extra.length ? <div className="tabla-env" style={{ marginTop: 10 }}><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Detalle</th><th>Registró</th><th className="n">Valor</th><th></th></tr></thead><tbody>
-      {extra.map(m => <tr key={m.id}><td>{hora(m.fecha)}</td><td>{nombreCliente(m.clienteId) || "—"}</td><td>{tipoTxt(m)}{medioAntes(m)}</td><td>{m.nota || ""}</td><td>{m.porNombre || ""}</td><td className="n">{pesos(m.valor)}</td>
-        {yo.esAdmin ? <td style={{ whiteSpace: "nowrap" }}><button className="btn sec chico" onClick={() => editar(v, m)}>Editar</button> <button className="btn peligro chico" onClick={() => quitarMx(m)}>Quitar</button></td>
-          : <td>{m.tipo !== "ganancia" && puedoCambiarMedio(m) ? <button className="btn sec chico" onClick={() => (yaContado(m.fecha) ? avisoContado(v) : v.abrir(<CambiarMedio col="movimientos" id={m.id} />))}>Cambiar medio</button> : null}</td>}</tr>)}
-    </tbody></table></div> : null}
+    <h1>Cuentas</h1>
+    <p className="sub">Entradas y salidas de JS Envíos, MT y la base de JS. Mueven la caja; no tocan clientes ni sueldos.</p>
+    <div className="cab-cuentas">
+      <div className="seg subtabs subtabs-cuentas" role="tablist" aria-label="Secciones de Cuentas">
+        {tabs.map(([k, t]) => <button key={k} id={"tabCue-" + k} type="button" role="tab" aria-selected={E.tabCuentas === k} aria-controls={"panelCue-" + k} tabIndex={E.tabCuentas === k ? 0 : -1} onClick={() => ir(k)} onKeyDown={alTeclear}>{t}</button>)}
+      </div>
+      {yo.esAdmin && <button className="btn nueva-cuenta" id="cuNueva" onClick={() => v.abrir(<NuevaCuenta />)}>+ Nueva cuenta</button>}
+    </div>
+
+    <div role="tabpanel" id="panelCue-cuentas" aria-labelledby="tabCue-cuentas" hidden={E.tabCuentas !== "cuentas"}>
+      <div className="cifras cifras-cuentas">
+        <div className="cifra fuerte"><span>Total en caja</span><b>{pesos(R.total)}</b><span>{Object.entries(R.porMedio).filter(([, x]) => Math.round(x)).map(([m, x]) => `${MEDIOS_CAJA[m] || m}: ${pesos(x)}`).join(" · ") || "Sin movimientos"}</span></div>
+        {(["efectivo", "nequi", "bancolombia"] as const).map(k => <div className="cifra" key={k}><span>{MEDIOS_CAJA[k] || k}</span><b>{pesos(R.porMedio[k] || 0)}</b></div>)}
+        <div className="cifra"><span>Disponible de JS</span><b className={R.disponible < 0 ? "neg" : ""}>{pesos(R.disponible)}</b><span>Caja − clientes − sueldos</span></div>
+      </div>
+      <div className="mgrid mgrid-cuentas">
+        {cs.map(cu => { const t = textoCuenta(cu); return <div className="mcard mcard-cuenta" key={cu.id}><div className="mcard-top"><b>{cu.nombre}</b><span className="acciones"><button className="btn ok chico" onClick={() => v.abrir(<MovCuenta id={cu.id} tipo="entra" />)}>Entrada</button><button className="btn sec chico" onClick={() => v.abrir(<MovCuenta id={cu.id} tipo="sale" />)}>Salida</button></span></div>
+          <span className="sub mcard-cuenta-sub">{TIPOS_CUENTA[cu.tipo] || ""}</span><dl className="datos"><dt>{t.txt}</dt><dd className={t.cls}>{t.val}</dd></dl></div>; })}
+      </div>
+      {!cs.length ? <div className="vacio">{yo.esAdmin ? <>Todavía no hay cuentas. <button className="btn chico" id="cuSemilla" disabled={creando} onClick={semilla}>Crear JS Envíos, MT y Base de JS</button></> : "El administrador todavía no ha creado las cuentas."}</div> : null}
+      <div className="cab-mov-cuentas">
+        <h2>Movimientos de las cuentas</h2>
+        <div className="filtros-mov">
+          <FiltroDia compacto id="diaInternos" d={E.diaInternos} poner={d => poner({ diaInternos: d, paginaInternos: 1 })} />
+          <select className="sel-medio" aria-label="Filtrar por medio" value={E.medioInternos} onChange={e => poner({ medioInternos: e.target.value as typeof E.medioInternos, paginaInternos: 1 })}>
+            <option value="">Todos los medios</option><option value="efectivo">Efectivo</option><option value="nequi">Nequi</option><option value="bancolombia">Bancolombia</option>
+          </select>
+        </div>
+      </div>
+      <div ref={arribaInt} style={{ scrollMarginTop: 90 }} />
+      {qInt.isError ? <div className="aviso alerta">No se pudieron traer los movimientos: {motivoError(qInt.error)} <button className="btn chico" onClick={() => qInt.refetch()}>Intentar otra vez</button></div>
+        : !pagInt ? <div className="vacio">Cargando movimientos…</div>
+        : movs.length ? <>
+          <div className="tabla-env" aria-busy={qInt.isFetching} style={qInt.isPlaceholderData ? { opacity: .6 } : undefined}><table><thead><tr><th>Fecha</th><th>Cuenta</th><th>Motivo</th><th>Medio</th><th className="n">Valor</th>{yo.esAdmin && <th></th>}</tr></thead><tbody>
+            {movs.map(c => <tr key={c.id}><td>{hora(c.fecha)}</td><td>{S.cuentas[c.cuentaId || ""]?.nombre || "—"}</td><td>{c.concepto || ""}</td><td>{MEDIOS[c.medio as Medio] || ""}</td><td className={"n " + (c.tipo === "entra" ? "pos" : "neg")}>{c.tipo === "entra" ? "+ " : "− "}{pesos(c.valor)}</td>
+              {yo.esAdmin && <td><button className="btn peligro chico" onClick={() => quitarCu(c.id)}>Quitar</button></td>}</tr>)}
+          </tbody></table></div>
+          <Paginador pagina={pagInt.pagina} paginas={pagInt.paginas} total={pagInt.total} porPagina={pagInt.porPagina} ir={irInt} cargando={qInt.isPlaceholderData} />
+        </> : <div className="vacio">Sin movimientos con esos filtros.</div>}
+    </div>
+
+    <div role="tabpanel" id="panelCue-movimientos" aria-labelledby="tabCue-movimientos" hidden={E.tabCuentas !== "movimientos"}>
+      <div className="toolbar-cuentas">
+        <div className="campo"><input id="buscarCue" type="search" placeholder="Buscar cliente o detalle…" value={buscar} aria-label="Buscar por cliente o detalle"
+          onChange={e => alBuscar(e.target.value)} /></div>
+        <div className="seg seg-tipo" role="group" aria-label="Tipo de movimiento">
+          {([["todos", "Todos"], ["pagos", "Pagos"], ["compras", "Compras"], ["ganancias", "Ganancias"]] as const).map(([k, t]) => <button key={k} aria-pressed={E.tipoCue === k} onClick={() => poner({ tipoCue: k, paginaCue: 1 })}>{t}</button>)}
+        </div>
+        <div className="filtro-dia compacto rango-cuentas">
+          <label className="dia-pill"><IconoCalendario /><input type="date" aria-label="Desde" value={E.desdeCue} max={E.hastaCue || hoy()} onChange={e => poner({ desdeCue: e.target.value, paginaCue: 1, paginaGan: 1 })} /></label>
+          <span className="sub">a</span>
+          <label className="dia-pill"><IconoCalendario /><input type="date" aria-label="Hasta" value={E.hastaCue} min={E.desdeCue} max={hoy()} onChange={e => poner({ hastaCue: e.target.value, paginaCue: 1, paginaGan: 1 })} /></label>
+          {conRango ? <button className="btn sec chico" onClick={() => poner({ desdeCue: "", hastaCue: "", paginaCue: 1, paginaGan: 1 })}>Ver todo</button>
+            : <button className="btn sec chico" onClick={() => poner({ desdeCue: moverDia(hoy(), -30), hastaCue: hoy(), paginaCue: 1, paginaGan: 1 })}>Últimos 30 días</button>}
+        </div>
+      </div>
+      <div className="cifras cifras-cuentas">
+        <div className="cifra fuerte"><span>Pagos recibidos</span><b className="pos">{pesos(tot.recibido)}</b></div>
+        <div className="cifra"><span>Compras registradas</span><b>{pesos(tot.compras)}</b></div>
+        <div className="cifra"><span>Pagos a clientes</span><b>{pesos(tot.pagado)}</b></div>
+        <div className="cifra"><span>Ganancia neta</span><b className="pos">{pesos(tot.ganancia)}</b><span>Ganancia ocasional del rango</span></div>
+      </div>
+      <div className="acciones acciones-cuentas"><button className="btn ok" id="cuPago" onClick={() => v.abrir(<MovClienteOficina tipo="pago_de_cliente" />)}>Pago de un cliente</button><button className="btn" id="cuPagoA" onClick={() => v.abrir(<MovClienteOficina tipo="pago_a_cliente" />)}>Pagarle a un cliente</button><button className="btn" id="cuCompra" onClick={() => v.abrir(<MovClienteOficina tipo="compra_cliente" />)}>Compra para un cliente</button><button className="btn sec" id="cuGanancia" onClick={() => v.abrir(<MovClienteOficina tipo="ganancia" />)}>Ganancia ocasional</button></div>
+      <details className="ayuda-cuentas"><summary>Cómo se calculan los pagos, compras y ganancias</summary>
+        <p className="sub">El pago de un cliente entra a la caja (efectivo, Nequi o Bancolombia) y se descuenta de lo que debe. Pagarle a un cliente es entregarle su saldo a favor: sale de la caja. La compra sale de la caja y queda como deuda del cliente; al entregar se compensa con lo cobrado. La ganancia ocasional se le carga al cliente y suma al sueldo de JS.</p></details>
+      <div ref={arribaMovs} style={{ scrollMarginTop: 90 }} />
+      {qMovs.isError ? <div className="aviso alerta">No se pudieron traer los movimientos: {motivoError(qMovs.error)} <button className="btn chico" onClick={() => qMovs.refetch()}>Intentar otra vez</button></div>
+        : !pag ? <div className="vacio">Cargando movimientos…</div>
+        : filas.length ? <>
+          <div className="tabla-env" aria-busy={qMovs.isFetching} style={qMovs.isPlaceholderData ? { opacity: .6 } : undefined}><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Detalle</th><th>Registró</th><th className="n">Valor</th><th></th></tr></thead><tbody>
+            {filas.map(m => <tr key={m.id}><td>{hora(m.fecha)}</td><td>{nombreCliente(m.clienteId) || "—"}</td><td>{tipoTxt(m)}{medioAntes(m)}</td><td>{m.nota || ""}</td><td>{m.porNombre || ""}</td><td className="n">{pesos(m.valor)}</td>
+              {yo.esAdmin ? <td style={{ whiteSpace: "nowrap" }}><button className="btn sec chico" onClick={() => editar(v, m)}>Editar</button> <button className="btn peligro chico" onClick={() => quitarMx(m)}>Quitar</button></td>
+                : <td>{m.tipo !== "ganancia" && puedoCambiarMedio(m) ? <button className="btn sec chico" onClick={() => (yaContado(m.fecha) ? avisoContado(v) : v.abrir(<CambiarMedio col="movimientos" id={m.id} />))}>Cambiar medio</button> : null}</td>}</tr>)}
+          </tbody></table></div>
+          <Paginador pagina={pag.pagina} paginas={pag.paginas} total={pag.total} porPagina={pag.porPagina} ir={irMovs} cargando={qMovs.isPlaceholderData} />
+        </> : <div className="vacio">No hay movimientos con esos filtros.</div>}
+    </div>
+
+    <div role="tabpanel" id="panelCue-ganancias" aria-labelledby="tabCue-ganancias" hidden={E.tabCuentas !== "ganancias"}>
+      <div className="cab-ganancias">
+        <div><h2>Ganancias por cliente</h2><p className="sub">Ganancia ocasional cargada a cada cliente, con el rango de fechas de Movimientos.</p></div>
+        <div className="campo"><input id="buscarGan" type="search" placeholder="Buscar cliente…" value={buscarGan} aria-label="Buscar cliente"
+          onChange={e => alBuscarGan(e.target.value)} /></div>
+      </div>
+      <div className="cifras cifras-cuentas">
+        <div className="cifra fuerte"><span>Ganancia neta</span><b className="pos">{pesos(pagGan?.totalGanancia ?? 0)}</b><span>{pagGan?.total ?? 0} {(pagGan?.total ?? 0) === 1 ? "cliente" : "clientes"} con movimientos</span></div>
+      </div>
+      <div ref={arribaGan} style={{ scrollMarginTop: 90 }} />
+      {qGan.isError ? <div className="aviso alerta">No se pudieron traer las ganancias: {motivoError(qGan.error)} <button className="btn chico" onClick={() => qGan.refetch()}>Intentar otra vez</button></div>
+        : !pagGan ? <div className="vacio">Cargando ganancias…</div>
+        : ganFilas.length ? <>
+          <div className="tabla-env" aria-busy={qGan.isFetching} style={qGan.isPlaceholderData ? { opacity: .6 } : undefined}><table><thead><tr><th>Cliente</th><th className="n">Pagos recibidos</th><th className="n">Compras</th><th className="n">Ganancia neta</th></tr></thead><tbody>
+            {ganFilas.map(x => <tr key={x.clienteId}><td><b>{x.nombre || nombreCliente(x.clienteId) || "(eliminado)"}</b></td><td className="n">{pesos(x.recibido)}</td><td className="n">{pesos(x.compras)}</td><td className="n pos">{pesos(x.ganancia)}</td></tr>)}
+          </tbody></table></div>
+          <Paginador pagina={pagGan.pagina} paginas={pagGan.paginas} total={pagGan.total} porPagina={pagGan.porPagina} ir={irGan} cargando={qGan.isPlaceholderData} />
+        </> : <div className="vacio">No hay ganancias con ese rango de fechas.</div>}
+    </div>
   </>;
 }
 const editar = (v: Ventana, m: Movimiento) => { if (mueveCaja(m) && yaContado(m.fecha)) return avisoContado(v); v.abrir(<MovClienteOficina tipo={m.tipo} mov={m} />); };
