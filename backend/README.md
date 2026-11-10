@@ -173,6 +173,17 @@ Cómo funciona:
 
 **Para desarrollo sin verificar el dominio:** usa `CORREO_REMITENTE=onboarding@resend.dev`. Resend acepta ese remitente de pruebas, pero **solo envía al correo con el que creaste la cuenta de Resend**. Si el envío falla, el backend igual responde `204` y, en `development`, deja el enlace en la consola con `[correo] Enlace de …`; también sirve dejar `RESEND_API_KEY` vacío.
 
+## Chatbot de clientes (Claude)
+
+Asistente para el portal de clientes. Usa la API de Anthropic con llamadas a herramientas directas (`servicios/chatbot.js`), sin frameworks de agentes.
+
+- **Llave y modelo:** `ANTHROPIC_API_KEY` (se crea en [console.anthropic.com](https://console.anthropic.com), nunca va al repositorio) y `CHATBOT_MODELO` (por defecto `claude-haiku-5-5`). Cambiar de modelo es cambiar esa variable. Todas las variables `CHATBOT_*` están en `.env.example`.
+- **Información de la empresa:** `chatbot/informacion-empresa.md` (horarios, proceso de envío, políticas). Lo edita administración y se carga en el prompt con caché (`cache_control`), así que cuesta poco por mensaje. Los textos entre corchetes son ejemplos: **hay que reemplazarlos por los datos reales antes de activar el chat**. Si algo no está en el archivo, el asistente no lo inventa y deriva a WhatsApp.
+- **Herramientas:** `consultar_pedido` (por guía), `listar_mis_pedidos` y `derivar_a_persona`. Ninguna recibe un cliente: la identidad sale siempre de la sesión (`req.usuario.clienteId`), así que un cliente solo puede ver sus pedidos aunque el modelo (o una instrucción metida en el chat) pida otra guía. Solo se devuelven los campos que el cliente ya ve en su portal.
+- **Derivación a una persona:** `CHATBOT_WHATSAPP` arma el enlace `wa.me`. Se deriva cuando el modelo no sabe, cuando el cliente pide un cambio o reclamo, y cuando algo falla (sin llave, Anthropic caído, rechazo del modelo): el error llega con `detalle.derivar` y nunca con el mensaje técnico.
+- **Límites:** por cuenta de cliente (no por IP): `CHATBOT_LIMITE_MINUTO` (8) y `CHATBOT_LIMITE_DIA` (100). Responden 429 con `CHAT_DEMASIADO_RAPIDO` o `CHAT_LIMITE_DIARIO`.
+- **Sin estado:** el navegador guarda la conversación y la manda completa (máximo 20 mensajes de 2000 caracteres); el servidor no guarda nada.
+
 ## Endpoints (todos bajo `/api`)
 
 Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, dinero en pesos enteros, fechas ISO.
@@ -203,6 +214,7 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `GET /mensajeros`, `GET /mensajeros/:id` | oficina; el mensajero solo su ficha | Personal |
 | `GET /mensajeros/pagina?buscar=&tipo=&pagina=&porPagina=` | oficina | Personal JS paginado (7 en escritorio, 4 en celular). Devuelve `{ mensajeros, pagina, porPagina, total, paginas }` |
 | `POST/PATCH/DELETE /mensajeros…` | admin | Cambia el personal. `PATCH /mensajeros/:id` acepta `nombre`, `telefono`, `tipo` (`mensajero`, `dueno`, `oficina`, `patinador`, `empresa`), `tarifa` (pago por día, entero ≥ 0) y `activo`; responde `{ mensajero }` o 404 si el id no existe |
+| `POST /chatbot/mensajes` | cliente | `{ mensajes: [{ rol: "user"\|"assistant", contenido }] }` (termina en `user`). Con `Accept: text/event-stream` responde en streaming (SSE): `event: texto` `{ texto }` por fragmento, `event: derivar` `{ canal: "whatsapp", numero, url }` si hay que pasar a una persona, `event: fin`, o `event: error` `{ code, message, derivar }`. Sin ese `Accept` responde `{ respuesta, derivar }`. Errores: 400, 403 (no es cliente), 429 (`CHAT_DEMASIADO_RAPIDO`, `CHAT_LIMITE_DIARIO`), 503 (`CHATBOT_NO_CONFIGURADO`, `CHATBOT_NO_DISPONIBLE`, con `detalle.derivar`) |
 | `GET /pedidos?estado=&cerrados=&desde=&hasta=&entregadoDesde=&entregadoHasta=&buscar=&conDiferencia=&diferencia=&sinRemitente=&cambioPendiente=&sinServicio=&dia=&cursor=` | cada rol ve lo suyo | Lista por cursor: `{ pedidos, siguiente }` (`siguiente` es el cursor, o `null`). `buscar` mira guía, quien recibió, remitente y mensajero. `diferencia`: `todas` o `sinRevisar` (igual a `conDiferencia=true`). `dia=AAAA-MM-DD`: salió, se entregó o se devolvió ese día en hora de Colombia |
 | `GET /pedidos?pagina=&porPagina=&…` | cada rol ve lo suyo | **Paginador**, con los mismos filtros: `{ pedidos, pagina, porPagina, total, paginas }`. `porPagina` de 1 a 100 (20 por defecto; las pantallas usan 8 en el celular y 20 en el computador). Si la página ya no existe, responde la última y lo dice en `pagina`. No se mezcla con `cursor` (400) |
 | `GET /pedidos/:guia` | quien la puede ver | Detalle con intentos. Lista y detalle traen `mini`: URL firmada de la miniatura, o `null` |

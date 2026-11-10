@@ -40,6 +40,20 @@ const esquema = z.object({
   // Vigencia de los enlaces. La contraseña vence rápido; la activación da tiempo para abrir el correo.
   ENLACE_CLAVE_MINUTOS: z.coerce.number().int().positive().default(60),
   ENLACE_ACTIVACION_DIAS: z.coerce.number().int().positive().default(7),
+  // Chatbot de clientes (Claude). Sin ANTHROPIC_API_KEY el chat responde 503 y manda al cliente a WhatsApp.
+  // La llave se crea en https://console.anthropic.com → API Keys y solo vive en el backend.
+  ANTHROPIC_API_KEY: z.string().optional().transform(v => v || undefined),
+  CHATBOT_MODELO: z.string().min(1).default("claude-haiku-5-5"),
+  // Cuánto "piensa" el modelo: low (rápido y barato, suficiente para atención) | medium | high
+  CHATBOT_ESFUERZO: z.enum(["low", "medium", "high"]).default("low"),
+  CHATBOT_MAX_TOKENS: z.coerce.number().int().min(256).max(8192).default(1024),
+  // Archivo en markdown con horarios, proceso de envío y políticas (se carga en el prompt del sistema)
+  CHATBOT_INFO_ARCHIVO: z.string().default("chatbot/informacion-empresa.md"),
+  // WhatsApp de atención humana, solo dígitos con indicativo (573001234567). Vacío = sin botón de WhatsApp.
+  CHATBOT_WHATSAPP: z.string().regex(/^\d{8,15}$/, "CHATBOT_WHATSAPP: solo dígitos con indicativo, por ejemplo 573001234567").optional().or(z.literal("")).transform(v => v || undefined),
+  // Límites por cliente (por cuenta, no por IP)
+  CHATBOT_LIMITE_MINUTO: z.coerce.number().int().min(1).default(8),
+  CHATBOT_LIMITE_DIA: z.coerce.number().int().min(1).default(100),
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1)
 });
 
