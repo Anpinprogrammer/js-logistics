@@ -1,0 +1,21 @@
+{
+  "name": "js-logistics-animacion-ingreso",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Animación de entrada del ingreso de la oficina, hecha en Remotion (referencia para implementarla en frontend/)",
+  "scripts": {
+    "estudio": "remotion studio src/index.ts",
+    "render:computador": "remotion render src/index.ts Escritorio videos/ingreso-computador.mp4 --scale=1.5 --crf=16",
+    "render:celular": "remotion render src/index.ts Celular videos/ingreso-celular.mp4 --scale=2 --crf=16",
+    "render": "npm run render:computador && npm run render:celular",
+    "cuadro": "remotion still src/index.ts Escritorio videos/cuadro.png"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.542",
+    "@remotion/paths": "4.0.542",
+    "framer-motion": "11.18.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.542"
+  }
+}
