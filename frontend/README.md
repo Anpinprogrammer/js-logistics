@@ -35,7 +35,7 @@ src/
 ├── App.tsx             Ingreso o app interna
 ├── api/                cliente.ts (axios), servicios.ts (llamadas por recurso), tipos.ts
 ├── auth/Sesion.tsx     Sesión (/auth/yo, ingresar, salir; cuentas de prueba en modo demo)
-├── pages/              Ingreso, Recuperar, Restablecer y AccesoComun (marco compartido del acceso)
+├── pages/              Ingreso, Recuperar, Restablecer y AccesoComun (marco compartido del acceso); intro/ es la animación de entrada del ingreso
 ├── lib/imagen.ts       Comprimir fotos y firma
 └── interna/            La app igual al prototipo
     ├── estilos.css     Copia de app/css/estilos.css dentro de .jsl (generada, no editar)

@@ -1,6 +1,34 @@
 /* Piezas compartidas de las pantallas de acceso de la oficina: ingreso, recuperar y restablecer.
    Las clases son exactamente las del ingreso original: aquí solo se reutilizan, no se cambia el diseño. */
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode, Ref } from "react";
+
+/*
+ * Animación de entrada del ingreso (pages/intro/). Solo `Ingreso.tsx` pasa estas props, y solo mientras la animación corre:
+ * traen el estilo del cuadro actual para cada pieza y las capas decorativas. Sin ellas (recuperar, restablecer y el ingreso
+ * cuando la animación ya terminó) todo queda exactamente como siempre.
+ */
+type ConRef<E> = { ref?: Ref<E>; style?: CSSProperties };
+export type IntroMarco = {
+  raiz: ConRef<HTMLDivElement>;
+  fondo: CSSProperties; malla: CSSProperties; rutas: CSSProperties;
+  nodos: { punto: CSSProperties; pulso: CSSProperties }[];
+  manchas: CSSProperties;
+  /** Capas decorativas detrás de la tarjeta (mensajeros, onda, chispas, telemetría). */
+  detras: ReactNode;
+  tarjeta: ConRef<HTMLDivElement>; borde: CSSProperties; halo: CSSProperties;
+  /** El vidrio de la tarjeta mientras se revela y el trazo de luz del borde. */
+  vidrio: ReactNode;
+  /** Capas decorativas encima de todo (marca blanca, destello, viñeta). */
+  frente: ReactNode;
+};
+export type IntroCabecera = {
+  insignia: ConRef<HTMLDivElement>; halo: CSSProperties; placa: ConRef<HTMLDivElement>; icono: CSSProperties;
+  ceja: CSSProperties; titulo: ConRef<HTMLHeadingElement>;
+  /** El título letra por letra, encima del título real. */
+  letras: ReactNode;
+  descripcion: CSSProperties;
+};
+export type IntroBoton = ConRef<HTMLButtonElement>;
 
 export const TARJETA =
   "relative space-y-4 rounded-3xl bg-[#0f172a]/75 p-5 sm:space-y-5 sm:p-9 shadow-[0_24px_80px_-20px_rgba(37,99,235,.5),0_8px_30px_rgba(0,0,0,.5)] backdrop-blur-[16px]";
@@ -28,10 +56,10 @@ export const IcCheck = () => <svg {...ic} className="size-7"><circle cx="12" cy=
 export const IcVolver = () => <svg {...ic} className="size-5"><path d="M19 12H5M11 18l-6-6 6-6" /></svg>;
 
 /** Fondo, tarjeta con borde brillante y ancho: el mismo marco del ingreso. */
-export function MarcoAcceso({ children }: { children: ReactNode }) {
+export function MarcoAcceso({ children, intro }: { children: ReactNode; intro?: IntroMarco }) {
   return (
-    <div className="relative isolate grid min-h-dvh place-items-center overflow-hidden bg-[#0b0f19] px-4 py-6 sm:py-10 text-slate-200">
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+    <div ref={intro?.raiz.ref} style={intro?.raiz.style} className="relative isolate grid min-h-dvh place-items-center overflow-hidden bg-[#0b0f19] px-4 py-6 sm:py-10 text-slate-200">
+      <div aria-hidden style={intro?.fondo} className="pointer-events-none absolute inset-0 -z-10">
         <div
           className="jsl-malla absolute inset-0 opacity-60"
           style={{
@@ -40,15 +68,16 @@ export function MarcoAcceso({ children }: { children: ReactNode }) {
             backgroundSize: "48px 48px",
             maskImage: "radial-gradient(ellipse 70% 60% at 50% 45%, #000 30%, transparent 100%)",
             WebkitMaskImage: "radial-gradient(ellipse 70% 60% at 50% 45%, #000 30%, transparent 100%)",
+            ...intro?.malla,
           }}
         />
-        <svg className="absolute inset-0 size-full opacity-50" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1200 800" fill="none">
+        <svg style={intro?.rutas} className="absolute inset-0 size-full opacity-50" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1200 800" fill="none">
           <path className="jsl-ruta" d="M-20 620 C 220 560, 300 300, 560 340 S 900 520, 1220 180" stroke="url(#jslRuta)" strokeWidth="1.5" strokeDasharray="6 10" />
           <path className="jsl-ruta jsl-ruta-2" d="M-20 220 C 200 260, 360 120, 620 190 S 960 80, 1220 360" stroke="url(#jslRuta)" strokeWidth="1.2" strokeDasharray="4 12" />
           {[[560, 340], [300, 330], [900, 505], [620, 190], [960, 120]].map(([x, y], i) => (
             <g key={i}>
-              <circle cx={x} cy={y} r="3.5" fill="#38bdf8" />
-              <circle className="jsl-pulso" cx={x} cy={y} r="3.5" stroke="#38bdf8" strokeWidth="1.2" style={{ animationDelay: `${i * 0.7}s` }} />
+              <circle cx={x} cy={y} r="3.5" fill="#38bdf8" style={intro?.nodos[i]?.punto} />
+              <circle className="jsl-pulso" cx={x} cy={y} r="3.5" stroke="#38bdf8" strokeWidth="1.2" style={{ animationDelay: `${i * 0.7}s`, ...intro?.nodos[i]?.pulso }} />
             </g>
           ))}
           <defs>
@@ -59,45 +88,48 @@ export function MarcoAcceso({ children }: { children: ReactNode }) {
             </linearGradient>
           </defs>
         </svg>
-        <div className="jsl-flota absolute -left-32 -top-32 size-[28rem] rounded-full bg-[#0284c7]/30 blur-[120px]" />
-        <div className="jsl-flota jsl-flota-2 absolute -bottom-40 -right-24 size-[32rem] rounded-full bg-[#38bdf8]/20 blur-[130px]" />
-        <div className="absolute left-1/2 top-1/3 size-72 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-[110px]" />
+        <div style={intro?.manchas} className="jsl-flota absolute -left-32 -top-32 size-[28rem] rounded-full bg-[#0284c7]/30 blur-[120px]" />
+        <div style={intro?.manchas} className="jsl-flota jsl-flota-2 absolute -bottom-40 -right-24 size-[32rem] rounded-full bg-[#38bdf8]/20 blur-[130px]" />
+        <div style={intro?.manchas} className="absolute left-1/2 top-1/3 size-72 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-[110px]" />
+        {intro?.detras}
       </div>
 
-      <div className="relative w-full max-w-[22rem] sm:max-w-[26rem]">
-        <div aria-hidden className="absolute -inset-px rounded-[1.6rem] bg-gradient-to-br from-[#38bdf8] via-[#2563eb]/40 to-[#38bdf8]/60 opacity-70 blur-[1px]" />
-        <div aria-hidden className="absolute -inset-6 -z-10 rounded-[2.5rem] bg-[#2563eb]/20 blur-3xl" />
+      <div ref={intro?.tarjeta.ref} style={intro?.tarjeta.style} className="relative w-full max-w-[22rem] sm:max-w-[26rem]">
+        <div aria-hidden style={intro?.borde} className="absolute -inset-px rounded-[1.6rem] bg-gradient-to-br from-[#38bdf8] via-[#2563eb]/40 to-[#38bdf8]/60 opacity-70 blur-[1px]" />
+        <div aria-hidden style={intro?.halo} className="absolute -inset-6 -z-10 rounded-[2.5rem] bg-[#2563eb]/20 blur-3xl" />
+        {intro?.vidrio}
         {children}
       </div>
+      {intro?.frente}
     </div>
   );
 }
 
 /** Logo, "Logistics · Cali" y el título de la pantalla, con el mismo tamaño del ingreso. */
-export function CabeceraAcceso({ titulo, descripcion }: { titulo: string; descripcion: ReactNode }) {
+export function CabeceraAcceso({ titulo, descripcion, intro }: { titulo: string; descripcion: ReactNode; intro?: IntroCabecera }) {
   return (
     <header className="text-center">
-      <div className="relative mx-auto mb-3 grid size-20 place-items-center sm:mb-5 sm:size-28">
-        <span aria-hidden className="absolute -inset-3 rounded-[2rem] bg-[#38bdf8]/50 blur-2xl" />
-        <div className="relative grid size-20 place-items-center rounded-[1.4rem] bg-gradient-to-br from-white to-sky-100 p-2 sm:size-28 sm:rounded-[1.75rem] sm:p-3 shadow-[0_0_0_1px_rgba(255,255,255,.7),0_0_28px_6px_rgba(56,189,248,.45),0_12px_28px_-6px_rgba(2,132,199,.55),inset_0_1px_0_#fff]">
+      <div ref={intro?.insignia.ref} style={intro?.insignia.style} className="relative mx-auto mb-3 grid size-20 place-items-center sm:mb-5 sm:size-28">
+        <span aria-hidden style={intro?.halo} className="absolute -inset-3 rounded-[2rem] bg-[#38bdf8]/50 blur-2xl" />
+        <div ref={intro?.placa.ref} style={intro?.placa.style} className="relative grid size-20 place-items-center rounded-[1.4rem] bg-gradient-to-br from-white to-sky-100 p-2 sm:size-28 sm:rounded-[1.75rem] sm:p-3 shadow-[0_0_0_1px_rgba(255,255,255,.7),0_0_28px_6px_rgba(56,189,248,.45),0_12px_28px_-6px_rgba(2,132,199,.55),inset_0_1px_0_#fff]">
           {/* El .webp trae "LOGISTICS CALI" en blanco (invisible sobre el badge claro): se recorta y el texto va aparte. */}
-          <div className="relative size-full overflow-hidden rounded-2xl">
+          <div style={intro?.icono} className="relative size-full overflow-hidden rounded-2xl">
             <img src="/icono-96.webp" alt="JS Logistics Cali" width={96} height={96} className="absolute left-[-10%] top-[3%] w-[120%] max-w-none" />
           </div>
         </div>
       </div>
-      <p className="-mt-1 mb-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-[#38bdf8]">Logistics · Cali</p>
-      <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">{titulo}</h1>
-      <p className="mx-auto mt-2 max-w-[19rem] text-[13px] sm:mt-2.5 sm:text-sm leading-relaxed text-slate-300">{descripcion}</p>
+      <p style={intro?.ceja} className="-mt-1 mb-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-[#38bdf8]">Logistics · Cali</p>
+      <h1 ref={intro?.titulo.ref} style={intro?.titulo.style} className="text-3xl font-bold tracking-tight text-white sm:text-4xl">{titulo}{intro?.letras}</h1>
+      <p style={intro?.descripcion} className="mx-auto mt-2 max-w-[19rem] text-[13px] sm:mt-2.5 sm:text-sm leading-relaxed text-slate-300">{descripcion}</p>
     </header>
   );
 }
 
 /** Botón principal del acceso, con el mismo degradado y animación del ingreso. */
-export function BotonAcceso({ cargando, children, cargandoTexto }: { cargando: boolean; children: ReactNode; cargandoTexto: string }) {
+export function BotonAcceso({ cargando, children, cargandoTexto, intro }: { cargando: boolean; children: ReactNode; cargandoTexto: string; intro?: IntroBoton }) {
   return (
     <button
-      type="submit" disabled={cargando}
+      type="submit" disabled={cargando} ref={intro?.ref} style={intro?.style}
       className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-[#0284c7] to-[#22d3ee] px-5 py-3 text-base font-bold sm:py-4 text-white shadow-[0_8px_24px_-8px_rgba(34,211,238,.6)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-8px_rgba(34,211,238,.8)] active:translate-y-0 disabled:cursor-wait disabled:opacity-90 disabled:hover:translate-y-0"
     >
       <span aria-hidden className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
