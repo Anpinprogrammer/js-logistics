@@ -61,6 +61,30 @@ function redisVivo({ host, port }) {
   });
 }
 
+/** Dice si Redis está configurado y responde PING (para validarlo al arrancar el servidor). */
+export async function estadoRedis() {
+  const connection = conexion();
+  if (!connection) return { configurado: false, listo: false, motivo: "sin-configurar" };
+  try {
+    const { default: Redis } = await import("ioredis");
+    const cliente = new Redis({
+      ...connection,
+      lazyConnect: true,
+      connectTimeout: 2000,
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      retryStrategy: () => null
+    });
+    cliente.on("error", () => { /* el resultado se devuelve abajo; no se deja sin manejar */ });
+    try {
+      await cliente.connect();
+      return { configurado: true, listo: await cliente.ping() === "PONG" };
+    } finally { cliente.disconnect(); }
+  } catch (e) {
+    return { configurado: true, listo: false, motivo: e.message };
+  }
+}
+
 /** Crea (una sola vez) la cola y su worker. Devuelve null si no hay Redis o si la conexión falla. */
 async function iniciar() {
   if (cola) return cola;

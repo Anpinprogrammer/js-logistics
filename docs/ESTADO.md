@@ -65,6 +65,8 @@ Es una receta, no un script del repo. Si lo conviertes en prueba automática, gu
 
 ## Registro de sesiones (lo más reciente arriba)
 
+- **2026-11-10:** `index.js` valida Redis antes de escuchar: `validarRedis()` usa `estadoRedis()` (conexión + `PING` con timeout de 2 s) y deja en el log si la cola `resetEmailQueue` está activa, si Redis no está configurado o si no responde (en esos casos el envío masivo sigue con el respaldo en memoria). Un fallo de Redis nunca impide arrancar la API. Probado con Redis apagado (aviso y arranque normal) y con un Redis temporal (PING correcto).
+
 - **2026-11-10:** se balanceó la tabla de Personal JS: Nombre con 24/16 px, columnas del medio con 16 px y Acciones con 16/24 px, anchos relativos 22/18/20/15/15/10 % (el navegador respeta el mínimo de las acciones, ~14 %). Los íconos van con `gap: 8px` y 4 px extra de aire, a 28 px del borde derecho. “Pago por día” queda a la izquierda, igual que el resto. Se conservan los tooltips y el marco redondeado.
 
 - **2026-11-09:** “Enviar saldos por WhatsApp” pasa a un drawer más ancho (`"drawer-ancho"`): 100 % en celular, 450 px desde 640, 500 px desde 768 y 540 px desde 1024, sin bordes redondeados. La tabla interna quedó en `.envio-tabla` (scroll horizontal si hace falta) con columnas Cliente / Saldo / Acción, nombres truncados a 180 px, saldos en ámbar a la derecha y botones “Enviar/Reenviar” sin cortes. El botón “Enviar al siguiente” ocupa todo el ancho con el verde de marca. Se conservaron las subtabs, el historial de enviados y los enlaces `wa.me`. Verificado a 1440, 768 y 390.
