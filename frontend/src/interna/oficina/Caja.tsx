@@ -48,8 +48,8 @@ export default function Caja({ pintar }: { pintar: () => void }) {
       <div className="cifra"><span>Pagado directo a clientes</span><b>{pesos(tot.tc)}</b></div>
     </div>
     <div style={{ height: 14 }} />
-    {ids.length ? <div className="mgrid">{ids.map(id => { const pm = pms[id], tt = totales(pm.ps); return <div className="mcard" key={id}>
-      <div className="mcard-top"><b>{S.mensajeros[id].nombre}</b><span className="acciones" style={{ margin: 0, gap: 6 }}><button className="btn sec chico" onClick={() => base(id)}>Dar base</button><button className="btn ok chico" onClick={() => v.abrir(<RecibirDinero mid={id} />)}>Recibir dinero</button></span></div>
+    {ids.length ? <div className="mgrid mgrid-mens">{ids.map(id => { const pm = pms[id], tt = totales(pm.ps); return <div className="mcard mcard-mens" key={id}>
+      <div className="mcard-top"><b>{S.mensajeros[id].nombre}</b><span className="acciones"><button className="btn sec chico" onClick={() => base(id)}>Dar base</button><button className="btn ok chico" onClick={() => v.abrir(<RecibirDinero mid={id} />)}>Recibir dinero</button></span></div>
       <span className="sub" style={{ fontSize: ".85rem" }}>Período desde {pm.ul ? hora(pm.ul.fecha) : "el inicio"}</span>
       <dl className="datos">
         <dt>Entregas / en ruta</dt><dd>{pm.ps.length} / {pendM[id] || 0}</dd>
@@ -98,7 +98,12 @@ function CierreDia({ pintar }: { pintar: () => void }) {
   };
   return <details className="mcard" id="cierreDia" open={abierto} onToggle={e => { E.cierreAbierto = (e.target as HTMLDetailsElement).open; }} style={{ marginBottom: 16 }}>
     <summary style={{ cursor: "pointer" }}><b>Cierre del día</b> <span className="sub">{listo ? (x.arqueoHoy ? "· todo listo y contado hoy" : "· listo para el arqueo") : "· hay pendientes antes del arqueo"}</span></summary>
-    {paso(!x.mens.length, "1. Plata de los mensajeros", x.mens.length ? x.mens.map(({ m, debe }, i) => <span key={m.id}>{i ? " · " : ""}{m.nombre} {pesos(debe)} <button className="btn ok chico" onClick={() => v.abrir(<RecibirDinero mid={m.id} />)}>Recibir</button></span>) : "Ningún mensajero tiene plata pendiente.")}
+    {paso(!x.mens.length, "1. Plata de los mensajeros", x.mens.length
+      ? <div className="fichas">{x.mens.map(({ m, debe }) => <div className="ficha" key={m.id}>
+        <div className="ficha-info"><b>{m.nombre}</b><span className={debe > 0 ? "neg" : ""}>{pesos(debe)}</span></div>
+        <button className="btn ok chico" onClick={() => v.abrir(<RecibirDinero mid={m.id} />)}>Recibir</button>
+      </div>)}</div>
+      : "Ningún mensajero tiene plata pendiente.")}
     {paso(!x.ofis.length, "2. Cajas de oficina", x.ofis.length ? x.ofis.map(({ u, s }, i) => <span key={u.uid}>{i ? " · " : ""}{u.nombre || u.email}: {MEDIOS_K.filter(k => Math.round(s[k])).map(k => MEDIOS[k] + " " + pesos(s[k])).join(", ")} <button className="btn ok chico" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="entrega" />)}>Recibir cierre</button></span>) : "Todas en $ 0.")}
     {paso(!x.sinRem.length, "3. Pedidos sin remitente", x.sinRem.length ? `${x.sinRem.length} ${pl(x.sinRem.length, "guía")}: el saldo de esos clientes no está completo.` : "Todos tienen remitente.", x.sinRem.length ? <button className="btn sec chico" onClick={() => aPedidos("sin")}>Asignar</button> : null)}
     {paso(!x.sinServ.length, "4. Entregas sin valor de domicilio", x.sinServ.length ? `${x.sinServ.length} ${pl(x.sinServ.length, "entrega")}: no se descuenta el domicilio ni suma al sueldo.` : "Todas tienen domicilio.", x.sinServ.length ? <button className="btn sec chico" onClick={() => aPedidos("serv")}>Completar</button> : null)}
@@ -132,7 +137,7 @@ function CajaGeneral({ pintar }: { pintar: () => void }) {
     try { await deshacerArqueo(id); v.avisar("Arqueo deshecho"); } catch (e) { noSePudo(v, "No se pudo deshacer")(e); }
   };
   return <>
-    <div className="cifras">
+    <div className="cifras cifras-caja">
       <div className="cifra fuerte"><span>Total en caja</span><b>{pesos(R.total)}</b><span>{Object.entries(R.porMedio).filter(([, x]) => Math.round(x)).map(([m, x]) => `${MEDIOS_CAJA[m] || m}: ${pesos(x)}`).join(" · ") || "Sin movimientos"}</span></div>
       <div className="cifra"><span>De clientes (cuentas por pagar)</span><b>{pesos(R.porPagar)}</b><span>Se resta cuando les pagas</span></div>
       <div className="cifra"><span>Sueldos por pagar esta semana</span><b>{pesos(R.sueldosPend)}</b></div>

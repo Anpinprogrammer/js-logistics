@@ -126,6 +126,13 @@ SELECT column_name, data_type FROM information_schema.columns
 4. **Storage:** crea un bucket **privado** llamado `pedidos` y pon `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` (*Project Settings → API*). La service role key es secreta: solo va en el backend, nunca en el frontend.
 5. Usa un proyecto de Supabase para pruebas y otro para producción.
 
+### Conexiones y pooler
+
+- El backend usa un pool con `DATABASE_POOL_MAX=5`, `DATABASE_POOL_IDLE_MS=10000` y `DATABASE_CONNECT_TIMEOUT_MS=5000`.
+- El **Session pooler** (puerto 5432) tiene **15 cupos por proyecto**. Cada proceso (local, Render, pruebas) abre hasta `DATABASE_POOL_MAX`; con local y Render a 10 cada uno se agota y aparece `EMAXCONNSESSION`.
+- Para la app con varias instancias, usa el **Transaction pooler** (puerto 6543): multiplexa conexiones y permite más clientes. Para `db:migrar` y `db:importar`, usa el Session pooler (5432) o la conexión directa.
+- Si aparece `read ETIMEDOUT` en una conexión inactiva, el pool la recicla; `keepAlive` y un `idleTimeout` corto reducen el problema. No subas `DATABASE_POOL_MAX` sin cambiar antes a Transaction mode.
+
 ## Render
 
 - Tipo **Web Service**, raíz `backend`, comando de build `npm ci`, comando de inicio `npm start`.

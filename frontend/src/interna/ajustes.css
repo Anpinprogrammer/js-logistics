@@ -37,3 +37,106 @@
 .jsl .paginador .btn:disabled{opacity:.45;cursor:default}
 .jsl .paginador .sub{text-align:center;flex:1;min-width:0;margin:0}
 @media (max-width:420px){.jsl .paginador .pag-rango{display:none}}
+
+/* ---------- Caja: fichas del cierre y tarjetas de mensajeros ---------- */
+/* Paso 1 del cierre: una ficha por mensajero, con la plata pendiente y "Recibir" a la derecha. */
+.jsl .fichas{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px}
+.jsl .ficha{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;padding:9px 12px;border:1px solid var(--linea);border-radius:12px;background:var(--hueco)}
+.jsl .ficha-info{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.jsl .ficha-info b{font-size:.86rem;color:var(--tinta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsl .ficha-info span{font-size:.82rem;font-weight:600;font-variant-numeric:tabular-nums;color:var(--suave)}
+.jsl .ficha-info span.neg{color:var(--rojo)}
+.jsl .ficha .btn{flex:none;min-width:80px;justify-content:center}
+
+/* Tarjetas de mensajeros: retícula estricta y todas de la misma altura. */
+.jsl .mgrid-mens{display:grid;grid-template-columns:1fr;gap:12px;align-items:stretch}
+.jsl .mcard-mens{display:flex;flex-direction:column;min-width:0;padding:13px}
+.jsl .mcard-mens .mcard-top{flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:2px}
+.jsl .mcard-mens .mcard-top b{font-size:1rem;font-weight:700;line-height:1.2;text-transform:uppercase;letter-spacing:.02em;min-width:0;overflow-wrap:anywhere}
+.jsl .mcard-mens .mcard-top .acciones{margin:0;gap:8px;flex-wrap:wrap}
+.jsl .mcard-mens .mcard-top .acciones .btn{flex:1 1 auto;justify-content:center}
+/* Cuerpo: clave-valor alineado con una línea fina entre filas. */
+.jsl .mcard-mens .datos{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 8px;margin:10px 0 0;font-size:.78rem}
+.jsl .mcard-mens .datos dt,.jsl .mcard-mens .datos dd{padding:5px 0;border-bottom:1px solid var(--linea)}
+.jsl .mcard-mens .datos dt{min-width:0;color:var(--suave)}
+.jsl .mcard-mens .datos dd{text-align:right;white-space:normal;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.jsl .mcard-mens .debe dt,.jsl .mcard-mens .debe dd{font-size:.92rem;font-weight:700;padding-top:7px;padding-bottom:7px}
+/* Pie: siempre al fondo, así los "Liquidar" quedan en la misma línea. */
+.jsl .mcard-mens .liq{margin-top:auto;padding-top:12px;border-top:1px solid var(--linea);gap:8px;flex-wrap:wrap}
+.jsl .mcard-mens .liq-est{font-size:.84rem;font-weight:600;flex:1 1 auto;min-width:0}
+.jsl .mcard-mens .liq .btn{flex:none}
+
+/* KPIs de la caja (Total en caja, De clientes, Sueldos…): misma altura y truncado limpio. */
+.jsl .cifras-caja{grid-template-columns:1fr;align-items:stretch}
+.jsl .cifras-caja .cifra{display:flex;flex-direction:column;min-width:0}
+.jsl .cifras-caja .cifra b{font-size:1.15rem;overflow-wrap:normal;word-break:normal}
+.jsl .cifras-caja .cifra span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+
+@media (min-width:640px){
+  .jsl .fichas{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .jsl .mgrid-mens{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .jsl .cifras-caja{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (min-width:768px){
+  .jsl .mgrid-mens{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .jsl .cifras-caja{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+/* Las fichas necesitan ~230 px para que el nombre y el monto no se corten:
+   con el menú lateral de 248 px, 4 columnas solo caben desde 1280 px. */
+@media (min-width:900px){
+  .jsl .fichas{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (min-width:1024px){
+  .jsl .mgrid-mens{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .jsl .cifras-caja{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media (min-width:1280px){
+  .jsl .fichas{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .jsl .mgrid-mens{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .jsl .cifras-caja{grid-template-columns:repeat(8,minmax(0,1fr));gap:10px}
+  .jsl .cifras-caja .cifra{padding:12px 10px}
+  .jsl .cifras-caja .cifra b{font-size:clamp(.85rem,1.05vw,1.15rem);letter-spacing:-.02em}
+}
+
+/* ---------- Clientes: acciones y toolbar de la tabla ---------- */
+/* Las acciones van a la derecha, justo debajo de los KPIs; la toolbar queda pegada a la tabla. */
+.jsl .controles{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.jsl .barra-acciones{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.jsl .barra-acciones .btn{min-height:40px}
+.jsl .barra-acciones .btn svg{width:18px;height:18px}
+
+.jsl .toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.jsl .toolbar .campo{margin:0;flex:1 1 240px;max-width:320px;min-width:0}
+.jsl .toolbar-filtros{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto}
+
+/* Filtro de estado como control segmentado (Todos / Por cobrar / Por pagar). */
+.jsl .seg{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:var(--hueco);box-shadow:inset 0 0 0 1px var(--linea);flex:none}
+.jsl .seg button{border:0;background:none;border-radius:999px;padding:7px 14px;font-weight:600;font-size:.86rem;color:var(--suave);white-space:nowrap;transition:background .15s,color .15s}
+.jsl .seg button:hover{color:var(--tinta)}
+.jsl .seg button[aria-pressed="true"]{background:var(--lateral);color:#fff}
+@media (prefers-color-scheme:dark){.jsl:not([data-theme="light"]) .seg button[aria-pressed="true"]{background:var(--marca)}}
+.jsl[data-theme="dark"] .seg button[aria-pressed="true"]{background:var(--marca)}
+
+/* Filtro de día integrado a la toolbar: ícono de calendario, ‹ fecha › y "Hoy"/"Ver todos". */
+.jsl .filtro-dia.compacto{margin:0;flex-wrap:wrap;gap:4px;justify-content:flex-end}
+.jsl .filtro-dia.compacto .btn.chico{min-height:36px}
+.jsl .dia-pill{position:relative;display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 8px 0 10px;border:1.5px solid var(--linea);border-radius:10px;background:var(--papel);color:var(--suave)}
+.jsl .dia-pill svg{width:16px;height:16px;flex:none}
+.jsl .filtro-dia.compacto .dia-pill input{flex:none;min-width:104px;border:0;border-radius:0;background:none;padding:0;color:var(--tinta)}
+.jsl .filtro-dia.compacto .dia-pill input:focus{outline:none;box-shadow:none}
+/* Se oculta el ícono nativo de Chrome/Safari y toda la caja abre el calendario. */
+.jsl .filtro-dia.compacto .dia-pill input::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;opacity:0;cursor:pointer}
+
+/* En el celular la toolbar se apila: búsqueda, filtros y luego las acciones. */
+@media (max-width:600px){
+  .jsl .controles .toolbar{order:1}
+  .jsl .controles .barra-acciones{order:2}
+  .jsl .barra-acciones .btn{flex:1 1 auto;justify-content:center}
+  .jsl .toolbar .campo{flex:1 1 100%;max-width:none}
+  .jsl .toolbar-filtros{margin-left:0;width:100%}
+  .jsl .toolbar-filtros .seg{flex:1 1 100%}
+  .jsl .seg button{flex:1;padding-inline:8px}
+  .jsl .filtro-dia.compacto{flex:1 1 100%;flex-wrap:nowrap;justify-content:space-between}
+  .jsl .filtro-dia.compacto .dia-pill{flex:1;min-width:0}
+  .jsl .filtro-dia.compacto .dia-pill input{flex:1;min-width:0}
+}

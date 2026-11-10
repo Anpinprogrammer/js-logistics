@@ -6,7 +6,7 @@ import {
   nombreCliente, servicio, gastoDe, cargoEnvio, cambiaLoContado, yaContado, mueveCaja, esPago, fechaCaja, fechaDia, diaMinCaja, fechaLarga,
   MOVS, MOVS_OFICINA, MEDIOS, type Medio, type TipoMov,
 } from "../motor";
-import { Cab, FiltroDia, Paginador, pl, useVentana } from "../ui";
+import { Cab, FiltroDia, IconoWhatsApp, Paginador, pl, useVentana } from "../ui";
 import { E, guardarLocal } from "../estado";
 import { actualizarPedido, borrarDe, guardarCliente, guardarMovimiento, unirClientes } from "../acciones";
 import { motivoError, useDatos } from "../datos";
@@ -69,21 +69,31 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
 
   return <>
     <h1>Clientes</h1><p className="sub">Saldo de cada cliente = lo cobrado menos el valor del servicio.</p>
-    <div className="cifras" style={{ marginBottom: 14 }}>
+    <div className="cifras" style={{ marginBottom: 12 }}>
       <div className="cifra"><span>{dia ? "Ese día te quedaron debiendo" : "Cuentas por cobrar (te deben)"}</span><b className="neg">{pesos(pag?.porCobrar.total ?? 0)}</b><span>{pag?.porCobrar.clientes ?? 0} {pl(pag?.porCobrar.clientes ?? 0, "cliente")}</span></div>
       <div className="cifra"><span>{dia ? "Ese día les quedaste debiendo" : "Cuentas por pagar (les debes)"}</span><b className="pos">{pesos(pag?.porPagar.total ?? 0)}</b><span>{pag?.porPagar.clientes ?? 0} {pl(pag?.porPagar.clientes ?? 0, "cliente")}</span></div>
     </div>
-    <div className="acciones" style={{ marginBottom: 16 }}><button className="btn" id="nuevoCli" onClick={() => v.abrir(<FormCliente />)}>Registrar cliente</button><button className="btn ok" id="waMasivo" onClick={() => v.abrir(<EnvioMasivo tipo0={E.filtroCli === "pagar" ? "pagar" : "cobrar"} />)}>Enviar saldos por WhatsApp</button></div>
-    <div className="filtros">{[["todos", "Todos"], ["cobrar", "Por cobrar"], ["pagar", "Por pagar"]].map(([x, t]) => <button key={x} aria-pressed={E.filtroCli === x} onClick={() => poner({ filtroCli: x, paginaCli: 1 })}>{t}</button>)}</div>
-    <FiltroDia d={dia} poner={x => poner({ diaCliF: x, paginaCli: 1 })} />{dia && <p className="sub">Clientes con movimiento ese día: lo que les quedó de ese día y, al lado, su saldo total de hoy.</p>}
+    <div className="controles">
+      <div className="barra-acciones">
+        <button className="btn ok" id="waMasivo" onClick={() => v.abrir(<EnvioMasivo tipo0={E.filtroCli === "pagar" ? "pagar" : "cobrar"} />)}><IconoWhatsApp />Enviar saldos por WhatsApp</button>
+        <button className="btn" id="nuevoCli" onClick={() => v.abrir(<FormCliente />)}>Registrar cliente</button>
+      </div>
+      <div className="toolbar">
+        <div className="campo" role="search"><input id="buscarCli" type="search" placeholder="Buscar por nombre o número" value={buscar} autoComplete="off" aria-label="Buscar cliente por nombre o número"
+          onChange={e => {
+            const x = e.target.value;
+            setBuscar(x);
+            clearTimeout(tBuscar.current);
+            tBuscar.current = window.setTimeout(() => poner({ buscarCli: x, paginaCli: 1 }), 300);
+          }} /></div>
+        <div className="toolbar-filtros">
+          <div className="seg" role="group" aria-label="Filtrar por estado de la cuenta">{[["todos", "Todos"], ["cobrar", "Por cobrar"], ["pagar", "Por pagar"]].map(([x, t]) => <button key={x} aria-pressed={E.filtroCli === x} onClick={() => poner({ filtroCli: x, paginaCli: 1 })}>{t}</button>)}</div>
+          <FiltroDia compacto d={dia} poner={x => poner({ diaCliF: x, paginaCli: 1 })} />
+        </div>
+      </div>
+    </div>
+    {dia && <p className="sub">Clientes con movimiento ese día: lo que les quedó de ese día y, al lado, su saldo total de hoy.</p>}
     {reps > 0 ? <div className="aviso">{reps === 1 ? "Hay 1 cliente que parece repetido" : "Hay " + reps + " clientes que parecen repetidos"} (mismo nombre o mismo número). <button className="btn sec chico" id="cliRep" onClick={() => v.abrir(<Repetidos />)}>Revisar y unir</button></div> : null}
-    <div className="campo" style={{ maxWidth: 360, marginTop: 10 }}><input id="buscarCli" type="search" placeholder="Buscar cliente por nombre o número" value={buscar} autoComplete="off" aria-label="Buscar cliente"
-      onChange={e => {
-        const x = e.target.value;
-        setBuscar(x);
-        clearTimeout(tBuscar.current);
-        tBuscar.current = window.setTimeout(() => poner({ buscarCli: x, paginaCli: 1 }), 300);
-      }} /></div>
     <div ref={arriba} style={{ scrollMarginTop: 90 }} />
     {q.isError ? <div className="aviso alerta">No se pudo traer la lista de clientes: {motivoError(q.error)} <button className="btn chico" onClick={() => q.refetch()}>Intentar otra vez</button></div>
       : !pag ? <div className="vacio">Cargando clientes…</div>

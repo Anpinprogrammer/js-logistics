@@ -7,6 +7,7 @@ import { marcarCierre } from "./controllers/salud.controller.js";
 const app = crearApp();
 const servidor = app.listen(env.PORT, () => {
   console.log(`API de JS Logistics en http://localhost:${env.PORT}/api (${env.NODE_ENV})`);
+  console.log(`Postgres: pool máximo ${env.DATABASE_POOL_MAX} conexiones por proceso`);
 });
 
 /* Render (y casi cualquier plataforma) apaga con SIGTERM al desplegar: se deja de aceptar tráfico,
