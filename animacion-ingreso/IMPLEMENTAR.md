@@ -15,7 +15,7 @@ Antes de empezar, lee `CLAUDE.md` (raíz), `docs/ESTADO.md` (en especial las dec
 1. **El último cuadro es el ingreso actual.** No cambies clases, colores, tamaños ni textos de `Ingreso.tsx` ni de `AccesoComun.tsx` en su estado final. Compara capturas antes y después (punto 7).
 2. **Solo en Ingreso.** `Recuperar.tsx` y `Restablecer.tsx` usan el mismo `MarcoAcceso` y deben seguir **sin** animación de entrada. Si tocas `MarcoAcceso`, hazlo con una prop opcional (por ejemplo `intro?: ControlIntro`) que por defecto no cambie nada.
 3. **Se puede saltar.** Un clic, un toque, una tecla o el foco en un campo terminan la animación al instante: todo salta a su estado final, sin parpadeo.
-4. **Una vez por sesión del navegador.** Guarda una bandera en `sessionStorage` (`jsl_intro_ingreso = "1"`). Si ya está, el ingreso aparece normal. Envuelve la lectura y la escritura en `try/catch` (Safari en privado puede fallar), y si falla muestra la animación. No guardes nada más: ninguna sesión ni token va en el navegador.
+4. **En cada carga del login.** La animación debe salir cada vez que se recarga el formulario de ingreso; no se guarda bandera de sesión. No guardes nada en el navegador: ninguna sesión ni token.
 5. **Respeta "reducir movimiento".** Con `useReducedMotion()` en `true` no hay animación de entrada, y las animaciones `jsl-*` de `index.css` siguen apagadas como hoy.
 6. **Accesible.** Todo lo decorativo (mensajeros, destello, onda, chispas, telemetría, la barra "CARGANDO RUTA", la marca blanca) va con `aria-hidden` y `pointer-events: none`. El botón real `Ingresar` existe desde el inicio para los lectores de pantalla y el teclado; la barra solo lo tapa a la vista mientras carga. No muevas el foco ni pongas `autoFocus`.
 7. **No bloquea el ingreso.** Si la persona envía el formulario antes de que termine, se salta la animación y el envío sigue normal (`BotonAcceso` muestra "Ingresando…").
@@ -34,7 +34,7 @@ Para que no pese en el resto de la app:
 
 ```
 frontend/src/pages/
-  Ingreso.tsx                 decide si hay intro (sessionStorage + reducir movimiento) y la monta
+  Ingreso.tsx                 decide si hay intro (cada carga + reducir movimiento) y la monta
   AccesoComun.tsx             MarcoAcceso, CabeceraAcceso y BotonAcceso aceptan una prop opcional de intro
   intro/
     useIntroIngreso.ts        reloj de la intro: inicia, salta y marca como vista
@@ -99,7 +99,7 @@ Valores exactos (colores, sombras, radios, tamaños): cópialos de `src/Intro.ts
 ## 7. Cómo probarlo antes del PR
 
 1. `cd frontend && npm run typecheck && npm run build`. Anota en el PR el peso del módulo del ingreso antes y después.
-2. Levanta `npm run dev` y abre `http://localhost:5173/` a 1440×900 y a 390×844, con la pestaña nueva (sin `jsl_intro_ingreso` en `sessionStorage`).
+2. Levanta `npm run dev` y abre `http://localhost:5173/` a 1440×900 y a 390×844; recarga para comprobar que la intro sale en cada carga.
 3. Con Playwright (o Puppeteer, como dice `docs/ESTADO.md`), toma capturas a 0,5 s, 1,0 s, 1,5 s, 2,0 s, 2,5 s, 3,0 s y 4,2 s, y compáralas con los mismos instantes de los videos de `referencia/`. Para sacar un cuadro del video: `ffmpeg -ss 1.5 -i referencia/ingreso-computador.mp4 -frames:v 1 ref-1.5.png`.
 4. La captura de 4,2 s debe ser igual a la del ingreso de hoy (rama `main`), salvo las animaciones de fondo que ya se mueven solas.
 5. Comprueba que se puede saltar con un clic, con Tab y escribiendo en un campo; que al recargar en la misma pestaña ya no sale; que con "reducir movimiento" (`page.emulateMedia({ reducedMotion: "reduce" })`) no sale; y que Recuperar y Restablecer no la tienen.
@@ -111,6 +111,6 @@ Valores exactos (colores, sombras, radios, tamaños): cópialos de `src/Intro.ts
 - Rama `feat/animacion-ingreso` desde `main` y PR contra `main`. Nunca push directo a `main`.
 - Commits en español, por ejemplo `Ingreso: animación de entrada "La ruta de entrega"`.
 - En el PR: qué cambió, cómo lo probaste (con las capturas comparadas con la referencia) y el peso del módulo.
-- En el mismo PR, en `docs/ESTADO.md`: agrega una decisión (dónde vive la intro, la bandera de `sessionStorage`, que se salta y que no sale con "reducir movimiento") y una línea en el registro de sesiones.
+- En el mismo PR, en `docs/ESTADO.md`: agrega una decisión (dónde vive la intro, que sale en cada carga, que se salta y que no sale con "reducir movimiento") y una línea en el registro de sesiones.
 - No toques el sistema viejo (`app/`, Firebase) ni el portal de clientes (`jslogistics-cliente-frontend`): su login es otro y no entra en este cambio.
 - No borres esta carpeta: queda como referencia por si hay que ajustar la animación.

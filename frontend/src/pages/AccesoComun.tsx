@@ -1,6 +1,6 @@
 /* Piezas compartidas de las pantallas de acceso de la oficina: ingreso, recuperar y restablecer.
    Las clases son exactamente las del ingreso original: aquí solo se reutilizan, no se cambia el diseño. */
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 export const TARJETA =
   "relative space-y-4 rounded-3xl bg-[#0f172a]/75 p-5 sm:space-y-5 sm:p-9 shadow-[0_24px_80px_-20px_rgba(37,99,235,.5),0_8px_30px_rgba(0,0,0,.5)] backdrop-blur-[16px]";
@@ -28,7 +28,7 @@ export const IcCheck = () => <svg {...ic} className="size-7"><circle cx="12" cy=
 export const IcVolver = () => <svg {...ic} className="size-5"><path d="M19 12H5M11 18l-6-6 6-6" /></svg>;
 
 /** Fondo, tarjeta con borde brillante y ancho: el mismo marco del ingreso. */
-export function MarcoAcceso({ children }: { children: ReactNode }) {
+export function MarcoAcceso({ children, intro }: { children: ReactNode; intro?: boolean }) {
   return (
     <div className="relative isolate grid min-h-dvh place-items-center overflow-hidden bg-[#0b0f19] px-4 py-6 sm:py-10 text-slate-200">
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
@@ -64,7 +64,7 @@ export function MarcoAcceso({ children }: { children: ReactNode }) {
         <div className="absolute left-1/2 top-1/3 size-72 -translate-x-1/2 rounded-full bg-indigo-500/10 blur-[110px]" />
       </div>
 
-      <div className="relative w-full max-w-[22rem] sm:max-w-[26rem]">
+      <div className={"relative w-full max-w-[22rem] sm:max-w-[26rem]" + (intro ? " jsl-intro-carta" : "")} data-intro-card>
         <div aria-hidden className="absolute -inset-px rounded-[1.6rem] bg-gradient-to-br from-[#38bdf8] via-[#2563eb]/40 to-[#38bdf8]/60 opacity-70 blur-[1px]" />
         <div aria-hidden className="absolute -inset-6 -z-10 rounded-[2.5rem] bg-[#2563eb]/20 blur-3xl" />
         {children}
@@ -74,31 +74,36 @@ export function MarcoAcceso({ children }: { children: ReactNode }) {
 }
 
 /** Logo, "Logistics · Cali" y el título de la pantalla, con el mismo tamaño del ingreso. */
-export function CabeceraAcceso({ titulo, descripcion }: { titulo: string; descripcion: ReactNode }) {
+export function CabeceraAcceso({ titulo, descripcion, intro }: { titulo: string; descripcion: ReactNode; intro?: boolean }) {
   return (
     <header className="text-center">
-      <div className="relative mx-auto mb-3 grid size-20 place-items-center sm:mb-5 sm:size-28">
+      <div className={"relative mx-auto mb-3 grid size-20 place-items-center sm:mb-5 sm:size-28" + (intro ? " jsl-intro-badge" : "")} data-intro-badge>
         <span aria-hidden className="absolute -inset-3 rounded-[2rem] bg-[#38bdf8]/50 blur-2xl" />
         <div className="relative grid size-20 place-items-center rounded-[1.4rem] bg-gradient-to-br from-white to-sky-100 p-2 sm:size-28 sm:rounded-[1.75rem] sm:p-3 shadow-[0_0_0_1px_rgba(255,255,255,.7),0_0_28px_6px_rgba(56,189,248,.45),0_12px_28px_-6px_rgba(2,132,199,.55),inset_0_1px_0_#fff]">
           {/* El .webp trae "LOGISTICS CALI" en blanco (invisible sobre el badge claro): se recorta y el texto va aparte. */}
           <div className="relative size-full overflow-hidden rounded-2xl">
-            <img src="/icono-96.webp" alt="JS Logistics Cali" width={96} height={96} className="absolute left-[-10%] top-[3%] w-[120%] max-w-none" />
+            <img src="/icono-96.webp" alt="JS Logistics Cali" width={96} height={96} className={"absolute left-[-10%] top-[3%] w-[120%] max-w-none" + (intro ? " jsl-intro-logo" : "")} />
           </div>
         </div>
       </div>
-      <p className="-mt-1 mb-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-[#38bdf8]">Logistics · Cali</p>
-      <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">{titulo}</h1>
-      <p className="mx-auto mt-2 max-w-[19rem] text-[13px] sm:mt-2.5 sm:text-sm leading-relaxed text-slate-300">{descripcion}</p>
+      <p className={"-mt-1 mb-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-[#38bdf8]" + (intro ? " jsl-intro-ceja" : "")}>Logistics · Cali</p>
+      <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl" aria-label={titulo}>
+        {intro ? titulo.split("").map((c, i) => (
+          <span key={i} className="jsl-intro-letra"
+            style={{ animationDelay: `${2.033 + i * 0.037}s`, "--rot": i % 2 ? "8deg" : "-8deg" } as CSSProperties}>{c === " " ? "\u00a0" : c}</span>
+        )) : titulo}
+      </h1>
+      <p className={"mx-auto mt-2 max-w-[19rem] text-[13px] sm:mt-2.5 sm:text-sm leading-relaxed text-slate-300" + (intro ? " jsl-intro-desc" : "")}>{descripcion}</p>
     </header>
   );
 }
 
 /** Botón principal del acceso, con el mismo degradado y animación del ingreso. */
-export function BotonAcceso({ cargando, children, cargandoTexto }: { cargando: boolean; children: ReactNode; cargandoTexto: string }) {
+export function BotonAcceso({ cargando, children, cargandoTexto, intro }: { cargando: boolean; children: ReactNode; cargandoTexto: string; intro?: boolean }) {
   return (
     <button
       type="submit" disabled={cargando}
-      className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-[#0284c7] to-[#22d3ee] px-5 py-3 text-base font-bold sm:py-4 text-white shadow-[0_8px_24px_-8px_rgba(34,211,238,.6)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-8px_rgba(34,211,238,.8)] active:translate-y-0 disabled:cursor-wait disabled:opacity-90 disabled:hover:translate-y-0"
+      data-intro-button className={"group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-[#0284c7] to-[#22d3ee] px-5 py-3 text-base font-bold sm:py-4 text-white shadow-[0_8px_24px_-8px_rgba(34,211,238,.6)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-8px_rgba(34,211,238,.8)] active:translate-y-0 disabled:cursor-wait disabled:opacity-90 disabled:hover:translate-y-0" + (intro ? " jsl-intro-boton" : "")}
     >
       <span aria-hidden className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
       {cargando ? (
