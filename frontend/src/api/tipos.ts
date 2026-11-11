@@ -242,3 +242,32 @@ export interface PaginaCajaMovimientos {
   total: number;
   paginas: number;
 }
+
+/** Solicitud de envío que un visitante manda desde la landing (formulario "Solicitar envío"). */
+export type EstadoSolicitud = "pendiente" | "cotizada" | "confirmada" | "asignada" | "rechazada";
+export interface Solicitud {
+  id: string;
+  estado: EstadoSolicitud;
+  nombre: string;
+  telefono: string;
+  email: string;
+  direccionRecogida: string;
+  paquetes: number;
+  pesoKg: number | null;
+  destinatarioNombre: string;
+  destinatarioTelefono: string;
+  direccionEntrega: string;
+  /** Domicilio que puso la oficina al aceptarla. */
+  valor: number | null;
+  motivoRechazo: string;
+  clienteId: string | null;
+  clienteNombre: string | null;
+  mensajeroId: string | null;
+  mensajeroNombre: string | null;
+  guia: string | null;
+  creado: string;
+  actualizado: string;
+}
+/** Cuántas solicitudes hay en cada estado abierto (la campanita). */
+export interface ConteoSolicitudes { pendiente: number; cotizada: number; confirmada: number }
+export interface ListaSolicitudes { solicitudes: Solicitud[]; conteo: ConteoSolicitudes }

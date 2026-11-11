@@ -9,6 +9,13 @@ Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/EST
 - `clientes.direccion_recogida` guarda la dirección habitual opcional (texto vacío por defecto) mediante migración idempotente en `db/schema.sql`.
 - `PATCH /api/clientes/mi-perfil` permite al cliente editar solo su ficha y el correo de su propia cuenta. Cambiar el correo exige la contraseña actual; la tarifa permanece reservada a oficina. El frontend de clientes usa esta ruta en la pestaña Configuración de Mi cuenta.
 
+## Solicitudes de envío (landing → campanita) — 2026-11-11
+
+- Un visitante pide una recogida desde `/register` del portal de clientes (`POST /api/solicitudes/publico`, sin sesión). Se guarda en la tabla `solicitudes` (estados `pendiente → cotizada → confirmada → asignada`, o `rechazada`). Detalle y límites en `backend/README.md`.
+- Protección del endpoint público: límites por IP (5/hora, 15/día) y tope global diario, tope de pendientes, campo trampa `sitio`, `strict()` en el validador (no se puede mandar `estado` ni `valor`), repetidas de los últimos 30 min se ignoran y la respuesta es siempre `{ recibida: true }` (no devuelve nada guardado). Se apaga con `SOLICITUDES_ACTIVO=false`.
+- Oficina (`frontend/src/interna/Solicitudes.tsx`): campanita junto al avatar con el total por atender; el panel es un drawer. Aceptar pone el valor del domicilio; el mensaje de WhatsApp (`mensajeCotizacion`) se arma en la app y se abre con un enlace `wa.me`; "El cliente está de acuerdo" pasa a `confirmada`; asignar crea la guía (`valorServicio` = valor) y, si no se eligió remitente, el cliente con los datos de la solicitud. La campanita consulta cada 30 s (no usa SSE todavía, aunque el backend ya emite `solicitudes`).
+- Pendiente: avisar por correo al admin, y que el remitente se pueda elegir entre clientes existentes al asignar (el backend ya acepta `clienteId`).
+
 ## Mapa rápido
 
 | Pieza | Dónde | Puerto en local | Guía |

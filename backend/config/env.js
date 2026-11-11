@@ -64,6 +64,12 @@ const esquema = z.object({
   CHATBOT_PUBLICO_MINUTO: z.coerce.number().int().min(1).default(5),
   CHATBOT_PUBLICO_DIA: z.coerce.number().int().min(1).default(30),
   CHATBOT_PUBLICO_DIA_TOTAL: z.coerce.number().int().min(1).default(500),
+  // Formulario público "Solicitar envío" de la landing (sin sesión): límites por IP y topes globales.
+  SOLICITUDES_ACTIVO: z.enum(["true", "false"]).default("true").transform(v => v === "true"),
+  SOLICITUDES_POR_HORA: z.coerce.number().int().min(1).default(5),
+  SOLICITUDES_POR_DIA: z.coerce.number().int().min(1).default(15),
+  SOLICITUDES_DIA_TOTAL: z.coerce.number().int().min(1).default(300),
+  SOLICITUDES_MAX_PENDIENTES: z.coerce.number().int().min(1).default(200),
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1)
 });
 

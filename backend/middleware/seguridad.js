@@ -123,3 +123,29 @@ export const limitePublicoGlobal = rateLimit({
   legacyHeaders: false,
   handler: respuestaChat429("CHAT_SATURADO", "El asistente tiene mucha demanda hoy. Escríbenos por WhatsApp y te atendemos.")
 });
+
+/* Formulario público "Solicitar envío": cualquiera en internet puede llamarlo y cada solicitud termina en la
+   campanita de la oficina, así que va con límites por IP (por hora y por día) y un tope global diario. */
+const respuestaSolicitud429 = message => respuesta429("DEMASIADAS_SOLICITUDES", message);
+export const limiteSolicitudHora = rateLimit({
+  windowMs: 60 * 60_000,
+  limit: env.SOLICITUDES_POR_HORA,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: respuestaSolicitud429("Ya enviaste varias solicitudes. Espera un rato o escríbenos por WhatsApp.")
+});
+export const limiteSolicitudDia = rateLimit({
+  windowMs: 24 * 60 * 60_000,
+  limit: env.SOLICITUDES_POR_DIA,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: respuestaSolicitud429("Llegaste al límite de solicitudes de hoy. Escríbenos por WhatsApp y te atendemos.")
+});
+export const limiteSolicitudGlobal = rateLimit({
+  windowMs: 24 * 60 * 60_000,
+  limit: env.SOLICITUDES_DIA_TOTAL,
+  keyGenerator: () => "global",
+  standardHeaders: false,
+  legacyHeaders: false,
+  handler: respuesta429("SOLICITUDES_SATURADAS", "Tenemos muchas solicitudes hoy. Escríbenos por WhatsApp y te atendemos.")
+});

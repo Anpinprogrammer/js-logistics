@@ -5,6 +5,8 @@ process.env.NODE_ENV = "test";
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || "postgresql://postgres@127.0.0.1:5432/jsl_test";
 process.env.JWT_SECRET = "secreto-de-pruebas-que-no-sirve-en-produccion-123";
 process.env.CORS_ORIGENES = "http://localhost:5173";
+// Límite por IP del formulario público: más alto que en producción para que las pruebas quepan (test/solicitudes.test.js).
+process.env.SOLICITUDES_POR_HORA = "12";
 
 const { pool } = await import("../config/db.js");
 const { crearApp } = await import("../app.js");
@@ -21,7 +23,7 @@ export async function reiniciarBase() {
   const sql = await readFile(new URL("../db/schema.sql", import.meta.url), "utf8");
   await pool.query(sql);
   await pool.query(`TRUNCATE historial, papelera, pedido_intentos, pedido_archivos, pedidos, movimientos, recaudos,
-    liquidaciones, cajamovs, jornadas, enlaces, usuarios, clientes, mensajeros, cuentas, ajustes RESTART IDENTITY CASCADE`);
+    liquidaciones, cajamovs, jornadas, enlaces, solicitudes, usuarios, clientes, mensajeros, cuentas, ajustes RESTART IDENTITY CASCADE`);
   await pool.query(`UPDATE contadores SET n = 0`);
 }
 

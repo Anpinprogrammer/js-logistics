@@ -5,6 +5,7 @@ import { ProveedorDatos, useDatos } from "./datos";
 import { ProveedorVentana, Icono, IconoSalir, useVentana } from "./ui";
 import { E, guardarLocal } from "./estado";
 import { useTema } from "./tema";
+import { Campanita } from "./Solicitudes";
 import { S, fechaLarga, hoy, horaActual, type Pedido } from "./motor";
 import { pendientesMios } from "./mensajero/pendientes";
 import { useEscritorio } from "../lib/pantalla";
@@ -123,6 +124,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
           {esAdmin && <button aria-pressed={E.rol === "admin"} id="btnAdmin" onClick={() => cambiarRol("admin")}>Administración</button>}
         </div>
       )}
+      {!enMensajero && <Campanita />}
       {nom && <span className="avatar" id="avatar" aria-hidden="true">{iniciales}</span>}
       <button
         type="button"

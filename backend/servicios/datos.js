@@ -26,7 +26,7 @@ export function lecturasDe(a) {
   return L;
 }
 /** Colecciones de las que cada rol recibe avisos en tiempo real. */
-export const visiblesDe = a => [...Object.keys(lecturasDe(a)), ...(a.esEquipo ? ["meta", "papelera"] : [])];
+export const visiblesDe = a => [...Object.keys(lecturasDe(a)), ...(a.esEquipo ? ["meta", "papelera"] : []), ...(a.esOficina ? ["solicitudes"] : [])];
 
 /** Lista una colección con el filtro de su rol. */
 export async function leer(db, col, filtro) {

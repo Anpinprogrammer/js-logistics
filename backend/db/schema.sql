@@ -310,6 +310,35 @@ CREATE TABLE IF NOT EXISTS papelera (              -- copia de lo borrado, para 
 );
 CREATE INDEX IF NOT EXISTS papelera_fecha_idx ON papelera (fecha DESC);
 
+-- ---------- Solicitudes de envío (formulario público de la landing) ----------
+-- Un visitante pide una recogida sin tener cuenta. La oficina la revisa: la acepta poniendo el valor del domicilio
+-- (se le confirma al cliente por WhatsApp) o la rechaza; cuando el cliente está de acuerdo se asigna a un mensajero
+-- y se crea la guía. Estados: pendiente → cotizada → confirmada → asignada, o rechazada.
+CREATE TABLE IF NOT EXISTS solicitudes (
+  id                    TEXT PRIMARY KEY,
+  estado                TEXT NOT NULL DEFAULT 'pendiente'
+                        CHECK (estado IN ('pendiente', 'cotizada', 'confirmada', 'asignada', 'rechazada')),
+  nombre                TEXT NOT NULL,
+  telefono              TEXT NOT NULL,
+  email                 TEXT NOT NULL,
+  direccion_recogida    TEXT NOT NULL,
+  paquetes              INTEGER NOT NULL CHECK (paquetes BETWEEN 1 AND 100),
+  peso_kg               NUMERIC(6,1) CHECK (peso_kg IS NULL OR (peso_kg > 0 AND peso_kg <= 1000)),
+  destinatario_nombre   TEXT NOT NULL,
+  destinatario_telefono TEXT NOT NULL DEFAULT '',
+  direccion_entrega     TEXT NOT NULL,
+  valor                 BIGINT CHECK (valor IS NULL OR valor >= 0),   -- domicilio que puso la oficina
+  motivo_rechazo        TEXT NOT NULL DEFAULT '',
+  cliente_id            TEXT REFERENCES clientes(id) ON DELETE SET NULL,
+  mensajero_id          TEXT REFERENCES mensajeros(id) ON DELETE SET NULL,
+  guia                  TEXT REFERENCES pedidos(guia) ON DELETE SET NULL,
+  revisado_por          TEXT REFERENCES usuarios(id) ON DELETE SET NULL,
+  creado                TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actualizado           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS solicitudes_estado_idx ON solicitudes (estado, creado DESC);
+CREATE INDEX IF NOT EXISTS solicitudes_creado_idx ON solicitudes (creado DESC);
+
 -- ---------- Supabase: cerrar la API pública ----------
 -- Supabase expone las tablas de "public" por su Data API (PostgREST) con la anon key.
 -- Toda la app pasa por Express, que se conecta con el rol dueño de las tablas (no lo afecta RLS).
@@ -319,7 +348,7 @@ DECLARE t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY['clientes', 'mensajeros', 'usuarios', 'enlaces', 'cuentas', 'contadores', 'ajustes', 'pedidos',
     'pedido_intentos', 'pedido_archivos', 'movimientos', 'recaudos', 'liquidaciones', 'cajamovs', 'jornadas',
-    'historial', 'papelera']
+    'historial', 'papelera', 'solicitudes']
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;
