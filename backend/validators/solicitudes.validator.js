@@ -24,7 +24,11 @@ export const crear = z.object({
 export const listar = z.object({
   estado: z.enum(["pendiente", "cotizada", "confirmada", "asignada", "rechazada"]).optional(),
   abiertas: z.enum(["true", "false"]).optional().transform(v => v === "true"),
-  limite: z.coerce.number().int().min(1).max(200).default(50)
+  limite: z.coerce.number().int().min(1).max(200).default(50),
+  // Pantalla de Solicitudes: con `grupo` o `pagina` responde una página del filtro.
+  grupo: z.enum(["todas", "pendientes", "por-confirmar", "aceptadas", "rechazadas"]).optional(),
+  pagina: z.coerce.number().int().min(1).optional(),
+  porPagina: z.coerce.number().int().min(1).max(100).default(20)
 });
 
 export const aceptar = z.object({ valor: pesos.refine(v => v > 0, "Escribe el valor del domicilio") });

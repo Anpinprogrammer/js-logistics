@@ -273,4 +273,8 @@ export interface Solicitud {
 }
 /** Cuántas solicitudes hay en cada estado abierto (la campanita). */
 export interface ConteoSolicitudes { pendiente: number; cotizada: number; confirmada: number }
+/** Filtros de la pantalla de Solicitudes. "Por confirmar" = esperando que el cliente acepte el valor. */
+export type GrupoSolicitud = "todas" | "pendientes" | "por-confirmar" | "aceptadas" | "rechazadas";
+export type ConteoGrupos = Record<"todas" | "pendientes" | "porConfirmar" | "aceptadas" | "rechazadas", number>;
+export interface PaginaSolicitudes { solicitudes: Solicitud[]; pagina: number; porPagina: number; total: number; paginas: number; grupos: ConteoGrupos }
 export interface ListaSolicitudes { solicitudes: Solicitud[]; conteo: ConteoSolicitudes }

@@ -123,6 +123,19 @@ test("rechazar guarda el motivo y la saca de las abiertas", async () => {
   assert.equal((await oficina.get("/api/solicitudes?estado=rechazada")).body.solicitudes.length, 1);
 });
 
+test("la pantalla de solicitudes filtra por grupo, pagina y cuenta cada filtro", async () => {
+  const g = await oficina.get("/api/solicitudes?grupo=todas&pagina=1&porPagina=1");
+  assert.equal(g.status, 200);
+  assert.equal(g.body.solicitudes.length, 1);
+  assert.equal(g.body.total, g.body.grupos.todas);
+  assert.equal(g.body.grupos.rechazadas, 1);
+  assert.equal(g.body.grupos.aceptadas, 1);
+  assert.equal((await oficina.get("/api/solicitudes?grupo=rechazadas&pagina=1")).body.solicitudes[0].estado, "rechazada");
+  assert.equal((await oficina.get("/api/solicitudes?grupo=aceptadas&pagina=1")).body.solicitudes[0].estado, "asignada");
+  assert.equal((await oficina.get("/api/solicitudes?grupo=por-confirmar&pagina=1")).body.total, 0);
+  assert.equal((await oficina.get("/api/solicitudes?grupo=raro")).status, 400);
+});
+
 test("después de varias solicitudes desde la misma IP responde 429", async () => {
   let ultimo;
   for (let i = 0; i < 15; i++) {

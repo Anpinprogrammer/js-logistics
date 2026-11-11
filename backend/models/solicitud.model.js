@@ -68,6 +68,40 @@ export async function listar({ estado, abiertas, limite = 50 } = {}) {
   return rows.map(aObjeto);
 }
 
+// Filtros de la pantalla de Solicitudes → estados que incluyen. "Aceptadas" es lo que la oficina ya aprobó (con o sin guía).
+export const GRUPOS = {
+  pendientes: ["pendiente"],
+  "por-confirmar": ["cotizada"],
+  aceptadas: ["confirmada", "asignada"],
+  rechazadas: ["rechazada"]
+};
+
+/** Una página de la lista (paginador de pantalla, con OFFSET). `grupo` omitido o "todas" = todas. */
+export async function listarPagina({ grupo, pagina = 1, porPagina = 20 } = {}) {
+  const estados = GRUPOS[grupo];
+  const valores = [];
+  if (estados) valores.push(estados);
+  const donde = estados ? "WHERE s.estado = ANY($1)" : "";
+  const { rows: [{ n }] } = await query(`SELECT count(*)::int AS n FROM solicitudes s ${donde}`, valores);
+  const { rows } = await query(
+    `${CON_NOMBRES} ${donde} ORDER BY s.creado DESC LIMIT $${valores.length + 1} OFFSET $${valores.length + 2}`,
+    [...valores, porPagina, (pagina - 1) * porPagina]
+  );
+  return { solicitudes: rows.map(aObjeto), total: n, paginas: Math.max(1, Math.ceil(n / porPagina)) };
+}
+
+/** Cuántas hay en cada filtro de la pantalla. */
+export async function contarGrupos() {
+  const { rows } = await query(`SELECT estado, count(*)::int AS n FROM solicitudes GROUP BY estado`);
+  const por = Object.fromEntries(rows.map(f => [f.estado, f.n]));
+  const suma = estados => estados.reduce((t, e) => t + (por[e] || 0), 0);
+  return {
+    todas: suma(["pendiente", "cotizada", "confirmada", "asignada", "rechazada"]),
+    pendientes: suma(GRUPOS.pendientes), porConfirmar: suma(GRUPOS["por-confirmar"]),
+    aceptadas: suma(GRUPOS.aceptadas), rechazadas: suma(GRUPOS.rechazadas)
+  };
+}
+
 /** Cuántas hay en cada estado abierto (para la campanita). */
 export async function contarAbiertas() {
   const { rows } = await query(

@@ -45,6 +45,12 @@ export async function crear(req, res) {
 }
 
 export async function listar(req, res) {
+  const q = req.valido.query;
+  if (q.pagina || q.grupo) {
+    const pagina = q.pagina || 1;
+    const [r, grupos] = await Promise.all([Solicitud.listarPagina({ grupo: q.grupo, pagina, porPagina: q.porPagina }), Solicitud.contarGrupos()]);
+    return res.json({ ...r, pagina, porPagina: q.porPagina, grupos });
+  }
   const [solicitudes, conteo] = await Promise.all([Solicitud.listar(req.valido.query), Solicitud.contarAbiertas()]);
   res.json({ solicitudes, conteo });
 }

@@ -1,6 +1,6 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
-import type { Archivo, TipoArchivo, Cliente, ClienteBreve, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
+import type { GrupoSolicitud, PaginaSolicitudes, Archivo, TipoArchivo, Cliente, ClienteBreve, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
   Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal, Solicitud, ListaSolicitudes } from "./tipos";
 import { FalloApi } from "./cliente";
 
@@ -209,6 +209,7 @@ export const historial = {
 /** Solicitudes de envío de la landing: la oficina las acepta (con valor), confirma, rechaza o asigna. */
 export const solicitudes = {
   abiertas: () => datos<ListaSolicitudes>(api.get("/solicitudes", { params: { abiertas: true } })),
+  pagina: (grupo: GrupoSolicitud, pagina: number, porPagina: number) => datos<PaginaSolicitudes>(api.get("/solicitudes", { params: { grupo, pagina, porPagina } })),
   aceptar: (id: string, valor: number) => datos<{ solicitud: Solicitud }>(api.post(`/solicitudes/${id}/aceptar`, { valor })).then(d => d.solicitud),
   confirmar: (id: string) => datos<{ solicitud: Solicitud }>(api.post(`/solicitudes/${id}/confirmar`)).then(d => d.solicitud),
   rechazar: (id: string, motivo: string) => datos<{ solicitud: Solicitud }>(api.post(`/solicitudes/${id}/rechazar`, { motivo })).then(d => d.solicitud),
