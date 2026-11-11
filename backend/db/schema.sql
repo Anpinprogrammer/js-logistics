@@ -336,6 +336,9 @@ CREATE TABLE IF NOT EXISTS solicitudes (
   creado                TIMESTAMPTZ NOT NULL DEFAULT now(),
   actualizado           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- De dónde llegó: 'publico' (formulario de la landing, sin sesión) o 'portal' (un cliente con cuenta, desde su portal;
+-- en ese caso cliente_id es su ficha desde el principio).
+ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT 'publico' CHECK (origen IN ('publico', 'portal'));
 CREATE INDEX IF NOT EXISTS solicitudes_estado_idx ON solicitudes (estado, creado DESC);
 CREATE INDEX IF NOT EXISTS solicitudes_creado_idx ON solicitudes (creado DESC);
 

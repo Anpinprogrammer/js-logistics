@@ -1,4 +1,4 @@
-/* Solicitudes de envío: las atiende la oficina (administración y asistentes). */
+/* Solicitudes de envío: las atiende la oficina (administración y asistentes); los clientes con cuenta las crean desde el portal. */
 import { Router } from "express";
 import * as C from "../controllers/solicitudes.controller.js";
 import * as V from "../validators/solicitudes.validator.js";
@@ -7,6 +7,8 @@ import { validar } from "../middleware/validar.js";
 import { permitir, OFICINA } from "../middleware/autorizar.js";
 
 const r = Router();
+// Un cliente con cuenta pide un envío desde su portal. Su ficha se toma de la sesión, nunca del cuerpo.
+r.post("/portal", permitir("cliente"), validar({ body: V.crearPortal }), C.crearDesdePortal);
 r.get("/", permitir(OFICINA), validar({ query: V.listar }), C.listar);
 r.get("/:id", permitir(OFICINA), validar({ params: paramId }), C.obtener);
 r.post("/:id/aceptar", permitir(OFICINA), validar({ params: paramId, body: V.aceptar }), C.aceptar);
