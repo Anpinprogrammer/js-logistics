@@ -137,6 +137,8 @@ export const entregar = conPedido(Servicio.entregar);
 export const noEntregado = conPedido(Servicio.noEntregado);
 /** El mensajero corrige lo que registró, solo durante 24 horas. No cambia el estado ni la hora. */
 export const corregir = conPedido(Servicio.corregir);
+/** El mensajero pone el remitente de su guía pendiente que todavía no tiene uno. */
+export const asignarRemitente = conPedido(Servicio.asignarRemitente);
 /** El cliente (o la oficina) confirma que la prenda de un cambio llegó. */
 export const confirmarCambio = conPedido(Servicio.cambioRecibido);
 /** Administración devuelve la guía a "por entregar". Las pruebas de la entrega quedan como "previas". */

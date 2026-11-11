@@ -9,8 +9,8 @@ import {
 } from "../motor";
 import { Columnas, Dona, EtqEstado, FiltroDia, Icono, IconoCamara, Kpi, Mini, TablaEntregas, pl, useVentana } from "../ui";
 import { crearGuias } from "../acciones";
-import { motivoError } from "../datos";
 import { abrirEntregaEn, VerEntregado } from "./Entrega";
+import { DlgNuevaGuia } from "./NuevaGuia";
 
 import { pendientesMios } from "./pendientes";
 const MAX_FOTOS = 30;
@@ -28,15 +28,14 @@ export default function Mensajero({ pintar }: { pintar: () => void }) {
   const enlaceCambiar = puedeCambiar ? <> · <a href="#" id="cambiarYo" onClick={cambiarYo}>{E.actuarComo ? "volver a mi nombre" : "cambiar"}</a></> : null;
   const irM = (k: string) => { E.tabM = k; if (k === "pend") E.diaPedM = ""; pintar(); scrollTo(0, 0); };
 
-  const fotos = async (lista: FileList | null) => {
+  // Al tomar la foto se abre una ventana que muestra la subida y deja elegir el remitente (opcional).
+  const fotos = (lista: FileList | null) => {
     let files = [...(lista || [])].filter(f => f.type.startsWith("image/")); if (!files.length) return;
     if (files.length > MAX_FOTOS) { ventana.avisar("Máximo " + MAX_FOTOS + " fotos a la vez"); files = files.slice(0, MAX_FOTOS); }
-    try {
-      const hechas = await crearGuias(files, E.miMensajero, ventana.avisar);
-      ventana.avisar(hechas.length === 1 ? "Guía " + hechas[0] + " creada" : "Se crearon " + hechas.length + " guías");
-      E.ultimaGuia = hechas.length === 1 ? hechas[0] : hechas[0] + " a " + hechas[hechas.length - 1];
-      pintar();
-    } catch (e) { ventana.avisar(navigator.onLine === false ? "Sin señal: la guía necesita conexión para darle número." : "No se pudo crear la guía: " + motivoError(e) + "."); }
+    let oyente: (msg: string) => void = () => {};
+    const trabajo = crearGuias(files, E.miMensajero, msg => oyente(msg));
+    trabajo.then(hechas => { E.ultimaGuia = hechas.length === 1 ? hechas[0] : hechas[0] + " a " + hechas[hechas.length - 1]; pintar(); }, () => {});
+    ventana.abrir(<DlgNuevaGuia trabajo={trabajo} fotos={files} escuchar={f => { oyente = f; }} />, "centrada");
   };
   const btnFoto = () => { if (camara.current) { camara.current.value = ""; camara.current.click(); } };
   const btnGaleria = () => { if (galeria.current) { galeria.current.value = ""; galeria.current.click(); } };

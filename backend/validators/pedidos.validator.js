@@ -76,6 +76,9 @@ export const correccion = z.object({
   notaDev: texto(300).optional()
 }).superRefine(conCuenta);
 
+// El mensajero elige el remitente de una guía suya recién creada (desde la recogida).
+export const remitente = z.object({ clienteId: z.string().trim().min(1, "Elige el remitente").max(64) });
+
 // Lo que organiza la oficina. valorCobrado y metodo solo los corrige administración (lo valida el controlador).
 export const actualizar = z.object({
   mensajeroId: id.optional(),

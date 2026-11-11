@@ -4,9 +4,9 @@
  */
 import * as api from "../api/servicios";
 import type * as T from "../api/tipos";
-import { S, yo, type Pedido, type Medio, type Motivo, type Metodo, type TipoMov, type TipoPersonal, type Almacen, type CajaMov, type Liquidacion, hora } from "./motor";
+import { S, yo, type Pedido, type Medio, type Motivo, type Metodo, type TipoMov, type TipoPersonal, type Almacen, type CajaMov, type Liquidacion, hora, sinTildes } from "./motor";
 import { aPedido, aPersona } from "./datos";
-import { DEMO } from "./demo";
+import { DEMO, remitentesDemo } from "./demo";
 import { comprimir, firmaABlob, FOTO, MINI } from "../lib/imagen";
 
 type Tocar = (fn?: (s: Almacen) => void) => void;
@@ -44,6 +44,33 @@ export async function crearGuias(files: File[], mensajeroId: string, avance: (ms
   }
   if (!DEMO) await recargar();
   return hechas;
+}
+
+/** Remitentes que coinciden con lo escrito (desde 2 letras). El mensajero solo recibe nombre e id. */
+export async function buscarRemitentes(q: string): Promise<T.ClienteBreve[]> {
+  const t = q.trim(); if (t.length < 2) return [];
+  if (DEMO) {
+    const k = sinTildes(t);
+    const lista = Object.keys(S.clientes).length ? Object.values(S.clientes) : remitentesDemo;
+    return lista.filter(c => sinTildes(c.nombre + " " + ("telefono" in c ? c.telefono : "")).includes(k))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, "es")).slice(0, 8).map(c => ({ id: c.id, nombre: c.nombre }));
+  }
+  return api.clientes.buscar(t);
+}
+
+/** Pone el remitente a las guías recién creadas. La oficina (actuando como mensajero) usa su ruta de siempre. */
+export async function ponerRemitente(guias: string[], cliente: T.ClienteBreve) {
+  for (const guia of guias) {
+    if (DEMO) {
+      const p = S.pedidos[guia], tarifa = Number((S.clientes[cliente.id] || remitentesDemo.find(c => c.id === cliente.id))?.tarifa) || 0;
+      demoPedido(guia, { clienteId: cliente.id, clienteNombre: cliente.nombre, ...(!(Number(p?.valorServicio) > 0) && tarifa ? { valorServicio: tarifa } : {}) });
+      continue;
+    }
+    if (yo.esAdmin || yo.esAsistente) {
+      const tarifa = Number(S.clientes[cliente.id]?.tarifa) || 0, p = S.pedidos[guia];
+      ponerPedido(await api.pedidos.actualizar(guia, { clienteId: cliente.id, ...(!(Number(p?.valorServicio) > 0) && tarifa ? { valorServicio: tarifa } : {}) }));
+    } else ponerPedido(await api.pedidos.remitente(guia, cliente.id));
+  }
 }
 
 export interface Entrega { destinatario: string; valorCobrado: number; metodo: Metodo; cuentaJs: "" | "nequi" | "bancolombia"; cambio: boolean; gasto: number; gastoNota: string }

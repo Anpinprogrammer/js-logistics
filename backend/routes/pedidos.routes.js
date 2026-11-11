@@ -20,6 +20,7 @@ r.post("/en-bloque", permitir(OFICINA), validar({ body: V.enBloque }), C.enBloqu
 r.patch("/:guia", permitir(OFICINA), validar({ ...guia, body: V.actualizar }), C.actualizar);
 r.post("/:guia/entrega", permitir(EQUIPO), validar({ ...guia, body: V.entrega }), C.entregar);
 r.post("/:guia/no-entregado", permitir(EQUIPO), validar({ ...guia, body: V.noEntregado }), C.noEntregado);
+r.patch("/:guia/remitente", permitir("mensajero"), validar({ ...guia, body: V.remitente }), C.asignarRemitente);
 r.patch("/:guia/correccion", permitir("mensajero"), validar({ ...guia, body: V.correccion }), C.corregir);
 r.post("/:guia/cambio-recibido", permitir(OFICINA, "cliente"), validar(guia), C.confirmarCambio);
 r.post("/:guia/reabrir", permitir("admin"), validar(guia), C.reabrir);

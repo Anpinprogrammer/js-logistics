@@ -231,6 +231,7 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `POST /usuarios/:id/activacion`, `POST /usuarios/:id/recuperacion` | admin | Reenvía la activación o manda el enlace de contraseña |
 | `GET /usuarios/pagina?buscar=&rol=&pagina=&porPagina=` | admin | Página de la sub-pestaña Acceso de Personal: `buscar` filtra por nombre o correo (sin tildes) y `rol` por `mensajero`, `asistente`, `cliente` o `admin`. Ordenada por nombre y correo. Devuelve `{ usuarios, pagina, porPagina, total, paginas }`. La app usa 5 en celular y 10 en computador; si la página ya no existe, responde la última |
 | `GET /clientes?buscar=` | oficina | Lista y busca |
+| `GET /clientes/buscar?q=` | equipo | `{ clientes: [{ id, nombre }] }`, máximo 8, desde 2 letras. Para elegir el remitente desde la recogida; el mensajero no ve teléfonos, tarifas ni saldos |
 | `GET /clientes/:id` | oficina, o el propio cliente | Ficha |
 | `PATCH /clientes/mi-perfil` | cliente | Actualiza únicamente su ficha con `nombre?`, `telefono?`, `direccionRecogida?` y/o el `email?` de su propia cuenta. Si cambia el correo, exige `claveActual`; el correo debe ser único. Responde `{ cliente }`. No permite cambiar tarifa ni otro cliente. El nuevo correo se ve en `GET /auth/yo` sin cerrar la sesión actual |
 | `POST /clientes`, `PATCH /clientes/:id` | oficina | Crea (avisa de repetidos con 409 `POSIBLE_REPETIDO`) y edita |
@@ -247,6 +248,7 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `GET /pedidos/:guia/archivos` | quien la puede ver | `{ archivos: [{ tipo, url, creado }] }` con URL firmadas de Storage que vencen en 1 hora (las `previa` solo para oficina) |
 | `POST /pedidos/:guia/archivos/:tipo` | oficina (cualquiera); mensajero (las suyas, en ruta o dentro de 24 horas) | Cuerpo **binario** de la imagen con `Content-Type: image/jpeg`, `image/png` o `image/webp`, máximo 1 MB. `tipo`: `salida`, `mini`, `entrega` o `firma`. El servidor revisa los bytes (`415 NO_ES_IMAGEN`), pone el nombre en el bucket y registra el historial. Responde `201 { archivo: { tipo, url, creado } }`. Sin Storage configurado: `503 FOTOS_NO_CONFIGURADAS`. La vigente de cada tipo es la más reciente |
 | `POST /pedidos` | equipo | Crea la guía con el siguiente consecutivo. El mensajero la crea a su nombre y en cero |
+| `PATCH /pedidos/:guia/remitente` | su mensajero | Pone el remitente de su guía por entregar que todavía no tiene (`{ clienteId }`). Si la guía no tiene valor de domicilio, toma la tarifa del cliente. Cambiar uno ya puesto es de la oficina (409) |
 | `PATCH /pedidos/:guia` | oficina | Remitente, valores, domicilio pagado. Lo cobrado solo lo corrige admin |
 | `POST /pedidos/:guia/entrega` | su mensajero u oficina | Entrega. El servidor calcula `difCobro` |
 | `POST /pedidos/:guia/no-entregado` | su mensajero u oficina | `reprogramar` anota el intento; otro motivo la devuelve |
