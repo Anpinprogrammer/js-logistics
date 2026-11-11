@@ -5,6 +5,10 @@
    Con --reemplazar, además, borra primero lo que haya en la base (menos las contraseñas de las cuentas),
    para que lo borrado en Firebase también desaparezca aquí.
 
+   El personal que se "quitó" en la app vieja ya no está en Firestore, pero sus entregas de plata, liquidaciones
+   y jornadas sí, y la caja de la app las sigue sumando. Para que los totales den igual, esas personas se crean
+   inactivas (con el nombre que tengan en la papelera): no aparecen en Personal, igual que en la app.
+
    Uso (desde backend/):
      npm run db:importar -- --carpeta ../exportacion-2026-11-08-1030 --simular     # ver qué pasaría, sin guardar
      npm run db:importar -- --carpeta ../exportacion-2026-11-08-1030               # importar
@@ -121,7 +125,13 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
     await q("SET LOCAL statement_timeout = 0");
     await q("SET LOCAL idle_in_transaction_session_timeout = 0");
 
+    // Con --reemplazar se guarda lo que no viene de Firebase y no se debe perder: las contraseñas que los clientes
+    // ya crearon en el sistema nuevo y las fotos ya subidas a Storage (así no se vuelven a subir).
+    let clavesClientes = [], fotosSubidas = new Set();
     if (reemplazar) {
+      clavesClientes = (await q(`SELECT id, clave_hash, version_sesion, ultimo_ingreso FROM usuarios
+        WHERE rol = 'cliente' AND clave_hash IS NOT NULL`)).rows;
+      fotosSubidas = new Set((await q(`SELECT ruta FROM pedido_archivos WHERE ruta LIKE '%-fs-%'`)).rows.map(r => r.ruta));
       // DELETE en orden (no TRUNCATE ... CASCADE, que se llevaría también las cuentas y sus contraseñas).
       await q(`UPDATE usuarios SET cliente_id = NULL, mensajero_id = NULL WHERE rol <> 'cliente'`);
       for (const t of ["pedido_archivos", "pedido_intentos", "historial", "papelera", "jornadas", "cajamovs", "liquidaciones",
@@ -130,7 +140,7 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
       await q(`DELETE FROM clientes`);
       await q(`DELETE FROM mensajeros`);
       await q(`UPDATE contadores SET n = 0 WHERE nombre = 'guia'`);
-      log("Base vaciada (las cuentas de oficina y mensajeros se conservan con su contraseña).");
+      log("Base vaciada (las cuentas de oficina y mensajeros se conservan con su contraseña; las de clientes se recrean con la suya).");
     }
     log("Guardando:");
 
@@ -140,6 +150,19 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
       if (!texto(d.nombre)) { inf.omitir("mensajeros", "sin nombre", id); continue; }
       filasM.push([id, texto(d.nombre), texto(d.telefono), uno(d.tipo, TIPOS_PERSONAL, "mensajero"), Math.max(0, pesos(d.tarifa)), true]);
       inf.ok("mensajeros");
+    }
+    // Personas quitadas en la app vieja que todavía tienen registros: se crean inactivas para no perder su plata.
+    const enFirebase = new Set(filasM.map(f => f[0]));
+    const borrados = new Map(L.papelera.filter(x => x.datos?.col === "mensajeros" && x.datos?.docId).map(x => [String(x.datos.docId), x.datos.data || {}]));
+    const referidos = new Set();
+    const referir = v => { const id = texto(v); if (id && !enFirebase.has(id)) referidos.add(id); };
+    for (const { datos: d } of L.pedidos) referir(d.mensajeroId);
+    for (const c of ["recaudos", "liquidaciones"]) for (const { datos: d } of L[c]) referir(d.mensajeroId);
+    for (const c of ["jornadas", "cajamovs"]) for (const { datos: d } of L[c]) referir(d.personaId);
+    for (const id of referidos) {
+      const b = borrados.get(id) || {};
+      filasM.push([id, texto(b.nombre) || `Persona retirada (${id})`, texto(b.telefono), uno(b.tipo, TIPOS_PERSONAL, "mensajero"), Math.max(0, pesos(b.tarifa)), false]);
+      inf.avisar("mensajeros", "persona quitada en la app vieja con registros: queda inactiva para conservarlos", id);
     }
     await upsert(q, "mensajeros", ["id", "nombre", "telefono", "tipo", "tarifa", "activo"], filasM, { extra: ["actualizado = now()"] });
     listo("mensajeros", filasM.length);
@@ -173,7 +196,7 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
       const clienteId = d.clienteId && clientes.has(d.clienteId) ? d.clienteId : null;
       if (rol === "cliente" && !clienteId) { inf.omitir("usuarios", "cuenta de cliente sin cliente que exista", id); continue; }
       const vin = vinculos.get(id)?.mensajeroId;
-      const mensajeroId = vin && mensajeros.has(vin) ? vin : null;
+      const mensajeroId = vin && mensajeros.has(vin) && !referidos.has(vin) ? vin : null; // nunca a una persona quitada
       if (vin && !mensajeroId) inf.avisar("usuarios", "vínculo con una persona que ya no está en Personal", id);
       const otra = correos.get(email);
       if ((otra && otra !== id) || vistos.has(email)) { inf.omitir("usuarios", `el correo ya lo usa otra cuenta (${otra || "repetido en Firebase"})`, id); continue; }
@@ -183,6 +206,11 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
     }
     await upsert(q, "usuarios", ["id", "email", "nombre", "rol", "cliente_id", "mensajero_id", "activo", "creado"], filasU,
       { conservar: ["creado"], extra: ["actualizado = now()"] }); // nunca toca clave_hash ni version_sesion
+    if (clavesClientes.length) { // contraseñas que los clientes ya crearon en el sistema nuevo
+      await q(`UPDATE usuarios u SET clave_hash = c.clave_hash, version_sesion = c.version_sesion, ultimo_ingreso = c.ultimo_ingreso
+        FROM jsonb_to_recordset($1::jsonb) AS c(id text, clave_hash text, version_sesion int, ultimo_ingreso timestamptz)
+        WHERE u.id = c.id AND u.rol = 'cliente'`, [JSON.stringify(clavesClientes)]);
+    }
     listo("usuarios", filasU.length);
     const usuarios = await existe("usuarios");
     const uidO = v => (v && usuarios.has(v) ? v : null);
@@ -358,7 +386,7 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
 
     await q(simular ? "ROLLBACK" : "COMMIT");
     log(simular ? `Simulación terminada en ${seg()} (no se guardó nada).` : `Datos guardados en ${seg()}.`);
-    if (!simular && conFotos) await importarFotos({ carpeta, guias: new Set(guias), inf, log });
+    if (!simular && conFotos) await importarFotos({ carpeta, guias: new Set(guias), inf, log, fotosSubidas });
     else if (conFotos) log("Simulación: las fotos no se suben.");
   } catch (e) {
     await q("ROLLBACK").catch(() => {});
@@ -383,7 +411,7 @@ export function deDataUrl(v) {
   return tipo ? { b, ...tipo } : null;
 }
 
-async function importarFotos({ carpeta, guias, inf, log }) {
+async function importarFotos({ carpeta, guias, inf, log, fotosSubidas = new Set() }) {
   if (!storageConfigurado()) { log("Fotos: Storage no está configurado (SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY). Se omiten."); return; }
   // El nombre lleva un resumen del contenido: la misma foto da el mismo nombre y no se sube dos veces.
   const yaEstan = new Set((await pool.query(`SELECT ruta FROM pedido_archivos WHERE ruta LIKE '%-fs-%'`)).rows.map(r => r.ruta));
@@ -392,14 +420,15 @@ async function importarFotos({ carpeta, guias, inf, log }) {
     const img = deDataUrl(dataUrl);
     if (!img) return;
     const ruta = `${guia}/${tipo}-fs-${createHash("sha256").update(img.b).digest("hex").slice(0, 16)}.${img.ext}`;
-    if (!yaEstan.has(ruta)) { yaEstan.add(ruta); pendientes.push({ guia, tipo, ruta, img }); }
+    // Si el archivo ya estaba en Storage (antes de un --reemplazar), solo se vuelve a anotar: el nombre lleva el resumen del contenido.
+    if (!yaEstan.has(ruta)) { yaEstan.add(ruta); pendientes.push({ guia, tipo, ruta, img, yaSubida: fotosSubidas.has(ruta) }); }
   };
   const vaciar = async () => {
     const lote = pendientes.splice(0);
     for (let i = 0; i < lote.length; i += 4) {
       await Promise.all(lote.slice(i, i + 4).map(async x => {
         try {
-          await subirArchivo(x.ruta, x.img.b, x.img.mime, { reemplazar: true });
+          if (!x.yaSubida) await subirArchivo(x.ruta, x.img.b, x.img.mime, { reemplazar: true });
           await pool.query(`INSERT INTO pedido_archivos (guia, tipo, ruta) VALUES ($1, $2, $3)`, [x.guia, x.tipo, x.ruta]);
           inf.ok("fotos");
         } catch (e) { inf.omitir("fotos", `no se pudo subir: ${e.message}`, x.ruta); }
