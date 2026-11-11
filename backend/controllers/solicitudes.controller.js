@@ -1,4 +1,5 @@
-/* Solicitudes de envío: el visitante las crea desde la landing (sin sesión) y la oficina las atiende.
+/* Solicitudes de envío: el visitante las crea desde la landing (sin sesión), o un cliente con cuenta desde su
+   portal (origen 'portal', ligada a su ficha), y la oficina las atiende.
    Flujo: pendiente → (aceptar con valor) cotizada → (el cliente confirma por WhatsApp) confirmada
    → (asignar mensajero) asignada, con su guía. En cualquier punto antes de asignar se puede rechazar. */
 import * as Solicitud from "../models/solicitud.model.js";
@@ -8,7 +9,7 @@ import * as Cliente from "../models/cliente.model.js";
 import * as Auditoria from "../models/auditoria.model.js";
 import { transaccion } from "../config/db.js";
 import { env } from "../config/env.js";
-import { HttpError, conflicto, invalido, noEncontrado } from "../helpers/errores.js";
+import { HttpError, conflicto, invalido, noEncontrado, prohibido } from "../helpers/errores.js";
 import { limpiarTexto } from "../helpers/textoSeguro.js";
 import { nuevoId } from "../helpers/ids.js";
 import { filaAObjeto } from "../helpers/sql.js";
@@ -44,6 +45,33 @@ export async function crear(req, res) {
   recibida();
 }
 
+// Tope de solicitudes sin revisar por cliente desde el portal: evita que una cuenta llene la campanita.
+const MAX_PENDIENTES_CLIENTE = 20;
+
+/** Desde el portal: un cliente con sesión pide un envío. La ficha sale de la sesión (req.usuario.clienteId),
+    nunca del cuerpo; así la oficina sabe que es un cliente que ya existe y le propone su domicilio de siempre. */
+export async function crearDesdePortal(req, res) {
+  const clienteId = req.usuario.clienteId;
+  if (!clienteId) throw prohibido("Tu cuenta no está vinculada con un cliente. Escríbenos por WhatsApp.");
+  if (!(await Cliente.buscarPorId(clienteId))) throw prohibido("Tu ficha de cliente ya no existe. Escríbenos por WhatsApp.");
+  const b = req.valido.body;
+  const d = {
+    nombre: limpio(b.nombre), telefono: limpio(b.telefono), email: b.email || req.usuario.email || "",
+    direccionRecogida: limpio(b.direccionRecogida), paquetes: b.paquetes, pesoKg: b.pesoKg,
+    destinatarioNombre: limpio(b.destinatarioNombre), destinatarioTelefono: limpio(b.destinatarioTelefono),
+    direccionEntrega: limpio(b.direccionEntrega), origen: "portal", clienteId
+  };
+  if (!d.nombre || !d.direccionRecogida || !d.destinatarioNombre || !d.direccionEntrega) throw invalido("Completa los campos obligatorios");
+  if (await Solicitud.hayRepetidaReciente(d)) return res.status(201).json({ solicitud: { recibida: true } });
+  if ((await Solicitud.contarPendientesDeCliente(clienteId)) >= MAX_PENDIENTES_CLIENTE) {
+    throw new HttpError(429, "DEMASIADAS_SOLICITUDES", "Tienes muchas solicitudes sin revisar. Espera a que la oficina las atienda o escríbenos por WhatsApp.");
+  }
+  const s = await Solicitud.crear(d);
+  await Auditoria.registrar({ uid: req.usuario.id, accion: `Pidió un envío desde su portal (${d.direccionRecogida} → ${d.direccionEntrega})`, tabla: "solicitudes", registro: s.id });
+  eventos.emitir(["solicitudes"]);
+  res.status(201).json({ solicitud: { recibida: true } });
+}
+
 export async function listar(req, res) {
   const q = req.valido.query;
   if (q.pagina || q.grupo) {
@@ -71,13 +99,18 @@ async function bloquearEn(db, id, estados, mensaje) {
 const ESTADO_TXT = { pendiente: "pendiente", cotizada: "esperando la confirmación del cliente", confirmada: "confirmada", asignada: "asignada", rechazada: "rechazada" };
 const yaEsta = s => `Esta solicitud ya está ${ESTADO_TXT[s.estado]}. Actualiza la lista.`;
 
-/** Aceptar: la oficina pone el valor del domicilio. Se puede cambiar el valor mientras no esté asignada. */
+/** Aceptar: la oficina pone el valor del domicilio. Se puede cambiar el valor mientras no esté asignada.
+    Si la pidió un cliente desde su portal y el valor es el domicilio que ya tiene asignado, no hay nada que consultarle:
+    queda confirmada y lista para asignar. Si la oficina propone otro valor, se le pregunta por WhatsApp como siempre. */
 export async function aceptar(req, res) {
   const { id } = req.valido.params, { valor } = req.valido.body;
   const s = await transaccion(async db => {
     const antes = await bloquearEn(db, id, ABIERTAS, yaEsta);
-    const s = await Solicitud.actualizar(id, { estado: "cotizada", valor, revisadoPor: req.usuario.id }, db);
-    await Auditoria.registrar({ uid: req.usuario.id, accion: `Aceptó la solicitud de ${antes.nombre} con domicilio de ${valor}`, tabla: "solicitudes", registro: id }, db);
+    const suTarifa = antes.origen === "portal" && antes.clienteId && antes.clienteTarifa > 0 && valor === antes.clienteTarifa;
+    const s = await Solicitud.actualizar(id, { estado: suTarifa ? "confirmada" : "cotizada", valor, revisadoPor: req.usuario.id }, db);
+    await Auditoria.registrar({ uid: req.usuario.id, accion: suTarifa
+      ? `Aceptó la solicitud de ${antes.nombre} con su domicilio de siempre (${valor})`
+      : `Aceptó la solicitud de ${antes.nombre} con domicilio de ${valor}`, tabla: "solicitudes", registro: id }, db);
     return s;
   });
   eventos.emitir(["solicitudes"]);
@@ -117,7 +150,8 @@ export async function asignar(req, res) {
       ? "Antes de asignarla, el cliente tiene que confirmar el valor del domicilio." : yaEsta(s));
     const m = await Mensajero.buscarPorId(mensajeroId, db);
     if (!m || !m.activo) throw invalido("El mensajero no existe", [{ campo: "mensajeroId", mensaje: "Elige un mensajero" }]);
-    let cid = clienteId;
+    // Si la pidió un cliente desde su portal, el remitente es él (salvo que la oficina elija otro).
+    let cid = clienteId || (s.origen === "portal" ? s.clienteId : null);
     if (cid) {
       if (!(await Cliente.buscarPorId(cid, db))) throw invalido("El cliente no existe", [{ campo: "clienteId", mensaje: "Elige un cliente" }]);
     } else {

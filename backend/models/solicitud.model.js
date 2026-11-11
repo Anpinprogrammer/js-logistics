@@ -7,24 +7,33 @@ import { nuevoId } from "../helpers/ids.js";
 const aObjeto = fila => {
   const o = filaAObjeto(fila);
   if (o) o.pesoKg = o.pesoKg == null ? null : Number(o.pesoKg);
+  // Domicilio que tiene asignado el cliente (solo si la solicitud ya está ligada a una ficha).
+  if (o && "clienteTarifa" in o) o.clienteTarifa = o.clienteTarifa == null ? null : Number(o.clienteTarifa);
   return o;
 };
 
 const CON_NOMBRES = `
-  SELECT s.*, m.nombre AS mensajero_nombre, c.nombre AS cliente_nombre
+  SELECT s.*, m.nombre AS mensajero_nombre, c.nombre AS cliente_nombre, c.tarifa AS cliente_tarifa
   FROM solicitudes s
   LEFT JOIN mensajeros m ON m.id = s.mensajero_id
   LEFT JOIN clientes c ON c.id = s.cliente_id`;
 
+/** `origen` y `clienteId` los pone el controlador (nunca la petición): 'portal' trae la ficha del cliente que pidió. */
 export async function crear(d) {
   const { rows } = await query(
     `INSERT INTO solicitudes (id, nombre, telefono, email, direccion_recogida, paquetes, peso_kg,
-       destinatario_nombre, destinatario_telefono, direccion_entrega)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+       destinatario_nombre, destinatario_telefono, direccion_entrega, origen, cliente_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
     [nuevoId(), d.nombre, d.telefono, d.email, d.direccionRecogida, d.paquetes, d.pesoKg ?? null,
-      d.destinatarioNombre, d.destinatarioTelefono || "", d.direccionEntrega]
+      d.destinatarioNombre, d.destinatarioTelefono || "", d.direccionEntrega, d.origen || "publico", d.clienteId || null]
   );
-  return aObjeto(rows[0]);
+  return buscarPorId(rows[0].id);
+}
+
+/** Cuántas solicitudes sin revisar tiene un cliente desde su portal: tope para que una cuenta no llene la campanita. */
+export async function contarPendientesDeCliente(clienteId) {
+  const { rows } = await query(`SELECT count(*)::int AS n FROM solicitudes WHERE estado = 'pendiente' AND cliente_id = $1`, [clienteId]);
+  return rows[0].n;
 }
 
 /** ¿Ya hay una solicitud igual sin revisar, enviada hace poco? Evita repetidas por doble clic o reintentos. */
@@ -49,9 +58,11 @@ export async function buscarPorId(id, db = { query }) {
   return aObjeto(rows[0]);
 }
 
-/** Bloquea la fila hasta el fin de la transacción. */
+/** Bloquea la fila hasta el fin de la transacción. Trae también el domicilio actual del cliente ligado. */
 export async function bloquear(id, db) {
-  const { rows } = await db.query(`SELECT * FROM solicitudes WHERE id = $1 FOR UPDATE`, [id]);
+  const { rows } = await db.query(
+    `SELECT s.*, c.tarifa AS cliente_tarifa FROM solicitudes s LEFT JOIN clientes c ON c.id = s.cliente_id
+     WHERE s.id = $1 FOR UPDATE OF s`, [id]);
   return aObjeto(rows[0]);
 }
 

@@ -2,7 +2,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { pool, app, request, ORIGEN, reiniciarBase, crearCuenta, sesion } from "./ayuda.js";
 
-let oficina, mensajero, cliente, idMensajero;
+let oficina, mensajero, cliente, idMensajero, idCliente;
 
 const publico = cuerpo => request(app).post("/api/solicitudes/publico").set("Origin", ORIGEN).set("X-JSL", "1").send(cuerpo);
 const base = (extra = {}) => ({
@@ -19,7 +19,7 @@ before(async () => {
   idMensajero = (await oficina.post("/api/mensajeros").send({ nombre: "Carlos Moto", telefono: "3200000000" })).body.mensajero.id;
   await crearCuenta({ email: "m@js.co", rol: "mensajero", mensajeroId: idMensajero });
   mensajero = await sesion("m@js.co");
-  const idCliente = (await oficina.post("/api/clientes").send({ nombre: "Tienda", telefono: "3001112233" })).body.cliente.id;
+  idCliente = (await oficina.post("/api/clientes").send({ nombre: "Tienda", telefono: "3001112233", tarifa: 8000 })).body.cliente.id;
   await crearCuenta({ email: "c@js.co", rol: "cliente", clienteId: idCliente });
   cliente = await sesion("c@js.co");
 });
@@ -144,4 +144,58 @@ test("después de varias solicitudes desde la misma IP responde 429", async () =
   }
   assert.equal(ultimo.status, 429);
   assert.equal(ultimo.body.error.code, "DEMASIADAS_SOLICITUDES");
+});
+
+/* ---- Desde el portal del cliente ---- */
+const portal = (quien, extra = {}) => quien.post("/api/solicitudes/portal").send(base({ nombre: "Tienda", telefono: "3001112233", email: undefined, ...extra }));
+const dePortal = async () => (await oficina.get("/api/solicitudes?estado=pendiente")).body.solicitudes.filter(s => s.origen === "portal");
+
+test("portal: exige sesión de cliente y no acepta clienteId, origen ni valor en el cuerpo", async () => {
+  assert.equal((await request(app).post("/api/solicitudes/portal").set("Origin", ORIGEN).set("X-JSL", "1").send(base())).status, 401);
+  assert.equal((await mensajero.post("/api/solicitudes/portal").send(base())).status, 403);
+  assert.equal((await oficina.post("/api/solicitudes/portal").send(base())).status, 403);
+  assert.equal((await portal(cliente, { clienteId: "otro" })).status, 400);
+  assert.equal((await portal(cliente, { origen: "publico" })).status, 400);
+  assert.equal((await portal(cliente, { valor: 1 })).status, 400);
+  assert.equal((await dePortal()).length, 0);
+});
+
+test("portal: la solicitud queda ligada a la ficha de la sesión, con el domicilio del cliente y el correo de la cuenta", async () => {
+  const r = await portal(cliente, { direccionRecogida: "Bodega, Calle 13 # 8-20, Cali" });
+  assert.equal(r.status, 201);
+  assert.deepEqual(r.body, { solicitud: { recibida: true } });
+  // Repetida por doble clic: no se duplica
+  assert.equal((await portal(cliente, { direccionRecogida: "Bodega, Calle 13 # 8-20, Cali" })).status, 201);
+  const xs = await dePortal();
+  assert.equal(xs.length, 1);
+  assert.equal(xs[0].clienteId, idCliente);
+  assert.equal(xs[0].clienteNombre, "Tienda");
+  assert.equal(xs[0].clienteTarifa, 8000);
+  assert.equal(xs[0].email, "c@js.co");
+  assert.equal(xs[0].direccionRecogida, "Bodega, Calle 13 # 8-20, Cali");
+});
+
+test("portal: aceptar con el domicilio del cliente la deja confirmada y asignar usa su ficha", async () => {
+  const [s] = await dePortal();
+  const a = await oficina.post(`/api/solicitudes/${s.id}/aceptar`).send({ valor: 8000 });
+  assert.equal(a.status, 200);
+  assert.equal(a.body.solicitud.estado, "confirmada");
+  const r = await oficina.post(`/api/solicitudes/${s.id}/asignar`).send({ mensajeroId: idMensajero });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.pedido.clienteId, idCliente);
+  assert.equal(r.body.pedido.valorServicio, 8000);
+});
+
+test("portal: si la oficina propone otro valor, espera la confirmación del cliente", async () => {
+  assert.equal((await portal(cliente, { direccionEntrega: "Cra 50 # 9-9, Cali" })).status, 201);
+  const [s] = await dePortal();
+  const a = await oficina.post(`/api/solicitudes/${s.id}/aceptar`).send({ valor: 10000 });
+  assert.equal(a.body.solicitud.estado, "cotizada");
+  assert.equal(a.body.solicitud.valor, 10000);
+});
+
+test("una solicitud del formulario público queda con origen publico y sin ficha", async () => {
+  const xs = (await oficina.get("/api/solicitudes?grupo=todas&pagina=1&porPagina=100")).body.solicitudes.filter(s => s.origen === "publico");
+  assert.ok(xs.length > 0);
+  assert.ok(xs.every(s => s.clienteTarifa == null || s.estado === "asignada"));
 });

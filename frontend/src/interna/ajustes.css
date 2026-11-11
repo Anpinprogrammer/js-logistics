@@ -790,6 +790,10 @@
 .jsl .solicitud .acciones{display:flex;flex-wrap:wrap;gap:8px}
 .jsl .solicitud .acciones .btn{min-height:44px;flex:1 1 auto;justify-content:center;text-decoration:none}
 .jsl .solicitud .campo{margin:0}
+/* Pedida por un cliente con cuenta desde su portal (no un visitante de la landing). */
+.jsl .solicitud-origen{justify-self:start;display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--azul-claro);color:var(--azul);font-size:.75rem;font-weight:600;max-width:100%;overflow-wrap:anywhere}
+.jsl .solicitud-origen::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.jsl .solicitud .campo small{display:block;margin-top:6px;font-size:.78rem;line-height:1.35}
 /* En celular la barra ya va llena (modo, avatar y salir): la campana y el avatar se achican para que quepa todo. */
 @media (max-width:639px){
   .jsl .barra{gap:6px}

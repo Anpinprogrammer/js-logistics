@@ -21,6 +21,10 @@ export const crear = z.object({
   sitio: z.string().max(200).optional()
 }).strict();
 
+/** Desde el portal: los mismos campos, sin trampa para robots. El correo es opcional (si no llega, se usa el de la
+   cuenta). `strict()` impide mandar clienteId, origen, estado o valor: esos los decide el servidor. */
+export const crearPortal = crear.omit({ sitio: true, email: true }).extend({ email: email.optional() }).strict();
+
 export const listar = z.object({
   estado: z.enum(["pendiente", "cotizada", "confirmada", "asignada", "rechazada"]).optional(),
   abiertas: z.enum(["true", "false"]).optional().transform(v => v === "true"),

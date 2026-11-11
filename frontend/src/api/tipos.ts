@@ -246,7 +246,8 @@ export interface PaginaCajaMovimientos {
   paginas: number;
 }
 
-/** Solicitud de envío que un visitante manda desde la landing (formulario "Solicitar envío"). */
+/** Solicitud de envío: la manda un visitante desde la landing ("publico") o un cliente con cuenta desde su portal ("portal"). */
+export type OrigenSolicitud = "publico" | "portal";
 export type EstadoSolicitud = "pendiente" | "cotizada" | "confirmada" | "asignada" | "rechazada";
 export interface Solicitud {
   id: string;
@@ -265,6 +266,9 @@ export interface Solicitud {
   motivoRechazo: string;
   clienteId: string | null;
   clienteNombre: string | null;
+  /** Domicilio que tiene asignado el cliente ligado (null si no hay ficha). */
+  clienteTarifa: number | null;
+  origen: OrigenSolicitud;
   mensajeroId: string | null;
   mensajeroNombre: string | null;
   guia: string | null;
