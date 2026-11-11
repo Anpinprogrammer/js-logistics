@@ -63,7 +63,7 @@ npm run db:verificar -- --carpeta ../exportacion-2026-11-08-1030                
 
 Mientras corre, muestra cada paso ("Leyendo los archivos…", "Conectando con la base de datos…") y cuántos registros guardó de cada colección, con los segundos que lleva. Los datos se escriben por lotes: unos miles de guías tardan pocos segundos. Las fotos son lo más lento, y muestra el avance cada 200 guías.
 
-- Si se queda en **"Conectando con la base de datos…"**, revisa `DATABASE_URL`. En Supabase usa la cadena del **Session pooler** (Project Settings → Database → Connection string).
+- Si se queda en **"Conectando con la base de datos…"**, revisa `DATABASE_URL_MIGRACIONES` (o `DATABASE_URL` si no la pusiste). En Supabase usa la cadena del **Session pooler** (Project Settings → Database → Connection string).
 - La importación quita el límite de tiempo por consulta (`statement_timeout`) solo dentro de su propia transacción, así que el error "canceling statement due to statement timeout" ya no la corta.
 
 Si ya habías importado antes de esta versión, corre primero `npm run db:migrar` y vuelve a importar: así los adelantos quedan unidos a su liquidación y se recuperan las notas de las jornadas (ver "Actualizar la base" en [`backend/README.md`](../backend/README.md)).

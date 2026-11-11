@@ -1,6 +1,7 @@
 /* Clientes (remitentes): registro con control de repetidos, cuenta y saldo, cuadre del día, unir repetidos
    y pagar saldos a favor al imprimir recibos. */
 import { Clientes } from "../models/documentos.js";
+import * as CuentaModel from "../models/cuenta.model.js";
 import { nuevoId } from "../helpers/ids.js";
 import { ahora } from "../helpers/reloj.js";
 import { esDia, hoy, diaDe } from "../helpers/fechas.js";
@@ -97,10 +98,16 @@ export async function listaConSaldos(ctx, { dia, buscar = "", filtro = "todos", 
   };
 }
 
-/** Cuenta de un cliente: saldo y movimientos. La ve la oficina y el propio cliente. */
-export async function cuenta(ctx, cid) {
+/** Cuenta de un cliente: saldo y movimientos. La ve la oficina y el propio cliente.
+ *  Con `pagina`/`porPagina` devuelve solo esa página; sin ellos mantiene la respuesta completa. */
+export async function cuenta(ctx, cid, { pagina, porPagina } = {}) {
   const a = ctx.actor;
   if (!a.esOficina && !(a.esCliente && a.clienteId === cid)) throw noEncontrado("Ese cliente ya no existe."); // a otro cliente no se le confirma que existe
+  if (pagina !== undefined || porPagina !== undefined) {
+    const c = await Clientes.obtener(ctx.db, cid);
+    if (!c) throw noEncontrado("Ese cliente ya no existe.");
+    return { cliente: c, ...(await CuentaModel.historial(cid, { pagina, porPagina })) };
+  }
   const calc = await calculosDe(ctx.db, ["clientes", "pedidos", "movimientos"]);
   const c = calc.S.clientes[cid];
   if (!c) throw noEncontrado("Ese cliente ya no existe.");

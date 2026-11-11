@@ -130,10 +130,26 @@ SELECT column_name, data_type FROM information_schema.columns
 
 ### Conexiones y pooler
 
-- El backend usa un pool con `DATABASE_POOL_MAX=5`, `DATABASE_POOL_IDLE_MS=10000` y `DATABASE_CONNECT_TIMEOUT_MS=5000`.
-- El **Session pooler** (puerto 5432) tiene **15 cupos por proyecto**. Cada proceso (local, Render, pruebas) abre hasta `DATABASE_POOL_MAX`; con local y Render a 10 cada uno se agota y aparece `EMAXCONNSESSION`.
-- Para la app con varias instancias, usa el **Transaction pooler** (puerto 6543): multiplexa conexiones y permite más clientes. Para `db:migrar` y `db:importar`, usa el Session pooler (5432) o la conexión directa.
-- Si aparece `read ETIMEDOUT` en una conexión inactiva, el pool la recicla; `keepAlive` y un `idleTimeout` corto reducen el problema. No subas `DATABASE_POOL_MAX` sin cambiar antes a Transaction mode.
+**Por qué se llenaba el cupo.** Los usuarios no abren conexiones a Postgres: todos los navegadores hablan con el backend, y el backend comparte un solo pool (`config/db.js`) de `DATABASE_POOL_MAX` conexiones por proceso. Lo que gasta cupo son los **procesos**: cada `npm run dev` en un computador, cada instancia de Render y cada script (`db:migrar`, pruebas). El **Session pooler** de Supabase (puerto 5432) le da a cada cliente una conexión fija mientras está conectado y tiene **15 cupos para todo el proyecto**: con Render y dos o tres computadores en desarrollo se agota y sale `EMAXCONNSESSION max clients reached in session mode`.
+
+**La solución: la app va por el Transaction pooler (puerto 6543).** Ahí una conexión del backend solo ocupa una conexión real de Postgres mientras dura cada consulta o transacción (milisegundos), así que muchos procesos y muchos usuarios a la vez caben en el mismo cupo. El backend ya es compatible con ese modo: no usa sentencias preparadas con nombre, ni `LISTEN/NOTIFY`, ni `SET` de sesión, ni bloqueos asesores de sesión (solo `pg_advisory_xact_lock` y `SET LOCAL`, dentro de `transaccion()`).
+
+Las cadenas salen de Supabase: botón **Connect** del proyecto → *Connection String* → *Transaction pooler* o *Session pooler*. El usuario es `postgres.<ref-del-proyecto>` y el host `aws-0-<región>.pooler.supabase.com`.
+
+| Variable | Render (producción) | Local (cada computador) |
+|---|---|---|
+| `DATABASE_URL` | Transaction pooler, puerto **6543** | Transaction pooler, puerto **6543** (de la base de pruebas, o la de producción solo si es necesario) |
+| `DATABASE_URL_MIGRACIONES` | Session pooler, puerto **5432** (opcional) | Session pooler, puerto **5432** |
+| `DATABASE_POOL_MAX` | `5` (sube a `10` solo si `/api/ready` o los registros muestran esperas) | `3` |
+| `DATABASE_POOL_IDLE_MS` | `10000` | `10000` |
+| `DATABASE_CONNECT_TIMEOUT_MS` | `5000` | `5000` |
+| `DATABASE_SSL` | `true` | `true` con Supabase, `false` con un Postgres local |
+
+- `npm run db:migrar`, `db:importar` y `db:demo` usan `DATABASE_URL_MIGRACIONES` si existe (si no, `DATABASE_URL`) y abren como máximo 3 conexiones. La conexión directa (`db.<ref>.supabase.co`) también sirve, pero solo funciona por IPv6 salvo que el proyecto tenga el complemento de IPv4: por eso se recomienda el Session pooler.
+- Al arrancar, el servidor dice por cuál conexión va (`Postgres: Transaction pooler (…:6543), pool máximo 5…`) y avisa si está en el Session pooler.
+- Si aun así la base no da conexión, la API responde **503 `BASE_OCUPADA`** con `Retry-After: 5` ("El sistema está muy ocupado…"), no un 500, y deja una sola línea en el registro.
+- Cada conexión se renueva a los 10 minutos (`maxLifetimeSeconds`) y lleva `keepAlive`, para que una conexión cortada por el pooler (`read ETIMEDOUT`) no se quede en el pool.
+- Para ver cuántas conexiones hay abiertas: *Database → Roles* o en el SQL Editor `select usename, application_name, state, count(*) from pg_stat_activity group by 1,2,3;` (las del backend se llaman `js-logistics-backend`).
 
 ## Render
 
@@ -216,6 +232,7 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `GET /usuarios/pagina?buscar=&rol=&pagina=&porPagina=` | admin | Página de la sub-pestaña Acceso de Personal: `buscar` filtra por nombre o correo (sin tildes) y `rol` por `mensajero`, `asistente`, `cliente` o `admin`. Ordenada por nombre y correo. Devuelve `{ usuarios, pagina, porPagina, total, paginas }`. La app usa 5 en celular y 10 en computador; si la página ya no existe, responde la última |
 | `GET /clientes?buscar=` | oficina | Lista y busca |
 | `GET /clientes/:id` | oficina, o el propio cliente | Ficha |
+| `PATCH /clientes/mi-perfil` | cliente | Actualiza únicamente su ficha con `nombre?`, `telefono?`, `direccionRecogida?` y/o el `email?` de su propia cuenta. Si cambia el correo, exige `claveActual`; el correo debe ser único. Responde `{ cliente }`. No permite cambiar tarifa ni otro cliente. El nuevo correo se ve en `GET /auth/yo` sin cerrar la sesión actual |
 | `POST /clientes`, `PATCH /clientes/:id` | oficina | Crea (avisa de repetidos con 409 `POSIBLE_REPETIDO`) y edita |
 | `GET /clientes/:id/movimientos?desde=&hasta=` | oficina, o el propio cliente | `{ movimientos: [{ id, clienteId, tipo, valor, medio, nota, fecha, … }] }` |
 | `DELETE /clientes/:id` | admin | Borra (a la papelera) si no tiene pedidos ni movimientos |
@@ -257,7 +274,7 @@ Lo ya contado en un arqueo no se cambia: responde `409 YA_CONTADO` con el texto 
 | `DELETE /movimientos/:id` | oficina | Quita un pago (si ya se contó, registra el reverso) |
 | `POST /movimientos/reversar` | oficina | `{ ids }` reversa varios pagos |
 | `GET /clientes/saldos?dia=&buscar=&filtro=&pagina=&porPagina=` | oficina | Clientes con su saldo. `filtro`: `todos`, `cobrar` o `pagar`. Con `pagina`/`porPagina` devuelve una página (`{ clientes, pagina, porPagina, total, paginas, totalClientes, porCobrar, porPagar, repetidos? }`); sin ellos, la lista completa. La app usa 8 en celular y 20 en computador |
-| `GET /clientes/:id/cuenta` | oficina, o el propio cliente | `{ cliente, saldo, filas, enRuta }` |
+| `GET /clientes/:id/cuenta?pagina=&porPagina=` | oficina, o el propio cliente | `{ cliente, saldo, filas, enRuta }`. Con `pagina`/`porPagina` devuelve solo esa página de `filas` más `{ pagina, porPagina, total, paginas }`; sin ellos mantiene todas las filas. El portal del cliente usa 5 en celular y 10 en computador |
 | `GET /clientes/cuadre?dia=&clienteId=` | oficina | Recibos de cuadre del día |
 | `GET /clientes/repetidos` | admin | Grupos de clientes parecidos |
 | `POST /clientes/:id/unir` | admin | `{ otros }`: pasa pedidos, movimientos y cuentas a `:id` y borra los otros |

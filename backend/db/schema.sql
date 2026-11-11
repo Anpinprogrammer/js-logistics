@@ -12,10 +12,12 @@ CREATE TABLE IF NOT EXISTS clientes (
   id          TEXT PRIMARY KEY,
   nombre      TEXT NOT NULL,
   telefono    TEXT NOT NULL DEFAULT '',
+  direccion_recogida TEXT NOT NULL DEFAULT '',
   tarifa      BIGINT NOT NULL DEFAULT 0 CHECK (tarifa >= 0),   -- domicilio por defecto
   creado      TIMESTAMPTZ NOT NULL DEFAULT now(),
   actualizado TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE clientes ADD COLUMN IF NOT EXISTS direccion_recogida TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS clientes_nombre_idx ON clientes (lower(nombre));
 
 CREATE TABLE IF NOT EXISTS mensajeros (            -- "Personal"

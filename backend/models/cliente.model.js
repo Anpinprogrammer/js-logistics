@@ -44,10 +44,10 @@ export async function crear({ nombre, telefono = "", tarifa = 0 }) {
   return filaAObjeto(rows[0]);
 }
 
-export async function actualizar(id, datos) {
-  const set = armarSet(datos, ["nombre", "telefono", "tarifa"], 2);
-  if (!set) return buscarPorId(id);
-  const { rows } = await query(`UPDATE clientes SET ${set.sql}, actualizado = now() WHERE id = $1 RETURNING *`, [id, ...set.valores]);
+export async function actualizar(id, datos, db = { query }) {
+  const set = armarSet(datos, ["nombre", "telefono", "tarifa", "direccionRecogida"], 2);
+  if (!set) return buscarPorId(id, db);
+  const { rows } = await db.query(`UPDATE clientes SET ${set.sql}, actualizado = now() WHERE id = $1 RETURNING *`, [id, ...set.valores]);
   return filaAObjeto(rows[0]);
 }
 

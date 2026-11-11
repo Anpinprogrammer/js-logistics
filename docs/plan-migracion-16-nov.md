@@ -9,7 +9,7 @@ Paso a paso para pasar de Firebase (app vieja) a Supabase (sistema nuevo). Los c
 1. Unir los PR de esta revisión en `js-logistics` (importación y verificación) y en `jslogistics-cliente-frontend` (pantalla `/activar-cuenta`), y desplegarlos.
 2. Tener a mano:
    - la llave de la cuenta de servicio de Firebase (`backend/migracion/llave.json`), solo en el computador de quien exporta;
-   - un `.env` para el **ensayo** (base de pruebas + un bucket de Storage de pruebas) y otro para **producción**, con `DATABASE_URL` del **Session pooler** (puerto 5432);
+   - un `.env` para el **ensayo** (base de pruebas + un bucket de Storage de pruebas) y otro para **producción**, con `DATABASE_URL_MIGRACIONES` apuntando al **Session pooler** (puerto 5432): los scripts de base (`db:migrar`, `db:importar`, `db:verificar`) la usan en vez del Transaction pooler de la app;
    - en Render: `RESEND_API_KEY` con el dominio verificado, `URL_CLIENTES=https://jslogistics.pro`, `URL_EQUIPO` con el subdominio de la oficina, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` y `STORAGE_BUCKET`.
 3. Bajar el TTL del DNS de los dominios a 5 minutos, para que el cambio (y una vuelta atrás) se note rápido.
 
@@ -55,7 +55,7 @@ Con lo corregido, repetir todo en la base de ensayo **desde cero** y comprobar:
 La app vieja sigue funcionando. Esto solo adelanta lo lento (las fotos):
 
 ```bash
-pg_dump "$DATABASE_URL" > respaldo-antes-de-precarga.sql   # si la base de producción ya tenía algo
+pg_dump "$DATABASE_URL_MIGRACIONES" > respaldo-antes-de-precarga.sql   # si la base de producción ya tenía algo
 npm run db:migrar
 npm run db:importar -- --carpeta ../exportacion-… --simular
 npm run db:importar -- --carpeta ../exportacion-… --reemplazar --si
@@ -71,7 +71,7 @@ Hora de Colombia. Los tiempos son de ejemplo: ajústalos con lo que tardó el en
 | Hora | Paso | Quién |
 |---|---|---|
 | 6:00 | Avisar al equipo: desde ya nadie registra nada en la app vieja hasta nuevo aviso. | Administración |
-| 6:05 | Respaldo de producción: `pg_dump "$DATABASE_URL" > respaldo-16-nov-antes.sql` | Backend |
+| 6:05 | Respaldo de producción: `pg_dump "$DATABASE_URL_MIGRACIONES" > respaldo-16-nov-antes.sql` | Backend |
 | 6:10 | Exportación completa, con fotos. | Dueño de Firebase |
 | 6:40 | `db:migrar` → `db:importar --simular` → revisar el informe | Backend |
 | 6:50 | `db:importar --reemplazar --si` (las fotos ya subidas no se repiten) | Backend |
@@ -93,7 +93,7 @@ Si no se cumple, **no se cambian los dominios**: se avisa al equipo que sigue en
 
 - **Antes de cambiar los dominios:** no hay nada que deshacer. La exportación solo lee, así que Firebase queda igual. Se le avisa al equipo y sigue en la app vieja.
 - **Después de cambiar los dominios, el mismo lunes:** se vuelven a apuntar los dominios a Firebase Hosting y se avisa al equipo. Todo lo que se haya registrado en la app nueva hay que pasarlo a mano a la app vieja: se saca del **Historial** de la app nueva. Por eso conviene decidir antes de las 12:00.
-- **Si se dañó la base de producción:** `psql "$DATABASE_URL" < respaldo-16-nov-antes.sql` (en una base vacía) y volver a importar.
+- **Si se dañó la base de producción:** `psql "$DATABASE_URL_MIGRACIONES" < respaldo-16-nov-antes.sql` (en una base vacía) y volver a importar.
 - La carpeta exportada del lunes y los respaldos se guardan fuera del repositorio, en un lugar privado.
 
 ## Después del cambio

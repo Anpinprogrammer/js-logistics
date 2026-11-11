@@ -22,6 +22,20 @@ export async function buscarParaIngreso(email) {
   return filaAObjeto(rows[0]);
 }
 
+/** Bloquea la cuenta al verificar la contraseña antes de cambiar su correo. El hash nunca sale de aquí a la API. */
+export async function bloquearParaPerfil(id, db) {
+  const { rows } = await db.query(`SELECT id, email, clave_hash FROM usuarios WHERE id = $1 FOR UPDATE`, [id]);
+  return filaAObjeto(rows[0]);
+}
+
+export async function actualizarEmail(id, email, db = { query }) {
+  const { rows } = await db.query(
+    `UPDATE usuarios SET email = $2, actualizado = now() WHERE id = $1 RETURNING ${COLUMNAS}`,
+    [id, email]
+  );
+  return filaAObjeto(rows[0]);
+}
+
 /** Para pedir un enlace: dice si la cuenta ya tiene contraseña (si no, el enlace es de activación). */
 export async function buscarParaEnlace(email) {
   const { rows } = await query(
