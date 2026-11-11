@@ -181,7 +181,7 @@
 .jsl .banner.alerta{background:var(--rojo-claro);border-color:color-mix(in srgb,var(--rojo) 22%,transparent);color:var(--rojo)}
 .jsl .banner.info{background:var(--mango-claro);border-color:color-mix(in srgb,var(--marca) 20%,transparent);color:var(--marca)}
 
-/* Toolbar de Pedidos: apilada en el celular, 2 filas en tablet y 1 fila desde 1280 px. */
+/* Toolbar de Pedidos: apilada en el celular (estado en lista desplegable); desde 768 px, 2 filas: búsqueda, mensajero y fecha arriba, y las píldoras de estado abajo. */
 .jsl .toolbar-pedidos{display:flex;flex-direction:column;align-items:stretch;gap:12px;background:var(--hueco);border:1px solid var(--linea);border-radius:12px;padding:12px;margin-bottom:18px}
 .jsl .tp-filtros{display:grid;grid-template-columns:1fr;gap:8px;width:100%;min-width:0}
 .jsl .tp-filtros .campo{margin:0;min-width:0}
@@ -196,7 +196,7 @@
 .jsl .toolbar-pedidos .seg-estado .num{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--rojo);color:#fff;font-size:.66rem;text-align:center;line-height:17px}
 .jsl .toolbar-pedidos .seg-estado button[aria-pressed="true"] .num{background:#fff;color:var(--lateral)}
 .jsl .toolbar-pedidos .filtro-dia.compacto{width:auto;justify-content:center;margin:0;flex-wrap:wrap}
-/* Filtro de estado híbrido: lista desplegable con ícono hasta 1279 px y píldoras desde 1280 px. */
+/* Filtro de estado: lista desplegable con ícono en el celular; las píldoras aparecen desde 768 px. */
 .jsl .tp-filtros .campo-estado{position:relative}
 .jsl .tp-filtros .campo-estado select{padding-left:38px}
 .jsl .campo-estado .ico-filtro{position:absolute;left:13px;top:50%;width:16px;height:16px;transform:translateY(-50%);display:flex;color:var(--suave);pointer-events:none}
@@ -208,25 +208,21 @@
 }
 /* Tablet y laptop pequeña: búsqueda y mensajero a la izquierda, fecha a la derecha; estados abajo. */
 @media (min-width:768px){
-  .jsl .toolbar-pedidos{display:grid;grid-template-columns:1fr auto;grid-template-areas:"filtros fecha";column-gap:12px;row-gap:10px}
+  .jsl .toolbar-pedidos{display:grid;grid-template-columns:1fr auto;grid-template-areas:"filtros fecha" "estado estado";column-gap:12px;row-gap:12px}
+  .jsl .tp-filtros .campo-estado{display:none}
+  .jsl .toolbar-pedidos .seg-estado{display:flex;grid-area:estado;width:100%;gap:8px;padding:12px 0 4px;background:transparent;border:0;border-top:1px solid var(--linea);border-radius:0;box-shadow:none;scroll-behavior:smooth}
+  .jsl .toolbar-pedidos .seg-estado button{padding:7px 14px;border:1px solid var(--linea);background:var(--papel)}
+  .jsl .toolbar-pedidos .seg-estado button:not([aria-pressed="true"]):hover{border-color:var(--suave)}
+  .jsl .toolbar-pedidos .seg-estado button[aria-pressed="true"]{border-color:var(--marca2)}
+  .jsl .toolbar-pedidos .seg-estado .num.amb{background:var(--ambar,#f59e0b);color:#1c1917}
   .jsl .tp-filtros{grid-area:filtros;display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:auto}
-  .jsl .tp-filtros .campo-estado{grid-column:auto}
   .jsl .tp-filtros .campo:first-child{flex:1 1 220px;max-width:300px}
   .jsl .tp-filtros .campo:nth-child(n+2){flex:0 0 auto;width:auto;min-width:210px}
   .jsl .tp-fecha{grid-area:fecha;width:auto;justify-content:flex-end}
   .jsl .toolbar-pedidos .filtro-dia.compacto{width:auto;justify-content:flex-end}
 }
-/* Escritorio grande: todo en una fila, con separadores verticales. */
 @media (min-width:1280px){
-  .jsl .toolbar-pedidos{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:12px}
-  .jsl .tp-filtros{flex:none;display:flex;gap:8px}
-  .jsl .tp-filtros .campo:first-child{flex:0 0 240px;max-width:240px}
-  .jsl .tp-filtros .campo:nth-child(n+2){flex:0 0 auto;width:auto;min-width:210px}
-  .jsl .tp-filtros .campo-estado{display:none}
-  .jsl .toolbar-pedidos .seg-estado{display:flex;flex:0 1 auto;width:fit-content;gap:4px}
-  .jsl .toolbar-pedidos .seg-estado button{padding:6px 16px}
-  .jsl .tp-fecha{width:auto}
-  .jsl .toolbar-pedidos .filtro-dia.compacto{flex:none;width:auto;justify-content:flex-end}
+  .jsl .tp-filtros{flex-wrap:nowrap}
 }
 @media (max-width:767px){
   .jsl .tp-filtros .campo select{width:100%;max-width:none}
