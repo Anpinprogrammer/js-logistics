@@ -6,7 +6,7 @@ Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/EST
 
 ## Remitente desde la recogida — 2026-11-11
 
-- Al tomar la foto, el mensajero ve una ventana (`frontend/src/interna/mensajero/NuevaGuia.tsx`) con la subida en curso y un buscador de cliente opcional. Si lo deja vacío, la oficina asigna el remitente como siempre.
+- Al tomar la foto **no se crea nada**: se abre una ventana (`frontend/src/interna/mensajero/NuevaGuia.tsx`) con la foto y un buscador de cliente opcional. La guía y la subida de fotos ocurren solo cuando el mensajero pulsa "Crear guía"; "Descartar foto" (o cerrar la ventana) no crea ni sube nada, así que no quedan fotos huérfanas. Si lo deja vacío, la oficina asigna el remitente como siempre.
 - Backend: `GET /clientes/buscar?q=` (solo nombre e id) y `PATCH /pedidos/:guia/remitente` (solo su mensajero, guía por entregar sin remitente; toma la tarifa del cliente si no había domicilio). Pruebas en `backend/test/remitente-mensajero.test.js`.
 - En demo, el mensajero busca entre `remitentesDemo` (`demo.ts`), porque su almacén no trae clientes.
 
