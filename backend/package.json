@@ -11,10 +11,10 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch --env-file-if-exists=.env index.js",
-    "db:migrar": "node --env-file-if-exists=.env db/migrar.js",
+    "db:migrar": "node --env-file-if-exists=.env --import ./db/conexion-migraciones.js db/migrar.js",
     "db:admin": "node --env-file-if-exists=.env db/crear-admin.js",
-    "db:demo": "node --env-file-if-exists=.env db/demo.js",
-    "db:importar": "node --env-file-if-exists=.env db/importar-firestore.js",
+    "db:demo": "node --env-file-if-exists=.env --import ./db/conexion-migraciones.js db/demo.js",
+    "db:importar": "node --env-file-if-exists=.env --import ./db/conexion-migraciones.js db/importar-firestore.js",
     "test": "node --test --test-concurrency=1 \"test/**/*.test.js\""
   },
   "dependencies": {
