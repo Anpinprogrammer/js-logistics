@@ -21,6 +21,7 @@ globalThis.fetch = async (url, op = {}) => {
 
 const { pool, reiniciarBase } = await import("./ayuda.js");
 const { importar, fecha, diaColombia } = await import("../db/importar-firestore.js");
+const { verificar } = await import("../db/verificar-migracion.js");
 const { hashClave } = await import("../helpers/claves.js");
 
 const T = Date.parse("2026-10-20T15:00:00Z"), H = 3_600_000;
@@ -59,7 +60,8 @@ function exportacion() {
       { id: "mv2", datos: { clienteId: "c1", tipo: "pago_de_cliente", valor: 30000, medio: "nequi", reversoDe: "mv1", fecha: T + H, porUid: "borrado" } },
       { id: "huerfano", datos: { clienteId: "c9", tipo: "abono", valor: 1000, fecha: T } }
     ],
-    recaudos: [{ id: "r1", datos: { mensajeroId: "m1", valor: 45000, medio: "", fecha: T } }],
+    recaudos: [{ id: "r1", datos: { mensajeroId: "m1", valor: 45000, medio: "", fecha: T } },
+      { id: "r9", datos: { mensajeroId: "m9", valor: 20000, medio: "nequi", fecha: T } }],
     liquidaciones: [{ id: "m1_1", datos: { mensajeroId: "m1", fecha: T + 5 * H, desde: T - 24 * H, entregas: 1, guias: ["JS-00001"], debe: -2000, ajuste: 1000 } }],
     cajamovs: [
       { id: "a1", datos: { tipo: "sale", cat: "adelanto", personaId: "m1", valor: 2000, medio: "efectivo", fecha: T, deLiquidacion: "m1_1", devuelto: 1000 } },
@@ -71,6 +73,7 @@ function exportacion() {
       { id: "m2_previo_2026-10-12", datos: { personaId: "m2", dia: "2026-10-12", valor: 90000, previo: true } }],
     historial: [{ id: "2026-10-20_uMen", datos: { uid: "uMen", e: [{ t: T, a: "Creó la guía JS-00001", u: "uMen" }, { t: T + H, a: "Entregó JS-00001" }] } }],
     papelera: [{ id: "p1", datos: { col: "clientes", docId: "c7", data: { nombre: "Borrado" }, fecha: T, uid: "uAdmin" } },
+      { id: "p3", datos: { col: "mensajeros", docId: "m9", data: { id: "m9", nombre: "Carlos (ya no trabaja)", tipo: "mensajero" }, fecha: T, uid: "uAdmin" } },
       { id: "p2", datos: { col: "vinculos", docId: "x", data: {} } }]
   };
 }
@@ -113,6 +116,7 @@ test("importa todo con las relaciones, limpia lo inválido y lo reporta", async 
   assert.deepEqual(c.movimientos.avisos["cliente que no existe"], ["huerfano"]);
   assert.deepEqual(c.cajamovs.avisos["categoría desconocida (propina)"], ["raro"]);
   assert.deepEqual(c.papelera.avisos["colección sin tabla en el sistema nuevo"], ["p2"]);
+  assert.deepEqual(c.mensajeros.avisos["persona quitada en la app vieja con registros: queda inactiva para conservarlos"].sort(), ["fantasma", "m9"]);
 
   // Cuentas: rol, vínculo con Personal, desactivadas y SIN contraseña (las de Firebase no se pueden pasar).
   const men = await uno(`SELECT * FROM usuarios WHERE id = 'uMen'`);
@@ -122,14 +126,21 @@ test("importa todo con las relaciones, limpia lo inválido y lo reporta", async 
   assert.equal((await uno(`SELECT activo FROM usuarios WHERE id = 'uEx'`)).activo, false);
   assert.equal((await uno(`SELECT cliente_id FROM usuarios WHERE id = 'uCli'`)).cliente_id, "c1");
 
-  // Pedidos: valores, intentos válidos, mensajero inexistente → sin mensajero, negativos → 0.
+  // Personal quitado en la app vieja: inactivo, con el nombre de la papelera, y su plata se conserva.
+  const m9 = await uno(`SELECT * FROM mensajeros WHERE id = 'm9'`);
+  assert.equal(m9.activo, false);
+  assert.equal(m9.nombre, "Carlos (ya no trabaja)");
+  assert.equal(Number((await uno(`SELECT valor FROM recaudos WHERE id = 'r9'`)).valor), 20000);
+  assert.equal((await uno(`SELECT nombre FROM mensajeros WHERE id = 'fantasma'`)).nombre, "Persona retirada (fantasma)");
+
+  // Pedidos: valores, intentos válidos, mensajero quitado → se conserva (inactivo), negativos → 0.
   const p1 = await uno(`SELECT * FROM pedidos WHERE guia = 'JS-00001'`);
   assert.equal(Number(p1.dif_cobro), -5000);
   assert.equal(p1.domi_pago_medio, "nequi");
   assert.equal(p1.entrego_uid, "uMen");
   assert.equal(await cuantos("pedido_intentos"), 1);
   const p2 = await uno(`SELECT * FROM pedidos WHERE guia = 'JS-00002'`);
-  assert.equal(p2.mensajero_id, null);
+  assert.equal(p2.mensajero_id, "fantasma");
   assert.equal(p2.cliente_id, null);
   assert.equal(Number(p2.a_cobrar), 0);
   assert.ok(p2.entregado, "una devuelta sin hora queda con la de salida");
@@ -175,12 +186,14 @@ test("se puede repetir: actualiza lo que cambió y no duplica nada", async () =>
   assert.equal((await uno(`SELECT estado FROM pedidos WHERE guia = 'JS-00003'`)).estado, "entregado");
   assert.equal(await cuantos("pedido_intentos"), 1);
   assert.equal(await cuantos("historial"), 2);
-  assert.equal(await cuantos("papelera"), 1);
+  assert.equal(await cuantos("papelera"), 2);
   assert.equal(await cuantos("pedido_archivos"), 5); // solo la foto nueva de JS-00003
 });
 
-test("--reemplazar quita lo borrado en Firebase y conserva la contraseña puesta en el sistema nuevo", async () => {
+test("--reemplazar quita lo borrado en Firebase, conserva las contraseñas puestas en el sistema nuevo y no vuelve a subir fotos", async () => {
   await pool.query(`UPDATE usuarios SET clave_hash = $1 WHERE id = 'uAdmin'`, [await hashClave("clave-del-sistema-nuevo")]);
+  await pool.query(`UPDATE usuarios SET clave_hash = $1, version_sesion = 3 WHERE id = 'uCli'`, [await hashClave("clave-del-cliente")]);
+  bucket.clear();
   const datos = exportacion();
   datos.pedidos = datos.pedidos.filter(p => p.id !== "JS-00002");
   await escribir(datos);
@@ -188,4 +201,54 @@ test("--reemplazar quita lo borrado en Firebase y conserva la contraseña puesta
   assert.equal(await cuantos("pedidos"), 2);
   assert.ok((await uno(`SELECT clave_hash FROM usuarios WHERE id = 'uAdmin'`)).clave_hash);
   assert.equal(await cuantos("usuarios"), 4);
+  const cli = await uno(`SELECT clave_hash, version_sesion FROM usuarios WHERE id = 'uCli'`);
+  assert.ok(cli.clave_hash, "el cliente que ya activó su cuenta no la pierde");
+  assert.equal(cli.version_sesion, 3);
+  assert.equal(bucket.size, 0, "las fotos que ya estaban en Storage no se suben otra vez");
+  assert.equal(await cuantos("pedido_archivos"), 4); // las de la exportación de nuevo (sin la foto agregada en la prueba anterior)
+});
+
+test("verificación: con datos limpios da igual que la app vieja, y señala lo que se omitió", async () => {
+  const datos = exportacion();
+  datos.usuarios = datos.usuarios.filter(u => u.id !== "sinCorreo");
+  datos.pedidos = datos.pedidos.filter(p => p.id !== "JS-00002"); // cerrada sin hora: la app vieja ni la puede calcular
+  datos.pedidos[0].datos.intentos.pop();
+  datos.movimientos = datos.movimientos.filter(m => m.id !== "huerfano");
+  datos.cajamovs = datos.cajamovs.filter(c => c.id !== "raro");
+  datos.recaudos[0].datos.medio = "efectivo";
+  await escribir(datos);
+  await importar({ carpeta, reemplazar: true, conFotos: false, log: silencio });
+  const r = await verificar({ carpeta });
+  assert.deepEqual(r.diferencias, []);
+  assert.equal(r.postgres.debeMensajeros.m9, undefined, "la persona quitada no cuenta, igual que en la app");
+  assert.equal(r.postgres.caja.porMedio.nequi, r.firebase.caja.porMedio.nequi); // incluye los $20.000 que entregó m9
+
+  // Un movimiento de caja que la importación omite aparece como diferencia en la caja y en los conteos.
+  datos.cajamovs.push({ id: "raro", datos: { tipo: "entra", cat: "propina", valor: 5, medio: "efectivo", fecha: T } });
+  await escribir(datos);
+  await importar({ carpeta, conFotos: false, log: silencio });
+  const r2 = await verificar({ carpeta });
+  assert.deepEqual(r2.diferencias.map(d => d.dato).sort(), ["caja.disponible", "caja.porMedio.efectivo", "caja.total", "conteos.cajamovs"]);
+});
+
+test("ensayo con datos generados como los de la app (varias semillas, con una persona quitada): todo da igual", async () => {
+  const { generarDatos } = await import("./generador.js");
+  await reiniciarBase();
+  for (const semilla of [3, 7, 21]) {
+    const S = generarDatos(semilla, Date.now());
+    S.usuarios.cl.email = "cliente@x.co"; // en Firebase toda cuenta tiene correo
+    delete S.mensajeros.m3; // "Quitar" en Personal: sus pedidos, pagos y liquidaciones se quedan
+    // La app vieja dejaba guardar valores negativos; la importación los pone en 0 y los lista en el informe
+    // (cambian el saldo del cliente: hay que corregirlos en la app vieja antes del cambio). Aquí se limpian antes.
+    const negativos = Object.values(S.pedidos).filter(p => ["valorServicio", "aCobrar", "valorCobrado", "gasto"].some(k => Number(p[k]) < 0));
+    for (const p of negativos) for (const k of ["valorServicio", "aCobrar", "valorCobrado", "gasto"]) if (Number(p[k]) < 0) p[k] = 0;
+    const datos = { admins: [{ id: "ad", datos: { uid: "ad" } }], meta: [{ id: "caja", datos: { corte: 0 } }],
+      auth: Object.values(S.usuarios).map(u => ({ id: u.uid, datos: { email: u.email } })) };
+    for (const [c, docs] of Object.entries(S)) datos[c] = Object.entries(docs).map(([id, d]) => ({ id, datos: d }));
+    await escribir(datos);
+    await importar({ carpeta, reemplazar: true, conFotos: false, log: silencio });
+    const r = await verificar({ carpeta });
+    assert.deepEqual(r.diferencias, [], `semilla ${semilla}`);
+    assert.ok(r.firebase.conteos.pedidos > 400);
+  }
 });

@@ -34,7 +34,8 @@ backend/
 │   ├── migrar.js         npm run db:migrar
 │   ├── crear-admin.js    npm run db:admin -- --email … --clave … [--restablecer]
 │   ├── demo.js           npm run db:demo -- --si (datos inventados, solo en una base vacía)
-│   └── importar-firestore.js  npm run db:importar -- --carpeta … [--simular] (ver ../docs/migracion-firestore.md)
+│   ├── importar-firestore.js  npm run db:importar -- --carpeta … [--simular] (ver ../docs/migracion-firestore.md)
+│   └── verificar-migracion.js npm run db:verificar -- --carpeta …: compara saldos y caja con la app vieja
 ├── migracion/            Exportador de Firestore (paquete aparte, con firebase-admin): lo corre el dueño de Firebase
 └── test/                 Pruebas de integración contra un Postgres de pruebas
 ```

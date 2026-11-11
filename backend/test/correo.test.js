@@ -100,7 +100,7 @@ test("crear una cuenta sin contraseña manda la activación; el enlace crea la c
   assert.equal(capturados.length, 1);
   assert.equal(capturados[0].to[0], "nuevo@js.co");
   assert.match(capturados[0].subject, /Activa tu cuenta/);
-  assert.match(capturados[0].html, /http:\/\/localhost:5173\/activar\?token=/);
+  assert.match(capturados[0].html, /http:\/\/localhost:5173\/activar-cuenta\?token=/);
 
   const { rows } = await pool.query(`SELECT clave_hash, activo FROM usuarios WHERE email = 'nuevo@js.co'`);
   assert.equal(rows[0].clave_hash, null);
@@ -109,7 +109,7 @@ test("crear una cuenta sin contraseña manda la activación; el enlace crea la c
   const sinClave = await conCabeceras(request(app).post("/api/auth/ingresar")).send({ email: "nuevo@js.co", clave: NUEVA });
   assert.equal(sinClave.status, 401);
 
-  const token = tokenDe(capturados[0], "activar");
+  const token = tokenDe(capturados[0], "activar-cuenta");
   const activar = await conCabeceras(request(app).post("/api/auth/activar")).send({ token, clave: NUEVA });
   assert.equal(activar.status, 204);
 
@@ -152,7 +152,7 @@ test("una cuenta desactivada no recibe enlaces y hay que activarla para reenviar
   assert.equal(activar.status, 200);
   assert.equal(activar.body.correo.enviado, true);
   assert.equal(capturados.length, 1);
-  assert.match(capturados[0].html, /\/activar\?token=/);
+  assert.match(capturados[0].html, /\/activar-cuenta\?token=/);
 });
 
 test("administración puede mandar el enlace de contraseña a un trabajador", async () => {
