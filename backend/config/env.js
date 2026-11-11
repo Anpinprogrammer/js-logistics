@@ -5,11 +5,15 @@ const esquema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().min(1, "DATABASE_URL es obligatoria"),
+  // (Opcional) Cadena para db:migrar, db:importar y db:demo. En Supabase, el Session pooler (puerto 5432):
+  // la app va por el Transaction pooler (6543) y los scripts largos, con varias sentencias, por aquí.
+  DATABASE_URL_MIGRACIONES: z.string().optional().transform(v => v || undefined),
   DATABASE_SSL: z.enum(["true", "false"]).default("false").transform(v => v === "true"),
   // Certificado de la base (PEM). En Supabase: Database Settings → SSL Configuration → Download certificate.
   DATABASE_CA: z.string().optional().transform(v => v ? v.replace(/\\n/g, "\n") : undefined),
-  // Pool de conexiones. En el pooler de Supabase en session mode el límite es 15 por proyecto:
-  // con varios procesos (local + Render) usa 5. En transaction mode (puerto 6543) se puede subir.
+  // Conexiones del pool POR PROCESO (cada `npm run dev` y cada instancia de Render es un proceso).
+  // Con el Transaction pooler (6543) 5 sobran para decenas de usuarios a la vez: cada consulta
+  // ocupa la conexión unos milisegundos. En session mode (5432) el cupo es 15 para todo el proyecto.
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(5),
   DATABASE_POOL_IDLE_MS: z.coerce.number().int().min(1000).max(300_000).default(10_000),
   DATABASE_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(500).max(60_000).default(5_000),

@@ -13,6 +13,16 @@ const ERRORES_PG = {
   "22P02": [400, "FORMATO", "Un valor tiene un formato inválido"]
 };
 
+/* La base no dio conexión: cupo del pooler de Supabase lleno (EMAXCONNSESSION), demasiadas conexiones
+   (53300), pool local sin conexiones libres a tiempo o la base no responde. No es un error del usuario
+   ni de los datos: es pasajero, así que se responde 503 con Retry-After y un mensaje para volver a intentar. */
+const CODIGOS_SIN_CONEXION = new Set(["53300", "53400", "57P01", "57P03", "08000", "08001", "08003", "08004", "08006",
+  "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN", "EPIPE"]);
+const MENSAJES_SIN_CONEXION = /EMAXCONN|max clients reached|too many (clients|connections)|remaining connection slots|timeout exceeded when trying to connect|Connection terminated (due to connection timeout|unexpectedly)/i;
+
+export const esFaltaDeConexion = err =>
+  !!err && !(err instanceof HttpError) && (CODIGOS_SIN_CONEXION.has(err.code) || MENSAJES_SIN_CONEXION.test(err.message || ""));
+
 // eslint-disable-next-line no-unused-vars
 export function manejarErrores(err, req, res, _next) {
   let status = 500, error = { code: "ERROR_INTERNO", message: "Error interno del servidor" };
@@ -27,6 +37,13 @@ export function manejarErrores(err, req, res, _next) {
   } else if (ERRORES_PG[err.code]) {
     const [s, code, message] = ERRORES_PG[err.code];
     status = s; error = { code, message };
+  } else if (esFaltaDeConexion(err)) {
+    status = 503;
+    error = { code: "BASE_OCUPADA", message: "El sistema está muy ocupado en este momento. Espera unos segundos e intenta de nuevo." };
+    res.set("Retry-After", "5");
+    // Una línea basta: la traza no ayuda y con muchos usuarios llenaría los registros.
+    console.error(`[${req.method} ${req.originalUrl}] Sin conexión a la base: ${err.code || ""} ${err.message}`);
+    return res.status(status).json({ error });
   }
 
   if (status >= 500) console.error(`[${req.method} ${req.originalUrl}]`, err);

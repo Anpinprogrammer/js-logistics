@@ -1,6 +1,6 @@
 /* Inicialización del servidor: carga la configuración, abre el puerto y cierra en orden. */
 import { env } from "./config/env.js";
-import { pool } from "./config/db.js";
+import { pool, describirConexion } from "./config/db.js";
 import { crearApp } from "./app.js";
 import { marcarCierre } from "./controllers/salud.controller.js";
 import { cerrarCola, estadoRedis } from "./queues/emailQueue.js";
@@ -28,7 +28,10 @@ await validarRedis();
 const app = crearApp();
 const servidor = app.listen(env.PORT, () => {
   console.log(`API de JS Logistics en http://localhost:${env.PORT}/api (${env.NODE_ENV})`);
-  console.log(`Postgres: pool máximo ${env.DATABASE_POOL_MAX} conexiones por proceso`);
+  const c = describirConexion();
+  console.log(`Postgres: ${c.modo} (${c.host}:${c.puerto}), pool máximo ${env.DATABASE_POOL_MAX} conexiones por proceso`);
+  if (c.modo === "Session pooler") console.warn(
+    "Aviso: el Session pooler de Supabase tiene 15 cupos para todo el proyecto. Para la app usa el Transaction pooler (puerto 6543).");
 });
 
 /* Render (y casi cualquier plataforma) apaga con SIGTERM al desplegar: se deja de aceptar tráfico,
