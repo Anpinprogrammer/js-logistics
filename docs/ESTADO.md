@@ -15,6 +15,11 @@ Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/EST
 - `clientes.direccion_recogida` guarda la dirección habitual opcional (texto vacío por defecto) mediante migración idempotente en `db/schema.sql`.
 - `PATCH /api/clientes/mi-perfil` permite al cliente editar solo su ficha y el correo de su propia cuenta. Cambiar el correo exige la contraseña actual; la tarifa permanece reservada a oficina. El frontend de clientes usa esta ruta en la pestaña Configuración de Mi cuenta.
 
+## Demo pública para el portafolio — 2026-11-11
+
+- Guía en [`demo-publica.md`](demo-publica.md): entorno real y separado (Supabase, Render y dos proyectos de Vercel propios) en subdominios de `ingenieroandrespineda.dev`, para que cualquiera pruebe el flujo portal → campanita → asignar. Los modos `VITE_DEMO` en memoria no comparten estado entre apps, por eso no sirven para esto.
+- Trampas: `db:demo` solo corre en una base **vacía** (hay que vaciarla antes de reiniciar la demo) y crea las cuentas con la contraseña `demo-js-2026`, no `demo1234`.
+
 ## Solicitudes de envío (landing → campanita) — 2026-11-11
 
 - Un visitante pide una recogida desde `/register` del portal de clientes (`POST /api/solicitudes/publico`, sin sesión). Se guarda en la tabla `solicitudes` (estados `pendiente → cotizada → confirmada → asignada`, o `rechazada`). Detalle y límites en `backend/README.md`.
