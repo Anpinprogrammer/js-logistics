@@ -1,9 +1,11 @@
 /* Clientes: la oficina los ve y registra; borrar solo administración; el cliente ve solo su ficha. */
 import * as Cliente from "../models/cliente.model.js";
+import * as Usuario from "../models/usuario.model.js";
 import * as Auditoria from "../models/auditoria.model.js";
 import * as Movimiento from "../models/movimiento.model.js";
 import { transaccion } from "../config/db.js";
-import { conflicto, noEncontrado, prohibido } from "../helpers/errores.js";
+import { conflicto, invalido, noEncontrado, prohibido } from "../helpers/errores.js";
+import { compararClave } from "../helpers/claves.js";
 import { esOficina } from "../middleware/autorizar.js";
 import * as S from "../servicios/clientes.js";
 import { responder } from "./accion.js";
@@ -52,6 +54,34 @@ export async function actualizar(req, res) {
   res.json({ cliente: c });
 }
 
+/** El cliente actualiza solo su ficha. Cambiar el correo exige confirmar la contraseña actual. */
+export async function actualizarMiPerfil(req, res) {
+  const id = req.usuario.clienteId;
+  if (!id) throw prohibido("Tu cuenta no está vinculada con un cliente");
+  const { email, claveActual, ...datos } = req.valido.body;
+  let cliente;
+  try {
+    cliente = await transaccion(async db => {
+      const cuenta = await Usuario.bloquearParaPerfil(req.usuario.id, db);
+      if (!cuenta) throw noEncontrado("Tu cuenta ya no existe");
+      if (email !== undefined && email !== cuenta.email) {
+        if (!claveActual) throw invalido("Escribe tu contraseña actual para cambiar el correo");
+        if (!(await compararClave(claveActual, cuenta.claveHash))) throw invalido("La contraseña actual no es correcta");
+        await Usuario.actualizarEmail(req.usuario.id, email, db);
+      }
+      const actualizada = await Cliente.actualizar(id, datos, db);
+      if (!actualizada) throw noEncontrado("Tu ficha de cliente ya no existe");
+      await Auditoria.registrar({ uid: req.usuario.id, accion: "Actualizó su perfil de cliente", tabla: "clientes", registro: id,
+        datos: { ...datos, ...(email !== undefined && email !== cuenta.email ? { email } : {}) } }, db);
+      return actualizada;
+    });
+  } catch (e) {
+    if (e.code === "23505" && e.constraint === "usuarios_email_uq") throw conflicto("Ese correo ya está registrado. Usa otro.", "CORREO_EN_USO");
+    throw e;
+  }
+  res.json({ cliente });
+}
+
 /** Borra y deja copia en la papelera. Si tiene pedidos o movimientos, la base no deja borrarlo. */
 export async function eliminar(req, res) {
   const { id } = req.valido.params;
@@ -76,7 +106,7 @@ export const cuadre = responder((ctx, req) => S.cuadre(ctx, req.valido.query));
 export const repetidos = responder(ctx => S.repetidos(ctx), { clave: "grupos" });
 export const pagarSaldos = responder((ctx, req) => S.pagarSaldos(ctx, req.valido.body), { status: 201 });
 /** Cuenta del cliente con su saldo (lo ve la oficina o el propio cliente; a otro cliente se le dice que no existe). */
-export const cuenta = responder((ctx, req) => S.cuenta(ctx, req.valido.params.id));
+export const cuenta = responder((ctx, req) => S.cuenta(ctx, req.valido.params.id, req.valido.query));
 /** Une repetidos en :id. Responde el cliente que queda y cuántos pedidos y movimientos se pasaron. */
 export const unir = responder(async (ctx, req) => {
   const r = await S.unir(ctx, req.valido.params.id, req.valido.body);

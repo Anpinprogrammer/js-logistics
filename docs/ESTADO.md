@@ -4,6 +4,11 @@ Este archivo es la **memoria compartida** entre sesiones y agentes. Léelo despu
 
 Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/ESTADO.md`.
 
+## Perfil del cliente — 2026-11-10
+
+- `clientes.direccion_recogida` guarda la dirección habitual opcional (texto vacío por defecto) mediante migración idempotente en `db/schema.sql`.
+- `PATCH /api/clientes/mi-perfil` permite al cliente editar solo su ficha y el correo de su propia cuenta. Cambiar el correo exige la contraseña actual; la tarifa permanece reservada a oficina. El frontend de clientes usa esta ruta en la pestaña Configuración de Mi cuenta.
+
 ## Mapa rápido
 
 | Pieza | Dónde | Puerto en local | Guía |

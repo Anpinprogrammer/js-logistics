@@ -24,6 +24,7 @@ export interface Cliente {
   id: string;
   nombre: string;
   telefono: string;
+  direccionRecogida: string;
   tarifa: number;
   creado: string;
 }
@@ -33,6 +34,7 @@ export interface ClienteConSaldo {
   id: string;
   nombre: string;
   telefono: string;
+  direccionRecogida?: string;
   tarifa: number;
   saldo: number;
   delDia?: number;

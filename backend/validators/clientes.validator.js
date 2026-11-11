@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { texto, pesos, telefono, paginacion } from "./comunes.js";
+import { texto, pesos, telefono, paginacion, email } from "./comunes.js";
 
 export const listar = z.object({ buscar: texto(80).optional(), ...paginacion });
 
@@ -25,11 +25,28 @@ export const crear = z.object({
 export const actualizar = z.object({
   nombre: texto(120).min(1).optional(),
   telefono: telefono.optional(),
-  tarifa: pesos.optional()
+  tarifa: pesos.optional(),
+  direccionRecogida: texto(200).optional()
 });
+
+/** El cliente solo edita su ficha y el correo de su propia cuenta; nunca la tarifa. */
+export const miPerfil = z.object({
+  nombre: texto(120).min(1).optional(),
+  telefono: telefono.optional(),
+  direccionRecogida: texto(200).optional(),
+  email: email.optional(),
+  claveActual: z.string().min(1).max(200).optional()
+}).strict().refine(d => d.nombre !== undefined || d.telefono !== undefined || d.direccionRecogida !== undefined || d.email !== undefined,
+  "Indica al menos un dato para actualizar");
 
 export const movimientos = z.object({
   desde: z.coerce.date().optional(),
   hasta: z.coerce.date().optional(),
   limite: z.coerce.number().int().min(1).max(1000).default(200)
+});
+
+/** Cuenta con historial paginado: sin `pagina`/`porPagina` devuelve todas las filas (compatibilidad). */
+export const cuenta = z.object({
+  pagina: z.coerce.number().int().min(1).optional(),
+  porPagina: z.coerce.number().int().min(1).max(50).optional()
 });

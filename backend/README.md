@@ -215,6 +215,7 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `GET /usuarios/pagina?buscar=&rol=&pagina=&porPagina=` | admin | Página de la sub-pestaña Acceso de Personal: `buscar` filtra por nombre o correo (sin tildes) y `rol` por `mensajero`, `asistente`, `cliente` o `admin`. Ordenada por nombre y correo. Devuelve `{ usuarios, pagina, porPagina, total, paginas }`. La app usa 5 en celular y 10 en computador; si la página ya no existe, responde la última |
 | `GET /clientes?buscar=` | oficina | Lista y busca |
 | `GET /clientes/:id` | oficina, o el propio cliente | Ficha |
+| `PATCH /clientes/mi-perfil` | cliente | Actualiza únicamente su ficha con `nombre?`, `telefono?`, `direccionRecogida?` y/o el `email?` de su propia cuenta. Si cambia el correo, exige `claveActual`; el correo debe ser único. Responde `{ cliente }`. No permite cambiar tarifa ni otro cliente. El nuevo correo se ve en `GET /auth/yo` sin cerrar la sesión actual |
 | `POST /clientes`, `PATCH /clientes/:id` | oficina | Crea (avisa de repetidos con 409 `POSIBLE_REPETIDO`) y edita |
 | `GET /clientes/:id/movimientos?desde=&hasta=` | oficina, o el propio cliente | `{ movimientos: [{ id, clienteId, tipo, valor, medio, nota, fecha, … }] }` |
 | `DELETE /clientes/:id` | admin | Borra (a la papelera) si no tiene pedidos ni movimientos |
@@ -256,7 +257,7 @@ Lo ya contado en un arqueo no se cambia: responde `409 YA_CONTADO` con el texto 
 | `DELETE /movimientos/:id` | oficina | Quita un pago (si ya se contó, registra el reverso) |
 | `POST /movimientos/reversar` | oficina | `{ ids }` reversa varios pagos |
 | `GET /clientes/saldos?dia=&buscar=&filtro=&pagina=&porPagina=` | oficina | Clientes con su saldo. `filtro`: `todos`, `cobrar` o `pagar`. Con `pagina`/`porPagina` devuelve una página (`{ clientes, pagina, porPagina, total, paginas, totalClientes, porCobrar, porPagar, repetidos? }`); sin ellos, la lista completa. La app usa 8 en celular y 20 en computador |
-| `GET /clientes/:id/cuenta` | oficina, o el propio cliente | `{ cliente, saldo, filas, enRuta }` |
+| `GET /clientes/:id/cuenta?pagina=&porPagina=` | oficina, o el propio cliente | `{ cliente, saldo, filas, enRuta }`. Con `pagina`/`porPagina` devuelve solo esa página de `filas` más `{ pagina, porPagina, total, paginas }`; sin ellos mantiene todas las filas. El portal del cliente usa 5 en celular y 10 en computador |
 | `GET /clientes/cuadre?dia=&clienteId=` | oficina | Recibos de cuadre del día |
 | `GET /clientes/repetidos` | admin | Grupos de clientes parecidos |
 | `POST /clientes/:id/unir` | admin | `{ otros }`: pasa pedidos, movimientos y cuentas a `:id` y borra los otros |
