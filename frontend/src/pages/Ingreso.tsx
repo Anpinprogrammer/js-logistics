@@ -61,9 +61,9 @@ export default function Ingreso() {
           intro={intro?.cabecera}
         />
 
-        <div className="space-y-3 sm:space-y-4">
+        <div className="space-y-2.5 sm:space-y-4">
           <div style={intro?.campos[0].estilo}>
-            <label htmlFor={idCorreo} className="mb-1.5 block text-sm font-medium text-slate-300">Correo</label>
+            <label htmlFor={idCorreo} className="mb-1 block text-sm font-medium text-slate-300 sm:mb-1.5">Correo</label>
             <div className="relative">
               <input
                 id={idCorreo} type="email" autoComplete="username" placeholder="tu@correo.co"
@@ -76,7 +76,7 @@ export default function Ingreso() {
           </div>
 
           <div style={intro?.campos[1].estilo}>
-            <label htmlFor={idClave} className="mb-1.5 block text-sm font-medium text-slate-300">Contraseña</label>
+            <label htmlFor={idClave} className="mb-1 block text-sm font-medium text-slate-300 sm:mb-1.5">Contraseña</label>
             <div className="relative">
               <input
                 id={idClave} type={ver ? "text" : "password"} autoComplete="current-password" placeholder="••••••••"

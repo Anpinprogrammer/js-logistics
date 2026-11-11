@@ -31,10 +31,10 @@ export type IntroCabecera = {
 export type IntroBoton = ConRef<HTMLButtonElement>;
 
 export const TARJETA =
-  "relative space-y-4 rounded-3xl bg-[#0f172a]/75 p-5 sm:space-y-5 sm:p-9 shadow-[0_24px_80px_-20px_rgba(37,99,235,.5),0_8px_30px_rgba(0,0,0,.5)] backdrop-blur-[16px]";
+  "relative space-y-3 rounded-3xl bg-[#0f172a]/75 p-4 sm:space-y-5 sm:p-9 shadow-[0_24px_80px_-20px_rgba(37,99,235,.5),0_8px_30px_rgba(0,0,0,.5)] backdrop-blur-[16px]";
 
 export const ENTRADA =
-  "peer w-full rounded-xl border border-[#334155] bg-[#070B19]/70 py-2.5 pl-11 text-base sm:py-3 sm:text-[15px] text-slate-100 " +
+  "peer w-full rounded-xl border border-[#334155] bg-[#070B19]/70 py-[9px] pl-11 text-base sm:py-3 sm:text-[15px] text-slate-100 " +
   "placeholder:text-slate-500 transition duration-200 hover:border-slate-500 " +
   "focus:border-[#38bdf8] focus:outline-none focus:ring-4 focus:ring-[#38bdf8]/20 focus:shadow-[0_0_24px_-6px_#38bdf8] disabled:opacity-60";
 
@@ -94,7 +94,7 @@ export function MarcoAcceso({ children, intro }: { children: ReactNode; intro?: 
         {intro?.detras}
       </div>
 
-      <div ref={intro?.tarjeta.ref} style={intro?.tarjeta.style} className="relative w-full max-w-[22rem] sm:max-w-[26rem]">
+      <div ref={intro?.tarjeta.ref} style={intro?.tarjeta.style} className="relative w-full max-w-[21rem] sm:max-w-[26rem]">
         <div aria-hidden style={intro?.borde} className="absolute -inset-px rounded-[1.6rem] bg-gradient-to-br from-[#38bdf8] via-[#2563eb]/40 to-[#38bdf8]/60 opacity-70 blur-[1px]" />
         <div aria-hidden style={intro?.halo} className="absolute -inset-6 -z-10 rounded-[2.5rem] bg-[#2563eb]/20 blur-3xl" />
         {intro?.vidrio}
@@ -109,18 +109,18 @@ export function MarcoAcceso({ children, intro }: { children: ReactNode; intro?: 
 export function CabeceraAcceso({ titulo, descripcion, intro }: { titulo: string; descripcion: ReactNode; intro?: IntroCabecera }) {
   return (
     <header className="text-center">
-      <div ref={intro?.insignia.ref} style={intro?.insignia.style} className="relative mx-auto mb-3 grid size-20 place-items-center sm:mb-5 sm:size-28">
+      <div ref={intro?.insignia.ref} style={intro?.insignia.style} className="relative mx-auto mb-2 grid size-14 place-items-center sm:mb-5 sm:size-28">
         <span aria-hidden style={intro?.halo} className="absolute -inset-3 rounded-[2rem] bg-[#38bdf8]/50 blur-2xl" />
-        <div ref={intro?.placa.ref} style={intro?.placa.style} className="relative grid size-20 place-items-center rounded-[1.4rem] bg-gradient-to-br from-white to-sky-100 p-2 sm:size-28 sm:rounded-[1.75rem] sm:p-3 shadow-[0_0_0_1px_rgba(255,255,255,.7),0_0_28px_6px_rgba(56,189,248,.45),0_12px_28px_-6px_rgba(2,132,199,.55),inset_0_1px_0_#fff]">
+        <div ref={intro?.placa.ref} style={intro?.placa.style} className="relative grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-white to-sky-100 p-1.5 sm:size-28 sm:rounded-[1.75rem] sm:p-3 shadow-[0_0_0_1px_rgba(255,255,255,.7),0_0_28px_6px_rgba(56,189,248,.45),0_12px_28px_-6px_rgba(2,132,199,.55),inset_0_1px_0_#fff]">
           {/* El .webp trae "LOGISTICS CALI" en blanco (invisible sobre el badge claro): se recorta y el texto va aparte. */}
-          <div style={intro?.icono} className="relative size-full overflow-hidden rounded-2xl">
+          <div style={intro?.icono} className="relative size-full overflow-hidden rounded-xl sm:rounded-2xl">
             <img src="/icono-96.webp" alt="JS Logistics Cali" width={96} height={96} className="absolute left-[-10%] top-[3%] w-[120%] max-w-none" />
           </div>
         </div>
       </div>
       <p style={intro?.ceja} className="-mt-1 mb-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-[#38bdf8]">Logistics · Cali</p>
-      <h1 ref={intro?.titulo.ref} style={intro?.titulo.style} className="text-3xl font-bold tracking-tight text-white sm:text-4xl">{titulo}{intro?.letras}</h1>
-      <p style={intro?.descripcion} className="mx-auto mt-2 max-w-[19rem] text-[13px] sm:mt-2.5 sm:text-sm leading-relaxed text-slate-300">{descripcion}</p>
+      <h1 ref={intro?.titulo.ref} style={intro?.titulo.style} className="text-2xl font-bold tracking-tight text-white sm:text-4xl">{titulo}{intro?.letras}</h1>
+      <p style={intro?.descripcion} className="mx-auto mt-1 max-w-[19rem] text-xs sm:mt-2.5 sm:text-sm leading-relaxed text-slate-300">{descripcion}</p>
     </header>
   );
 }
@@ -130,7 +130,7 @@ export function BotonAcceso({ cargando, children, cargandoTexto, intro }: { carg
   return (
     <button
       type="submit" disabled={cargando} ref={intro?.ref} style={intro?.style}
-      className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-[#0284c7] to-[#22d3ee] px-5 py-3 text-base font-bold sm:py-4 text-white shadow-[0_8px_24px_-8px_rgba(34,211,238,.6)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-8px_rgba(34,211,238,.8)] active:translate-y-0 disabled:cursor-wait disabled:opacity-90 disabled:hover:translate-y-0"
+      className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-[#0284c7] to-[#22d3ee] px-5 py-2.5 text-base font-bold sm:py-4 text-white shadow-[0_8px_24px_-8px_rgba(34,211,238,.6)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-8px_rgba(34,211,238,.8)] active:translate-y-0 disabled:cursor-wait disabled:opacity-90 disabled:hover:translate-y-0"
     >
       <span aria-hidden className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
       {cargando ? (
