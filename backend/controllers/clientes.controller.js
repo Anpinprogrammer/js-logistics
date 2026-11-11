@@ -14,6 +14,14 @@ export async function listar(req, res) {
   res.json({ clientes: await Cliente.listar(req.valido.query) });
 }
 
+/** Lo mínimo para elegir el remitente en la calle: el mensajero no ve teléfonos, tarifas ni saldos. */
+export async function buscar(req, res) {
+  const q = req.valido.query.q.trim();
+  if (q.length < 2) return res.json({ clientes: [] });
+  const cs = await Cliente.listar({ buscar: q, limite: 8 });
+  res.json({ clientes: cs.map(c => ({ id: c.id, nombre: c.nombre })) });
+}
+
 export async function obtener(req, res) {
   const { id } = req.valido.params;
   if (!esOficina(req.usuario) && req.usuario.clienteId !== id) throw prohibido();

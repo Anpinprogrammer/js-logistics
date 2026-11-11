@@ -20,6 +20,9 @@ export interface Usuario {
   status?: "pending_activation" | "active" | "disabled";
 }
 
+/** Lo que ve el mensajero al buscar un remitente (GET /clientes/buscar). */
+export interface ClienteBreve { id: string; nombre: string }
+
 export interface Cliente {
   id: string;
   nombre: string;

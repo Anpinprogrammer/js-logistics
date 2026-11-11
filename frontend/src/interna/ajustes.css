@@ -181,11 +181,11 @@
 .jsl .banner.alerta{background:var(--rojo-claro);border-color:color-mix(in srgb,var(--rojo) 22%,transparent);color:var(--rojo)}
 .jsl .banner.info{background:var(--mango-claro);border-color:color-mix(in srgb,var(--marca) 20%,transparent);color:var(--marca)}
 
-/* Toolbar de Pedidos: apilada en el celular, 2 filas en tablet y 1 fila desde 1280 px. */
+/* Toolbar de Pedidos: apilada en el celular (estado en lista desplegable); desde 768 px, 2 filas: búsqueda, mensajero y fecha arriba, y las píldoras de estado abajo. */
 .jsl .toolbar-pedidos{display:flex;flex-direction:column;align-items:stretch;gap:12px;background:var(--hueco);border:1px solid var(--linea);border-radius:12px;padding:12px;margin-bottom:18px}
 .jsl .tp-filtros{display:grid;grid-template-columns:1fr;gap:8px;width:100%;min-width:0}
 .jsl .tp-filtros .campo{margin:0;min-width:0}
-.jsl .tp-filtros .campo select{appearance:none;-webkit-appearance:none;min-width:210px;width:auto;max-width:260px;padding:8px 36px 8px 16px;background-color:var(--papel);background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:9px 9px}
+.jsl .tp-filtros .campo select,.jsl .tp-filtros .campo-estado select{appearance:none;-webkit-appearance:none;min-width:210px;width:auto;max-width:260px;padding:8px 36px 8px 16px;background-color:var(--papel);background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:9px 9px}
 .jsl .tp-fecha{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-width:0}
 .jsl .toolbar-pedidos .seg-estado{width:100%;min-width:0;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;padding:4px;gap:2px}
 .jsl .toolbar-pedidos .seg-estado::-webkit-scrollbar{display:none}
@@ -196,29 +196,33 @@
 .jsl .toolbar-pedidos .seg-estado .num{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--rojo);color:#fff;font-size:.66rem;text-align:center;line-height:17px}
 .jsl .toolbar-pedidos .seg-estado button[aria-pressed="true"] .num{background:#fff;color:var(--lateral)}
 .jsl .toolbar-pedidos .filtro-dia.compacto{width:auto;justify-content:center;margin:0;flex-wrap:wrap}
+/* Filtro de estado: lista desplegable con ícono en el celular; las píldoras aparecen desde 768 px. */
+.jsl .tp-filtros .campo-estado{position:relative}
+.jsl .tp-filtros .campo-estado select{padding-left:38px}
+.jsl .campo-estado .ico-filtro{position:absolute;left:13px;top:50%;width:16px;height:16px;transform:translateY(-50%);display:flex;color:var(--suave);pointer-events:none}
+.jsl .campo-estado .ico-filtro svg{width:16px;height:16px}
+.jsl .toolbar-pedidos .seg-estado{display:none}
 @media (min-width:640px){
   .jsl .tp-filtros{grid-template-columns:1fr 1fr}
+  .jsl .tp-filtros .campo-estado{grid-column:1 / -1}
 }
 /* Tablet y laptop pequeña: búsqueda y mensajero a la izquierda, fecha a la derecha; estados abajo. */
 @media (min-width:768px){
-  .jsl .toolbar-pedidos{display:grid;grid-template-columns:1fr auto;grid-template-areas:"filtros fecha" "estado estado";column-gap:12px;row-gap:10px}
-  .jsl .tp-filtros{grid-area:filtros;display:flex;align-items:center;gap:8px;width:auto}
+  .jsl .toolbar-pedidos{display:grid;grid-template-columns:1fr auto;grid-template-areas:"filtros fecha" "estado estado";column-gap:12px;row-gap:12px}
+  .jsl .tp-filtros .campo-estado{display:none}
+  .jsl .toolbar-pedidos .seg-estado{display:flex;grid-area:estado;width:100%;gap:8px;padding:12px 0 4px;background:transparent;border:0;border-top:1px solid var(--linea);border-radius:0;box-shadow:none;scroll-behavior:smooth}
+  .jsl .toolbar-pedidos .seg-estado button{padding:7px 14px;border:1px solid var(--linea);background:var(--papel)}
+  .jsl .toolbar-pedidos .seg-estado button:not([aria-pressed="true"]):hover{border-color:var(--suave)}
+  .jsl .toolbar-pedidos .seg-estado button[aria-pressed="true"]{border-color:var(--marca2)}
+  .jsl .toolbar-pedidos .seg-estado .num.amb{background:var(--ambar,#f59e0b);color:#1c1917}
+  .jsl .tp-filtros{grid-area:filtros;display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:auto}
   .jsl .tp-filtros .campo:first-child{flex:1 1 220px;max-width:300px}
-  .jsl .tp-filtros .campo:last-child{flex:0 0 auto;width:auto;min-width:210px}
-  .jsl .toolbar-pedidos .seg-estado{grid-area:estado}
+  .jsl .tp-filtros .campo:nth-child(n+2){flex:0 0 auto;width:auto;min-width:210px}
   .jsl .tp-fecha{grid-area:fecha;width:auto;justify-content:flex-end}
   .jsl .toolbar-pedidos .filtro-dia.compacto{width:auto;justify-content:flex-end}
 }
-/* Escritorio grande: todo en una fila, con separadores verticales. */
 @media (min-width:1280px){
-  .jsl .toolbar-pedidos{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:12px}
-  .jsl .tp-filtros{flex:none;display:flex;gap:8px}
-  .jsl .tp-filtros .campo:first-child{flex:0 0 240px;max-width:240px}
-  .jsl .tp-filtros .campo:last-child{flex:0 0 auto;width:auto;min-width:210px}
-  .jsl .toolbar-pedidos .seg-estado{flex:0 1 auto;width:fit-content;gap:4px}
-  .jsl .toolbar-pedidos .seg-estado button{padding:6px 16px}
-  .jsl .tp-fecha{width:auto}
-  .jsl .toolbar-pedidos .filtro-dia.compacto{flex:none;width:auto;justify-content:flex-end}
+  .jsl .tp-filtros{flex-wrap:nowrap}
 }
 @media (max-width:767px){
   .jsl .tp-filtros .campo select{width:100%;max-width:none}
@@ -791,3 +795,31 @@
   .jsl .campana svg{width:17px;height:17px}
 }
 @media (max-width:359px){ .jsl .barra .avatar{display:none} }
+
+/* Nueva guía del mensajero: foto subiendo y remitente opcional (mensajero/NuevaGuia.tsx). */
+.jsl .ng-subida{display:flex;gap:14px;align-items:center;padding:12px;border:1px solid var(--linea);border-radius:14px;background:var(--hueco)}
+.jsl .ng-foto{position:relative;flex:0 0 auto;width:84px;height:84px;border-radius:12px;overflow:hidden;background:var(--linea)}
+.jsl .ng-foto img{width:100%;height:100%;object-fit:cover;display:block}
+.jsl .ng-capa{position:absolute;inset:0;display:grid;place-items:center;background:rgba(4,20,40,.45);color:#fff}
+.jsl .ng-capa.ok{background:color-mix(in srgb,var(--verde) 70%,transparent);animation:ng-aparece .25s ease-out}
+.jsl .ng-girador{width:30px;height:30px;border-radius:50%;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;animation:girar .8s linear infinite}
+.jsl .ng-cuenta{position:absolute;right:4px;bottom:4px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--tinta);color:var(--papel);font-size:.75rem;font-weight:700;display:grid;place-items:center}
+.jsl .ng-texto{display:flex;flex-direction:column;gap:3px;min-width:0;overflow-wrap:anywhere}
+.jsl .ng-texto .sub{font-size:.85rem}
+.jsl .ng-fase-error .ng-texto b{color:var(--rojo)}
+.jsl .ng-remitente{margin-top:16px}
+.jsl .ng-remitente .campo{margin:0}
+.jsl .ng-remitente input[type=search]{min-height:48px;font-size:1rem}
+.jsl .ng-lista{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.jsl .ng-lista:empty{display:none}
+.jsl .ng-lista button{width:100%;min-height:48px;padding:10px 14px;text-align:left;border:1px solid var(--linea);border-radius:12px;background:var(--papel);color:var(--tinta);font:inherit;font-weight:600;cursor:pointer;overflow-wrap:anywhere}
+.jsl .ng-lista button:hover,.jsl .ng-lista button:focus-visible{border-color:var(--marca);background:color-mix(in srgb,var(--marca) 8%,var(--papel))}
+.jsl .ng-ayuda{display:block;margin-top:6px;font-size:.8rem}
+.jsl .ng-ayuda:empty{display:none}
+.jsl .ng-elegido{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid var(--marca);border-radius:12px;background:color-mix(in srgb,var(--marca) 7%,var(--papel))}
+.jsl .ng-elegido-txt{display:flex;flex-direction:column;flex:1;min-width:0;overflow-wrap:anywhere}
+.jsl .ng-elegido-txt .sub{font-size:.75rem;margin:0}
+.jsl .ng-acciones{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+.jsl .ng-acciones .btn{width:100%;min-height:48px;margin:0}
+@keyframes ng-aparece{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.jsl .ng-girador{animation-duration:2s}.jsl .ng-capa.ok{animation:none}}

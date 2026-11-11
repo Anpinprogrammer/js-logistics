@@ -1,6 +1,6 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
-import type { Archivo, TipoArchivo, Cliente, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
+import type { Archivo, TipoArchivo, Cliente, ClienteBreve, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
   Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal, Solicitud, ListaSolicitudes } from "./tipos";
 import { FalloApi } from "./cliente";
 
@@ -76,6 +76,8 @@ export const pedidos = {
   entregar: (guia: string, d: DatosEntrega) => datos<{ pedido: Pedido }>(api.post(`/pedidos/${guia}/entrega`, d)).then(r => r.pedido),
   noEntregado: (guia: string, d: { motivo: Motivo; nota: string }) =>
     datos<{ pedido: Pedido }>(api.post(`/pedidos/${guia}/no-entregado`, d)).then(r => r.pedido),
+  /** El mensajero pone el remitente de su guía nueva (solo si todavía no tiene). */
+  remitente: (guia: string, clienteId: string) => datos<{ pedido: Pedido }>(api.patch(`/pedidos/${guia}/remitente`, { clienteId })).then(r => r.pedido),
   corregir: (guia: string, d: Partial<DatosEntrega> & { motivoDev?: Motivo; notaDev?: string }) =>
     datos<{ pedido: Pedido }>(api.patch(`/pedidos/${guia}/correccion`, d)).then(r => r.pedido),
   eliminar: (guia: string) => api.delete(`/pedidos/${guia}`),
@@ -91,6 +93,8 @@ export const pedidos = {
 };
 
 export const clientes = {
+  /** Búsqueda corta para elegir el remitente desde la recogida: solo nombre e id (también para el mensajero). */
+  buscar: (q: string) => datos<{ clientes: ClienteBreve[] }>(api.get("/clientes/buscar", { params: { q } })).then(d => d.clientes),
   listar: (buscar = "") => datos<{ clientes: Cliente[] }>(api.get("/clientes", { params: limpio({ buscar, limite: 500 }) })).then(d => d.clientes),
   /** Una página de la pestaña Clientes, con saldos y totales calculados por el servidor. */
   pagina: (f: { filtro?: string; dia?: string; buscar?: string }, pagina: number, porPagina: number) =>

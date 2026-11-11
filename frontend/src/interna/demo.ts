@@ -17,6 +17,9 @@ const PERSONAS: [string, string, Almacen["mensajeros"][string]["tipo"], number][
   ["m4", "Sebastián Pardo", "mensajero", 0], ["m-dueno", "Dueño (demo)", "dueno", 0], ["m-ofi", "Oficina JS", "oficina", 0],
   ["m-pat", "Tomás Vélez", "patinador", 70000], ["m-emp", "Empresa (JS)", "empresa", 0],
 ];
+/** Remitentes que puede buscar el mensajero en el demo (el almacén del mensajero no trae clientes). */
+export let remitentesDemo: { id: string; nombre: string; tarifa: number }[] = [];
+
 const CLIENTES = ["Tienda Aurora", "Moda Sol", "Calzado Andino", "Bella Piel", "Mundo Bebé", "Accesorios Luna", "Deportes Río", "Casa Verde",
   "Dulce Hogar", "Tecno Plus", "Perfumes Brisa", "Joyas Nácar", "Ropa Urbana", "Mascotas Felices", "Papelería Arcoíris", "Natural Vida",
   "Café del Valle", "Juguetes Kiwi", "Óptica Clara", "Ferretería Roble"];
@@ -112,6 +115,8 @@ export function datosDemo(u: Usuario): Almacen {
     S.mensajeros = { [mid]: S.mensajeros[mid] };
     for (const k of ["recaudos", "liquidaciones"] as const) for (const id of Object.keys(S[k])) if (S[k][id].mensajeroId !== mid) delete S[k][id];
     for (const id of Object.keys(S.cajamovs)) if (S.cajamovs[id].personaId !== mid) delete S.cajamovs[id];
+    // Como GET /clientes/buscar: el mensajero solo busca nombre e id para el remitente.
+    remitentesDemo = Object.values(S.clientes).map(c => ({ id: c.id, nombre: c.nombre, tarifa: c.tarifa }));
     S.clientes = {}; S.movimientos = {}; S.cuentas = {}; S.usuarios = { [u.id]: S.usuarios[u.id] };
   } else if (u.rol === "asistente") S.usuarios = { [u.id]: S.usuarios[u.id] };
   return S;

@@ -5,7 +5,7 @@ import {
   S, yo, hora, pesos, listaOrdenada, esRepartidor, tipoDe, cambioPendiente, sinServicio, delDia, nombreCliente, sinTildes, cerrado, gastoDe, pagoDomi,
   saldoPedido, metodoTxt, pedidoLiquidado, cambiaLoContado, corteCaja, CUENTAS_JS, METODOS, MEDIOS, MOTIVOS, type Metodo, type Medio, type Motivo, type Pedido,
 } from "../motor";
-import { Cab, EtqEstado, FiltroDia, FilaPedido, FotosGuia, IconoCamara, IconoInfo, Paginador, pl, useVentana } from "../ui";
+import { Cab, EtqEstado, FiltroDia, FilaPedido, FotosGuia, IconoCamara, IconoFiltro, IconoInfo, Paginador, pl, useVentana } from "../ui";
 import { E } from "../estado";
 import { actualizarPedido, cambioEntregado, crearGuias, eliminarPedido, reabrir } from "../acciones";
 import { aPedido, motivoError, useDatos } from "../datos";
@@ -82,6 +82,7 @@ export default function Pedidos({ pintar }: { pintar: () => void }) {
   const nCambio = todos.filter(cambioPendiente).length, nServ = todos.filter(sinServicio).length, nDif = todos.filter(p => Number(p.difCobro) && !p.difRevisada).length;
   const poner = (cambio: Partial<typeof E>) => { Object.assign(E, cambio); pintar(); };
   const tBuscar = useRef<number>(0);
+  const estados: [string, string, number?][] = [["todos", "Todos los pedidos"], ["sin", "Sin remitente"], ["pend", "Por entregar", porEntregar], ["ent", "Entregados"], ["dev", "Devueltos"], ["dif", "Con diferencia"], ["cambio", "Cambios por recibir", nCambio]];
 
   const fotos = async (lista: FileList | null) => {
     const files = [...(lista || [])].filter(x => x.type.startsWith("image/")).slice(0, 30); if (!files.length) return;
@@ -115,10 +116,11 @@ export default function Pedidos({ pintar }: { pintar: () => void }) {
         <div className="campo"><input id="buscar" type="search" placeholder="Buscar guía, remitente…" value={buscar} aria-label="Buscar guía, remitente, destinatario o mensajero"
           onChange={e => { const x = e.target.value; setBuscar(x); clearTimeout(tBuscar.current); tBuscar.current = window.setTimeout(() => poner({ buscarA: x, paginaA: 1 }), 300); }} /></div>
         <div className="campo"><select id="mensPed" aria-label="Filtrar por mensajero" value={E.mensPedA} onChange={e => poner({ mensPedA: e.target.value, paginaA: 1 })}><option value="">Todos los mensajeros</option>{repartidores.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div>
+        <div className="campo campo-estado"><span className="ico-filtro"><IconoFiltro /></span><select id="estadoPed" aria-label="Filtrar por estado" value={f} onChange={e => poner({ filtroA: e.target.value, paginaA: 1 })}>
+          {estados.map(([k, t, n]) => <option key={k} value={k}>{t}{n ? " (" + n + ")" : ""}</option>)}</select></div>
       </div>
       <div className="seg seg-estado" role="group" aria-label="Filtrar por estado">
-        {([["sin", "Sin remitente"], ["pend", "Por entregar", porEntregar], ["ent", "Entregados"], ["dev", "Devueltos"], ["dif", "Con diferencia"], ["cambio", "Cambios"], ["todos", "Todos"]] as [string, string, number?][])
-          .map(([k, t, n]) => <button key={k} aria-pressed={f === k} onClick={() => poner({ filtroA: k, paginaA: 1 })}>{t}{n !== undefined ? <> <span className="num">{n}</span></> : null}</button>)}
+        {estados.map(([k, t, n]) => <button key={k} aria-pressed={f === k} onClick={() => poner({ filtroA: k, paginaA: 1 })}>{t}{n !== undefined ? <> <span className={k === "cambio" ? "num amb" : "num"}>{n}</span></> : null}</button>)}
       </div>
       <div className="tp-fecha"><FiltroDia compacto id="diaPed" d={E.diaPedA} poner={d => poner({ diaPedA: d, paginaA: 1 })} /></div>
     </div>

@@ -4,6 +4,12 @@ Este archivo es la **memoria compartida** entre sesiones y agentes. Léelo despu
 
 Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/ESTADO.md`.
 
+## Remitente desde la recogida — 2026-11-11
+
+- Al tomar la foto, el mensajero ve una ventana (`frontend/src/interna/mensajero/NuevaGuia.tsx`) con la subida en curso y un buscador de cliente opcional. Si lo deja vacío, la oficina asigna el remitente como siempre.
+- Backend: `GET /clientes/buscar?q=` (solo nombre e id) y `PATCH /pedidos/:guia/remitente` (solo su mensajero, guía por entregar sin remitente; toma la tarifa del cliente si no había domicilio). Pruebas en `backend/test/remitente-mensajero.test.js`.
+- En demo, el mensajero busca entre `remitentesDemo` (`demo.ts`), porque su almacén no trae clientes.
+
 ## Perfil del cliente — 2026-11-10
 
 - `clientes.direccion_recogida` guarda la dirección habitual opcional (texto vacío por defecto) mediante migración idempotente en `db/schema.sql`.

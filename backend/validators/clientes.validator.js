@@ -3,6 +3,9 @@ import { texto, pesos, telefono, paginacion, email } from "./comunes.js";
 
 export const listar = z.object({ buscar: texto(80).optional(), ...paginacion });
 
+/** Búsqueda corta de remitentes para el mensajero: solo nombre e id. */
+export const buscar = z.object({ q: texto(80).default("") });
+
 const dia = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "El día no es válido (AAAA-MM-DD).");
 
 /** Lista de clientes con saldo. Con `pagina`/`porPagina` devuelve una sola página. */
