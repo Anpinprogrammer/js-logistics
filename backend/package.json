@@ -15,6 +15,7 @@
     "db:admin": "node --env-file-if-exists=.env db/crear-admin.js",
     "db:demo": "node --env-file-if-exists=.env --import ./db/conexion-migraciones.js db/demo.js",
     "db:importar": "node --env-file-if-exists=.env --import ./db/conexion-migraciones.js db/importar-firestore.js",
+    "db:verificar": "node --env-file-if-exists=.env --import ./db/conexion-migraciones.js db/verificar-migracion.js",
     "test": "node --test --test-concurrency=1 \"test/**/*.test.js\""
   },
   "dependencies": {

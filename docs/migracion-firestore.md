@@ -53,14 +53,17 @@ cd backend
 npm run db:migrar                                                    # crea o actualiza las tablas
 npm run db:importar -- --carpeta ../exportacion-2026-11-08-1030 --simular
 npm run db:importar -- --carpeta ../exportacion-2026-11-08-1030
+npm run db:verificar -- --carpeta ../exportacion-2026-11-08-1030                  # compara con la app vieja
 ```
 
 1. `--simular` hace todo dentro de una transacción y al final la deshace. Así ves cuántos registros entrarían y cuáles se omitirían, sin guardar nada ni subir fotos.
 2. Sin `--simular` se guarda y se suben las fotos. Al final deja `informe-importacion.json` dentro de la carpeta, con cada registro que se omitió y el motivo.
 
+3. `db:verificar` solo lee. Calcula con las **mismas cuentas de la app vieja** (`helpers/calculos.js`) sobre la carpeta exportada y sobre la base, y compara: cuántos registros hay de cada cosa, el saldo de cada cliente, lo que debe cada mensajero, la caja general (total y por medio), las cajas de oficina, las cuentas internas y la hora del último arqueo. Deja `verificacion-migracion.json` en la carpeta y termina con error si algo no da igual. Las diferencias que quedan casi siempre son registros que la importación omitió o corrigió por inválidos (están en `informe-importacion.json`): corrígelos en la app vieja y vuelve a exportar.
+
 Mientras corre, muestra cada paso ("Leyendo los archivos…", "Conectando con la base de datos…") y cuántos registros guardó de cada colección, con los segundos que lleva. Los datos se escriben por lotes: unos miles de guías tardan pocos segundos. Las fotos son lo más lento, y muestra el avance cada 200 guías.
 
-- Si se queda en **"Conectando con la base de datos…"**, revisa `DATABASE_URL`. En Supabase usa la cadena del **Session pooler** (Project Settings → Database → Connection string).
+- Si se queda en **"Conectando con la base de datos…"**, revisa `DATABASE_URL_MIGRACIONES` (o `DATABASE_URL` si no la pusiste). En Supabase usa la cadena del **Session pooler** (Project Settings → Database → Connection string).
 - La importación quita el límite de tiempo por consulta (`statement_timeout`) solo dentro de su propia transacción, así que el error "canceling statement due to statement timeout" ya no la corta.
 
 Si ya habías importado antes de esta versión, corre primero `npm run db:migrar` y vuelve a importar: así los adelantos quedan unidos a su liquidación y se recuperan las notas de las jornadas (ver "Actualizar la base" en [`backend/README.md`](../backend/README.md)).
@@ -69,7 +72,7 @@ Si ya habías importado antes de esta versión, corre primero `npm run db:migrar
 
 | Firestore | Postgres | Notas |
 |---|---|---|
-| `mensajeros`, `clientes`, `cuentas` | mismas tablas | Mismos IDs. |
+| `mensajeros`, `clientes`, `cuentas` | mismas tablas | Mismos IDs. Una persona que se quitó en Personal pero tiene pedidos, entregas de plata, liquidaciones, jornadas o movimientos de caja se crea **inactiva** (con su nombre de la papelera): no aparece en Personal, igual que en la app, y su plata sigue contando en la caja. |
 | `usuarios` + `admins` + `vinculos` + Firebase Auth | `usuarios` | El uid de Firebase es el ID. `admins` da el rol de administración y `vinculos` da la persona de Personal. Las cuentas desactivadas en Auth quedan inactivas. |
 | `pedidos` (con `intentos[]` y `mini`) | `pedidos`, `pedido_intentos` | El consecutivo de guías sigue después de la última. |
 | `fotos`, `entregas` (dataURL) | archivos en Storage + `pedido_archivos` | Foto de salida, miniatura, foto de entrega, firma y pruebas anteriores (`previa`). |
@@ -81,17 +84,20 @@ Si ya habías importado antes de esta versión, corre primero `npm run db:migrar
 Datos que la app vieja dejaba pasar y aquí se limpian (todos quedan en el informe):
 
 - **Se omite el registro:** un movimiento de un cliente que ya no existe, una cuenta sin correo, una categoría de caja desconocida.
-- **Se corrige el valor:** un valor negativo pasa a 0; un mensajero o remitente que ya no existe queda vacío.
+- **Se corrige el valor:** un valor negativo de una guía pasa a 0; un remitente que ya no existe queda vacío. Ojo: un valor negativo **cambia el saldo del cliente**. Si el informe trae "valores negativos puestos en 0", corrige esas guías en la app vieja antes del cambio (`db:verificar` muestra en qué clientes cambia el saldo).
 
-### Contraseñas
+### Contraseñas e invitaciones
 
-Firebase no entrega las contraseñas, así que **las cuentas importadas no tienen contraseña y no pueden entrar** hasta que se les asigne una:
+Firebase no entrega las contraseñas, así que **las cuentas importadas quedan sin contraseña** (estado "Pendiente") y no pueden entrar hasta que activen su cuenta con el enlace del correo:
 
-```bash
-npm run db:admin -- --email dueno@correo.com --clave "una-clave-larga" --restablecer   # la primera, por terminal
-```
+1. La primera cuenta de administración, por terminal y **después** de importar (si la creas antes, la cuenta de Firebase con el mismo correo se omite y su historial queda sin nombre):
 
-Con esa cuenta, administración entra a la app nueva → **Accesos** → le pone una contraseña a cada persona y se la comunica.
+   ```bash
+   npm run db:admin -- --email dueno@correo.com --clave "una-clave-larga" --restablecer
+   ```
+
+2. Con esa cuenta, en **Personal → Acceso → Restablecimiento masivo**, se eligen las cuentas y se manda el correo (**máximo 100 por envío**: si son más, hazlo en varias tandas). A una cuenta sin contraseña le llega el enlace de **activación** (vale 7 días); a la persona de clientes la lleva a `jslogistics.pro/activar-cuenta`, y a la de oficina, al subdominio de la app. Necesita `RESEND_API_KEY`, el dominio verificado en Resend, `URL_CLIENTES` y `URL_EQUIPO` de producción.
+3. Manda las invitaciones **solo después de la importación final**: un `--reemplazar` posterior borra los enlaces pendientes de los clientes (las contraseñas que ya crearon sí se conservan).
 
 ---
 
@@ -104,17 +110,17 @@ Cada vez que quieras ponerte al día, exporta (con `--sin-fotos` es rápido) e i
 - Lo que se **borró** en Firebase no se borra aquí. Para eso usa `--reemplazar --si`:
   - Vacía las tablas y vuelve a cargar todo.
   - Conserva las cuentas de oficina y mensajeros con la contraseña que ya les pusiste en el sistema nuevo.
-  - Las cuentas de clientes sí se vuelven a crear sin contraseña.
+  - Las cuentas de clientes se vuelven a crear con la contraseña que ya hayan creado en el sistema nuevo (los enlaces pendientes sí se pierden).
+  - Las fotos que ya estaban en Storage no se vuelven a subir: solo se anotan otra vez.
 
 > Mientras se sincroniza, **el sistema nuevo no se usa para operar**: Firebase es la fuente de verdad, y una importación pisa lo que se haya cambiado aquí.
 
 ## 4. El día del cambio
 
-1. Avisa al equipo. Nadie registra nada en la app vieja desde ese momento.
-2. Haz la exportación completa, con fotos.
-3. Importa en la base de **producción**:
-   1. Primero con `--simular`, para revisar el informe.
-   2. Después con `--reemplazar --si`.
-4. Compara contra la app vieja: número de guías, saldo de algunos clientes, caja del día y lo pendiente por liquidar de cada mensajero. Tienen que dar igual.
-5. Pon las contraseñas y cambia los dominios hacia el sistema nuevo.
-6. La app vieja queda solo para consulta hasta que se retire, en un PR aparte. Guarda la carpeta exportada como respaldo, fuera del repositorio.
+El plan completo, con el ensayo, los tiempos y cómo devolverse, está en [`docs/plan-migracion-16-nov.md`](plan-migracion-16-nov.md). En resumen:
+
+1. **Antes (ensayo):** exporta completo, importa en una base de pruebas con `--simular`, después de verdad, y corre `db:verificar`. Corrige en la app vieja lo que salga en el informe y repite hasta que la verificación dé igual.
+2. **Uno o dos días antes:** importa todo, con fotos, en la base de **producción**. Así el día del cambio las fotos ya están en Storage y no se vuelven a subir.
+3. **El día:** avisa al equipo y desde ese momento nadie registra nada en la app vieja. Respaldo de la base de producción (`pg_dump`), exportación completa, `db:migrar`, importación con `--simular` y luego con `--reemplazar --si`, y `db:verificar`. Si da igual, contraseña de administración, invitaciones y cambio de dominios.
+4. **Si algo no cuadra:** no cambies los dominios. La app vieja sigue intacta (la exportación solo lee): se vuelve a habilitar y se intenta otro día.
+5. La app vieja queda solo para consulta hasta que se retire, en un PR aparte. Guarda la carpeta exportada como respaldo, fuera del repositorio.
