@@ -80,6 +80,25 @@ export async function noEntregado(ctx, guia, datos) {
   });
 }
 
+/** El mensajero elige el remitente al recoger (es opcional: si no, lo pone la oficina).
+    Solo en su guía, por entregar y sin remitente: cambiar uno ya puesto es de la oficina.
+    Si la guía no tiene valor de domicilio, toma la tarifa del cliente, igual que la ficha de la oficina. */
+export async function asignarRemitente(ctx, guia, { clienteId }) {
+  const a = ctx.actor;
+  exigirEquipo(a);
+  return enTransaccion(ctx, async t => {
+    const p = await pedidoBloqueado(t, guia, x => esMio(a, x.mensajeroId));
+    if (p.clienteId === clienteId) return p;
+    if (p.estado !== "pendiente") throw conflicto("Esa guía ya está cerrada: pídele a administración que ponga el remitente.");
+    if (p.clienteId) throw conflicto("Esa guía ya tiene remitente: pídele a administración que lo cambie.");
+    const cli = await Clientes.obtener(t.c, clienteId);
+    if (!cli) throw datosInvalidos("Ese cliente no existe. Deja la guía sin remitente y administración lo pone.");
+    const d = { clienteId: cli.id };
+    if (!(Number(p.valorServicio) > 0) && Number(cli.tarifa) > 0) d.valorServicio = Number(cli.tarifa);
+    return actualizar(t, "pedidos", guia, d, { antes: p });
+  });
+}
+
 /** El mensajero corrige lo que registró durante 24 horas (firestore.rules: entregaDeMensajero).
     No cambia el estado, la hora ni el cobro de la devolución. */
 export async function corregir(ctx, guia, datos) {

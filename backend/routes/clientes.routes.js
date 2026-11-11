@@ -3,12 +3,13 @@ import * as C from "../controllers/clientes.controller.js";
 import * as V from "../validators/clientes.validator.js";
 import { paramId } from "../validators/comunes.js";
 import { validar } from "../middleware/validar.js";
-import { permitir, OFICINA } from "../middleware/autorizar.js";
+import { permitir, OFICINA, EQUIPO } from "../middleware/autorizar.js";
 import * as D from "../validators/dinero.validator.js";
 
 const r = Router();
 
 r.get("/", permitir(OFICINA), validar({ query: V.listar }), C.listar);
+r.get("/buscar", permitir(EQUIPO), validar({ query: V.buscar }), C.buscar);       // nombre e id, para el remitente desde la recogida
 r.get("/saldos", permitir(OFICINA), validar({ query: V.saldos }), C.saldos);       // lista con el saldo de cada uno
 r.get("/cuadre", permitir(OFICINA), validar({ query: D.cuadre }), C.cuadre);         // cuadre del día por cliente
 r.get("/repetidos", permitir("admin"), C.repetidos);
