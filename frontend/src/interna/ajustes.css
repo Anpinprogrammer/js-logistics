@@ -214,6 +214,8 @@
   .jsl .toolbar-pedidos .seg-estado button{padding:7px 14px;border:1px solid var(--linea);background:var(--papel)}
   .jsl .toolbar-pedidos .seg-estado button:not([aria-pressed="true"]):hover{border-color:var(--suave)}
   .jsl .toolbar-pedidos .seg-estado button[aria-pressed="true"]{border-color:var(--marca2)}
+  .jsl .toolbar-pedidos .seg-estado .num.neu{background:var(--linea);color:var(--tinta)}
+  .jsl .toolbar-pedidos .seg-estado button[aria-pressed="true"] .num.neu{background:rgba(255,255,255,.25);color:#fff}
   .jsl .toolbar-pedidos .seg-estado .num.amb{background:var(--ambar,#f59e0b);color:#1c1917}
   .jsl .tp-filtros{grid-area:filtros;display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:auto}
   .jsl .tp-filtros .campo:first-child{flex:1 1 220px;max-width:300px}
