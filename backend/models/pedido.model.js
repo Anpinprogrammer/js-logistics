@@ -97,8 +97,10 @@ export async function bloquear(guia, db) {
  * Crea la guía con el siguiente consecutivo, en una transacción: dos mensajeros a la vez nunca reciben
  * el mismo número y, si algo falla, el contador no avanza (no quedan huecos).
  */
-export async function crear({ mensajeroId, clienteId = null, valorServicio = 0, aCobrar = 0, creadoPor }) {
-  return transaccion(async db => {
+/** Crea una guía con el siguiente consecutivo. Con `db` participa en una transacción que ya está abierta. */
+export async function crear({ mensajeroId, clienteId = null, valorServicio = 0, aCobrar = 0, creadoPor }, dbExterno) {
+  const enDb = fn => (dbExterno ? fn(dbExterno) : transaccion(fn));
+  return enDb(async db => {
     const { rows: [c] } = await db.query(`UPDATE contadores SET n = n + 1 WHERE nombre = 'guia' RETURNING n`);
     const n = c.n, guia = formatoGuia(n);
     await db.query(

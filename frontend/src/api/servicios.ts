@@ -1,7 +1,7 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
 import type { Archivo, TipoArchivo, Cliente, ClienteBreve, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
-  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal } from "./tipos";
+  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal, Solicitud, ListaSolicitudes } from "./tipos";
 import { FalloApi } from "./cliente";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
@@ -204,4 +204,15 @@ export const historial = {
   papelera: () => opcional(datos<{ papelera: EnPapelera[] }>(api.get("/papelera")).then(d => d.papelera), [] as EnPapelera[]),
   restaurar: (id: string) => api.post(`/papelera/${id}/restaurar`),
   eliminarDefinitivo: (id: string) => api.delete(`/papelera/${id}`)
+};
+
+/** Solicitudes de envío de la landing: la oficina las acepta (con valor), confirma, rechaza o asigna. */
+export const solicitudes = {
+  abiertas: () => datos<ListaSolicitudes>(api.get("/solicitudes", { params: { abiertas: true } })),
+  aceptar: (id: string, valor: number) => datos<{ solicitud: Solicitud }>(api.post(`/solicitudes/${id}/aceptar`, { valor })).then(d => d.solicitud),
+  confirmar: (id: string) => datos<{ solicitud: Solicitud }>(api.post(`/solicitudes/${id}/confirmar`)).then(d => d.solicitud),
+  rechazar: (id: string, motivo: string) => datos<{ solicitud: Solicitud }>(api.post(`/solicitudes/${id}/rechazar`, { motivo })).then(d => d.solicitud),
+  /** Crea la guía para ese mensajero. Sin clienteId, el backend crea el cliente con los datos de la solicitud. */
+  asignar: (id: string, mensajeroId: string, clienteId?: string) =>
+    datos<{ solicitud: Solicitud; pedido: Pedido }>(api.post(`/solicitudes/${id}/asignar`, { mensajeroId, clienteId }))
 };
