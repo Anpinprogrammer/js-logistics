@@ -5,7 +5,7 @@ import { ProveedorDatos, useDatos } from "./datos";
 import { ProveedorVentana, Icono, IconoSalir, useVentana } from "./ui";
 import { E, guardarLocal } from "./estado";
 import { useTema } from "./tema";
-import { Campanita } from "./Solicitudes";
+import { Campanita, useSolicitudes } from "./Solicitudes";
 import { S, fechaLarga, hoy, horaActual, type Pedido } from "./motor";
 import { pendientesMios } from "./mensajero/pendientes";
 import { useEscritorio } from "../lib/pantalla";
@@ -25,7 +25,7 @@ const ADMIN_ESCRITORIO: ItemNav[] = [["resultados", "Resultados"], ["personal", 
 
 /** Grupos del menú lateral en computador (las mismas pestañas de siempre, agrupadas). */
 const SECCIONES: [string, string[]][] = [
-  ["Principal", ["inicio", "nuevo", "pend", "entregados", "pedidos", "clientes"]],
+  ["Principal", ["inicio", "nuevo", "pend", "entregados", "pedidos", "solicitudes", "clientes"]],
   ["Gestión financiera", ["caja", "cuentas", "sueldo", "sueldos"]],
   ["Administración", ["mas", ...ADMIN_ESCRITORIO.map(([k]) => k)]],
 ];
@@ -58,6 +58,8 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
   if (esAsistente) E.rol = "admin"; else if (!esAdmin) E.rol = "mensajero";
   const pintar = () => tocar();
   const enMensajero = E.rol === "mensajero";
+  // Misma consulta que la campanita (comparten caché): el número de la pestaña Solicitudes.
+  const solicitudesAbiertas = useSolicitudes(!enMensajero);
 
   // Pestañas de cada modo, como en el prototipo
   let items: ItemNav[], actual: string, elegir: (k: string) => void;
@@ -66,9 +68,10 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     actual = E.tabM; elegir = k => { E.tabM = k; };
   } else {
     const sin = Object.values(S.pedidos).filter((p: Pedido) => !p.clienteId).length;
-    const base: ItemNav[] = [["inicio", "Inicio"], ["pedidos", "Pedidos", sin], ["clientes", "Clientes"], ["caja", "Caja"], ["cuentas", "Cuentas"], ["sueldos", "Sueldos"]];
+    const nSol = solicitudesAbiertas.data ? solicitudesAbiertas.data.conteo.pendiente + solicitudesAbiertas.data.conteo.cotizada + solicitudesAbiertas.data.conteo.confirmada : 0;
+    const base: ItemNav[] = [["inicio", "Inicio"], ["pedidos", "Pedidos", sin], ["solicitudes", "Solicitudes", nSol], ["clientes", "Clientes"], ["caja", "Caja"], ["cuentas", "Cuentas"], ["sueldos", "Sueldos"]];
     // El asistente no ve Sueldos ni Administración, como en el prototipo.
-    const propias = esAdmin ? base : base.filter(([k]) => ["inicio", "pedidos", "clientes", "caja", "cuentas"].includes(k));
+    const propias = esAdmin ? base : base.filter(([k]) => ["inicio", "pedidos", "solicitudes", "clientes", "caja", "cuentas"].includes(k));
     // En el escritorio no hay "Más": sus sub-pestañas se abren desde el menú lateral. En el celular sigue igual.
     items = esAdmin ? (escritorio ? [...propias, ...ADMIN_ESCRITORIO] : [...propias, ["mas", "Más"]]) : propias;
     if (!items.some(([k]) => k === E.tabA) && !(esAdmin && E.tabA === "mas")) E.tabA = "inicio";

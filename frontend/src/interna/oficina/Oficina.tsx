@@ -11,6 +11,7 @@ const Clientes = perezoso(() => import("./Clientes"));
 const Caja = perezoso(() => import("./Caja"));
 const Cuentas = perezoso(() => import("./Cuentas"));
 const Sueldos = perezoso(() => import("./Sueldos"));
+const Solicitudes = perezoso(() => import("./Solicitudes"));
 const Mas = perezoso(() => import("./Mas"));
 
 export const AvisoDemo = () => DEMO ? <div className="aviso">Modo de prueba: los datos son inventados y los cambios se pierden al recargar la página.</div> : null;
@@ -18,7 +19,7 @@ export const AvisoDemo = () => DEMO ? <div className="aviso">Modo de prueba: los
 /** Cuando el navegador queda libre, baja las demás pestañas para que cambiar de pestaña no espere a la red. */
 function usePrecargarPestanas() {
   useEffect(() => {
-    const precargar = () => [Panel, Pedidos, Clientes, Caja, Cuentas, Sueldos, Mas].forEach(p => { p.precargar().catch(() => { /* se reintenta al abrir la pestaña */ }); });
+    const precargar = () => [Panel, Pedidos, Clientes, Caja, Cuentas, Sueldos, Solicitudes, Mas].forEach(p => { p.precargar().catch(() => { /* se reintenta al abrir la pestaña */ }); });
     if ("requestIdleCallback" in window) { const id = requestIdleCallback(precargar, { timeout: 4000 }); return () => cancelIdleCallback(id); }
     const id = setTimeout(precargar, 2000);
     return () => clearTimeout(id);
@@ -32,7 +33,7 @@ export default function Oficina({ pintar }: { pintar: () => void }) {
     <AvisoDemo />
     <Suspense fallback={<div className="vacio" role="status">Cargando…</div>}>
       {t === "pedidos" ? <Pedidos pintar={pintar} /> : t === "clientes" ? <Clientes pintar={pintar} /> : t === "caja" ? <Caja pintar={pintar} />
-        : t === "cuentas" ? <Cuentas pintar={pintar} /> : t === "sueldos" ? <Sueldos pintar={pintar} /> : t === "mas" ? <Mas pintar={pintar} /> : <Panel pintar={pintar} />}
+        : t === "cuentas" ? <Cuentas pintar={pintar} /> : t === "sueldos" ? <Sueldos pintar={pintar} /> : t === "solicitudes" ? <Solicitudes pintar={pintar} /> : t === "mas" ? <Mas pintar={pintar} /> : <Panel pintar={pintar} />}
     </Suspense>
   </>;
 }

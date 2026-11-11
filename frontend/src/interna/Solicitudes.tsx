@@ -1,9 +1,9 @@
 /* Campanita de la barra: solicitudes de envío que llegan de la landing. La oficina las acepta poniendo el valor del
    domicilio (se le avisa al cliente por WhatsApp), marca cuándo el cliente está de acuerdo y las asigna a un mensajero. */
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "../api/servicios";
-import type { Solicitud, ListaSolicitudes, ConteoSolicitudes } from "../api/tipos";
+import type { Solicitud, ListaSolicitudes, ConteoSolicitudes, GrupoSolicitud, PaginaSolicitudes } from "../api/tipos";
 import { mensajeDe } from "../api/cliente";
 import { DEMO } from "./demo";
 import { S, hora, pesos, linkWhatsApp, telWhatsApp } from "./motor";
@@ -14,13 +14,31 @@ const ahora = Date.now();
 let demo: Solicitud[] = [
   { id: "d1", estado: "pendiente", nombre: "Laura Gómez (demo)", telefono: "300 000 0001", email: "laura@demo.co", direccionRecogida: "Cra 10 # 5-20, Cali", paquetes: 2, pesoKg: 3.5, destinatarioNombre: "Pedro Ruiz", destinatarioTelefono: "311 000 0002", direccionEntrega: "Calle 70 # 1-10, Cali", valor: null, motivoRechazo: "", clienteId: null, clienteNombre: null, mensajeroId: null, mensajeroNombre: null, guia: null, creado: new Date(ahora - 18 * 60_000).toISOString(), actualizado: new Date(ahora).toISOString() },
   { id: "d2", estado: "confirmada", nombre: "Tienda Brisa (demo)", telefono: "300 000 0003", email: "brisa@demo.co", direccionRecogida: "Av 6N # 20-15, Cali", paquetes: 1, pesoKg: null, destinatarioNombre: "Marta Díaz", destinatarioTelefono: "", direccionEntrega: "Cra 100 # 14-30, Cali", valor: 9000, motivoRechazo: "", clienteId: null, clienteNombre: null, mensajeroId: null, mensajeroNombre: null, guia: null, creado: new Date(ahora - 3 * 3600_000).toISOString(), actualizado: new Date(ahora).toISOString() },
+  { id: "d3", estado: "cotizada", nombre: "Camila Torres (demo)", telefono: "300 000 0004", email: "camila@demo.co", direccionRecogida: "Calle 5 # 38-10, Cali", paquetes: 3, pesoKg: 6, destinatarioNombre: "Julián Mora", destinatarioTelefono: "", direccionEntrega: "Cra 1 # 62-20, Cali", valor: 12000, motivoRechazo: "", clienteId: null, clienteNombre: null, mensajeroId: null, mensajeroNombre: null, guia: null, creado: new Date(ahora - 5 * 3600_000).toISOString(), actualizado: new Date(ahora).toISOString() },
+  { id: "d4", estado: "asignada", nombre: "Papelería Sol (demo)", telefono: "300 000 0005", email: "sol@demo.co", direccionRecogida: "Cra 8 # 12-40, Cali", paquetes: 1, pesoKg: 1, destinatarioNombre: "Ana Vélez", destinatarioTelefono: "", direccionEntrega: "Av Roosevelt # 30-5, Cali", valor: 8000, motivoRechazo: "", clienteId: null, clienteNombre: "Papelería Sol (demo)", mensajeroId: "demo", mensajeroNombre: "Carlos", guia: "JS-0042", creado: new Date(ahora - 26 * 3600_000).toISOString(), actualizado: new Date(ahora).toISOString() },
+  { id: "d5", estado: "rechazada", nombre: "Pablo Ríos (demo)", telefono: "300 000 0006", email: "pablo@demo.co", direccionRecogida: "Jamundí, vereda La Meseta", paquetes: 4, pesoKg: null, destinatarioNombre: "Luz Mejía", destinatarioTelefono: "", direccionEntrega: "Palmira, centro", valor: null, motivoRechazo: "Fuera de la zona de cobertura", clienteId: null, clienteNombre: null, mensajeroId: null, mensajeroNombre: null, guia: null, creado: new Date(ahora - 30 * 3600_000).toISOString(), actualizado: new Date(ahora).toISOString() },
 ];
 const contar = (xs: Solicitud[]): ConteoSolicitudes => ({ pendiente: xs.filter(s => s.estado === "pendiente").length, cotizada: xs.filter(s => s.estado === "cotizada").length, confirmada: xs.filter(s => s.estado === "confirmada").length });
 const abiertasDemo = (): ListaSolicitudes => { const xs = demo.filter(s => ["pendiente", "cotizada", "confirmada"].includes(s.estado)); return { solicitudes: xs, conteo: contar(xs) }; };
 const cambiarDemo = (id: string, c: Partial<Solicitud>) => { demo = demo.map(s => (s.id === id ? { ...s, ...c } : s)); return demo.find(s => s.id === id)!; };
 
+const ESTADOS_GRUPO: Record<GrupoSolicitud, string[]> = { todas: [], pendientes: ["pendiente"], "por-confirmar": ["cotizada"], aceptadas: ["confirmada", "asignada"], rechazadas: ["rechazada"] };
+const paginaDemo = (grupo: GrupoSolicitud, pagina: number, porPagina: number): PaginaSolicitudes => {
+  const en = (g: GrupoSolicitud) => demo.filter(s => !ESTADOS_GRUPO[g].length || ESTADOS_GRUPO[g].includes(s.estado));
+  const xs = en(grupo).sort((a, b) => b.creado.localeCompare(a.creado));
+  return { solicitudes: xs.slice((pagina - 1) * porPagina, pagina * porPagina), pagina, porPagina, total: xs.length, paginas: Math.max(1, Math.ceil(xs.length / porPagina)),
+    grupos: { todas: demo.length, pendientes: en("pendientes").length, porConfirmar: en("por-confirmar").length, aceptadas: en("aceptadas").length, rechazadas: en("rechazadas").length } };
+};
+/** Una página de la pantalla de Solicitudes. Comparte la clave ["solicitudes"] con la campanita, así una acción refresca las dos. */
+export const useSolicitudesPagina = (grupo: GrupoSolicitud, pagina: number, porPagina: number) => useQuery({
+  queryKey: ["solicitudes", "pagina", grupo, pagina, porPagina],
+  queryFn: () => (DEMO ? Promise.resolve(paginaDemo(grupo, pagina, porPagina)) : api.solicitudes.pagina(grupo, pagina, porPagina)),
+  placeholderData: keepPreviousData, refetchInterval: 30_000, refetchOnWindowFocus: true,
+});
+
 const CLAVE = ["solicitudes", "abiertas"] as const;
-export const useSolicitudes = () => useQuery({
+export const useSolicitudes = (activo = true) => useQuery({
+  enabled: activo,
   queryKey: CLAVE,
   queryFn: () => (DEMO ? Promise.resolve(abiertasDemo()) : api.solicitudes.abiertas()),
   refetchInterval: 30_000, refetchOnWindowFocus: true,
@@ -60,9 +78,9 @@ function PanelSolicitudes() {
   </>;
 }
 
-const ETQ: Record<string, [string, string]> = { pendiente: ["sin", "Nueva"], cotizada: ["pend", "Esperando al cliente"], confirmada: ["ent", "Cliente de acuerdo"] };
+const ETQ: Record<string, [string, string]> = { pendiente: ["sin", "Nueva"], cotizada: ["pend", "Esperando al cliente"], confirmada: ["ent", "Cliente de acuerdo"], asignada: ["ent", "Asignada"], rechazada: ["gris", "Rechazada"] };
 
-function TarjetaSolicitud({ s }: { s: Solicitud }) {
+export function TarjetaSolicitud({ s }: { s: Solicitud }) {
   const qc = useQueryClient();
   const v = useVentana();
   const [valor, setValor] = useState(s.valor ? String(s.valor) : "");
@@ -101,6 +119,8 @@ function TarjetaSolicitud({ s }: { s: Solicitud }) {
         <div><dt>Entregar a</dt><dd>{s.destinatarioNombre}{s.destinatarioTelefono ? ` · ${s.destinatarioTelefono}` : ""}<br />{s.direccionEntrega}</dd></div>
         <div><dt>Paquetes</dt><dd>{s.paquetes}{s.pesoKg ? ` · ${s.pesoKg} kg` : ""}</dd></div>
         {s.valor ? <div><dt>Domicilio</dt><dd>{pesos(s.valor)}</dd></div> : null}
+        {s.estado === "asignada" ? <div><dt>Asignada a</dt><dd>{s.mensajeroNombre || "—"}{s.guia ? ` · guía ${s.guia}` : ""}</dd></div> : null}
+        {s.estado === "rechazada" && s.motivoRechazo ? <div><dt>Motivo</dt><dd>{s.motivoRechazo}</dd></div> : null}
       </dl>
       {error && <div className="aviso alerta" role="alert">{error}</div>}
 

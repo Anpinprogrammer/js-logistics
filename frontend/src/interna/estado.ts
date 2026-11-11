@@ -1,5 +1,6 @@
 /* Estado de la interfaz que se conserva al cambiar de pestaña (como las variables globales del prototipo). */
 import { hoy, moverDia, semanaDe } from "./motor";
+import type { GrupoSolicitud } from "../api/tipos";
 
 const leer = (k: string) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
 export const guardarLocal = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } };
@@ -9,6 +10,7 @@ const tabCuentasGuardada = leer("js_cuentas");
 
 export const E = {
   rol: (leer("js_rol") || "admin") as "mensajero" | "admin",
+  filtroSol: "todas" as GrupoSolicitud, paginaSol: 1,
   tabA: "inicio", tabM: "inicio", subMas: "resultados",
   // Oficina → Pedidos
   filtroA: "sin", buscarA: "", diaPedA: "", mensPedA: "", paginaA: 1,
