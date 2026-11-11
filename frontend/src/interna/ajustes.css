@@ -185,7 +185,7 @@
 .jsl .toolbar-pedidos{display:flex;flex-direction:column;align-items:stretch;gap:12px;background:var(--hueco);border:1px solid var(--linea);border-radius:12px;padding:12px;margin-bottom:18px}
 .jsl .tp-filtros{display:grid;grid-template-columns:1fr;gap:8px;width:100%;min-width:0}
 .jsl .tp-filtros .campo{margin:0;min-width:0}
-.jsl .tp-filtros .campo select{appearance:none;-webkit-appearance:none;min-width:210px;width:auto;max-width:260px;padding:8px 36px 8px 16px;background-color:var(--papel);background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:9px 9px}
+.jsl .tp-filtros .campo select,.jsl .tp-filtros .campo-estado select{appearance:none;-webkit-appearance:none;min-width:210px;width:auto;max-width:260px;padding:8px 36px 8px 16px;background-color:var(--papel);background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:9px 9px}
 .jsl .tp-fecha{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-width:0}
 .jsl .toolbar-pedidos .seg-estado{width:100%;min-width:0;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;padding:4px;gap:2px}
 .jsl .toolbar-pedidos .seg-estado::-webkit-scrollbar{display:none}
@@ -196,16 +196,23 @@
 .jsl .toolbar-pedidos .seg-estado .num{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--rojo);color:#fff;font-size:.66rem;text-align:center;line-height:17px}
 .jsl .toolbar-pedidos .seg-estado button[aria-pressed="true"] .num{background:#fff;color:var(--lateral)}
 .jsl .toolbar-pedidos .filtro-dia.compacto{width:auto;justify-content:center;margin:0;flex-wrap:wrap}
+/* Filtro de estado híbrido: lista desplegable con ícono hasta 1279 px y píldoras desde 1280 px. */
+.jsl .tp-filtros .campo-estado{position:relative}
+.jsl .tp-filtros .campo-estado select{padding-left:38px}
+.jsl .campo-estado .ico-filtro{position:absolute;left:13px;top:50%;width:16px;height:16px;transform:translateY(-50%);display:flex;color:var(--suave);pointer-events:none}
+.jsl .campo-estado .ico-filtro svg{width:16px;height:16px}
+.jsl .toolbar-pedidos .seg-estado{display:none}
 @media (min-width:640px){
   .jsl .tp-filtros{grid-template-columns:1fr 1fr}
+  .jsl .tp-filtros .campo-estado{grid-column:1 / -1}
 }
 /* Tablet y laptop pequeña: búsqueda y mensajero a la izquierda, fecha a la derecha; estados abajo. */
 @media (min-width:768px){
-  .jsl .toolbar-pedidos{display:grid;grid-template-columns:1fr auto;grid-template-areas:"filtros fecha" "estado estado";column-gap:12px;row-gap:10px}
-  .jsl .tp-filtros{grid-area:filtros;display:flex;align-items:center;gap:8px;width:auto}
+  .jsl .toolbar-pedidos{display:grid;grid-template-columns:1fr auto;grid-template-areas:"filtros fecha";column-gap:12px;row-gap:10px}
+  .jsl .tp-filtros{grid-area:filtros;display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:auto}
+  .jsl .tp-filtros .campo-estado{grid-column:auto}
   .jsl .tp-filtros .campo:first-child{flex:1 1 220px;max-width:300px}
-  .jsl .tp-filtros .campo:last-child{flex:0 0 auto;width:auto;min-width:210px}
-  .jsl .toolbar-pedidos .seg-estado{grid-area:estado}
+  .jsl .tp-filtros .campo:nth-child(n+2){flex:0 0 auto;width:auto;min-width:210px}
   .jsl .tp-fecha{grid-area:fecha;width:auto;justify-content:flex-end}
   .jsl .toolbar-pedidos .filtro-dia.compacto{width:auto;justify-content:flex-end}
 }
@@ -214,8 +221,9 @@
   .jsl .toolbar-pedidos{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:12px}
   .jsl .tp-filtros{flex:none;display:flex;gap:8px}
   .jsl .tp-filtros .campo:first-child{flex:0 0 240px;max-width:240px}
-  .jsl .tp-filtros .campo:last-child{flex:0 0 auto;width:auto;min-width:210px}
-  .jsl .toolbar-pedidos .seg-estado{flex:0 1 auto;width:fit-content;gap:4px}
+  .jsl .tp-filtros .campo:nth-child(n+2){flex:0 0 auto;width:auto;min-width:210px}
+  .jsl .tp-filtros .campo-estado{display:none}
+  .jsl .toolbar-pedidos .seg-estado{display:flex;flex:0 1 auto;width:fit-content;gap:4px}
   .jsl .toolbar-pedidos .seg-estado button{padding:6px 16px}
   .jsl .tp-fecha{width:auto}
   .jsl .toolbar-pedidos .filtro-dia.compacto{flex:none;width:auto;justify-content:flex-end}
