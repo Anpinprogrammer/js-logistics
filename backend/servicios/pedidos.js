@@ -4,6 +4,7 @@
    - La hora de la entrega es la del servidor, no la del celular (backend/CLAUDE.md: nada contable con la hora del cliente).
    - Las fotos y la firma se suben aparte (POST /pedidos/:guia/archivos/:tipo) antes de confirmar la entrega. */
 import { Pedidos, Clientes, Mensajeros, cargarEstado } from "../models/documentos.js";
+import * as Pedido from "../models/pedido.model.js";
 import { METODOS, MOTIVOS, CUENTAS_JS, MEDIOS, VENTANA_CORRECCION_MS } from "../helpers/constantes.js";
 import { nuevoId } from "../helpers/ids.js";
 import { ahora } from "../helpers/reloj.js";
@@ -101,7 +102,84 @@ export async function noEntregado(ctx, guia, datos) {
     const fecha = ahora(), intentos = [...(p.intentos || []), { fecha, motivo, nota, uid: a.uid }];
     if (motivo === "reprogramar") return actualizar(t, "pedidos", guia, { intentos }, { antes: p });
     return actualizar(t, "pedidos", guia, { estado: "devuelto", entregado: fecha, motivoDev: motivo, notaDev: nota, valorCobrado: 0, metodo: "devuelto",
-      cuentaJs: "", difCobro: 0, destinatario: "", cobrarDev: true, intentos }, { antes: p });
+      cuentaJs: "", difCobro: 0, destinatario: "", cobrarDev: true, destinoDev: "por_definir", intentos }, { antes: p });
+  });
+}
+
+/* ---- Devoluciones: dónde quedó el paquete y reintentos ----
+   El reintento es una guía NUEVA enlazada a la original (`reintentoDe`). La original conserva su devolución y su cobro
+   (no se toca la lógica del dinero); la nueva se cobra como cualquier domicilio. */
+
+const DESTINOS_DEV = { cliente: "se lo devolvió al cliente", oficina: "lo llevó a la oficina" };
+
+/** La guía que ya reintenta a esta (si la hay). */
+async function reintentoDe(t, guia) {
+  const r = await t.c.query(`SELECT guia FROM pedidos WHERE reintento_de = $1 ORDER BY n DESC LIMIT 1`, [guia]);
+  return r.rows[0]?.guia || null;
+}
+
+/** El mensajero (su guía) o la oficina dice dónde quedó el paquete de un devuelto: con el cliente o en la oficina.
+    El mensajero lo dice una vez; la oficina lo puede corregir mientras no haya un reintento. */
+export async function destinoDevolucion(ctx, guia, { destino }) {
+  const a = ctx.actor;
+  exigirEquipo(a);
+  if (!DESTINOS_DEV[destino]) throw datosInvalidos("Elige si se lo entregaste al cliente o lo llevaste a la oficina");
+  return enTransaccion(ctx, async t => {
+    const p = await pedidoBloqueado(t, guia, delEquipo(a));
+    if (p.estado !== "devuelto") throw conflicto("Ese pedido no está devuelto.", undefined, "NO_DEVUELTA");
+    const hijo = await reintentoDe(t, guia);
+    if (hijo || p.destinoDev === "reintento") throw conflicto("Esa guía ya tiene un reintento" + (hijo ? " (" + hijo + ")" : "") + ".", undefined, "YA_REINTENTADA");
+    if (!a.esOficina && p.destinoDev !== "por_definir") throw conflicto("Ya dijiste dónde quedó el paquete: pídele a administración que lo cambie.", undefined, "DESTINO_YA_DICHO");
+    if (p.destinoDev === destino) return p;
+    return actualizar(t, "pedidos", guia, { destinoDev: destino }, { antes: p });
+  });
+}
+
+/** Crea la guía del reintento de un devuelto.
+    - Mensajero: "haré el reintento" con el paquete en su poder; la guía queda en ruta, a su nombre.
+    - Oficina: asigna el reintento a un mensajero (`mensajeroId`). Si el paquete está con el cliente, la guía nace "por recoger"
+      (el mensajero lo recoge con foto); si está en la oficina, nace en ruta.
+    Hereda remitente, domicilio y valor a cobrar de la original. */
+export async function reintentar(ctx, guia, datos = {}) {
+  const a = ctx.actor;
+  exigirEquipo(a);
+  return enTransaccion(ctx, async t => {
+    const p = await pedidoBloqueado(t, guia, delEquipo(a));
+    if (p.estado !== "devuelto") throw conflicto("Ese pedido no está devuelto.", undefined, "NO_DEVUELTA");
+    const hijo = await reintentoDe(t, guia);
+    if (hijo) throw conflicto("Esa guía ya tiene un reintento (" + hijo + ").", undefined, "YA_REINTENTADA");
+    let mensajeroId, estado, destino = p.destinoDev;
+    if (!a.esOficina) {
+      if (p.destinoDev !== "por_definir") throw conflicto("Este reintento lo asigna administración.", undefined, "SOLO_OFICINA");
+      mensajeroId = a.mensajeroId; estado = "pendiente"; destino = "reintento";
+    } else {
+      if (!datos.mensajeroId || !(await Mensajeros.existe(t.c, datos.mensajeroId))) throw datosInvalidos("Elige el mensajero que hará el reintento");
+      if (p.destinoDev !== "cliente" && p.destinoDev !== "oficina") throw conflicto("Primero indica dónde está el paquete: con el cliente o en la oficina.", undefined, "DESTINO_SIN_DEFINIR");
+      mensajeroId = datos.mensajeroId; estado = p.destinoDev === "cliente" ? "aceptado" : "pendiente";
+    }
+    const nueva = await Pedido.crear({ mensajeroId, clienteId: p.clienteId || null, valorServicio: Number(p.valorServicio) || 0,
+      aCobrar: Number(p.aCobrar) || 0, creadoPor: a.uid, estado, reintentoDe: guia }, t.c);
+    t.cambios.add("pedidos");
+    await registrar(t, `Reintento de ${guia}: nueva guía ${nueva.guia}${estado === "aceptado" ? " por recoger" : " en ruta"}`, { col: "pedidos", id: nueva.guia });
+    await actualizar(t, "pedidos", guia, { destinoDev: destino, reintentoPedido: 0 }, { antes: p, log: false });
+    return Pedidos.obtener(t.c, nueva.guia);
+  });
+}
+
+/** El cliente pide el reintento de su devuelto desde el portal. Solo deja la petición: la oficina decide, asigna
+    mensajero y crea la guía nueva. Necesita que el mensajero ya haya dicho dónde quedó el paquete. */
+export async function pedirReintento(ctx, guia) {
+  const a = ctx.actor;
+  if (!a?.esCliente || !a.clienteId) throw permisoNegado();
+  return enTransaccion(ctx, async t => {
+    const p = await pedidoBloqueado(t, guia, x => x.clienteId === a.clienteId);
+    if (p.estado !== "devuelto") throw conflicto("Ese pedido no está devuelto.", undefined, "NO_DEVUELTA");
+    const hijo = await reintentoDe(t, guia);
+    if (hijo || p.destinoDev === "reintento") throw conflicto("Ese pedido ya tiene un reintento" + (hijo ? " (" + hijo + ")" : "") + ".", undefined, "YA_REINTENTADA");
+    if (p.destinoDev === "por_definir") throw conflicto("Todavía no sabemos dónde quedó tu paquete. Inténtalo de nuevo en un rato o escríbenos.", undefined, "DESTINO_SIN_DEFINIR");
+    if (p.reintentoPedido) return p;
+    return actualizar(t, "pedidos", guia, { reintentoPedido: ahora() }, { antes: p, log: false })
+      .then(async r => { await registrar(t, `El cliente pidió el reintento de ${guia}`, { col: "pedidos", id: guia }); return r; });
   });
 }
 
@@ -259,11 +337,13 @@ export async function reabrir(ctx, guia) {
   return enTransaccion(ctx, async t => {
     const p = await pedidoBloqueado(t, guia);
     if (!cerrado(p)) throw conflicto("Ese pedido ya está por entregar.");
+    const hijo = await reintentoDe(t, guia);
+    if (hijo) throw conflicto("Esa guía ya tiene un reintento (" + hijo + "): sigue el trabajo en esa guía.", undefined, "YA_REINTENTADA");
     await exigirQueNoCambieLoContado(t, p, { ...p, estado: "pendiente", metodo: "" });
     const r = await t.c.query(`UPDATE pedido_archivos SET tipo = 'previa' WHERE guia = $1 AND tipo IN ('entrega', 'firma')`, [guia]);
     if (r.rowCount) await registrar(t, "Reabrió " + guia + " (se guardaron las pruebas de la entrega anterior)", { col: "pedidos", id: guia });
     return actualizar(t, "pedidos", guia, { estado: "pendiente", entregado: null, destinatario: "", valorCobrado: 0, metodo: "", cuentaJs: "", difCobro: 0,
-      difRevisada: false, motivoDev: "", notaDev: "", cobrarDev: false }, { antes: p });
+      difRevisada: false, motivoDev: "", notaDev: "", cobrarDev: false, destinoDev: "", reintentoPedido: 0 }, { antes: p });
   });
 }
 

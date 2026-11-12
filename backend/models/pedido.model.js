@@ -12,7 +12,10 @@ const CON_INTENTOS = `
     -- Solo lo ve quien puede ver la guía; no trae los datos de contacto del remitente.
     (SELECT json_build_object('direccionRecogida', s.direccion_recogida, 'direccionEntrega', s.direccion_entrega,
        'destinatarioNombre', s.destinatario_nombre, 'destinatarioTelefono', s.destinatario_telefono, 'paquetes', s.paquetes)
-     FROM solicitudes s WHERE s.guia = p.guia LIMIT 1) AS solicitud
+     FROM solicitudes s WHERE s.guia = p.guia LIMIT 1) AS solicitud,
+    -- Reintentos de un devuelto: las guías nuevas que apuntan a esta (para ver la cadena completa).
+    COALESCE((SELECT json_agg(json_build_object('guia', r.guia, 'estado', r.estado) ORDER BY r.n)
+              FROM pedidos r WHERE r.reintento_de = p.guia), '[]'::json) AS reintentos
   FROM pedidos p
   LEFT JOIN clientes c ON c.id = p.cliente_id
   LEFT JOIN mensajeros m ON m.id = p.mensajero_id`;
@@ -104,15 +107,15 @@ export async function bloquear(guia, db) {
  */
 /** Crea una guía con el siguiente consecutivo. Con `db` participa en una transacción que ya está abierta.
     `estado` "aceptado" es para las guías de una solicitud: quedan por recoger hasta que el mensajero les toma la foto. */
-export async function crear({ mensajeroId, clienteId = null, valorServicio = 0, aCobrar = 0, creadoPor, estado = "pendiente" }, dbExterno) {
+export async function crear({ mensajeroId, clienteId = null, valorServicio = 0, aCobrar = 0, creadoPor, estado = "pendiente", reintentoDe = null }, dbExterno) {
   const enDb = fn => (dbExterno ? fn(dbExterno) : transaccion(fn));
   return enDb(async db => {
     const { rows: [c] } = await db.query(`UPDATE contadores SET n = n + 1 WHERE nombre = 'guia' RETURNING n`);
     const n = c.n, guia = formatoGuia(n);
     await db.query(
-      `INSERT INTO pedidos (guia, n, mensajero_id, cliente_id, valor_servicio, a_cobrar, creado_por, estado)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [guia, n, mensajeroId, clienteId, valorServicio, aCobrar, creadoPor, estado]
+      `INSERT INTO pedidos (guia, n, mensajero_id, cliente_id, valor_servicio, a_cobrar, creado_por, estado, reintento_de)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [guia, n, mensajeroId, clienteId, valorServicio, aCobrar, creadoPor, estado, reintentoDe]
     );
     return buscarPorGuia(guia, db);
   });
@@ -123,7 +126,7 @@ const CAMPOS = [
   "estado", "mensajeroId", "clienteId", "valorServicio", "aCobrar", "entregado", "destinatario", "valorCobrado",
   "metodo", "cuentaJs", "difCobro", "difRevisada", "entregoUid", "motivoDev", "notaDev", "cobrarDev", "cambio",
   "cambioRecibido", "cambioConfirmo", "gasto", "gastoNota", "domiPagado", "domiPagoMedio", "domiPagoValor",
-  "domiPagoFecha", "domiPagoUid", "fotosBorradas"
+  "domiPagoFecha", "domiPagoUid", "fotosBorradas", "destinoDev", "reintentoPedido"
 ];
 
 export async function actualizar(guia, datos, db = { query }) {

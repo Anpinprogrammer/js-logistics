@@ -13,6 +13,12 @@ Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/EST
 - Mensajero: la pestaña "Por entregar" ahora es **Pedidos** con sub-pestañas Todos / Por entregar / Por recoger (`E.subPedM`, guardada en `js_pedidos_m`). "Recoger" abre `mensajero/Recoger.tsx` (mismas piezas `ng-*` de la foto de salida): sube la foto a esa guía, no crea otra. Los pedidos traen `solicitud` (dónde recoger y a quién entregar) si salieron de una solicitud.
 - Oficina: filtro "Por recoger" en Pedidos y, en la ficha, "Recoger (foto del paquete)" en vez de entregar o devolver. Rechazar una solicitud **pide la razón** (el backend la exige): el cliente la ve en "Mis solicitudes" (`GET /solicitudes/mias`) de su portal.
 
+## Reintentos de pedidos devueltos — 2026-11-12
+- Un devuelto no vuelve a "por entregar". El mensajero dice dónde quedó el paquete (`POST /pedidos/:guia/destino-devolucion`: con el cliente o en la oficina) o hace el reintento él mismo. El reintento es una **guía nueva** enlazada (`reintento_de`); la original queda devuelta con su cobro (`cobrar_dev`), sin tocar `helpers/calculos.js`. La nueva se cobra como cualquier domicilio (hereda `valor_servicio` y `a_cobrar`) y al mensajero le cuenta como otro domicilio.
+- Paquete con el cliente: la guía nueva nace `aceptado` (por recoger, con foto). En la oficina, o si el mensajero lo reintenta: nace en ruta. El cliente solo **pide** (`pedir-reintento`, deja `reintento_pedido`); la oficina asigna mensajero.
+- Los devueltos de antes del cambio tienen `destino_dev = ''` y no entran al flujo (la oficina puede fijarles el destino). "Devolver a por entregar" (admin) sigue igual, pero ya no funciona si la guía tiene reintento.
+- Necesita `npm run db:migrar` (columnas `destino_dev`, `reintento_de`, `reintento_pedido`). Pruebas en `test/reintentos.test.js`.
+
 ## Remitente desde la recogida — 2026-11-11
 
 - Al tomar la foto **no se crea nada**: se abre una ventana (`frontend/src/interna/mensajero/NuevaGuia.tsx`) con la foto y un buscador de cliente opcional. La guía y la subida de fotos ocurren solo cuando el mensajero pulsa "Crear guía"; "Descartar foto" (o cerrar la ventana) no crea ni sube nada, así que no quedan fotos huérfanas. Si lo deja vacío, la oficina asigna el remitente como siempre.

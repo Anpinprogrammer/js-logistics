@@ -133,13 +133,20 @@ export const EtqEstado = ({ p }: { p: Pedido }) => p.estado === "entregado" ? <s
   : p.estado === "aceptado" ? <span className="etq rec">Por recoger</span>
   : <><span className="etq pend">Por entregar</span>{p.intentos.length ? <>{" "}<span className="etq sin">{p.intentos.length} {pl(p.intentos.length, "intento")}</span></> : null}</>;
 export const EtqCambio = ({ p }: { p: Pedido }) => p.cambio ? <>{" "}{p.cambioRecibido ? <span className="etq ent">Cambio recibido</span> : <span className="etq sin">Cambio por entregar</span>}</> : null;
+/** Marcas de las devoluciones y sus reintentos: el reintento de otra guía, el pedido del cliente y la devolución sin confirmar. */
+export const EtqDev = ({ p }: { p: Pedido }) => <>
+  {p.reintentoDe ? <>{" "}<span className="etq rec">Reintento de {p.reintentoDe}</span></> : null}
+  {p.estado === "devuelto" && p.reintentos?.length ? <>{" "}<span className="etq ent">Reintentada en {p.reintentos[p.reintentos.length - 1].guia}</span></> : null}
+  {p.estado === "devuelto" && !p.reintentos?.length && p.reintentoPedido ? <>{" "}<span className="etq sin">El cliente pidió reintento</span></> : null}
+  {p.estado === "devuelto" && p.destinoDev === "por_definir" ? <>{" "}<span className="etq sin">Sin confirmar</span></> : null}
+</>;
 export const EtqDash = ({ p }: { p: Pedido }) => p.estado === "pendiente" ? <span className="etq ruta">En ruta</span> : <EtqEstado p={p} />;
 export const Mini = ({ p }: { p: Pedido }) => p.mini ? <img src={p.mini} alt="" /> : <span className="sinfoto" />;
 
 export function FilaPedido({ p, onClick }: { p: Pedido; onClick: () => void }) {
   return (
     <button className="fila" onClick={onClick}><Mini p={p} />
-      <span className="info"><span className="guia">{p.guia}</span> <EtqEstado p={p} /><EtqCambio p={p} />{Number(p.difCobro) ? <>{" "}<span className="etq sin">Diferencia {pesos(p.difCobro)}</span></> : null}
+      <span className="info"><span className="guia">{p.guia}</span> <EtqEstado p={p} /><EtqDev p={p} /><EtqCambio p={p} />{Number(p.difCobro) ? <>{" "}<span className="etq sin">Diferencia {pesos(p.difCobro)}</span></> : null}
         <p>{p.clienteId ? nombreCliente(p.clienteId) : <span className="etq sin">Sin remitente</span>} · {S.mensajeros[p.mensajeroId]?.nombre || ""} · {hora(p.creado)}</p></span>
       <span className="n" style={{ textAlign: "right", fontWeight: 700 }}>{p.estado === "entregado" ? pesos(p.valorCobrado) : ""}</span></button>
   );

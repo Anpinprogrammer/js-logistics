@@ -5,3 +5,5 @@ import { S } from "../motor";
 export const pendientesMios = () => Object.values(S.pedidos).filter(p => p.estado === "pendiente" && p.mensajeroId === E.miMensajero).sort((a, b) => a.creado - b.creado);
 /** Guías "aceptado": salieron de una solicitud y el mensajero todavía no las recoge (falta la foto del paquete). */
 export const porRecogerMios = () => Object.values(S.pedidos).filter(p => p.estado === "aceptado" && p.mensajeroId === E.miMensajero).sort((a, b) => a.creado - b.creado);
+/** Devoluciones propias que todavía no tienen destino: el mensajero debe decir si las dejó con el cliente o en la oficina, o si hará el reintento. */
+export const devolucionesPorDefinirMios = () => Object.values(S.pedidos).filter(p => p.estado === "devuelto" && p.destinoDev === "por_definir" && p.mensajeroId === E.miMensajero).sort((a, b) => (b.entregado || 0) - (a.entregado || 0));

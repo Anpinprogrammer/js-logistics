@@ -365,6 +365,16 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+-- ---------- Reintentos de pedidos devueltos — 2026-11-12 ----------
+-- Un devuelto nuevo queda "por_definir" hasta que el mensajero diga dónde dejó el paquete: 'cliente' (se lo devolvió),
+-- 'oficina' (lo llevó a JS) o 'reintento' (hace el reintento él mismo). '' = devuelto de antes del cambio: no entra al flujo.
+-- El reintento es una guía NUEVA que apunta a la original (reintento_de); la original conserva su devolución y su cobro.
+-- reintento_pedido: cuándo el cliente pidió el reintento desde su portal (la oficina lo asigna a un mensajero).
+ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS destino_dev TEXT NOT NULL DEFAULT '' CHECK (destino_dev IN ('', 'por_definir', 'cliente', 'oficina', 'reintento'));
+ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS reintento_de TEXT REFERENCES pedidos(guia) ON DELETE SET NULL;
+ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS reintento_pedido TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS pedidos_reintento_de_idx ON pedidos (reintento_de) WHERE reintento_de IS NOT NULL;
+
 -- Datos de antes del cambio (una sola vez, marcado en ajustes): las guías que salieron de una solicitud, siguen
 -- por entregar y no tienen foto de salida ni intentos nunca se recogieron con foto; pasan a "aceptado" para que el
 -- mensajero las vea en "Por recoger". Si se vuelve a correr db:migrar no se repite.

@@ -107,3 +107,8 @@ export const enBloque = z.object({
 });
 
 export const paramArchivo = paramGuia.extend({ tipo: z.enum(TIPOS_ARCHIVO, { error: "Tipo de archivo inválido" }) });
+
+// Dónde quedó el paquete de un devuelto.
+export const destinoDevolucion = z.object({ destino: z.enum(["cliente", "oficina"]) });
+// Reintento: el mensajero no manda nada (es suyo); la oficina elige quién lo hace.
+export const reintento = z.object({ mensajeroId: id.optional() });
