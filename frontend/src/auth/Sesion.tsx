@@ -13,7 +13,7 @@ const demo = {
   yo: async () => { const u = USUARIOS_DEMO.find(x => x.email === sessionStorage.getItem(CLAVE_DEMO)); if (!u) throw new Error("Sin sesión"); return u; },
   ingresar: async (email: string, clave: string) => {
     const u = USUARIOS_DEMO.find(x => x.email === email.trim().toLowerCase());
-    if (!u || clave !== "demo1234") throw new Error("En la demo usa admin@demo.co, asistente@demo.co o mensajero@demo.co con la clave demo1234.");
+    if (!u || clave !== "demo1234") throw new Error("En la demo usa admin@demo.co, asistente@demo.co, mensajero@demo.co o patinador@demo.co con la clave demo1234.");
     sessionStorage.setItem(CLAVE_DEMO, u.email);
     return u;
   },

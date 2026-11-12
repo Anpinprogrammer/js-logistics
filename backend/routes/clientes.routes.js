@@ -9,7 +9,7 @@ import * as D from "../validators/dinero.validator.js";
 const r = Router();
 
 r.get("/", permitir(OFICINA), validar({ query: V.listar }), C.listar);
-r.get("/buscar", permitir(EQUIPO), validar({ query: V.buscar }), C.buscar);       // nombre e id, para el remitente desde la recogida
+r.get("/buscar", permitir(EQUIPO, "patinador"), validar({ query: V.buscar }), C.buscar); // nombre e id: remitente desde la recogida y quién le pagó al patinador
 r.get("/saldos", permitir(OFICINA), validar({ query: V.saldos }), C.saldos);       // lista con el saldo de cada uno
 r.get("/cuadre", permitir(OFICINA), validar({ query: D.cuadre }), C.cuadre);         // cuadre del día por cliente
 r.get("/repetidos", permitir("admin"), C.repetidos);

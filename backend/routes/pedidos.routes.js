@@ -11,9 +11,9 @@ const imagen = express.raw({ type: ["image/jpeg", "image/png", "image/webp"], li
 const r = Router();
 const guia = { params: V.paramGuia };
 
-r.get("/", validar({ query: V.listar }), C.listar);                          // cada rol ve lo suyo
-r.get("/:guia", validar(guia), C.obtener);
-r.get("/:guia/archivos", validar(guia), C.archivos);
+r.get("/", permitir(EQUIPO, "cliente"), validar({ query: V.listar }), C.listar); // cada rol ve lo suyo (el patinador no lee guías)
+r.get("/:guia", permitir(EQUIPO, "cliente"), validar(guia), C.obtener);
+r.get("/:guia/archivos", permitir(EQUIPO, "cliente"), validar(guia), C.archivos);
 r.post("/:guia/archivos/:tipo", permitir(EQUIPO), validar({ params: V.paramArchivo }), imagen, C.subirArchivo);
 r.post("/", permitir(EQUIPO), validar({ body: V.crear }), C.crear);
 r.post("/en-bloque", permitir(OFICINA), validar({ body: V.enBloque }), C.enBloque);

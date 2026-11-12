@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   id           TEXT PRIMARY KEY,                   -- al migrar: el uid de Firebase Auth
   email        TEXT NOT NULL,
   nombre       TEXT NOT NULL DEFAULT '',
-  rol          TEXT NOT NULL CHECK (rol IN ('admin', 'asistente', 'mensajero', 'cliente')),
+  rol          TEXT NOT NULL CHECK (rol IN ('admin', 'asistente', 'mensajero', 'cliente', 'patinador')),
   clave_hash   TEXT,                               -- bcrypt; NULL = debe crear su contraseña
   cliente_id   TEXT REFERENCES clientes(id) ON DELETE SET NULL,     -- rol cliente
   mensajero_id TEXT REFERENCES mensajeros(id) ON DELETE SET NULL,   -- vínculo con su ficha en Personal
@@ -394,6 +394,35 @@ BEGIN
   END IF;
 END $$;
 
+-- ---------- Rol patinador y su caja — 2026-11-12 ----------
+-- El patinador recorre una ruta que no se registra en el sistema y recoge paquetes; en algunos puntos un cliente le
+-- paga en efectivo (domicilios u otro concepto). Cada pago lo anota él mismo desde el celular y suma a su caja.
+-- La cuenta (rol 'patinador') se vincula con su ficha de Personal (tipo 'patinador') por usuarios.mensajero_id.
+-- Las bases creadas antes tienen el CHECK de rol sin 'patinador': se cambia una sola vez.
+DO $$
+DECLARE c RECORD;
+BEGIN
+  FOR c IN SELECT conname FROM pg_constraint
+           WHERE conrelid = 'usuarios'::regclass AND contype = 'c' AND pg_get_constraintdef(oid) LIKE '%mensajero%'
+             AND pg_get_constraintdef(oid) NOT LIKE '%patinador%'
+  LOOP
+    EXECUTE format('ALTER TABLE usuarios DROP CONSTRAINT %I', c.conname);
+    ALTER TABLE usuarios ADD CONSTRAINT usuarios_rol_check CHECK (rol IN ('admin', 'asistente', 'mensajero', 'cliente', 'patinador'));
+  END LOOP;
+END $$;
+
+CREATE TABLE IF NOT EXISTS caja_patinador (        -- dinero que recibe un patinador en su ruta
+  id           TEXT PRIMARY KEY,
+  mensajero_id TEXT NOT NULL REFERENCES mensajeros(id) ON DELETE RESTRICT,   -- su ficha en Personal
+  cliente_id   TEXT NOT NULL REFERENCES clientes(id) ON DELETE RESTRICT,     -- quién le pagó
+  concepto     TEXT NOT NULL CHECK (length(concepto) BETWEEN 1 AND 80),
+  valor        BIGINT NOT NULL CHECK (valor > 0),
+  fecha        TIMESTAMPTZ NOT NULL DEFAULT now(),                           -- hora del servidor, no la del celular
+  por_uid      TEXT REFERENCES usuarios(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS caja_patinador_mensajero_idx ON caja_patinador (mensajero_id, fecha DESC);
+CREATE INDEX IF NOT EXISTS caja_patinador_cliente_idx ON caja_patinador (cliente_id);
+
 -- ---------- Supabase: cerrar la API pública ----------
 -- Supabase expone las tablas de "public" por su Data API (PostgREST) con la anon key.
 -- Toda la app pasa por Express, que se conecta con el rol dueño de las tablas (no lo afecta RLS).
@@ -403,7 +432,7 @@ DECLARE t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY['clientes', 'mensajeros', 'usuarios', 'enlaces', 'cuentas', 'contadores', 'ajustes', 'pedidos',
     'pedido_intentos', 'pedido_archivos', 'movimientos', 'recaudos', 'liquidaciones', 'cajamovs', 'jornadas',
-    'historial', 'papelera', 'solicitudes']
+    'historial', 'papelera', 'solicitudes', 'caja_patinador']
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;

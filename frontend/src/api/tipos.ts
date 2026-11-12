@@ -1,6 +1,6 @@
 /* Formas de los datos que devuelve el backend (backend/README.md). Dinero en pesos enteros, fechas ISO. */
 
-export type Rol = "admin" | "asistente" | "mensajero" | "cliente";
+export type Rol = "admin" | "asistente" | "mensajero" | "cliente" | "patinador";
 export type Medio = "efectivo" | "nequi" | "bancolombia";
 export type MetodoEntrega = "efectivo" | "transf_js" | "transf_cliente";
 export type Motivo = "no_contesta" | "direccion" | "rechazo" | "reprogramar" | "otro";
@@ -300,3 +300,9 @@ export type OrigenFiltroSolicitudes = "todos" | "portal" | "web";
 export interface FiltrosSolicitudes { page: number; limit: number; status: EstadoFiltroSolicitudes; search: string; source: OrigenFiltroSolicitudes; date: string }
 export interface PaginaSolicitudesFiltradas { data: Solicitud[]; pagination: { page: number; limit: number; totalItems: number; totalPages: number }; counts: Record<EstadoFiltroSolicitudes, number> }
 export interface ListaSolicitudes { solicitudes: Solicitud[]; conteo: ConteoSolicitudes }
+
+/** Un pago que el patinador recibió de un cliente en su ruta (GET/POST /patinador/caja). */
+export interface RegistroCajaPatinador { id: string; mensajeroId: string; clienteId: string; clienteNombre: string; concepto: string; valor: number; fecha: string }
+/** Total acumulado de su caja y lo de hoy (día de Colombia), calculados por el servidor. */
+export interface ResumenCajaPatinador { total: number; registros: number; totalHoy: number; registrosHoy: number }
+export interface CajaPatinador { resumen: ResumenCajaPatinador; registros: RegistroCajaPatinador[]; pagina: number; porPagina: number; total: number; paginas: number }

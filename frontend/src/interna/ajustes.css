@@ -1300,3 +1300,17 @@
   .jsl .cli-ficha .cuenta-mov-det{flex-basis:100%}
   .jsl .cli-ficha .cuenta-mov-fin{width:100%;justify-content:space-between}
 }
+
+/* App del patinador: su caja, el formulario de pagos y la lista. */
+.jsl .kpis.kpis-patinador{grid-template-columns:repeat(2,minmax(0,1fr))}
+.jsl .form-pago{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;margin:4px 0 22px;padding:18px}
+.jsl .form-pago h2{margin:0}
+.jsl .form-pago .campo{margin:0;min-width:0}
+.jsl .form-pago input{min-height:48px;font-size:1rem}
+.jsl .form-pago .btn-pago{width:100%;min-height:52px;font-size:1.05rem}
+.jsl .cab-lista{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px}
+.jsl .cab-lista h2{margin:0}
+.jsl .lista-patinador .fila-pago{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}
+.jsl .lista-patinador .fila-pago .info{min-width:0;flex:1;overflow-wrap:anywhere}
+.jsl .lista-patinador .fila-pago-valor{font-weight:700;white-space:nowrap}
+@media (min-width:960px){.jsl .form-pago{max-width:520px}}

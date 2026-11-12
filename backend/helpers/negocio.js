@@ -6,7 +6,8 @@ export const MEDIOS = Object.keys(C.MEDIOS);
 export const METODOS_ENTREGA = Object.keys(C.METODOS);
 export const CUENTAS_JS = Object.keys(C.CUENTAS_JS);
 export const MOTIVOS = Object.keys(C.MOTIVOS);
-export const ROLES = Object.keys(C.ROLES);
+// "patinador" no existe en la app vieja (constantes.js es copia fiel): es un rol solo del sistema nuevo.
+export const ROLES = [...Object.keys(C.ROLES), "patinador"];
 export const TIPOS_PERSONAL = Object.keys(C.TIPOS);
 export const TIPOS_MOVIMIENTO = Object.keys(C.MOVS);
 export const VENTANA_CORRECCION_MS = C.VENTANA_CORRECCION_MS;

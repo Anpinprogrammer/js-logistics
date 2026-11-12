@@ -233,9 +233,9 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `POST /auth/activate-account` | público | `{ token, newPassword }`: alias de la activación con los nombres de la API nueva; consume el mismo enlace |
 | `GET/POST /usuarios`, `PATCH/DELETE /usuarios/:id`, `PUT /usuarios/:id/clave` | admin | Accesos a la app. `POST /usuarios` acepta `{ role, entityId, email }` (el nombre sale de la ficha de Personal o del cliente) o la forma antigua con `nombre` y vínculos; `clave` es opcional y sin ella manda la activación. Responde `201 { message, usuario, user: { id, nombre, email, telefono, activationUrl, status }, correo }` |
 | `POST /usuarios/:id/activacion`, `POST /usuarios/:id/recuperacion` | admin | Reenvía la activación o manda el enlace de contraseña |
-| `GET /usuarios/pagina?buscar=&rol=&pagina=&porPagina=` | admin | Página de la sub-pestaña Acceso de Personal: `buscar` filtra por nombre o correo (sin tildes) y `rol` por `mensajero`, `asistente`, `cliente` o `admin`. Ordenada por nombre y correo. Devuelve `{ usuarios, pagina, porPagina, total, paginas }`. La app usa 5 en celular y 10 en computador; si la página ya no existe, responde la última |
+| `GET /usuarios/pagina?buscar=&rol=&pagina=&porPagina=` | admin | Página de la sub-pestaña Acceso de Personal: `buscar` filtra por nombre o correo (sin tildes) y `rol` por `mensajero`, `patinador`, `asistente`, `cliente` o `admin`. Ordenada por nombre y correo. Devuelve `{ usuarios, pagina, porPagina, total, paginas }`. La app usa 5 en celular y 10 en computador; si la página ya no existe, responde la última |
 | `GET /clientes?buscar=` | oficina | Lista y busca |
-| `GET /clientes/buscar?q=` | equipo | `{ clientes: [{ id, nombre }] }`, máximo 8, desde 2 letras. Para elegir el remitente desde la recogida; el mensajero no ve teléfonos, tarifas ni saldos |
+| `GET /clientes/buscar?q=` | equipo y patinador | `{ clientes: [{ id, nombre }] }`, máximo 8, desde 2 letras. Para elegir el remitente desde la recogida (y quién le pagó al patinador); el mensajero y el patinador no ven teléfonos, tarifas ni saldos |
 | `GET /clientes/:id` | oficina, o el propio cliente | Ficha |
 | `PATCH /clientes/mi-perfil` | cliente | Actualiza únicamente su ficha con `nombre?`, `telefono?`, `direccionRecogida?` y/o el `email?` de su propia cuenta. Si cambia el correo, exige `claveActual`; el correo debe ser único. Responde `{ cliente }`. No permite cambiar tarifa ni otro cliente. El nuevo correo se ve en `GET /auth/yo` sin cerrar la sesión actual |
 | `POST /clientes`, `PATCH /clientes/:id` | oficina | Crea (avisa de repetidos con 409 `POSIBLE_REPETIDO`) y edita |
@@ -305,6 +305,8 @@ Lo ya contado en un arqueo no se cambia: responde `409 YA_CONTADO` con el texto 
 | `POST /recaudos` | oficina | `{ mensajeroId, valor, medio, nota }` → `{ recaudo, debe }` |
 | `PATCH /recaudos/:id` | `{ medio }`: el asistente, lo suyo; lo demás: admin | Cambia el medio o corrige |
 | `DELETE /recaudos/:id` | admin | Quita |
+| `GET /patinador/caja?pagina=&porPagina=` | patinador (la suya); oficina con `mensajeroId=` | `{ resumen: { total, registros, totalHoy, registrosHoy }, registros: [{ id, mensajeroId, clienteId, clienteNombre, concepto, valor, fecha }], pagina, porPagina, total, paginas }`. Lo más nuevo primero; "hoy" es el día de Colombia |
+| `POST /patinador/caja` | patinador | `{ clienteId, concepto (1–80), valor (> 0) }` → `201 { registro, resumen }`. La hora y el patinador los pone el servidor (la ficha vinculada a su cuenta); queda en el historial |
 | `GET /mensajeros/resumen` | oficina | Período abierto de cada repartidor |
 | `GET /mensajeros/:id/periodo` | oficina; el mensajero, el suyo | `{ periodo: { debe, efectivo, base, gastos, recibido, entregas, … } }` |
 | `GET /liquidaciones` | equipo (el mensajero, las suyas) | `{ liquidaciones }` |

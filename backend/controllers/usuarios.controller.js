@@ -7,7 +7,7 @@ import * as Accesos from "../servicios/usuarios.js";
 import * as Mensajero from "../models/mensajero.model.js";
 import * as Cliente from "../models/cliente.model.js";
 import { hashClave } from "../helpers/claves.js";
-import { conflicto, noEncontrado, prohibido, correoFallo, correoNoConfigurado } from "../helpers/errores.js";
+import { conflicto, noEncontrado, prohibido, invalido, correoFallo, correoNoConfigurado } from "../helpers/errores.js";
 import { publico } from "./auth.controller.js";
 import { responder } from "./accion.js";
 
@@ -51,6 +51,12 @@ export async function crear(req, res) {
     }
   }
 
+  // La caja del patinador se lleva sobre su ficha: tiene que ser un patinador de Personal.
+  if (rol === "patinador") {
+    const f = ficha || (mensajeroId ? await Mensajero.buscarPorId(mensajeroId) : null);
+    if (!f || f.tipo !== "patinador") throw invalido("Elige un patinador de Personal (o créalo con el tipo Patinador)", { entityId: "Elige un patinador de Personal" });
+  }
+
   if (await Usuario.buscarPorEmail(b.email)) throw conflicto("Ese correo ya tiene una cuenta", "EMAIL_EN_USO");
   const u = await Usuario.crear({ email: b.email, nombre, rol, clienteId, mensajeroId, claveHash: b.clave ? await hashClave(b.clave) : null });
   await Auditoria.registrar({ uid: req.usuario.id, accion: `Creó el acceso de ${u.email} (${u.rol})`, tabla: "usuarios", registro: u.id });
@@ -75,6 +81,13 @@ export async function actualizar(req, res) {
   // Nadie se cambia su propio rol ni se desactiva a sí mismo (igual que firestore.rules).
   if (id === req.usuario.id && (datos.rol !== undefined && datos.rol !== req.usuario.rol || datos.activo === false))
     throw prohibido("No puedes cambiar tu propio rol ni desactivar tu cuenta");
+
+  // Un patinador siempre va vinculado a una ficha de tipo patinador (ahí vive su caja).
+  const rolFinal = datos.rol ?? antes.rol, mensajeroFinal = datos.mensajeroId !== undefined ? datos.mensajeroId : antes.mensajeroId;
+  if (rolFinal === "patinador" && (datos.rol !== undefined || datos.mensajeroId !== undefined)) {
+    const f = mensajeroFinal ? await Mensajero.buscarPorId(mensajeroFinal) : null;
+    if (!f || f.tipo !== "patinador") throw invalido("Un patinador debe estar vinculado a una persona de Personal de tipo Patinador");
+  }
 
   const u = await Usuario.actualizar(id, datos);
   if (!u) throw noEncontrado("La cuenta no existe");
