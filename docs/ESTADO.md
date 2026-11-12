@@ -4,6 +4,11 @@ Este archivo es la **memoria compartida** entre sesiones y agentes. Léelo despu
 
 Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/ESTADO.md`.
 
+## Filtros móviles de Clientes — 2026-11-12
+
+- Bajo 768 px Clientes usa el mismo patrón de Pedidos y Solicitudes: buscador con X y botón Filtros con contador (+1 si la cuenta no es "Todos", +1 si hay día). La hoja (`tp-hoja`) prepara estado de cuenta (Todos, Por cobrar, Por pagar) y día (`FiltroDia compacto`), y los aplica o limpia juntos; cierra con Escape, al tocar fuera o al pasar a escritorio.
+- Debajo van "Enviar saldos" y "Registrar cliente" en dos columnas (`.cli-movil-acciones`); bajo 360 px se ocultan sus íconos para que el texto quepa. `main.vista-clientes-oficina` reserva el espacio de la barra inferior. Desde 768 px la barra de escritorio (`.controles.tp-escritorio`) no cambia. Revisado en demo a 320, 390 y 1280 px, claro y oscuro, sin scroll horizontal.
+
 ## Avisos con SweetAlert2 — 2026-11-12
 
 - La app interna ya no pinta su propio "toast" ni su diálogo de confirmación: `useVentana().avisar` y `.confirmar` (`interna/ui.tsx`) llaman a `lib/alertasAdmin.ts`, que usa SweetAlert2. Los ~190 `avisar(...)` y las ~30 `confirmar(...)` de las pantallas no cambiaron. Dependencia nueva: `sweetalert2`.

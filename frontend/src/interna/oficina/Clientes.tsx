@@ -1,12 +1,12 @@
 /* Oficina → Clientes, la cuenta de un cliente, el formulario y el envío de saldos por WhatsApp, igual al prototipo. */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, listaOrdenada, saldoCliente, filasCuenta, sinTildes, normNom, normTel, parecidos, gruposRepetidos, telWhatsApp, linkSaldo, textoSaldo,
   nombreCliente, servicio, gastoDe, cargoEnvio, cambiaLoContado, yaContado, mueveCaja, esPago, fechaCaja, fechaDia, diaMinCaja, fechaLarga,
   MOVS, MOVS_OFICINA, MEDIOS, type Medio, type TipoMov,
 } from "../motor";
-import { Cab, FiltroDia, IconoWhatsApp, Paginador, pl, useVentana } from "../ui";
+import { Cab, FiltroDia, IconoAgregarUsuario, IconoFiltro, IconoWhatsApp, Paginador, pl, useVentana } from "../ui";
 import { E, guardarLocal } from "../estado";
 import { actualizarPedido, borrarDe, guardarCliente, guardarMovimiento, unirClientes } from "../acciones";
 import { motivoError, useDatos } from "../datos";
@@ -66,6 +66,28 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
   const pag = q.data, filas = pag?.clientes ?? [], reps = pag?.repetidos ?? 0;
   const poner = (cambio: Partial<typeof E>) => { Object.assign(E, cambio); pintar(); };
   const irA = (n: number) => { E.paginaCli = n; pintar(); arriba.current?.scrollIntoView({ block: "start", behavior: "smooth" }); };
+  const cambiarBusqueda = (x: string) => { setBuscar(x); clearTimeout(tBuscar.current); tBuscar.current = window.setTimeout(() => poner({ buscarCli: x, paginaCli: 1 }), 300); };
+  const enviarSaldos = () => v.abrir(<EnvioMasivo tipo0={E.filtroCli === "pagar" ? "pagar" : "cobrar"} />, "drawer-ancho");
+  const registrar = () => v.abrir(<FormCliente />, "centrada");
+
+  // Celular: la cuenta y el día se preparan en una hoja y se aplican juntos, igual que en Pedidos y Solicitudes.
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
+  const [borrador, setBorrador] = useState({ cuenta: E.filtroCli, dia });
+  const cerrarFiltros = () => setFiltrosAbiertos(false);
+  const abrirFiltros = () => { setBorrador({ cuenta: E.filtroCli, dia }); setFiltrosAbiertos(true); };
+  const aplicarFiltros = () => { poner({ filtroCli: borrador.cuenta, diaCliF: borrador.dia, paginaCli: 1 }); cerrarFiltros(); };
+  const filtrosActivos = Number(E.filtroCli !== "todos") + Number(!!dia);
+  useEffect(() => {
+    if (!filtrosAbiertos) return;
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") cerrarFiltros(); };
+    const pantalla = window.matchMedia("(min-width: 768px)");
+    const alCambiarPantalla = () => { if (pantalla.matches) cerrarFiltros(); };
+    document.addEventListener("keydown", tecla);
+    pantalla.addEventListener("change", alCambiarPantalla);
+    return () => { document.body.style.overflow = anterior; document.removeEventListener("keydown", tecla); pantalla.removeEventListener("change", alCambiarPantalla); };
+  }, [filtrosAbiertos]);
 
   return <>
     <h1>Clientes</h1><p className="sub">Saldo de cada cliente = lo cobrado menos el valor del servicio.</p>
@@ -73,19 +95,34 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
       <div className="cifra"><span>{dia ? "Ese día te quedaron debiendo" : "Cuentas por cobrar (te deben)"}</span><b className="neg">{pesos(pag?.porCobrar.total ?? 0)}</b><span>{pag?.porCobrar.clientes ?? 0} {pl(pag?.porCobrar.clientes ?? 0, "cliente")}</span></div>
       <div className="cifra"><span>{dia ? "Ese día les quedaste debiendo" : "Cuentas por pagar (les debes)"}</span><b className="pos">{pesos(pag?.porPagar.total ?? 0)}</b><span>{pag?.porPagar.clientes ?? 0} {pl(pag?.porPagar.clientes ?? 0, "cliente")}</span></div>
     </div>
-    <div className="controles">
+    <div className="cli-movil">
+      <div className="tp-movil">
+        <div className="tp-movil-buscar" role="search"><input type="search" value={buscar} placeholder="Buscar por nombre o número…" autoComplete="off" aria-label="Buscar cliente por nombre o número" onChange={e => cambiarBusqueda(e.target.value)} />{buscar && <button type="button" aria-label="Limpiar búsqueda" onClick={() => { clearTimeout(tBuscar.current); setBuscar(""); poner({ buscarCli: "", paginaCli: 1 }); }}>×</button>}</div>
+        <button type="button" className="tp-movil-abrir" onClick={abrirFiltros} aria-haspopup="dialog" aria-label={`Filtros${filtrosActivos ? `, ${filtrosActivos} activos` : ""}`}><IconoFiltro /><span>Filtros</span>{filtrosActivos > 0 && <b>{filtrosActivos}</b>}</button>
+      </div>
+      <div className="cli-movil-acciones">
+        <button type="button" className="btn ok" onClick={enviarSaldos}><IconoWhatsApp /><span>Enviar saldos</span></button>
+        <button type="button" className="btn" onClick={registrar}><IconoAgregarUsuario /><span>Registrar cliente</span></button>
+      </div>
+    </div>
+    {filtrosAbiertos && <div className="tp-capa" onMouseDown={e => { if (e.target === e.currentTarget) cerrarFiltros(); }}>
+      <div className="tp-hoja" role="dialog" aria-modal="true" aria-labelledby="cli-filtros-titulo">
+        <header><h2 id="cli-filtros-titulo"><IconoFiltro /> Filtrar clientes</h2><button type="button" className="cerrar" aria-label="Cerrar filtros" onClick={cerrarFiltros}>×</button></header>
+        <div className="tp-hoja-cuerpo">
+          <div className="campo"><label htmlFor="cli-cuenta">Estado de cuenta</label><div className="tp-hoja-select"><select id="cli-cuenta" value={borrador.cuenta} onChange={e => setBorrador(b => ({ ...b, cuenta: e.target.value }))}><option value="todos">Todos</option><option value="cobrar">Por cobrar (te deben)</option><option value="pagar">Por pagar (les debes)</option></select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></div></div>
+          <div className="campo"><label htmlFor="cli-dia">Día de movimiento</label><FiltroDia compacto id="cli-dia" d={borrador.dia} poner={d => setBorrador(b => ({ ...b, dia: d }))} /></div>
+        </div>
+        <footer><button type="button" className="btn sec" onClick={() => setBorrador({ cuenta: "todos", dia: "" })}>Limpiar filtros</button><button type="button" className="btn" onClick={aplicarFiltros}>Aplicar filtros</button></footer>
+      </div>
+    </div>}
+    <div className="controles tp-escritorio">
       <div className="barra-acciones">
-        <button className="btn ok" id="waMasivo" onClick={() => v.abrir(<EnvioMasivo tipo0={E.filtroCli === "pagar" ? "pagar" : "cobrar"} />, "drawer-ancho")}><IconoWhatsApp />Enviar saldos por WhatsApp</button>
-        <button className="btn" id="nuevoCli" onClick={() => v.abrir(<FormCliente />, "centrada")}>Registrar cliente</button>
+        <button className="btn ok" id="waMasivo" onClick={enviarSaldos}><IconoWhatsApp />Enviar saldos por WhatsApp</button>
+        <button className="btn" id="nuevoCli" onClick={registrar}>Registrar cliente</button>
       </div>
       <div className="toolbar">
         <div className="campo" role="search"><input id="buscarCli" type="search" placeholder="Buscar por nombre o número" value={buscar} autoComplete="off" aria-label="Buscar cliente por nombre o número"
-          onChange={e => {
-            const x = e.target.value;
-            setBuscar(x);
-            clearTimeout(tBuscar.current);
-            tBuscar.current = window.setTimeout(() => poner({ buscarCli: x, paginaCli: 1 }), 300);
-          }} /></div>
+          onChange={e => cambiarBusqueda(e.target.value)} /></div>
         <div className="toolbar-filtros">
           <div className="seg" role="group" aria-label="Filtrar por estado de la cuenta">{[["todos", "Todos"], ["cobrar", "Por cobrar"], ["pagar", "Por pagar"]].map(([x, t]) => <button key={x} aria-pressed={E.filtroCli === x} onClick={() => poner({ filtroCli: x, paginaCli: 1 })}>{t}</button>)}</div>
           <FiltroDia compacto d={dia} poner={x => poner({ diaCliF: x, paginaCli: 1 })} />
