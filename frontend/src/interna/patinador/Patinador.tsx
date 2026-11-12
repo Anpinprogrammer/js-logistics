@@ -136,7 +136,7 @@ function FormPago() {
     onSuccess: ({ registro, resumen }) => {
       qc.invalidateQueries({ queryKey: ["patinador"] });
       setCliente(null); setBusca(""); setConcepto(""); setValor("");
-      v.avisar(`Anotado: ${pesos(registro.valor)} de ${registro.clienteNombre}. Ya tienes ${pesos(resumen.total)} en tu caja.`);
+      v.avisar(`Anotado: ${pesos(registro.valor)} de ${registro.clienteNombre}, a favor en su cuenta. Ya tienes ${pesos(resumen.total)} en tu caja.`);
     },
     onError: e => v.avisar("No se pudo anotar: " + (e instanceof FalloApi ? e.message : motivoError(e)))
   });

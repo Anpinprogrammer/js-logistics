@@ -83,6 +83,19 @@ test("cada pago que anota suma a su caja, con la hora del servidor y en el histo
   assert.match(rows[0].accion, /Panadería La Espiga/);
 });
 
+test("lo que paga el cliente queda a su favor en su cuenta, sin mover la caja de JS", async () => {
+  const movs = (await oficina.get(`/api/clientes/${idCliente}/movimientos`)).body.movimientos;
+  const ab = movs.find(m => m.tipo === "abono" && m.valor === 24000);
+  assert.ok(ab, "debe haber un abono por el pago del patinador");
+  assert.match(ab.nota, /Tomás Vélez|Domicilios de la semana/);
+  // En el saldo suma a favor del cliente (en verde en su cuenta)...
+  const saldo = (await oficina.get("/api/clientes/saldos")).body.clientes.find(c => c.id === idCliente).saldo;
+  assert.equal(saldo, 24000);
+  // ...y la caja de JS sigue en cero hasta que el patinador entregue el dinero a la oficina.
+  const caja = (await oficina.get("/api/caja/resumen")).body;
+  assert.equal(caja.total, 0);
+});
+
 test("valida el pago: cliente, concepto y valor; no acepta otra caja ni otra hora", async () => {
   const mal = async cuerpo => (await patinador.post("/api/patinador/caja").send(cuerpo));
   assert.equal((await mal({ clienteId: idCliente, concepto: "", valor: 1000 })).status, 400);
@@ -93,6 +106,9 @@ test("valida el pago: cliente, concepto y valor; no acepta otra caja ni otra hor
   assert.equal((await mal({ clienteId: idCliente, concepto: "x", valor: 1000, fecha: "2020-01-01" })).status, 400);
   const noExiste = await mal({ clienteId: "no-existe", concepto: "x", valor: 1000 });
   assert.equal(noExiste.status, 404);
+  // Un pago rechazado no deja nada a medias: ni abono ni registro.
+  const { rows: n } = await pool.query(`SELECT (SELECT count(*) FROM caja_patinador)::int AS cp, (SELECT count(*) FROM movimientos WHERE tipo = 'abono')::int AS ab`);
+  assert.deepEqual([n[0].cp, n[0].ab], [2, 2]);
   // Pedir la caja de otro patinador no sirve: el servidor usa la ficha de la cuenta.
   const otra = await patinador.get(`/api/patinador/caja?mensajeroId=${idOtroPatinador}`);
   assert.equal(otra.body.resumen.total, 32000);

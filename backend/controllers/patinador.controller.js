@@ -1,6 +1,9 @@
 /* Caja del patinador: anota lo que le pagan los clientes en su ruta y ve el total acumulado.
    El patinador solo ve y anota en su caja (la de su ficha en Personal); la oficina puede consultar la de cualquiera. */
-import { transaccion } from "../config/db.js";
+import { enTransaccion, guardar } from "../servicios/transaccion.js";
+import { ctxDe } from "./accion.js";
+import { nuevoId } from "../helpers/ids.js";
+import { ahora } from "../helpers/reloj.js";
 import * as Caja from "../models/cajaPatinador.model.js";
 import * as Cliente from "../models/cliente.model.js";
 import * as Auditoria from "../models/auditoria.model.js";
@@ -27,19 +30,26 @@ export async function caja(req, res) {
   res.json({ resumen, ...lista });
 }
 
-/** POST /patinador/caja: anota un pago. Responde 201 { registro, resumen } para pintar el total nuevo sin otra petición. */
+/** POST /patinador/caja: anota un pago. Responde 201 { registro, resumen } para pintar el total nuevo sin otra petición.
+    Lo que paga el cliente queda a su favor en su cuenta (un abono), como cuando el mensajero cobra al entregar; la caja de JS
+    no se mueve hasta que el patinador entregue el dinero a la oficina. Todo en una transacción: o quedan las dos cosas o ninguna. */
 export async function registrar(req, res) {
   const mensajeroId = fichaPropia(req.usuario);
   const { clienteId, concepto, valor } = req.valido.body;
-  const r = await transaccion(async db => {
-    const c = await Cliente.buscarPorId(clienteId, db);
+  const r = await enTransaccion(ctxDe(req), async t => {
+    const c = await Cliente.buscarPorId(clienteId, t.c);
     if (!c) throw noEncontrado("Ese cliente ya no existe. Búscalo de nuevo.");
-    const registro = await Caja.crear({ mensajeroId, clienteId, concepto, valor, porUid: req.usuario.id }, db);
+    const movimientoId = nuevoId();
+    await guardar(t, "movimientos", {
+      id: movimientoId, clienteId, tipo: "abono", valor, medio: "", nota: `Recibido por ${t.actor.nombre}: ${concepto}`.slice(0, 300),
+      fecha: ahora(), porUid: req.usuario.id, porNombre: t.actor.nombre
+    });
+    const registro = await Caja.crear({ mensajeroId, clienteId, concepto, valor, porUid: req.usuario.id, movimientoId }, t.c);
     await Auditoria.registrar({
       uid: req.usuario.id, accion: `Recibió ${pesos(valor)} de ${c.nombre} (${concepto})`,
       tabla: "caja_patinador", registro: registro.id, datos: { clienteId, concepto, valor }
-    }, db);
-    return { registro, resumen: await Caja.resumen(mensajeroId, db) };
+    }, t.c);
+    return { registro, resumen: await Caja.resumen(mensajeroId, t.c) };
   });
   res.status(201).json(r);
 }
