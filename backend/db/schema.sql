@@ -426,6 +426,27 @@ CREATE TABLE IF NOT EXISTS caja_patinador (        -- dinero que recibe un patin
   fecha        TIMESTAMPTZ NOT NULL DEFAULT now(),                           -- hora del servidor, no la del celular
   por_uid      TEXT REFERENCES usuarios(id) ON DELETE SET NULL
 );
+-- Cada pago que anota el patinador es dinero que el cliente abona a su cuenta (un `abono`, "A favor", en verde): igual
+-- que cuando el mensajero entrega y cobra. No mueve la caja de JS: entra a la caja cuando el patinador se lo entrega a la
+-- oficina (un `recaudo`). movimiento_id enlaza el pago con ese abono.
+ALTER TABLE caja_patinador ADD COLUMN IF NOT EXISTS movimiento_id TEXT REFERENCES movimientos(id) ON DELETE SET NULL;
+-- Los pagos anotados antes de este cambio no tenían abono: se crean una sola vez (marcado en ajustes, para que un abono que
+-- administración borre después no se vuelva a crear al correr db:migrar otra vez).
+DO $$
+BEGIN
+  INSERT INTO ajustes (clave, valor) VALUES ('migracion_abonos_patinador', jsonb_build_object('fecha', now())) ON CONFLICT (clave) DO NOTHING;
+  IF FOUND THEN
+    INSERT INTO movimientos (id, cliente_id, tipo, valor, nota, fecha, por_uid, por_nombre)
+      SELECT 'pat_' || r.id, r.cliente_id, 'abono', r.valor,
+             left('Recibido por ' || coalesce(nullif(u.nombre, ''), m.nombre) || ': ' || r.concepto, 300),
+             r.fecha, r.por_uid, coalesce(u.nombre, m.nombre)
+      FROM caja_patinador r JOIN mensajeros m ON m.id = r.mensajero_id LEFT JOIN usuarios u ON u.id = r.por_uid
+      WHERE r.movimiento_id IS NULL
+      ON CONFLICT (id) DO NOTHING;
+    UPDATE caja_patinador r SET movimiento_id = 'pat_' || r.id
+      WHERE r.movimiento_id IS NULL AND EXISTS (SELECT 1 FROM movimientos x WHERE x.id = 'pat_' || r.id);
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS caja_patinador_mensajero_idx ON caja_patinador (mensajero_id, fecha DESC);
 CREATE INDEX IF NOT EXISTS caja_patinador_cliente_idx ON caja_patinador (cliente_id);
 

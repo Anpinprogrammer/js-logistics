@@ -11,11 +11,11 @@ const CON_CLIENTE = `
 const ES_HOY = `(r.fecha AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date`;
 
 /** La fecha la pone la base (now()): el patinador no puede anotar un pago con otra hora. */
-export async function crear({ mensajeroId, clienteId, concepto, valor, porUid }, db = { query }) {
+export async function crear({ mensajeroId, clienteId, concepto, valor, porUid, movimientoId = null }, db = { query }) {
   const id = nuevoId();
   await db.query(
-    `INSERT INTO caja_patinador (id, mensajero_id, cliente_id, concepto, valor, por_uid) VALUES ($1, $2, $3, $4, $5, $6)`,
-    [id, mensajeroId, clienteId, concepto, valor, porUid]
+    `INSERT INTO caja_patinador (id, mensajero_id, cliente_id, concepto, valor, por_uid, movimiento_id) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [id, mensajeroId, clienteId, concepto, valor, porUid, movimientoId]
   );
   const { rows } = await db.query(`${CON_CLIENTE} WHERE r.id = $1`, [id]);
   return filaAObjeto(rows[0]);

@@ -105,7 +105,7 @@ function MiCaja({ irHistorial }: { irHistorial: () => void }) {
   </>;
 }
 
-const anotarYContar: Anotar = d => anotar(d).then(({ registro, resumen }) => `Anotado: ${pesos(registro.valor)} de ${registro.clienteNombre}. Ya tienes ${pesos(resumen.total)} en tu caja.`);
+const anotarYContar: Anotar = d => anotar(d).then(({ registro, resumen }) => `Anotado: ${pesos(registro.valor)} de ${registro.clienteNombre}, a favor en su cuenta. Ya tienes ${pesos(resumen.total)} en tu caja.`);
 
 function Historial() {
   const porPagina = usePorPagina(), [pagina, setPagina] = useState(1);
