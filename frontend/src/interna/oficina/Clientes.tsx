@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, listaOrdenada, saldoCliente, filasCuenta, sinTildes, normNom, normTel, parecidos, gruposRepetidos, telWhatsApp, linkSaldo, textoSaldo,
-  nombreCliente, servicio, gastoDe, cargoEnvio, cambiaLoContado, yaContado, mueveCaja, esPago, fechaCaja, fechaDia, diaMinCaja, fechaLarga,
+  nombreCliente, servicio, gastoDe, cargoEnvio, cambiaLoContado, yaContado, mueveCaja, esPago, fechaCaja, fechaDia,
   MOVS, MOVS_OFICINA, MEDIOS, type Medio, type TipoMov,
 } from "../motor";
 import { Cab, FiltroDia, Icono, IconoAgregarUsuario, IconoEditar, IconoFiltro, IconoInfo, Paginador, pl, useVentana } from "../ui";
@@ -15,12 +15,9 @@ import { DEMO } from "../demo";
 import { clientes as apiClientes } from "../../api/servicios";
 import { usePorPagina } from "../../lib/pantalla";
 import type { ClienteConSaldo, PaginaClientes } from "../../api/tipos";
-import { avisoContado } from "./Pedidos";
+import { avisoContado, diaAntesDelArqueo } from "./comun";
 import { SelectorFecha } from "../Calendario";
 
-type Ventana = ReturnType<typeof useVentana>;
-/** La caja ya se contó ese día: no se registran movimientos de días anteriores al arqueo. */
-export const diaAntesDelArqueo = (v: Ventana, dia: string) => { const m = diaMinCaja(); if (m && dia < m) { v.avisar("La caja ya se contó el " + fechaLarga(m) + ": no se pueden registrar movimientos de días anteriores."); return true; } return false; };
 
 /** La misma página que arma el servidor, calculada con los datos en memoria (modo demo). */
 function paginaClientesDemo(filtro: string, dia: string, buscar: string, pagina: number, porPagina: number): PaginaClientes {

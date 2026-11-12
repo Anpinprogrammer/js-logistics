@@ -16,8 +16,8 @@ import { SelectorFecha } from "../Calendario";
 import { borrarDe, cambiarMedio, cierreOficina, deshacerArqueo, quitarDevolucion, liquidar, movCaja, reabrirLiquidacion, recibirDinero, arqueo } from "../acciones";
 import { aLiq, motivoError, useDatos } from "../datos";
 import { DEMO } from "../demo";
-import { avisoContado, EnBloque } from "./Pedidos";
-import { diaAntesDelArqueo } from "./Clientes";
+import { avisoContado, diaAntesDelArqueo } from "./comun";
+import { EnBloque } from "./modales";
 
 type Ventana = ReturnType<typeof useVentana>;
 const noSePudo = (v: Ventana, que: string) => (e: unknown) => v.avisar(que + ": " + motivoError(e));
@@ -40,12 +40,14 @@ function paginaLiquidacionesDemo(f: { dia: string; estado: string; buscar: strin
 
 export default function Caja({ pintar }: { pintar: () => void }) {
   const v = useVentana();
-  const pendM: Record<string, number> = {}; Object.values(S.pedidos).filter(p => p.estado === "pendiente").forEach(p => (pendM[p.mensajeroId] = (pendM[p.mensajeroId] || 0) + 1));
-  const pms: Record<string, ReturnType<typeof periodoMensajero>> = {}; Object.keys(S.mensajeros).forEach(id => (pms[id] = periodoMensajero(id)));
+  // Lo de la sub-pestaña Mensajeros (el período de cada uno recorre todos los pedidos) solo se calcula si está abierta.
+  const verMens = E.tabCaja === "mensajeros";
+  const pendM: Record<string, number> = {}; if (verMens) Object.values(S.pedidos).filter(p => p.estado === "pendiente").forEach(p => (pendM[p.mensajeroId] = (pendM[p.mensajeroId] || 0) + 1));
+  const pms: Record<string, ReturnType<typeof periodoMensajero>> = {}; if (verMens) Object.keys(S.mensajeros).forEach(id => (pms[id] = periodoMensajero(id)));
   // los mensajeros siempre, para poder darles base al empezar el día
-  const ids = listaOrdenada(S.mensajeros, "nombre").filter(esRepartidor).map(m => m.id).filter(id => { const pm = pms[id]; return tipoDe(S.mensajeros[id]) === "mensajero" || pm.ps.length || pm.recs.length || pm.debe || pendM[id]; });
+  const ids = !verMens ? [] : listaOrdenada(S.mensajeros, "nombre").filter(esRepartidor).map(m => m.id).filter(id => { const pm = pms[id]; return tipoDe(S.mensajeros[id]) === "mensajero" || pm.ps.length || pm.recs.length || pm.debe || pendM[id]; });
   const tot = { debe: 0, ef: 0, tj: 0, tc: 0 }; ids.forEach(id => { const pm = pms[id], tt = totales(pm.ps); tot.debe += pm.debe; tot.ef += tt.efectivo; tot.tj += tt.transfJs; tot.tc += tt.transfCli; });
-  const recsDia = Object.values(S.recaudos).filter(r => diaDe(r.fecha) === E.diaCaja).sort((a, b) => a.fecha - b.fecha);
+  const recsDia = !verMens ? [] : Object.values(S.recaudos).filter(r => diaDe(r.fecha) === E.diaCaja).sort((a, b) => a.fecha - b.fecha);
   const cajaDia = recsDia.reduce((a, r) => a + (Number(r.valor) || 0), 0);
   const porMedio: Record<string, number> = {}; recsDia.forEach(r => (porMedio[r.medio] = (porMedio[r.medio] || 0) + (Number(r.valor) || 0)));
   const base = (id: string) => (yo.esAdmin ? v.abrir(<MovCaja tipo="sale" pre={{ cat: "base", personaId: id }} />, "centrada") : v.abrir(<BaseDesdeOficina mid={id} />, "centrada"));
@@ -105,12 +107,16 @@ export default function Caja({ pintar }: { pintar: () => void }) {
       </div>
     </header>
 
+    {/* Cada panel existe siempre (aria-controls apunta a él), pero solo el activo se pinta y calcula. */}
     <div role="tabpanel" id="panelCaja-caja" aria-labelledby="tabCaja-caja" hidden={E.tabCaja !== "caja"}>
-      {yo.esAdmin && <><CierreDia pintar={pintar} /><CajaGeneral pintar={pintar} /></>}
-      <BloqueCajaOficina />
+      {E.tabCaja === "caja" && <>
+        {yo.esAdmin && <><CierreDia pintar={pintar} /><CajaGeneral pintar={pintar} /></>}
+        <BloqueCajaOficina />
+      </>}
     </div>
 
     <div role="tabpanel" id="panelCaja-mensajeros" aria-labelledby="tabCaja-mensajeros" hidden={E.tabCaja !== "mensajeros"}>
+      {verMens && <>
       <h2>Mensajeros</h2><p className="sub">{yo.esAdmin ? "Cada mensajero lleva un período abierto que se cierra cuando lo liquidas. Lo que entregue después cuenta para el siguiente período." : "Lo que cada mensajero debe entregar. Toca “Recibir dinero” cada vez que te entregue plata."}</p>
       <div className="cifras">
         <div className="cifra fuerte"><span>Pendiente por entregar (todos)</span><b>{pesos(tot.debe)}</b></div>
@@ -144,10 +150,11 @@ export default function Caja({ pintar }: { pintar: () => void }) {
             : <td>{r.porNombre || ""}{puedoCambiarMedio(r) ? <> <button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<CambiarMedio col="recaudos" id={r.id} />, "centrada"))}>Cambiar medio</button></> : null}</td>}</tr>)}
       </tbody></table></div> : <div className="vacio">Toca “Recibir dinero” en un mensajero cada vez que te entregue plata.</div>}
       {!yo.esAdmin && recsDia.length ? <p className="sub" style={{ marginTop: 8 }}>Si algo quedó mal registrado, avísale al administrador para que lo corrija.</p> : null}
+      </>}
     </div>
 
     <div role="tabpanel" id="panelCaja-liquidaciones" aria-labelledby="tabCaja-liquidaciones" hidden={E.tabCaja !== "liquidaciones"}>
-      {yo.esAdmin ? <>
+      {E.tabCaja !== "liquidaciones" ? null : yo.esAdmin ? <>
         <div className="liq-cab">
           <div className="liq-cab-txt">
             <h2>Liquidaciones recientes</h2>
@@ -181,7 +188,7 @@ export default function Caja({ pintar }: { pintar: () => void }) {
     </div>
 
     <div role="tabpanel" id="panelCaja-arqueos" aria-labelledby="tabCaja-arqueos" hidden={E.tabCaja !== "arqueos"}>
-      {yo.esAdmin ? <Arqueos /> : <div className="vacio">Los arqueos los maneja administración.</div>}
+      {E.tabCaja !== "arqueos" ? null : yo.esAdmin ? <Arqueos /> : <div className="vacio">Los arqueos los maneja administración.</div>}
     </div>
   </>;
 }

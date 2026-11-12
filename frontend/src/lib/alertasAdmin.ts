@@ -2,8 +2,15 @@
    Toman los colores de la app (los mismos del tema claro/oscuro de `.jsl`), así que cambian solos con el tema.
    Si hay una ventana (`<dialog>`) abierta, el aviso se monta dentro de ella: lo que está fuera de un diálogo modal
    queda inerte y tapado, y la confirmación no se podría tocar. */
-import Swal, { type SweetAlertIcon, type SweetAlertOptions } from "sweetalert2";
+import type { SweetAlertIcon, SweetAlertOptions } from "sweetalert2";
 import "./alertas.css";
+
+/* SweetAlert2 se descarga con el primer aviso, no al abrir la app: así no pesa en la carga inicial.
+   Después queda en memoria. Las opciones se leen al mostrar el aviso (qué ventana está abierta en ese momento). */
+let cargaSwal: Promise<typeof import("sweetalert2").default> | null = null;
+const swal = () => (cargaSwal ??= import("sweetalert2").then(m => m.default).catch(e => { cargaSwal = null; throw e; }));
+/** Precarga la librería de avisos cuando el navegador queda libre, para que el primer aviso salga sin espera. */
+export const precargarAvisos = () => { void swal().catch(() => { /* se reintenta con el primer aviso */ }); };
 
 export type TonoAviso = "exito" | "error" | "aviso" | "info";
 
@@ -50,7 +57,8 @@ function opcionesBase(): SweetAlertOptions {
 }
 
 /** Aviso corto que se quita solo (reemplaza al "toast" de la app interna). */
-export function avisoRapido(mensaje: string, tono: TonoAviso = "exito") {
+export async function avisoRapido(mensaje: string, tono: TonoAviso = "exito") {
+  const Swal = await swal();
   const base = opcionesBase();
   return Swal.fire({
     ...base,
@@ -67,13 +75,14 @@ export function avisoRapido(mensaje: string, tono: TonoAviso = "exito") {
 
 export const alertaAdmin = {
   exito: (titulo: string, texto?: string) => avisoRapido(texto ? `${titulo}. ${texto}` : titulo, "exito"),
-  error: (titulo: string, texto?: string) => Swal.fire({ ...opcionesBase(), icon: "error", title: titulo, text: texto, confirmButtonText: "Entendido" }),
-  aviso: (titulo: string, texto?: string) => Swal.fire({ ...opcionesBase(), icon: "warning", title: titulo, text: texto, confirmButtonText: "Aceptar" }),
+  error: async (titulo: string, texto?: string) => (await swal()).fire({ ...opcionesBase(), icon: "error", title: titulo, text: texto, confirmButtonText: "Entendido" }),
+  aviso: async (titulo: string, texto?: string) => (await swal()).fire({ ...opcionesBase(), icon: "warning", title: titulo, text: texto, confirmButtonText: "Aceptar" }),
 
   /** Pregunta antes de una acción. `peligro` pinta el botón en rojo (borrar, quitar, deshacer). */
   async confirmar({ titulo, texto, boton = "Sí, continuar", cancelar = "Cancelar", peligro = false, icono = "question" }: {
     titulo: string; texto?: string; boton?: string; cancelar?: string; peligro?: boolean; icono?: SweetAlertIcon;
   }): Promise<boolean> {
+    const Swal = await swal();
     const base = opcionesBase();
     const r = await Swal.fire({
       ...base,

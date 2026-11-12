@@ -16,6 +16,8 @@ export default defineConfig({
             { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
             // La animación del ingreso es lo único que usa motion: en su propio archivo para no cargarla en la app.
             { name: "intro-motion", test: /node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/ },
+            // SweetAlert2 se descarga con el primer aviso (lib/alertasAdmin.ts), no al abrir la app.
+            { name: "avisos", test: /node_modules[\\/]sweetalert2[\\/]/ },
             { name: "librerias", test: /node_modules[\\/]/ }
           ]
         }
