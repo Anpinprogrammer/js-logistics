@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Formato estructurado de JSBot — 2026-11-12
+
+- El prompt compartido de `servicios/chatbot.js` pide saltos reales, secciones, viñetas y negritas para guías/montos; se retiró la instrucción contradictoria de texto plano. El ejemplo está marcado como ficticio y no amplía datos, herramientas ni permisos del visitante. No inventar saldos: no existe herramienta financiera del bot.
+
 ## Intro clara del ingreso y contraste de red — 2026-11-12
 
 - `escenaIntro` recibe el tema efectivo desde Ingreso: fondo claro desde `sinMedir`, capa de revelado blanca con borde/sombra claros y sin viñeta negra en claro. La rama oscura conserva los valores y tiempos anteriores.
