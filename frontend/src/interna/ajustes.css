@@ -3,6 +3,93 @@
 .jsl .oculto{display:none !important}
 .jsl a.enlace{cursor:pointer}
 
+/* Cabecera móvil: el cambio de vista, tema y salida viven en el perfil. */
+.jsl .barra-escritorio{display:none}
+.jsl .barra-movil{display:flex;align-items:center;justify-content:space-between;width:100%;min-width:0}
+.jsl .barra-movil .marca-movil{margin:0;flex:none}
+.jsl .barra-movil .marca-movil img{width:36px;height:36px;border-radius:11px}
+.jsl .barra-movil-acciones{display:flex;align-items:center;gap:12px}
+.jsl .barra-movil .campana{width:36px;height:36px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#e2e8f0}
+.jsl .barra-movil .campana:hover{background:rgba(255,255,255,.16)}
+.jsl .perfil-area{position:relative}
+.jsl .perfil-disparador.avatar{width:36px;height:36px;padding:0;border:1.5px solid rgba(125,211,252,.55);cursor:pointer}
+.jsl .perfil-disparador[aria-expanded="true"]{box-shadow:0 0 0 3px rgba(56,189,248,.24)}
+.jsl .perfil-popover{position:absolute;top:calc(100% + 12px);right:0;z-index:20;width:min(276px,calc(100vw - 28px));padding:12px;border:1px solid var(--linea);border-radius:16px;background:var(--papel);color:var(--tinta);box-shadow:0 20px 50px rgba(2,6,23,.28);animation:perfil-aparece .16s ease-out}
+@keyframes perfil-aparece{from{opacity:0;transform:translateY(-6px) scale(.98)}to{opacity:1;transform:none}}
+.jsl .perfil-info{display:flex;flex-direction:column;gap:3px;min-width:0;padding:5px 8px 12px;border-bottom:1px solid var(--linea)}
+.jsl .perfil-info b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.84rem}
+.jsl .perfil-info small{color:var(--suave);font-size:.72rem}
+.jsl .perfil-modos{padding:12px 0 8px}
+.jsl .perfil-modos>span{display:block;margin:0 7px 7px;color:var(--suave);font-size:.66rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+.jsl .perfil-modos>div{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border:1px solid var(--linea);border-radius:11px;background:var(--hueco)}
+.jsl .perfil-modos button{min-width:0;min-height:36px;padding:6px 5px;border:0;border-radius:8px;background:none;color:var(--suave);font-size:.72rem;font-weight:700;cursor:pointer}
+.jsl .perfil-modos button[aria-pressed="true"]{background:var(--papel);color:var(--tinta);box-shadow:0 1px 5px rgba(2,6,23,.12)}
+.jsl .perfil-opcion{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding:9px 10px;border:0;border-radius:10px;background:none;color:var(--tinta);font:inherit;font-size:.78rem;font-weight:600;text-align:left;cursor:pointer}
+.jsl .perfil-opcion:hover{background:var(--hueco)}
+.jsl .perfil-opcion svg{width:17px;height:17px;color:var(--marca2)}
+.jsl .perfil-salir{margin-top:5px;border-top:1px solid var(--linea);border-radius:0 0 10px 10px;color:var(--rojo)}
+.jsl .perfil-salir svg{color:var(--rojo)}
+@media (min-width:960px){.jsl .barra-escritorio{display:contents}.jsl .barra-movil{display:none}}
+@media (prefers-reduced-motion:reduce){.jsl .perfil-popover{animation:none}}
+
+/* Entrega: hoja inferior en el celular y formulario de dos columnas al centro en escritorio. */
+.jsl dialog:is([data-variante="entrega"],[data-variante="devolucion"]){position:fixed;inset:auto 0 0;margin:0;width:100%;max-width:100%;max-height:92dvh;border-radius:24px 24px 0 0;overflow:hidden}
+.jsl dialog:is([data-variante="entrega"],[data-variante="devolucion"]) .dlg{padding:0;max-height:92dvh;overflow:hidden}
+.jsl dialog:is([data-variante="entrega"],[data-variante="devolucion"]) .dlg::before{display:none}
+.jsl .entrega-modal{display:flex;flex-direction:column;max-height:92dvh;min-height:0}
+.jsl .entrega-cab{display:flex;align-items:center;justify-content:space-between;gap:16px;flex:none;margin:0;padding:14px 20px;border-bottom:1px solid var(--linea);background:var(--papel)}
+.jsl .entrega-cab h2{margin:0;font-size:1.05rem;line-height:1.3;overflow-wrap:anywhere}
+.jsl .devolucion-modal .entrega-cab .guia{white-space:nowrap}
+.jsl .entrega-cab p{margin:4px 0 0;color:var(--suave);font-size:.75rem}
+.jsl .entrega-cab .cerrar{display:grid;place-items:center;flex:none;width:36px;height:36px;font-size:1.35rem}
+.jsl .entrega-estado{display:inline-block;vertical-align:middle;padding:3px 7px;border-radius:7px;background:var(--mango-claro);color:var(--marca);font-size:.65rem;font-weight:700}
+.jsl .devolucion-estado{background:var(--rojo-claro);color:var(--rojo)}
+.jsl .entrega-cuerpo{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;min-height:0;padding:18px 20px;overflow-y:auto;overscroll-behavior:contain}
+.jsl .entrega-col{display:grid;align-content:start;gap:14px;min-width:0}
+.jsl .entrega-col .campo{margin:0;min-width:0}
+.jsl .entrega-col .campo label,.jsl .entrega-col .campo .lbl{display:block;margin-bottom:6px;font-size:.76rem;font-weight:700;color:var(--tinta)}
+.jsl .entrega-col .campo input:not([type="radio"]):not([type="checkbox"]),.jsl .entrega-col .campo select{width:100%;min-width:0;min-height:42px;border:1px solid var(--linea);border-radius:12px;background:var(--hueco);color:var(--tinta);padding:9px 12px;font-size:.85rem}
+.jsl .entrega-col .campo textarea{display:block;width:100%;min-width:0;min-height:112px;resize:vertical;border:1px solid var(--linea);border-radius:12px;background:var(--hueco);color:var(--tinta);padding:10px 12px;font:inherit;font-size:.85rem}
+.jsl .entrega-col .campo input:focus,.jsl .entrega-col .campo select:focus{outline:2px solid var(--marca2);outline-offset:1px}
+.jsl .entrega-col .campo textarea:focus{outline:2px solid var(--marca2);outline-offset:1px}
+.jsl .entrega-col .foto-pedido{margin:0;min-width:0}
+.jsl .entrega-col .foto-pedido img{width:100%;height:112px;max-height:none;object-fit:contain;background:var(--hueco)}
+.jsl .entrega-col .foto-pedido .sub{font-size:.7rem}
+.jsl .entrega-col .firma-caja canvas{height:128px}
+.jsl .entrega-col .firma-caja button{min-height:34px}
+.jsl .entrega-col .foto-elegida{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.jsl .entrega-col .foto-elegida img:not(.oculto){grid-column:1/-1;width:100%;height:96px;object-fit:contain;background:var(--hueco)}
+.jsl .entrega-col .foto-elegida .btn{min-width:0;min-height:44px;padding:8px;justify-content:center;font-size:.76rem}
+.jsl .entrega-col .cobrar-box{margin:0}
+.jsl .entrega-metodos{gap:7px}
+.jsl .entrega-col .entrega-metodos label{display:flex;align-items:flex-start;gap:10px;min-height:0;padding:8px 12px;border-width:1px;cursor:pointer}
+.jsl .entrega-metodos input[type="radio"]{flex:none;width:16px;height:16px;margin:2px 0 0;accent-color:var(--marca2)}
+.jsl .entrega-metodos label span{min-width:0;font-size:.8rem;line-height:1.25}
+.jsl .entrega-metodos small{margin-top:2px;font-size:.7rem;line-height:1.3}
+.jsl .entrega-col .linea2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.jsl .entrega-col .linea2 label{min-height:32px;line-height:1.2}
+.jsl .entrega-col .check{display:flex;align-items:flex-start;gap:9px;margin:0;padding:11px;border:1px solid var(--linea);border-radius:12px;background:var(--hueco);font-size:.78rem;line-height:1.35}
+.jsl .entrega-col .check input{flex:none;margin-top:2px}
+.jsl .entrega-pie{display:flex;flex:none;gap:10px;padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--linea);background:var(--papel)}
+.jsl .entrega-pie .btn{flex:1;min-width:0;min-height:44px;justify-content:center;padding:9px 12px;font-size:.8rem}
+.jsl .devolucion-modal .entrega-pie #dGuardar{background:var(--marca2);color:#fff}
+@media (max-width:599px){.jsl .entrega-pie{flex-direction:column}.jsl .entrega-pie .btn{width:100%}}
+@media (min-width:1024px){
+  .jsl dialog:is([data-variante="entrega"],[data-variante="devolucion"]){inset:0;margin:auto;width:min(896px,calc(100vw - 48px));max-width:896px;max-height:88dvh;border-radius:24px}
+  .jsl dialog[data-variante="devolucion"]{width:min(768px,calc(100vw - 48px));max-width:768px}
+  .jsl dialog:is([data-variante="entrega"],[data-variante="devolucion"]) .dlg,.jsl .entrega-modal{max-height:88dvh}
+  .jsl .entrega-cuerpo{grid-template-columns:repeat(2,minmax(0,1fr));gap:28px;padding:16px 24px}
+  .jsl .entrega-col{gap:10px}
+  .jsl .entrega-col .linea2 label{min-height:0}
+  .jsl .entrega-cab{padding:16px 24px}
+  .jsl .entrega-col .foto-pedido img{height:140px}
+  .jsl .entrega-col .firma-caja canvas{height:144px}
+  .jsl .entrega-pie{justify-content:flex-end;padding:14px 24px}
+  .jsl .entrega-pie .btn{flex:none;min-width:190px}
+  .jsl .entrega-pie #eGuardar{order:2}
+  .jsl .devolucion-modal .entrega-pie #dGuardar{order:2}
+}
+
 /* Botón de tema claro/oscuro en el header de escritorio; en el celular aparece en el menú. */
 .jsl .tema{display:none}
 @media (min-width:960px){
@@ -794,13 +881,8 @@
 .jsl .solicitud-origen{justify-self:start;display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--azul-claro);color:var(--azul);font-size:.75rem;font-weight:600;max-width:100%;overflow-wrap:anywhere}
 .jsl .solicitud-origen::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
 .jsl .solicitud .campo small{display:block;margin-top:6px;font-size:.78rem;line-height:1.35}
-/* En celular la barra ya va llena (modo, avatar y salir): la campana y el avatar se achican para que quepa todo. */
-@media (max-width:639px){
-  .jsl .barra{gap:6px}
-  .jsl .campana,.jsl .barra .avatar{width:32px;height:32px}
-  .jsl .campana svg{width:17px;height:17px}
-}
-@media (max-width:359px){ .jsl .barra .avatar{display:none} }
+/* La cabecera móvil conserva el logo, la campana y el perfil incluso a 320 px. */
+@media (max-width:359px){.jsl .barra{padding-inline:10px}}
 
 /* Nueva guía del mensajero: foto subiendo y remitente opcional (mensajero/NuevaGuia.tsx). */
 .jsl .ng-subida{display:flex;gap:14px;align-items:center;padding:12px;border:1px solid var(--linea);border-radius:14px;background:var(--hueco)}
@@ -830,9 +912,56 @@
 @keyframes ng-aparece{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.jsl .ng-girador{animation-duration:2s}.jsl .ng-capa.ok{animation:none}}
 
-/* Pantalla de Solicitudes: las tarjetas de la campanita, en una cuadrícula en el computador. */
-.solicitudes-pagina { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0; }
-@media (min-width: 1100px) { .solicitudes-pagina { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; } }
+/* Solicitudes de oficina: filas para explorar y detalle completo en la ventana compartida. */
+.jsl .solicitudes-lista{display:grid;gap:8px;margin-top:12px}
+.jsl .sol-fila{display:block;width:100%;min-width:0;padding:12px;border:1px solid var(--linea);border-radius:16px;background:var(--papel);box-shadow:var(--sombra);color:var(--tinta);font:inherit;text-align:left;cursor:pointer;transition:border-color .16s,box-shadow .16s,transform .16s}
+.jsl .sol-fila:hover{border-color:color-mix(in srgb,var(--marca2) 45%,var(--linea));box-shadow:0 8px 20px rgba(2,6,23,.09)}
+.jsl .sol-fila:active{transform:scale(.995)}
+.jsl .sol-fila-escritorio{display:none}
+.jsl .sol-fila-movil{display:grid;grid-template-columns:minmax(0,1fr) auto 28px;gap:9px;align-items:center;min-width:0}
+.jsl .sol-fila-resumen{display:flex;flex-direction:column;gap:4px;min-width:0}
+.jsl .sol-fila-resumen>span{display:flex;align-items:center;gap:6px;min-width:0}
+.jsl .sol-fila-resumen b,.jsl .sol-fila-resumen small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsl .sol-fila-resumen b{font-size:.78rem;min-width:0}
+.jsl .sol-fila-resumen .etq{flex:none;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.61rem}
+.jsl .sol-fila-resumen small{font-size:.68rem;color:var(--suave)}
+.jsl .sol-fila-valor{display:flex;flex-direction:column;align-items:flex-end;gap:2px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.jsl .sol-fila-valor b{font-size:.78rem}
+.jsl .sol-fila-valor small{font-size:.65rem;color:var(--suave)}
+.jsl .sol-fila-info{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--hueco);color:var(--suave)}
+.jsl .sol-fila-info svg{width:15px;height:15px}
+@media (min-width:768px){
+  .jsl .sol-fila{padding:14px 16px}
+  .jsl .sol-fila-movil{display:none}
+  .jsl .sol-fila-escritorio{display:grid;grid-template-columns:minmax(135px,1fr) minmax(0,1.6fr) auto;gap:14px;align-items:center;min-width:0}
+  .jsl .sol-fila-cliente,.jsl .sol-fila-ruta{display:flex;flex-direction:column;gap:5px;min-width:0}
+  .jsl .sol-fila-cliente>b,.jsl .sol-fila-ruta b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem}
+  .jsl .sol-fila-cliente>span,.jsl .sol-fila-ruta>span{display:flex;align-items:center;gap:6px;min-width:0}
+  .jsl .sol-fila-cliente em{flex:none;padding:2px 6px;border-radius:6px;background:var(--hueco);color:var(--suave);font-size:.63rem;font-style:normal;font-weight:700}
+  .jsl .sol-fila-cliente em.portal{background:var(--azul-claro);color:var(--azul)}
+  .jsl .sol-fila-cliente small,.jsl .sol-fila-ruta small{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.67rem;color:var(--suave)}
+  .jsl .sol-fila-ruta>span>small{max-width:35%}
+  .jsl .sol-fila-ruta i{flex:none;color:var(--marca2);font-style:normal}
+  .jsl .sol-fila-final{display:flex;align-items:center;gap:10px;min-width:0}
+  .jsl .sol-fila-final .etq{max-width:115px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.62rem}
+  .jsl .sol-fila-detalle{display:inline-flex;align-items:center;gap:5px;padding:7px 9px;border:1px solid var(--linea);border-radius:9px;background:var(--hueco);font-size:.68rem;font-weight:700;white-space:nowrap}
+  .jsl .sol-fila:hover .sol-fila-detalle{color:var(--marca2);border-color:var(--marca2)}
+}
+@media (min-width:768px) and (max-width:1150px){.jsl .sol-fila-escritorio{grid-template-columns:minmax(120px,.8fr) minmax(0,1fr) auto;gap:9px}.jsl .sol-fila-final{gap:6px}.jsl .sol-fila-detalle{padding:6px}}
+.jsl dialog[data-variante="solicitud"]{position:fixed;inset:auto 0 0;margin:0;width:100%;max-width:100%;max-height:90dvh;border-radius:24px 24px 0 0;overflow:hidden}
+.jsl dialog[data-variante="solicitud"] .dlg{padding:0;max-height:90dvh;overflow:hidden}
+.jsl dialog[data-variante="solicitud"] .dlg::before{display:none}
+.jsl .sol-detalle{display:flex;flex-direction:column;max-height:90dvh;min-height:0;background:var(--papel)}
+.jsl .sol-detalle-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex:none;margin:0;padding:16px 20px;border-bottom:1px solid var(--linea)}
+.jsl .sol-detalle-cab h2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0;font-size:1.02rem;overflow-wrap:anywhere}
+.jsl .sol-detalle-cab p{margin:5px 0 0;color:var(--suave);font-size:.72rem}
+.jsl .sol-detalle-cuerpo{min-height:0;padding:16px 20px calc(20px + env(safe-area-inset-bottom,0px));overflow-y:auto;overscroll-behavior:contain}
+.jsl .sol-detalle .solicitud{padding:0;border:0;border-radius:0;box-shadow:none;gap:12px}
+.jsl .sol-detalle-contacto{display:flex;flex-wrap:wrap;gap:7px;min-width:0}
+.jsl .sol-detalle-contacto a{max-width:100%;padding:7px 10px;border-radius:9px;background:var(--hueco);color:var(--tinta);font-size:.76rem;font-weight:600;overflow-wrap:anywhere;text-decoration:none}
+.jsl .sol-detalle .solicitud dl{padding:12px;border:1px solid var(--linea);border-radius:12px;background:var(--hueco)}
+.jsl .sol-detalle .solicitud > .acciones{position:sticky;bottom:-16px;z-index:1;margin-top:4px;padding:12px 0 0;border-top:1px solid var(--linea);background:var(--papel)}
+@media (min-width:768px){.jsl dialog[data-variante="solicitud"]{inset:0;margin:auto;width:min(560px,calc(100vw - 32px));max-width:560px;border-radius:22px}.jsl .sol-detalle-cab{padding:18px 22px}.jsl .sol-detalle-cuerpo{padding:18px 22px 24px}}
 .jsl .seg-solicitudes{display:flex;width:100%;min-width:0;justify-content:flex-start;overflow-x:auto;scrollbar-width:none;padding:4px;gap:2px;margin-bottom:10px}
 .jsl .seg-solicitudes::-webkit-scrollbar{display:none}
 .jsl .seg-solicitudes button{flex:none;white-space:nowrap;padding:6px 12px;font-size:.8rem;border-radius:999px}

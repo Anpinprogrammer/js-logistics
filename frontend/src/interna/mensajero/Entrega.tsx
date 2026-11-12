@@ -11,7 +11,8 @@ import { BloqueDevolucion } from "./Reintento";
 import { DlgRecoger } from "./Recoger";
 
 type Ventana = ReturnType<typeof useVentana>;
-export const abrirEntregaEn = (v: Ventana, guia: string) => v.abrir(<DlgEntrega guia={guia} />);
+export const abrirEntregaEn = (v: Ventana, guia: string) => v.abrir(<DlgEntrega guia={guia} />, "entrega");
+export const abrirDevolucionEn = (v: Ventana, guia: string) => v.abrir(<DlgDevolucion guia={guia} />, "devolucion");
 /** Abre una guía del mensajero según su estado: por recoger, por entregar o cerrada (la cadena de un reintento salta entre ellas). */
 export function abrirGuiaMensajero(v: Ventana, guia: string) {
   const p = S.pedidos[guia];
@@ -80,26 +81,31 @@ function DlgEntrega({ guia }: { guia: string }) {
       v.cerrar(); v.avisar("Entrega de " + guia + " registrada");
     } catch (e) { setGuardando(false); v.avisar("No se pudo guardar la entrega: " + motivoError(e) + "."); }
   };
-  return <>
-    <Cab sub={<span className="sub">{nombreCliente(p.clienteId) || p.clienteNombre || "Remitente sin asignar"}</span>}><h2>Entregar <span className="guia">{guia}</span></h2></Cab>
-    <div className="foto-pedido" id="eFotoPed"><FotoSalida guia={guia} mini={p.mini} /></div>
-    {aC ? <div className="cobrar-box"><span>Valor a cobrar</span><b>{pesos(aC)}</b></div> : null}
-    {p.intentos.length ? <div className="aviso">Intentos anteriores: {p.intentos.map(i => hora(i.fecha) + " · " + (MOTIVOS[i.motivo as Motivo] || "") + (i.nota ? " (" + i.nota + ")" : "")).join("; ")}</div> : null}
-    <div className="campo"><label htmlFor="eNom">Nombre de quien recibe</label><input id="eNom" autoComplete="off" value={nom} onChange={e => setNom(e.target.value)} /></div>
-    <div className="campo"><span className="lbl">Firma</span>{firma.lienzo}</div>
-    <div className="campo"><span className="lbl">Foto de entrega</span>{bloque("e")}</div>
-    <div className="campo"><label htmlFor="eValor">Valor cobrado</label><input id="eValor" type="number" inputMode="numeric" min="0" step="100" placeholder="0" value={valor} onChange={e => { setValor(e.target.value); reset(); }} /></div>
-    <div className="campo"><span className="lbl">Método de pago</span><div className="metodos">
-      {(Object.keys(METODOS) as Metodo[]).map(k => <label key={k}><input type="radio" name="metodo" value={k} checked={metodo === k} onChange={() => { setMetodo(k); if (k === "transf_cliente") setValor("0"); else if (aC && valor === "0") setValor(String(aC)); reset(); }} /><span>{METODOS[k].t}<small>{METODOS[k].d}</small></span></label>)}
-    </div></div>
-    <div className={"campo" + (metodo === "transf_js" ? "" : " oculto")} id="eCtaC"><label htmlFor="eCta">¿A qué cuenta de JS llegó la transferencia?</label><select id="eCta" value={cta} onChange={e => setCta(e.target.value)}><option value="">Elige…</option>{Object.entries(CUENTAS_JS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></div>
-    <div id="eDif">{aceptoDif && dif ? <div className="aviso alerta">Debías cobrar <b>{pesos(esperado)}</b> y escribiste <b>{pesos(v0)}</b> ({dif > 0 ? "sobran" : "faltan"} {pesos(Math.abs(dif))}). Revisa el valor. Si está bien, toca otra vez el botón.</div> : null}</div>
-    <div className="linea2"><div className="campo"><label htmlFor="eGasto">Gasté en este envío (flete, bus…)</label><input id="eGasto" type="number" inputMode="numeric" min="0" step="1000" placeholder="0" value={gasto} onChange={e => setGasto(e.target.value)} /></div>
-      <div className="campo"><label htmlFor="eGastoNota">Detalle del gasto (opcional)</label><input id="eGastoNota" placeholder="Ej: bus a Popayán" value={gastoNota} onChange={e => setGastoNota(e.target.value)} /></div></div>
-    <label className="check"><input type="checkbox" id="eCambio" checked={cambio} onChange={e => setCambio(e.target.checked)} /> Recibí un cambio (prenda de vuelta para el remitente)</label>
-    <button className="btn ok" id="eGuardar" style={{ width: "100%" }} disabled={guardando} onClick={guardar}>{guardando ? "Guardando…" : aceptoDif && dif ? "Sí, guardar con diferencia" : "Confirmar entrega"}</button>
-    <button className="btn peligro" id="eNoEnt" style={{ width: "100%", marginTop: 10 }} onClick={() => v.abrir(<DlgDevolucion guia={guia} />)}>No se pudo entregar</button>
-  </>;
+  return <div className="entrega-modal">
+    <header className="entrega-cab"><div><h2>Entregar <span className="guia">{guia}</span> <span className="entrega-estado">En ruta</span></h2><p>{nombreCliente(p.clienteId) || p.clienteNombre || "Remitente sin asignar"}</p></div><button type="button" className="cerrar" data-cerrar aria-label="Cerrar entrega">×</button></header>
+    <div className="entrega-cuerpo">
+      <div className="entrega-col">
+        <div className="foto-pedido" id="eFotoPed"><FotoSalida guia={guia} mini={p.mini} /></div>
+        <div className="campo"><label htmlFor="eNom">Nombre de quien recibe</label><input id="eNom" autoComplete="off" value={nom} onChange={e => setNom(e.target.value)} /></div>
+        <div className="campo"><span className="lbl">Firma</span>{firma.lienzo}</div>
+        <div className="campo"><span className="lbl">Foto de entrega</span>{bloque("e")}</div>
+      </div>
+      <div className="entrega-col">
+        {aC ? <div className="cobrar-box"><span>Valor a cobrar</span><b>{pesos(aC)}</b></div> : null}
+        {p.intentos.length ? <div className="aviso">Intentos anteriores: {p.intentos.map(i => hora(i.fecha) + " · " + (MOTIVOS[i.motivo as Motivo] || "") + (i.nota ? " (" + i.nota + ")" : "")).join("; ")}</div> : null}
+        <div className="campo"><label htmlFor="eValor">Valor cobrado</label><input id="eValor" type="number" inputMode="numeric" min="0" step="100" placeholder="0" value={valor} onChange={e => { setValor(e.target.value); reset(); }} /></div>
+        <div className="campo"><span className="lbl">Método de pago</span><div className="metodos entrega-metodos">
+          {(Object.keys(METODOS) as Metodo[]).map(k => <label key={k}><input type="radio" name="metodo" value={k} checked={metodo === k} onChange={() => { setMetodo(k); if (k === "transf_cliente") setValor("0"); else if (aC && valor === "0") setValor(String(aC)); reset(); }} /><span>{METODOS[k].t}<small>{METODOS[k].d}</small></span></label>)}
+        </div></div>
+        <div className={"campo" + (metodo === "transf_js" ? "" : " oculto")} id="eCtaC"><label htmlFor="eCta">¿A qué cuenta de JS llegó la transferencia?</label><select id="eCta" value={cta} onChange={e => setCta(e.target.value)}><option value="">Elige…</option>{Object.entries(CUENTAS_JS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></div>
+        <div id="eDif">{aceptoDif && dif ? <div className="aviso alerta">Debías cobrar <b>{pesos(esperado)}</b> y escribiste <b>{pesos(v0)}</b> ({dif > 0 ? "sobran" : "faltan"} {pesos(Math.abs(dif))}). Revisa el valor. Si está bien, toca otra vez el botón.</div> : null}</div>
+        <div className="linea2"><div className="campo"><label htmlFor="eGasto">Gasté en este envío (flete, bus…)</label><input id="eGasto" type="number" inputMode="numeric" min="0" step="1000" placeholder="0" value={gasto} onChange={e => setGasto(e.target.value)} /></div>
+          <div className="campo"><label htmlFor="eGastoNota">Detalle del gasto (opcional)</label><input id="eGastoNota" placeholder="Ej: bus a Popayán" value={gastoNota} onChange={e => setGastoNota(e.target.value)} /></div></div>
+        <label className="check"><input type="checkbox" id="eCambio" checked={cambio} onChange={e => setCambio(e.target.checked)} /> Recibí un cambio (prenda de vuelta para el remitente)</label>
+      </div>
+    </div>
+    <footer className="entrega-pie"><button className="btn ok" id="eGuardar" type="button" disabled={guardando} onClick={guardar}>{guardando ? "Guardando…" : aceptoDif && dif ? "Sí, guardar con diferencia" : "Confirmar entrega"}</button><button className="btn peligro" id="eNoEnt" type="button" onClick={() => abrirDevolucionEn(v, guia)}>No se pudo entregar</button></footer>
+  </div>;
 }
 
 /** Foto de salida del pedido: primero la miniatura y, cuando llega, la foto completa. */
@@ -127,14 +133,19 @@ export function DlgDevolucion({ guia }: { guia: string }) {
     try { await noEntregado(guia, motivo, nota.trim(), foto); v.cerrar(); v.avisar(motivo === "reprogramar" ? "Intento registrado. " + guia + " sigue en tu lista" : "Devolución de " + guia + " registrada"); }
     catch (e) { setGuardando(false); v.avisar("No se pudo guardar: " + motivoError(e) + "."); }
   };
-  return <>
-    <Cab sub={<span className="sub">{nombreCliente(p.clienteId) || p.clienteNombre || "Remitente sin asignar"}</span>}><h2>No se pudo entregar <span className="guia">{guia}</span></h2></Cab>
-    <div className="campo"><span className="lbl">¿Qué pasó?</span><div className="metodos">{(Object.keys(MOTIVOS) as Motivo[]).map(k => <label key={k}><input type="radio" name="motivo" value={k} checked={motivo === k} onChange={() => setMotivo(k)} /><span>{MOTIVOS[k]}{k === "reprogramar" ? <small>El pedido sigue en tu lista para intentarlo después</small> : k === "otro" ? null : <small>El paquete vuelve al remitente</small>}</span></label>)}</div></div>
-    <div className="campo"><label htmlFor="dNota">Detalle (opcional)</label><input id="dNota" placeholder="Ej: llamé 3 veces, el portero no lo recibió" value={nota} onChange={e => setNota(e.target.value)} /></div>
-    <div className="campo"><span className="lbl">Foto de evidencia (opcional)</span>{bloque("d")}</div>
-    <button className="btn" id="dGuardar" style={{ width: "100%" }} disabled={guardando} onClick={guardar}>{guardando ? "Guardando…" : "Registrar"}</button>
-    <button className="btn sec" id="dVolver" style={{ width: "100%", marginTop: 10 }} onClick={() => abrirEntregaEn(v, guia)}>Volver a la entrega</button>
-  </>;
+  return <div className="entrega-modal devolucion-modal">
+    <header className="entrega-cab"><div><h2>No se pudo entregar <span className="guia">{guia}</span> <span className="entrega-estado devolucion-estado">Novedad</span></h2><p>{nombreCliente(p.clienteId) || p.clienteNombre || "Remitente sin asignar"}</p></div><button type="button" className="cerrar" data-cerrar aria-label="Cerrar novedad">×</button></header>
+    <div className="entrega-cuerpo">
+      <div className="entrega-col"><div className="campo"><span className="lbl">¿Qué pasó?</span><div className="metodos entrega-metodos">
+        {(Object.keys(MOTIVOS) as Motivo[]).map(k => <label key={k}><input type="radio" name="motivo" value={k} checked={motivo === k} onChange={() => setMotivo(k)} /><span>{MOTIVOS[k]}<small>{k === "reprogramar" ? "El pedido sigue en tu lista para intentarlo después" : k === "otro" ? "Describe qué pasó en el detalle" : "El paquete vuelve al remitente"}</small></span></label>)}
+      </div></div></div>
+      <div className="entrega-col">
+        <div className="campo"><label htmlFor="dNota">Detalle {motivo === "otro" ? "(obligatorio)" : "(opcional)"}</label><textarea id="dNota" rows={4} placeholder="Ej: llamé 3 veces, el portero no lo recibió" value={nota} onChange={e => setNota(e.target.value)} /></div>
+        <div className="campo"><span className="lbl">Foto de evidencia (opcional)</span>{bloque("d")}</div>
+      </div>
+    </div>
+    <footer className="entrega-pie"><button className="btn" id="dGuardar" type="button" disabled={guardando} onClick={guardar}>{guardando ? "Guardando…" : "Registrar novedad"}</button><button className="btn sec" id="dVolver" type="button" onClick={() => abrirEntregaEn(v, guia)}>Volver a la entrega</button></footer>
+  </div>;
 }
 
 /** Pedido entregado o devuelto visto por el mensajero: solo información y pruebas, sin acciones. */

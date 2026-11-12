@@ -49,7 +49,7 @@ export const useSolicitudes = (activo = true) => useQuery({
 export const mensajeCotizacion = (s: Solicitud) =>
   `Hola ${s.nombre.split(" ")[0]}, te escribimos de JS Logistics. Recibimos tu solicitud de recogida en ${s.direccionRecogida} para entregar en ${s.direccionEntrega} (${s.paquetes} ${s.paquetes === 1 ? "paquete" : "paquetes"}). El valor del domicilio es ${pesos(s.valor)}. ¿Estás de acuerdo? Respóndenos "sí" y enviamos a un mensajero.`;
 
-const IconoCampana = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z" /><path d="M10 20a2 2 0 0 0 4 0" /></svg>;
+export const IconoCampana = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z" /><path d="M10 20a2 2 0 0 0 4 0" /></svg>;
 
 export function Campanita() {
   const { abrir } = useVentana();
@@ -82,9 +82,9 @@ function PanelSolicitudes() {
 /** ¿La pidió un cliente con cuenta desde su portal y tiene un domicilio asignado? */
 const tarifaDe = (s: Solicitud) => (s.origen === "portal" && s.clienteId && s.clienteTarifa ? s.clienteTarifa : 0);
 
-const ETQ: Record<string, [string, string]> = { pendiente: ["sin", "Nueva"], cotizada: ["pend", "Esperando al cliente"], confirmada: ["ent", "Cliente de acuerdo"], asignada: ["ent", "Asignada"], rechazada: ["gris", "Rechazada"] };
+export const ETQ: Record<string, [string, string]> = { pendiente: ["sin", "Nueva"], cotizada: ["pend", "Esperando al cliente"], confirmada: ["ent", "Cliente de acuerdo"], asignada: ["ent", "Asignada"], rechazada: ["gris", "Rechazada"] };
 
-export function TarjetaSolicitud({ s }: { s: Solicitud }) {
+export function TarjetaSolicitud({ s, enDetalle = false, alCompletar }: { s: Solicitud; enDetalle?: boolean; alCompletar?: () => void }) {
   const qc = useQueryClient();
   const v = useVentana();
   const tarifa = tarifaDe(s);
@@ -99,7 +99,7 @@ export function TarjetaSolicitud({ s }: { s: Solicitud }) {
 
   const correr = async (fn: () => Promise<unknown>, aviso: string) => {
     setOcupado(true); setError("");
-    try { await fn(); await qc.invalidateQueries({ queryKey: ["solicitudes"] }); v.avisar(aviso); }
+    try { await fn(); await qc.invalidateQueries({ queryKey: ["solicitudes"] }); v.avisar(aviso); alCompletar?.(); }
     catch (e) { setError(mensajeDe(e)); }
     finally { setOcupado(false); }
   };
@@ -111,6 +111,7 @@ export function TarjetaSolicitud({ s }: { s: Solicitud }) {
       const nueva = DEMO ? cambiarDemo(s.id, { estado: tarifa && monto === tarifa ? "confirmada" : "cotizada", valor: monto }) : await api.solicitudes.aceptar(s.id, monto);
       await qc.invalidateQueries({ queryKey: ["solicitudes"] });
       v.avisar(nueva.estado === "confirmada" ? "Solicitud aceptada con su domicilio de siempre. Asígnala a un mensajero." : "Solicitud aceptada. Envía el valor al cliente por WhatsApp.");
+      alCompletar?.();
     } catch (e) { setError(mensajeDe(e)); }
     finally { setOcupado(false); }
   };
@@ -130,10 +131,11 @@ export function TarjetaSolicitud({ s }: { s: Solicitud }) {
   const wa = s.estado === "cotizada" ? linkWhatsApp(s.telefono, mensajeCotizacion(s)) : "";
   const hayTel = !!telWhatsApp(s.telefono);
   return (
-    <article className="solicitud">
-      <header><b>{s.nombre}</b><span className={"etq " + cls}>{etq}</span></header>
-      {s.origen === "portal" && <span className="solicitud-origen">Cliente existente · la pidió desde su portal</span>}
-      <small className="suave">{hora(new Date(s.creado).getTime())} · {s.telefono} · {s.email}</small>
+    <article className={"solicitud" + (enDetalle ? " solicitud-en-detalle" : "")}>
+      {!enDetalle && <><header><b>{s.nombre}</b><span className={"etq " + cls}>{etq}</span></header>
+        {s.origen === "portal" && <span className="solicitud-origen">Cliente existente · la pidió desde su portal</span>}
+        <small className="suave">{hora(new Date(s.creado).getTime())} · {s.telefono} · {s.email}</small></>}
+      {enDetalle && <div className="sol-detalle-contacto"><a href={`tel:${s.telefono}`}>{s.telefono}</a>{s.email && <a href={`mailto:${s.email}`}>{s.email}</a>}</div>}
       <dl>
         <div><dt>Recoger en</dt><dd>{s.direccionRecogida}</dd></div>
         <div><dt>Entregar a</dt><dd>{s.destinatarioNombre}{s.destinatarioTelefono ? ` · ${s.destinatarioTelefono}` : ""}<br />{s.direccionEntrega}</dd></div>

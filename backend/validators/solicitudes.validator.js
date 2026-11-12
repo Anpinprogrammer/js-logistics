@@ -40,7 +40,9 @@ export const aceptar = z.object({ valor: pesos.refine(v => v > 0, "Escribe el va
 export const rechazar = z.object({ motivo: texto(300).min(3, "Escribe la razón del rechazo: el cliente la va a ver") });
 export const mias = z.object({
   pagina: z.coerce.number().int().min(1).max(100_000).default(1),
-  porPagina: z.coerce.number().int().min(1).max(50).default(10)
+  porPagina: z.coerce.number().int().min(1).max(50).default(10),
+  // Con `sinTotal` el portal no consulta el total: la respuesta trae `hayMas`.
+  sinTotal: z.enum(["true", "false"]).transform(v => v === "true").optional()
 });
 export const asignar = z.object({
   mensajeroId: id,

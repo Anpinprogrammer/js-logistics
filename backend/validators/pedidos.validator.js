@@ -32,7 +32,9 @@ export const listar = z.object({
   limite: z.coerce.number().int().min(1).max(500).default(100),
   cursor: z.coerce.number().int().positive().optional(),
   pagina: z.coerce.number().int().min(1).max(100_000).optional(),
-  porPagina: z.coerce.number().int().min(1).max(100).default(20)
+  porPagina: z.coerce.number().int().min(1).max(100).default(20),
+  // Con `sinTotal` el paginador no consulta el total: la respuesta trae `hayMas`.
+  sinTotal: bandera.optional()
 }).refine(d => !(d.pagina && d.cursor), { message: "Usa pagina o cursor, no los dos", path: ["cursor"] });
 
 // El mensajero solo manda el body vacío: la guía queda a su nombre y en cero.

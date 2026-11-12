@@ -73,21 +73,33 @@ export async function listar({ limite = 100, cursor, ...filtros } = {}) {
  * Lista por páginas numeradas, para el paginador de las pantallas. Si la página pedida ya no existe
  * (por ejemplo, porque se borraron pedidos o cambió el filtro), devuelve la última y dice cuál mandó.
  * Usa OFFSET: la pantalla salta a cualquier página, y con 20 por página el costo es bajo.
+ * Con `sinTotal` no ejecuta `COUNT(*)`: trae una fila extra y responde `hayMas` para el paginador.
  */
-export async function listarPagina({ pagina = 1, porPagina = 20, ...filtros } = {}) {
+export async function listarPagina({ pagina = 1, porPagina = 20, sinTotal = false, ...filtros } = {}) {
   const { cond, valores } = filtrosSql(filtros);
-  const { rows: [c] } = await query(
-    `SELECT count(*)::int AS total FROM pedidos p
-     LEFT JOIN clientes c ON c.id = p.cliente_id LEFT JOIN mensajeros m ON m.id = p.mensajero_id ${donde(cond)}`,
-    valores
-  );
-  const total = c.total, paginas = Math.max(1, Math.ceil(total / porPagina));
-  const actual = Math.min(pagina, paginas);
+  let actual = pagina, total, paginas;
+  if (!sinTotal) {
+    const { rows: [c] } = await query(
+      `SELECT count(*)::int AS total FROM pedidos p
+       LEFT JOIN clientes c ON c.id = p.cliente_id LEFT JOIN mensajeros m ON m.id = p.mensajero_id ${donde(cond)}`,
+      valores
+    );
+    total = c.total;
+    paginas = Math.max(1, Math.ceil(total / porPagina));
+    actual = Math.min(pagina, paginas);
+  }
+  const limite = sinTotal ? porPagina + 1 : porPagina;
   const { rows } = await query(
     `${CON_INTENTOS} ${donde(cond)} ORDER BY p.n DESC LIMIT $${valores.length + 1} OFFSET $${valores.length + 2}`,
-    [...valores, porPagina, (actual - 1) * porPagina]
+    [...valores, limite, (actual - 1) * porPagina]
   );
-  return { pedidos: rows.map(filaAObjeto), pagina: actual, porPagina, total, paginas };
+  const hayMas = sinTotal ? rows.length > porPagina : undefined;
+  return {
+    pedidos: (hayMas ? rows.slice(0, porPagina) : rows).map(filaAObjeto),
+    pagina: actual,
+    porPagina,
+    ...(sinTotal ? { hayMas } : { total, paginas })
+  };
 }
 
 export async function buscarPorGuia(guia, db = { query }) {

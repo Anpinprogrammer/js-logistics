@@ -4,6 +4,27 @@ Este archivo es la **memoria compartida** entre sesiones y agentes. Léelo despu
 
 Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/ESTADO.md`.
 
+## Cabecera móvil de la app interna — 2026-11-11
+
+- El logo del sidebar de escritorio y de las cabeceras de la app interna usa `frontend/public/logo_JS_sin_texto.webp` en los tres modos (administración, oficina y mensajero).
+- Bajo 960 px la barra superior muestra logo, campana y perfil. El perfil abre un popover con nombre, vista activa, cambio de modo solo para admin, tema y salida; se cierra al tocar fuera, con Escape o tras elegir una acción. En modo mensajero la campana lleva a Pedidos y muestra sus pendientes; en oficina mantiene las solicitudes de la campanita existente. Desde 960 px la barra conserva los controles anteriores.
+- Revisado en demo a 320, 390, 768 y 1024 px, sin desbordamiento horizontal; se comprobó cambio de modo, tema y cierre del popover.
+
+## Solicitudes de oficina — 2026-11-11
+
+- La pantalla Solicitudes muestra filas compactas en escritorio y filas de dos líneas en móvil. El detalle completo abre la variante `solicitud` de la ventana compartida, con hoja inferior en móvil y modal centrado desde 768 px. La campanita conserva sus tarjetas originales.
+- `TarjetaSolicitud` reutiliza su lógica de aceptar, confirmar, asignar y rechazar dentro del detalle; después de una acción exitosa cierra la ventana e invalida las consultas de solicitudes. Los filtros y la paginación permanecen en la pantalla. Revisado en demo a 320, 390, 768, 1024 y 1440 px, sin scroll horizontal; aceptar actualiza la lista y permite asignar.
+
+## Modal de entrega del mensajero — 2026-11-11
+
+- “No se pudo entregar” usa la variante `devolucion` de la misma ventana: hoja inferior en móvil, modal centrado de 768 px con motivos y evidencia en dos columnas desde 1024 px. La barra de acciones queda visible; los cinco motivos conservan las claves de la API (`no_contesta`, `direccion`, `rechazo`, `reprogramar`, `otro`) y “Otro” sigue exigiendo detalle. También se usa desde Pedidos de oficina.
+- `DlgEntrega` abre la variante `entrega` de la ventana compartida: hoja inferior hasta 1023 px y modal centrado de 896 px con dos columnas desde 1024 px. La cabecera y las acciones quedan fijas; solo el cuerpo desplaza. Las opciones de pago alinean el radio a la izquierda. Se conservan firma, foto, validaciones, cuenta de transferencia, diferencias, gastos y devolución.
+- Los ajustes viven en `frontend/src/interna/ajustes.css`; `estilos.css` sigue siendo la copia generada del prototipo. Revisado en demo a 320, 390, 1024 y 1440 px; en escritorio el cuerpo cabe sin scroll a 844 px de alto.
+
+## Paginación sin total — 2026-11-11
+
+- `GET /pedidos?pagina=&porPagina=&sinTotal=true` y `GET /solicitudes/mias?pagina=&porPagina=&sinTotal=true` ya no ejecutan `COUNT(*)`: traen `porPagina + 1` filas y responden `hayMas`. Sin `sinTotal`, la respuesta anterior con `total` y `paginas` se mantiene para la oficina y otros consumidores. El portal del cliente usa 5 en celular y 10 en computador.
+
 ## Estado "aceptado" y recogida con foto — 2026-11-12
 
 - Estados del pedido: `aceptado` (por recoger) → `pendiente` (en ruta; en pantalla "En ruta" / "Por entregar") → `entregado` o `devuelto`. **No se renombró `pendiente`**: lo usan `calculos.js` (copia de `app/js/app.js`), la importación de Firestore y todas las cuentas; solo se agregó `aceptado` antes.

@@ -125,18 +125,31 @@ export async function contarAbiertas() {
 
 /** Las solicitudes de un cliente, para su portal ("Mis solicitudes"). Solo las ligadas a su ficha (cliente_id lo pone
     el servidor desde la sesión) y solo los campos que le sirven: nada de quién la revisó ni datos internos.
-    `pedidoEstado` es el estado de la guía que salió de la solicitud, si ya se asignó. */
-export async function listarDeCliente(clienteId, { pagina = 1, porPagina = 20 } = {}) {
-  const { rows: [{ n }] } = await query(`SELECT count(*)::int AS n FROM solicitudes WHERE cliente_id = $1`, [clienteId]);
-  const paginas = Math.max(1, Math.ceil(n / porPagina)), actual = Math.min(pagina, paginas);
+    `pedidoEstado` es el estado de la guía que salió de la solicitud, si ya se asignó.
+    Con `sinTotal` no consulta el total: trae una fila extra y responde `hayMas`. */
+export async function listarDeCliente(clienteId, { pagina = 1, porPagina = 20, sinTotal = false } = {}) {
+  let actual = pagina, total, paginas;
+  if (!sinTotal) {
+    const { rows: [{ n }] } = await query(`SELECT count(*)::int AS n FROM solicitudes WHERE cliente_id = $1`, [clienteId]);
+    total = n;
+    paginas = Math.max(1, Math.ceil(n / porPagina));
+    actual = Math.min(pagina, paginas);
+  }
+  const limite = sinTotal ? porPagina + 1 : porPagina;
   const { rows } = await query(
     `SELECT s.id, s.estado, s.origen, s.direccion_recogida, s.paquetes, s.peso_kg, s.destinatario_nombre, s.destinatario_telefono,
        s.direccion_entrega, s.valor, s.motivo_rechazo, s.guia, s.creado, s.actualizado, p.estado AS pedido_estado
      FROM solicitudes s LEFT JOIN pedidos p ON p.guia = s.guia
      WHERE s.cliente_id = $1 ORDER BY s.creado DESC LIMIT $2 OFFSET $3`,
-    [clienteId, porPagina, (actual - 1) * porPagina]
+    [clienteId, limite, (actual - 1) * porPagina]
   );
-  return { solicitudes: rows.map(aObjeto), pagina: actual, porPagina, total: n, paginas };
+  const hayMas = sinTotal ? rows.length > porPagina : undefined;
+  return {
+    solicitudes: (hayMas ? rows.slice(0, porPagina) : rows).map(aObjeto),
+    pagina: actual,
+    porPagina,
+    ...(sinTotal ? { hayMas } : { total, paginas })
+  };
 }
 
 // Columnas que se pueden cambiar. La lista la fija el código, no la petición.
