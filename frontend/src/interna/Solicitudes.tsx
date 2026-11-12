@@ -93,6 +93,8 @@ export function TarjetaSolicitud({ s }: { s: Solicitud }) {
   const [mensajero, setMensajero] = useState("");
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState("");
+  // Rechazar pide la razón: el cliente la ve en "Mis solicitudes" de su portal.
+  const [rechazando, setRechazando] = useState(false), [motivo, setMotivo] = useState("");
   const mensajeros = Object.values(S.mensajeros).filter(m => m.tipo === "mensajero");
 
   const correr = async (fn: () => Promise<unknown>, aviso: string) => {
@@ -113,9 +115,11 @@ export function TarjetaSolicitud({ s }: { s: Solicitud }) {
     finally { setOcupado(false); }
   };
   const confirmar = () => correr(async () => { if (DEMO) cambiarDemo(s.id, { estado: "confirmada" }); else await api.solicitudes.confirmar(s.id); }, "Listo: ya puedes asignarla a un mensajero.");
-  const rechazar = async () => {
-    if (!(await v.confirmar("¿Rechazar la solicitud?", `Se descarta la solicitud de ${s.nombre}. No se le avisa por WhatsApp: escríbele tú si hace falta.`, "Rechazar"))) return;
-    await correr(async () => { if (DEMO) cambiarDemo(s.id, { estado: "rechazada" }); else await api.solicitudes.rechazar(s.id, ""); }, "Solicitud rechazada.");
+  const rechazar = () => { setRechazando(true); setError(""); };
+  const confirmarRechazo = async () => {
+    const m = motivo.trim();
+    if (m.length < 3) { setError("Escribe la razón del rechazo: el cliente la va a ver."); return; }
+    await correr(async () => { if (DEMO) cambiarDemo(s.id, { estado: "rechazada", motivoRechazo: m }); else await api.solicitudes.rechazar(s.id, m); }, "Solicitud rechazada.");
   };
   const asignar = () => correr(async () => {
     if (DEMO) cambiarDemo(s.id, { estado: "asignada", mensajeroId: mensajero });
@@ -141,6 +145,18 @@ export function TarjetaSolicitud({ s }: { s: Solicitud }) {
       </dl>
       {error && <div className="aviso alerta" role="alert">{error}</div>}
 
+      {rechazando && ["pendiente", "cotizada", "confirmada"].includes(s.estado) && <div className="form-modal solicitud-rechazo">
+        <div className="campo">
+          <label htmlFor={"mot" + s.id}>Razón del rechazo</label>
+          <textarea id={"mot" + s.id} rows={2} maxLength={300} placeholder="Ej: No llegamos a esa zona" value={motivo} onChange={e => setMotivo(e.target.value)} aria-describedby={"motAyuda" + s.id} autoFocus />
+          <small id={"motAyuda" + s.id} className="suave">El cliente la ve en su portal. No se le avisa por WhatsApp: escríbele tú si hace falta.</small>
+        </div>
+        <div className="acciones">
+          <button className="btn peligro" disabled={ocupado || motivo.trim().length < 3} onClick={confirmarRechazo}>Rechazar solicitud</button>
+          <button className="btn sec" disabled={ocupado} onClick={() => { setRechazando(false); setMotivo(""); setError(""); }}>Cancelar</button>
+        </div>
+      </div>}
+
       {s.estado === "pendiente" && <>
         <div className="form-modal"><div className="campo">
           <label htmlFor={"val" + s.id}>Valor del domicilio</label>
@@ -153,7 +169,7 @@ export function TarjetaSolicitud({ s }: { s: Solicitud }) {
         </div></div>
         <div className="acciones">
           <button className="btn ok" disabled={ocupado || monto <= 0} onClick={aceptar}>Aceptar</button>
-          <button className="btn sec" disabled={ocupado} onClick={rechazar}>Rechazar</button>
+          {!rechazando && <button className="btn sec" disabled={ocupado} onClick={rechazar}>Rechazar</button>}
         </div>
       </>}
 
@@ -164,7 +180,7 @@ export function TarjetaSolicitud({ s }: { s: Solicitud }) {
             ? <a className="btn ok" href={wa} target="_blank" rel="noopener noreferrer"><IconoWhatsApp />Enviar valor por WhatsApp</a>
             : <span className="aviso alerta">El teléfono no sirve para WhatsApp: llámalo.</span>}
           <button className="btn" disabled={ocupado} onClick={confirmar}>El cliente está de acuerdo</button>
-          <button className="btn sec" disabled={ocupado} onClick={rechazar}>Rechazar</button>
+          {!rechazando && <button className="btn sec" disabled={ocupado} onClick={rechazar}>Rechazar</button>}
         </div>
       </>}
 
@@ -178,7 +194,7 @@ export function TarjetaSolicitud({ s }: { s: Solicitud }) {
         </div></div>
         <div className="acciones">
           <button className="btn ok" disabled={ocupado || !mensajero} onClick={asignar}>Asignar y crear guía</button>
-          <button className="btn sec" disabled={ocupado} onClick={rechazar}>Rechazar</button>
+          {!rechazando && <button className="btn sec" disabled={ocupado} onClick={rechazar}>Rechazar</button>}
         </div>
       </>}
     </article>

@@ -13,6 +13,7 @@ import { DEMO } from "../demo";
 import { usePorPagina } from "../../lib/pantalla";
 import { pedidos as apiPedidos, type FiltrosPedidos } from "../../api/servicios";
 import { abrirEntregaEn, DlgDevolucion } from "../mensajero/Entrega";
+import { DlgRecoger } from "../mensajero/Recoger";
 import { FormCliente } from "./Clientes";
 import type { CambiosPedido } from "../../api/servicios";
 
@@ -24,6 +25,7 @@ function filtrosServidor(f: string, buscar: string, mensajeroId: string, dia: st
   const base = { buscar: buscar.trim() || undefined, mensajeroId: mensajeroId || undefined, dia: dia || undefined };
   if (f === "sin") return { ...base, sinRemitente: true };
   if (f === "pend") return { ...base, estado: "pendiente" };
+  if (f === "rec") return { ...base, estado: "aceptado" };
   if (f === "ent") return { ...base, estado: "entregado" };
   if (f === "dev") return { ...base, estado: "devuelto" };
   if (f === "dif") return { ...base, diferencia: "todas" };
@@ -37,6 +39,7 @@ function filtrarEnMemoria(f: string, buscar: string, mensajeroId: string, dia: s
   let ps = Object.values(S.pedidos).sort((a, b) => b.n - a.n);
   if (f === "sin") ps = ps.filter(p => !p.clienteId);
   else if (f === "pend") ps = ps.filter(p => p.estado === "pendiente");
+  else if (f === "rec") ps = ps.filter(p => p.estado === "aceptado");
   else if (f === "ent") ps = ps.filter(p => p.estado === "entregado");
   else if (f === "dev") ps = ps.filter(p => p.estado === "devuelto");
   else if (f === "dif") ps = ps.filter(p => Number(p.difCobro));
@@ -78,12 +81,13 @@ export default function Pedidos({ pintar }: { pintar: () => void }) {
   const todos = Object.values(S.pedidos);
   const totalPedidos = E.mensPedA ? todos.filter(p => p.mensajeroId === E.mensPedA).length : todos.length;
   const porEntregar = todos.filter(p => p.estado === "pendiente" && (!E.mensPedA || p.mensajeroId === E.mensPedA)).length;
+  const porRecoger = todos.filter(p => p.estado === "aceptado" && (!E.mensPedA || p.mensajeroId === E.mensPedA)).length;
   const repartidores = listaOrdenada(S.mensajeros, "nombre").filter(m => esRepartidor(m) || m.id === E.mensPedA);
   const ofis = listaOrdenada(S.mensajeros, "nombre").filter(m => tipoDe(m) === "oficina");
   const nCambio = todos.filter(cambioPendiente).length, nServ = todos.filter(sinServicio).length, nDif = todos.filter(p => Number(p.difCobro) && !p.difRevisada).length;
   const poner = (cambio: Partial<typeof E>) => { Object.assign(E, cambio); pintar(); };
   const tBuscar = useRef<number>(0);
-  const estados: [string, string, number?][] = [["todos", "Todos los pedidos", totalPedidos], ["sin", "Sin remitente"], ["pend", "Por entregar", porEntregar], ["ent", "Entregados"], ["dev", "Devueltos"], ["dif", "Con diferencia"], ["cambio", "Cambios por recibir", nCambio]];
+  const estados: [string, string, number?][] = [["todos", "Todos los pedidos", totalPedidos], ["sin", "Sin remitente"], ["rec", "Por recoger", porRecoger], ["pend", "Por entregar", porEntregar], ["ent", "Entregados"], ["dev", "Devueltos"], ["dif", "Con diferencia"], ["cambio", "Cambios por recibir", nCambio]];
 
   const fotos = async (lista: FileList | null) => {
     const files = [...(lista || [])].filter(x => x.type.startsWith("image/")).slice(0, 30); if (!files.length) return;
@@ -217,7 +221,9 @@ export function AbrirPedido({ guia, cliElegido }: { guia: string; cliElegido?: s
     <dl className="datos" style={{ marginTop: 18 }}>
       {p.cambio && <><dt>Cambio</dt><dd>{p.cambioRecibido ? "El cliente lo recibió " + hora(p.cambioRecibido) : "Prenda por entregar al cliente"}</dd></>}
       <dt>Mensajero</dt><dd>{S.mensajeros[p.mensajeroId]?.nombre || "—"}</dd>
-      <dt>Salió</dt><dd>{hora(p.creado)}</dd>
+      {p.estado === "aceptado" ? <><dt>Estado</dt><dd>Por recoger: el mensajero todavía no le toma la foto al paquete</dd><dt>Asignado</dt><dd>{hora(p.creado)}</dd></>
+        : <><dt>Salió</dt><dd>{hora(p.creado)}</dd></>}
+      {p.solicitud && <><dt>Recoger en</dt><dd>{p.solicitud.direccionRecogida}</dd><dt>Entregar a</dt><dd>{p.solicitud.destinatarioNombre}{p.solicitud.destinatarioTelefono ? " · " + p.solicitud.destinatarioTelefono : ""} · {p.solicitud.direccionEntrega}</dd></>}
       {p.intentos.map((i, k) => <IntentoFila key={k} n={k + 1} fecha={i.fecha} motivo={i.motivo} nota={i.nota} />)}
       {p.estado === "devuelto" && <><dt>Devuelto</dt><dd>{hora(p.entregado)}</dd><dt>Motivo</dt><dd>{MOTIVOS[p.motivoDev as Motivo] || ""}{p.notaDev ? " · " + p.notaDev : ""}</dd><dt>Efecto en saldo</dt><dd className={s < 0 ? "neg" : ""}>{pesos(s)}</dd></>}
       {p.estado === "entregado" && Number(p.difCobro) ? <><dt>Debía cobrar</dt><dd>{pesos(p.aCobrar)}</dd><dt>Diferencia</dt><dd className="neg">{pesos(p.difCobro)}{p.difRevisada ? " (revisada)" : ""}</dd></> : null}
@@ -229,9 +235,10 @@ export function AbrirPedido({ guia, cliElegido }: { guia: string; cliElegido?: s
     <FotosGuia p={p} id="pFotos" conPrevias />
     </div>
     <div className="acciones pedido-drawer-pie">
+      {p.estado === "aceptado" ? <button className="btn chico" id="pRecoger" onClick={() => v.abrir(<DlgRecoger guia={guia} />, "centrada")}>Recoger (foto del paquete)</button> : <>
       {!cerrado(p) && tipoDe(S.mensajeros[p.mensajeroId]) === "oficina" && <button className="btn ok chico" id="pEntregar" onClick={() => abrirEntregaEn(v, guia)}>Marcar entregado</button>}
       {cerrado(p) ? (yo.esAdmin && <button className="btn sec chico" id="pReabrir" onClick={reabrirG}>Devolver a por entregar</button>)
-        : <button className="btn sec chico" id="pNoEnt" onClick={() => v.abrir(<DlgDevolucion guia={guia} />)}>Registrar que no se pudo entregar</button>}
+        : <button className="btn sec chico" id="pNoEnt" onClick={() => v.abrir(<DlgDevolucion guia={guia} />)}>Registrar que no se pudo entregar</button>}</>}
       {Number(p.difCobro) && !p.difRevisada ? <button className="btn sec chico" id="pDifOk" onClick={() => conCambio(() => actualizarPedido(guia, { difRevisada: true }), "Diferencia revisada", false)}>Marcar diferencia como revisada</button> : null}
       {cambioPendiente(p) && <button className="btn sec chico" id="pCambioOk" onClick={cambioOk}>Cambio entregado al cliente</button>}
       {yo.esAdmin && <button className="btn peligro chico" id="pBorrar" onClick={borrar}>Eliminar pedido</button>}

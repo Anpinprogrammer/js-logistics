@@ -46,6 +46,19 @@ export async function crearGuias(files: File[], mensajeroId: string, avance: (ms
   return hechas;
 }
 
+/** Recoger una guía "aceptado" (salió de una solicitud): sube la foto del paquete a esa misma guía (no crea otra)
+    y la pasa a en ruta. Si la foto subió pero falló la recogida, volver a intentarlo sube otra foto y vuelve a pedirla. */
+export async function recoger(guia: string, f: File) {
+  if (DEMO) {
+    const mini = URL.createObjectURL(await comprimir(f, MINI));
+    return demoPedido(guia, { estado: "pendiente", creado: Date.now(), mini });
+  }
+  const [foto, mini] = await Promise.all([comprimir(f, FOTO), comprimir(f, MINI)]);
+  await api.pedidos.subirArchivo(guia, "salida", foto);
+  await api.pedidos.subirArchivo(guia, "mini", mini).catch(() => {});
+  ponerPedido(await api.pedidos.recoger(guia));
+}
+
 /** Remitentes que coinciden con lo escrito (desde 2 letras). El mensajero solo recibe nombre e id. */
 export async function buscarRemitentes(q: string): Promise<T.ClienteBreve[]> {
   const t = q.trim(); if (t.length < 2) return [];

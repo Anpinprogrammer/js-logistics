@@ -4,7 +4,10 @@ export type Rol = "admin" | "asistente" | "mensajero" | "cliente";
 export type Medio = "efectivo" | "nequi" | "bancolombia";
 export type MetodoEntrega = "efectivo" | "transf_js" | "transf_cliente";
 export type Motivo = "no_contesta" | "direccion" | "rechazo" | "reprogramar" | "otro";
-export type EstadoPedido = "pendiente" | "entregado" | "devuelto";
+/** aceptado: guía de una solicitud, asignada y sin recoger (el mensajero no ha tomado la foto); pendiente: en ruta. */
+export type EstadoPedido = "aceptado" | "pendiente" | "entregado" | "devuelto";
+/** Datos de la solicitud de la que salió la guía (dónde recoger y a quién entregar). */
+export interface SolicitudDePedido { direccionRecogida: string; direccionEntrega: string; destinatarioNombre: string; destinatarioTelefono: string; paquetes: number }
 export type TipoPersonal = "mensajero" | "dueno" | "oficina" | "patinador" | "empresa";
 
 export interface Usuario {
@@ -98,6 +101,8 @@ export interface Pedido {
   /** Cuándo y quién registró el pago aparte del domicilio (lo usa la caja de oficina). */
   domiPagoFecha?: string | null;
   domiPagoUid?: string | null;
+  /** Si la guía salió de una solicitud; si no, null. */
+  solicitud?: SolicitudDePedido | null;
   intentos: Intento[];
   mini: string | null;
 }

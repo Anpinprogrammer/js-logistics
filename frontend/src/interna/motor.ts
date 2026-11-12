@@ -7,6 +7,8 @@
  * función se reemplaza por el valor del servidor.
  */
 
+import type { SolicitudDePedido } from "../api/tipos";
+
 /* ---------- tipos del almacén (forma del prototipo) ---------- */
 export type Medio = "efectivo" | "nequi" | "bancolombia";
 export type Metodo = "efectivo" | "transf_js" | "transf_cliente";
@@ -16,7 +18,8 @@ export type TipoMov = "cargo" | "abono" | "pago_a_cliente" | "pago_de_cliente" |
 
 export interface Intento { fecha: number; motivo: Motivo | ""; nota: string }
 export interface Pedido {
-  guia: string; n: number; estado: "pendiente" | "entregado" | "devuelto";
+  /** aceptado = por recoger (guía de una solicitud sin foto); pendiente = en ruta, por entregar. */
+  guia: string; n: number; estado: "aceptado" | "pendiente" | "entregado" | "devuelto";
   creado: number; entregado: number | null;
   mensajeroId: string; clienteId: string; clienteNombre: string;
   valorServicio: number; aCobrar: number;
@@ -27,6 +30,8 @@ export interface Pedido {
   gasto: number; gastoNota: string;
   domiPagado: boolean; domiPagoMedio: Medio | ""; domiPagoValor: number | null; domiPagoFecha: number; domiPagoUid: string;
   intentos: Intento[]; mini: string;
+  /** Dónde recoger y a quién entregar, si la guía salió de una solicitud. */
+  solicitud?: SolicitudDePedido | null;
 }
 export interface Cliente { id: string; nombre: string; telefono: string; tarifa: number }
 export interface Persona { id: string; nombre: string; telefono: string; tipo: TipoPersonal; tarifa: number }

@@ -7,6 +7,7 @@ export const guardarLocal = (k: string, v: string) => { try { localStorage.setIt
 
 const tabCajaGuardada = leer("js_caja");
 const tabCuentasGuardada = leer("js_cuentas");
+const subPedMGuardada = leer("js_pedidos_m");
 
 export const E = {
   rol: (leer("js_rol") || "admin") as "mensajero" | "admin",
@@ -24,6 +25,8 @@ export const E = {
   buscarCue: "", buscarGan: "", diaInternos: "", medioInternos: "" as "" | "efectivo" | "nequi" | "bancolombia", paginaInternos: 1, tipoCue: "todos" as "todos" | "pagos" | "compras" | "ganancias", paginaCue: 1, paginaGan: 1,
   desdeCue: moverDia(hoy(), -30), hastaCue: hoy(),
   // Mensajero
+  // subPedM: sub-pestaña de Pedidos (Todos, Por entregar, Por recoger), guardada en js_pedidos_m
+  subPedM: (subPedMGuardada === "entregar" || subPedMGuardada === "recoger" ? subPedMGuardada : "todos") as "todos" | "entregar" | "recoger",
   miMensajero: leer("js_mensajero"), actuarComo: false, diaPedM: "", diaEntM: hoy(), semM: semanaDe(hoy()), ultimaGuia: "",
   // Más → Resultados
   rangoPanel: "mes",
