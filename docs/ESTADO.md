@@ -1,5 +1,29 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Intro clara del ingreso y contraste de red — 2026-11-12
+
+- `escenaIntro` recibe el tema efectivo desde Ingreso: fondo claro desde `sinMedir`, capa de revelado blanca con borde/sombra claros y sin viñeta negra en claro. La rama oscura conserva los valores y tiempos anteriores.
+- Red del marco: variables CSS por tema, rutas/nodos sky-600 en claro y cian original en oscuro; cuadrícula clara rgba(2,132,199,.08) sin la doble reducción de opacidad anterior. No cambiar recorridos ni coordenadas.
+
+## Corrección de prioridad del tema del skeleton — 2026-11-12
+
+- Se eliminaron las reglas propias de `.dark` y `prefers-color-scheme` del skeleton. El selector `html:not(.light):not(.dark)` tenía mayor especificidad y aplicaba colores oscuros con sistema oscuro aunque el panel tuviera `data-theme="light"`. El skeleton ahora consume únicamente `--papel`, `--linea` y `--hueco` heredados del panel. No volver a agregar una segunda fuente de tema.
+
+## Skeleton junto al marco y tarjetas blancas — 2026-11-12
+
+- Se eliminó `CargaInicialDashboard`: nunca mostrar el skeleton antes del marco real. Mientras se verifica sesión se descarga `Marco` en paralelo en la ruta raíz; al montarlo aparecen juntos navegación y skeleton dentro de `main`. Durante la sesión o descarga pendiente se mantiene el indicador neutral, sin simular permisos ni identidad. Sustituye la decisión anterior de skeleton a pantalla completa.
+- El pulso afecta solo a las formas, no a los contenedores: las tarjetas conservan fondo blanco sólido en claro, incluida la cuarta KPI. Los colores de oscuro siguen las variables del panel.
+
+## Skeleton del Panel de control — 2026-11-12
+
+- `components/skeletons/DashboardSkeleton.tsx` replica cabecera, cuatro KPIs, dona, mensajeros, barras, plata y la última fila de pedidos/clientes. CSS aislado, sin Tailwind dentro de la oficina, con los cortes reales del panel (KPIs 2/4, columnas 5/7 desde 1200 px), variables del tema `.jsl`, pulso y respeto por movimiento reducido.
+- `Marco` lo muestra solo en Inicio de oficina al cargar colecciones y descargar Oficina; `Oficina` lo usa en el Suspense de Panel. El menú y header permanecen montados. Las otras pestañas/mensajero conservan sus indicadores. `App` usa una carga neutral con el mismo skeleton mientras verifica sesión y descarga el marco de oficina: todavía no hay sidebar/header autenticados que conservar en ese punto.
+
+## Tema en el ingreso administrativo — 2026-11-12
+
+- El ingreso sigue `useTema` y la misma clave `js_tema` del panel, con botón flotante Sol/Luna (Lucide React) accesible antes de iniciar sesión. El hook sincroniza además la clase `dark` y `color-scheme` de `<html>`; ya no importa el estado/motor de la oficina para guardar la preferencia.
+- Tailwind 4 usa ahora la variante `dark` por clase. `MarcoAcceso` permite `seguirTema` solo en el ingreso; recuperar/restablecer conservan su apariencia oscura. Tarjeta sólida y campos claros con contraste; decoración y animaciones conservadas. Esta decisión sustituye la regla previa de ingreso siempre oscuro.
+
 Este archivo es la **memoria compartida** entre sesiones y agentes. Léelo después de `CLAUDE.md` y antes de tocar nada. Si cambias algo que otro agente necesitaría saber (una decisión, una trampa, algo pendiente), **actualiza este archivo en el mismo PR**. Última revisión: 2026-11-12.
 
 Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/ESTADO.md`.
@@ -55,6 +79,10 @@ Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/EST
 - Nuevo endpoint `POST /solicitudes/mias/:id/responder` (solo rol `cliente`): el cliente acepta o rechaza desde su portal el valor que propuso la oficina. Solo acepta solicitudes propias y en estado `cotizada`: una ajena responde 404 y fuera de estado 409 `ESTADO_SOLICITUD`. Aceptar la deja `confirmada` (lista para asignar); rechazar la deja `rechazada` con el motivo opcional del cliente o uno genérico.
 - La respuesta usa `Solicitud.buscarDeCliente`/`bloquearDeCliente` para no devolver ni permitir tocar datos internos (quién revisó, teléfono del remitente, tarifa del cliente). Emite `solicitudes` por SSE para que la oficina actualice la campanita y la pantalla.
 - El flujo ya no depende solo de WhatsApp: `POST /solicitudes/:id/confirmar` sigue existiendo para cuando el cliente responde por fuera del portal, pero el portal ahora puede hacerlo directamente. Las pruebas de `test/solicitudes.test.js` cubren aceptar, rechazar con y sin motivo, solicitud ajena, cuerpo estricto y estados inválidos.
+- La columna `confirmada_por_cliente` distingue la aceptación del cliente desde el portal de la confirmación de la oficina. Se enciende en `responderMia` y se apaga en `aceptar`/`confirmar`. La usa el aviso de la oficina para mostrar “El cliente aceptó” solo cuando corresponde, y no cuando el propio admin acaba de aceptar con el tarifario.
+- La vista del cliente (`GET /solicitudes/mias`) ahora incluye `mensajeroNombre`, para el aviso final “aprobado y asignado a {mensajero}”. Las solicitudes públicas siguen fuera del flujo del portal: `responderMia` responde 409 `SOLICITUD_PUBLICA` aunque la oficina las vincule a una ficha.
+- Los avisos de `solicitudes` por SSE llevan `solicitudClienteId`: la oficina recibe todos y cada cliente solo los de su ficha. Los dos frontends abren `EventSource` y refrescan al instante; el sondeo de 30 s queda como respaldo.
+- La oficina muestra un aviso de 10 s cuando el cliente acepta (`cotizada → confirmada` con la marca) y también cuando la solicitud queda confirmada por la oficina (aceptada con el tarifario o confirmada por WhatsApp). Reutiliza la tarjeta `confirmada`, así el admin puede asignar el mensajero antes de que se cierre; si no lo hace, la solicitud sigue en Solicitudes. El cliente recibe un aviso final de 10 s al quedar `asignada` (con mensajero y guía) o `rechazada`; si estaba desconectado, lo ve en la campanita.
 
 ## Aviso automático de solicitud nueva — 2026-11-12
 
@@ -200,6 +228,8 @@ Para revisar anchos de celular y desbordes se usó Chrome headless con `puppetee
 Es una receta, no un script del repo. Si lo conviertes en prueba automática, guárdalo en una carpeta `scripts/` y documéntalo aquí.
 
 ## Registro de sesiones (lo más reciente arriba)
+
+- **2026-11-12:** cierre del flujo de solicitudes del portal. La oficina ve un aviso de 10 s cuando el cliente acepta una propuesta (`confirmadaPorCliente`) y cuando la solicitud queda confirmada por la oficina, con la tarjeta de asignación para escoger mensajero sin salir del modal. El cliente recibe un aviso final de 10 s cuando queda `asignada` (nombre del mensajero y guía) o `rechazada`. Las solicitudes de la landing siguen por WhatsApp aunque se vinculen a una ficha. `GET /solicitudes/mias` agrega `mensajeroNombre` y `confirmadaPorCliente`; SSE filtra los avisos por `solicitudClienteId` y ambos portales refrescan al instante, con el sondeo de 30 s como respaldo. Probado en demo a 1440/390 y con el filtro de eventos; requiere `npm run db:migrar` por la columna nueva.
 
 - **2026-11-12:** rendimiento de la app interna y del backend (ver la sección "Rendimiento" arriba): pestaña y sub-pestaña que vuelven con F5, carga de datos por pestaña con caché de 30 s, ventanas compartidas y SweetAlert2 bajo demanda (el Panel ya no baja Pedidos, Clientes ni Entrega), compresión, listas de pedidos más livianas y saldos de clientes en una sola pasada. Probado con Playwright contra la API local (`db:demo`) y en modo demo.
 

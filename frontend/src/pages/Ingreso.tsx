@@ -1,4 +1,6 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Moon, Sun } from "lucide-react";
+import { useTema } from "../interna/tema";
 import { Link } from "react-router";
 import { useSesion } from "../auth/Sesion";
 import { mensajeDe } from "../api/cliente";
@@ -14,6 +16,7 @@ const TITULO = "JS Logistics";
 
 export default function Ingreso() {
   const { ingresar } = useSesion();
+  const { oscuro, cambiar } = useTema();
   const idCorreo = useId();
   const idClave = useId();
   const [email, setEmail] = useState("");
@@ -42,7 +45,7 @@ export default function Ingreso() {
     document.fonts?.ready.then(() => { if (vivo) tomar(); });
     return () => { vivo = false; window.removeEventListener("resize", tomar); };
   }, [activa]);
-  const intro = activa ? escenaIntro(cuadro, medidas, refs, TITULO) : undefined;
+  const intro = activa ? escenaIntro(cuadro, medidas, refs, TITULO, oscuro) : undefined;
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +56,14 @@ export default function Ingreso() {
   };
 
   return (
-    <MarcoAcceso intro={intro?.marco}>
+    <MarcoAcceso intro={intro?.marco} seguirTema controles={
+      <button type="button" onClick={() => { saltar(); cambiar(); }}
+        aria-label={oscuro ? "Activar modo claro" : "Activar modo oscuro"}
+        className="fixed top-4 right-4 z-50 flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3.5 py-2 text-xs font-bold text-slate-700 shadow-lg shadow-slate-900/5 backdrop-blur-md transition-all hover:border-sky-500/50 active:scale-95 dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200 dark:shadow-black/30 sm:top-6 sm:right-6">
+        {oscuro ? <Sun aria-hidden className="size-4 text-amber-400" /> : <Moon aria-hidden className="size-4 text-sky-600" />}
+        <span className="hidden sm:inline">{oscuro ? "Modo claro" : "Modo oscuro"}</span>
+      </button>
+    }>
       <form onSubmit={enviar} className={TARJETA} style={intro?.formulario}>
         <CabeceraAcceso
           titulo={TITULO}
@@ -63,7 +73,7 @@ export default function Ingreso() {
 
         <div className="space-y-2.5 sm:space-y-4">
           <div style={intro?.campos[0].estilo}>
-            <label htmlFor={idCorreo} className="mb-1 block text-sm font-medium text-slate-300 sm:mb-1.5">Correo</label>
+            <label htmlFor={idCorreo} className="mb-1 block text-sm font-bold text-slate-700 dark:font-medium dark:text-slate-300 sm:mb-1.5">Correo</label>
             <div className="relative">
               <input
                 id={idCorreo} type="email" autoComplete="username" placeholder="tu@correo.co"
@@ -76,7 +86,7 @@ export default function Ingreso() {
           </div>
 
           <div style={intro?.campos[1].estilo}>
-            <label htmlFor={idClave} className="mb-1 block text-sm font-medium text-slate-300 sm:mb-1.5">Contraseña</label>
+            <label htmlFor={idClave} className="mb-1 block text-sm font-bold text-slate-700 dark:font-medium dark:text-slate-300 sm:mb-1.5">Contraseña</label>
             <div className="relative">
               <input
                 id={idClave} type={ver ? "text" : "password"} autoComplete="current-password" placeholder="••••••••"
@@ -88,7 +98,7 @@ export default function Ingreso() {
               <button
                 type="button" onClick={() => setVer(v => !v)}
                 aria-label={ver ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={ver}
-                className="absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-700/50 hover:text-[#38bdf8] focus-visible:outline-2 focus-visible:outline-[#38bdf8]"
+                className="absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-200/70 dark:hover:bg-slate-700/50 hover:text-[#38bdf8] focus-visible:outline-2 focus-visible:outline-[#38bdf8]"
               >
                 {ver ? <IcOjoTachado /> : <IcOjo />}
               </button>

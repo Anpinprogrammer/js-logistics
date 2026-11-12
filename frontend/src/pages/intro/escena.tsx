@@ -44,10 +44,10 @@ const SIN_VIDRIO: CSSProperties = { background: "transparent", boxShadow: "none"
 const BOTON_TAPADO: CSSProperties = { clipPath: "inset(50%)" };
 
 /** Antes de medir el ingreso (un solo render, que no llega a pintarse) todo va oculto. */
-function sinMedir(refs: RefsIntro): EscenaIntro {
+function sinMedir(refs: RefsIntro, oscuro: boolean): EscenaIntro {
   return {
     marco: {
-      raiz: { ref: refs.raiz, style: { backgroundColor: "#03060a" } },
+      raiz: { ref: refs.raiz, style: { backgroundColor: oscuro ? "#03060a" : "#f8fafc" } },
       fondo: OCULTO, malla: {}, rutas: OCULTO, nodos: [], manchas: OCULTO, detras: null,
       tarjeta: { ref: refs.tarjeta, style: OCULTO }, borde: OCULTO, halo: OCULTO, vidrio: null, frente: null,
     },
@@ -64,8 +64,8 @@ function sinMedir(refs: RefsIntro): EscenaIntro {
 }
 
 /** Arma todo lo que la animación le pone al ingreso en el cuadro `c`. */
-export function escenaIntro(c: number, m: Medidas | null, refs: RefsIntro, titulo: string): EscenaIntro {
-  if (!m) return sinMedir(refs);
+export function escenaIntro(c: number, m: Medidas | null, refs: RefsIntro, titulo: string, oscuro = true): EscenaIntro {
+  if (!m) return sinMedir(refs, oscuro);
 
   const seg = c / FPS;
   const bcx = m.insignia.x + m.insignia.w / 2, bcy = m.insignia.y + m.insignia.h / 2;
@@ -115,13 +115,13 @@ export function escenaIntro(c: number, m: Medidas | null, refs: RefsIntro, titul
 
   return {
     marco: {
-      raiz: { ref: refs.raiz, style: fondoP < 1 ? { backgroundColor: mezcla("#03060a", "#0b0f19", fondoP) } : undefined },
+      raiz: { ref: refs.raiz, style: fondoP < 1 ? { backgroundColor: oscuro ? mezcla("#03060a", "#0b0f19", fondoP) : "#f8fafc" } : undefined },
       fondo: camara ? { transform: camara, transformOrigin: centro } : {},
       malla: ondaViva ? {
         maskImage: `${mascaraOnda}, ${mascaraMalla}`, WebkitMaskImage: `${mascaraOnda}, ${mascaraMalla}`,
         maskComposite: "intersect", WebkitMaskComposite: "source-in",
       } : {},
-      rutas: { opacity: entre(c, 10, 90, 0, 0.5) },
+      rutas: { opacity: entre(c, 10, 90, 0, oscuro ? 0.5 : 0.6) },
       nodos: [0, 1, 2, 3, 4].map(i => {
         const aparece = entre(c, COLISION + 10 + i * 6, COLISION + 24 + i * 6, 0, 1, backOut);
         return {
@@ -162,8 +162,9 @@ export function escenaIntro(c: number, m: Medidas | null, refs: RefsIntro, titul
         <>
           {/* Cuerpo de vidrio: se llena desde arriba, como tinta */}
           <div aria-hidden style={{
-            ...CAPA, borderRadius: "1.5rem", background: "rgba(15,23,42,.75)",
-            boxShadow: `0 24px 80px -20px rgba(37,99,235,${0.5 * relleno}), 0 8px 30px rgba(0,0,0,${0.5 * relleno})`,
+            ...CAPA, borderRadius: "1.5rem", background: oscuro ? "rgba(15,23,42,.75)" : "#fff",
+            boxShadow: oscuro ? `0 24px 80px -20px rgba(37,99,235,${0.5 * relleno}), 0 8px 30px rgba(0,0,0,${0.5 * relleno})` : `0 25px 50px -12px rgba(15,23,42,${0.08 * relleno})`,
+            border: oscuro ? undefined : "1px solid #e2e8f0",
             backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
             clipPath: `circle(${relleno * 170}% at 50% 0%)`,
           }} />
@@ -184,7 +185,7 @@ export function escenaIntro(c: number, m: Medidas | null, refs: RefsIntro, titul
             }} />;
           })()}
           {/* Viñeta que se abre */}
-          {fondoP < 1 && (
+          {oscuro && fondoP < 1 && (
             <div aria-hidden style={{
               ...CAPA,
               background: `radial-gradient(ellipse at ${(bcx / m.W) * 100}% ${(bcy / m.H) * 100}%, transparent ${20 + fondoP * 60}%, rgba(0,0,0,${0.85 - fondoP * 0.85}) 100%)`,

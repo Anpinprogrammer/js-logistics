@@ -140,6 +140,27 @@ test("la pantalla de solicitudes filtra por grupo, pagina y cuenta cada filtro",
   assert.equal((await oficina.get("/api/solicitudes?grupo=raro")).status, 400);
 });
 
+test("una solicitud pública vinculada a un cliente no se responde desde el portal", async () => {
+  const r = await publico(base({
+    nombre: "Pública vinculada", telefono: "3005550001",
+    direccionRecogida: "Cra 1 # 1-1, Cali", direccionEntrega: "Calle 2 # 2-2, Cali"
+  }));
+  assert.equal(r.status, 201);
+  const s = (await oficina.get("/api/solicitudes?estado=pendiente")).body.solicitudes
+    .find(x => x.nombre === "Pública vinculada" && x.origen === "publico");
+  assert.ok(s);
+  assert.equal((await oficina.post(`/api/solicitudes/${s.id}/aceptar`).send({ valor: 7000 })).status, 200);
+  assert.equal((await oficina.post(`/api/solicitudes/${s.id}/confirmar`)).status, 200);
+  const asignada = await oficina.post(`/api/solicitudes/${s.id}/asignar`).send({ mensajeroId: idMensajero, clienteId: idCliente });
+  assert.equal(asignada.status, 200);
+  assert.equal(asignada.body.solicitud.origen, "publico");
+  const mia = (await cliente.get("/api/solicitudes/mias?porPagina=50")).body.solicitudes.find(x => x.id === s.id);
+  assert.ok(mia, "la solicitud vinculada aparece en su portal");
+  const respuesta = await responder(cliente, s.id, { aceptar: true });
+  assert.equal(respuesta.status, 409);
+  assert.equal(respuesta.body.error.code, "SOLICITUD_PUBLICA");
+});
+
 test("después de varias solicitudes desde la misma IP responde 429", async () => {
   let ultimo;
   for (let i = 0; i < 15; i++) {
@@ -184,10 +205,14 @@ test("portal: aceptar con el domicilio del cliente la deja confirmada y asignar 
   const a = await oficina.post(`/api/solicitudes/${s.id}/aceptar`).send({ valor: 8000 });
   assert.equal(a.status, 200);
   assert.equal(a.body.solicitud.estado, "confirmada");
+  assert.equal(a.body.solicitud.confirmadaPorCliente, false);
   const r = await oficina.post(`/api/solicitudes/${s.id}/asignar`).send({ mensajeroId: idMensajero });
   assert.equal(r.status, 200);
   assert.equal(r.body.pedido.clienteId, idCliente);
   assert.equal(r.body.pedido.valorServicio, 8000);
+  const [mia] = (await cliente.get("/api/solicitudes/mias?porPagina=50")).body.solicitudes.filter(x => x.id === s.id);
+  assert.equal(mia.estado, "asignada");
+  assert.equal(mia.mensajeroNombre, "Carlos Moto");
 });
 
 test("portal: si la oficina propone otro valor, espera la confirmación del cliente", async () => {
@@ -196,6 +221,7 @@ test("portal: si la oficina propone otro valor, espera la confirmación del clie
   const a = await oficina.post(`/api/solicitudes/${s.id}/aceptar`).send({ valor: 10000 });
   assert.equal(a.body.solicitud.estado, "cotizada");
   assert.equal(a.body.solicitud.valor, 10000);
+  assert.equal(a.body.solicitud.confirmadaPorCliente, false);
 });
 
 test("una solicitud del formulario público queda con origen publico y sin ficha", async () => {
@@ -271,16 +297,22 @@ test("portal: el cliente acepta la propuesta solo de una solicitud suya", async 
   assert.equal(r.status, 200);
   assert.equal(r.body.solicitud.estado, "confirmada");
   assert.equal(r.body.solicitud.valor, 12000);
+  assert.equal(r.body.solicitud.confirmadaPorCliente, true);
   // La respuesta trae solo lo que ve el portal, no datos internos.
   assert.equal(r.body.solicitud.revisadoPor, undefined);
   assert.equal(r.body.solicitud.telefono, undefined);
   assert.equal(r.body.solicitud.clienteTarifa, undefined);
+  assert.equal(r.body.solicitud.mensajeroNombre, null);
+
+  const ficha = (await oficina.get("/api/solicitudes?page=1&limit=100&status=todas")).body.data.find(x => x.id === s.id);
+  assert.equal(ficha.confirmadaPorCliente, true);
 
   // Ya respondida: repetir da 409 y la oficina puede asignarla.
   assert.equal((await responder(cliente, s.id, { aceptar: true })).status, 409);
   const asignada = await oficina.post(`/api/solicitudes/${s.id}/asignar`).send({ mensajeroId: idMensajero });
   assert.equal(asignada.status, 200);
   assert.equal(asignada.body.solicitud.estado, "asignada");
+  assert.equal(asignada.body.solicitud.mensajeroNombre, "Carlos Moto");
 });
 
 test("portal: rechazar la propuesta guarda la razón del cliente o una genérica", async () => {

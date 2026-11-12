@@ -31,18 +31,18 @@ export type IntroCabecera = {
 export type IntroBoton = ConRef<HTMLButtonElement>;
 
 export const TARJETA =
-  "relative space-y-3 rounded-3xl bg-[#0f172a]/75 p-4 sm:space-y-5 sm:p-9 shadow-[0_24px_80px_-20px_rgba(37,99,235,.5),0_8px_30px_rgba(0,0,0,.5)] backdrop-blur-[16px]";
+  "relative space-y-3 rounded-3xl border border-slate-200/90 bg-white dark:border-0 dark:bg-[#0f172a]/75 p-4 sm:space-y-5 sm:p-9 shadow-2xl shadow-slate-900/[0.08] dark:shadow-[0_24px_80px_-20px_rgba(37,99,235,.5),0_8px_30px_rgba(0,0,0,.5)] backdrop-blur-xl dark:backdrop-blur-[16px]";
 
 export const ENTRADA =
-  "peer w-full rounded-xl border border-[#334155] bg-[#070B19]/70 py-[9px] pl-11 text-base sm:py-3 sm:text-[15px] text-slate-100 " +
-  "placeholder:text-slate-500 transition duration-200 hover:border-slate-500 " +
-  "focus:border-[#38bdf8] focus:outline-none focus:ring-4 focus:ring-[#38bdf8]/20 focus:shadow-[0_0_24px_-6px_#38bdf8] disabled:opacity-60";
+  "peer w-full rounded-xl border border-slate-300/80 bg-slate-50 dark:border-[#334155] dark:bg-[#070B19]/70 py-[9px] pl-11 text-base sm:py-3 sm:text-[15px] text-slate-900 dark:text-slate-100 " +
+  "placeholder:text-slate-400 dark:placeholder:text-slate-500 transition duration-200 hover:border-slate-500 " +
+  "focus:border-sky-500 dark:focus:border-[#38bdf8] focus:outline-none focus:ring-4 focus:ring-[#38bdf8]/20 focus:shadow-[0_0_24px_-6px_#38bdf8] disabled:opacity-60";
 
 export const ICONO =
   "pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 transition-colors duration-200 peer-focus:text-[#38bdf8]";
 
 export const ENLACE =
-  "font-semibold text-[#38bdf8] underline-offset-4 transition-colors hover:text-cyan-300 hover:underline";
+  "font-semibold text-sky-600 dark:text-[#38bdf8] underline-offset-4 transition-colors hover:text-sky-700 dark:hover:text-cyan-300 hover:underline";
 
 const ic = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
 
@@ -56,34 +56,35 @@ export const IcCheck = () => <svg {...ic} className="size-7"><circle cx="12" cy=
 export const IcVolver = () => <svg {...ic} className="size-5"><path d="M19 12H5M11 18l-6-6 6-6" /></svg>;
 
 /** Fondo, tarjeta con borde brillante y ancho: el mismo marco del ingreso. */
-export function MarcoAcceso({ children, intro }: { children: ReactNode; intro?: IntroMarco }) {
+export function MarcoAcceso({ children, intro, seguirTema = false, controles }: { children: ReactNode; intro?: IntroMarco; seguirTema?: boolean; controles?: ReactNode }) {
   return (
-    <div ref={intro?.raiz.ref} style={intro?.raiz.style} className="relative isolate grid min-h-dvh place-items-center overflow-hidden bg-[#0b0f19] px-4 py-6 sm:py-10 text-slate-200">
+    <div ref={intro?.raiz.ref} style={intro?.raiz.style} className={`${seguirTema ? "" : "dark"} [--acceso-red:#0284c7] dark:[--acceso-red:#38bdf8] [--acceso-grid:rgba(2,132,199,0.08)] dark:[--acceso-grid:rgba(56,189,248,0.09)] relative isolate grid min-h-dvh place-items-center overflow-hidden bg-slate-50 dark:bg-[#0b0f19] px-4 py-6 sm:py-10 text-slate-700 dark:text-slate-200 transition-colors duration-300`}>
+      {controles}
       <div aria-hidden style={intro?.fondo} className="pointer-events-none absolute inset-0 -z-10">
         <div
-          className="jsl-malla absolute inset-0 opacity-60"
+          className="jsl-malla absolute inset-0 opacity-100 dark:opacity-60"
           style={{
             backgroundImage:
-              "linear-gradient(to right, rgba(56,189,248,.09) 1px, transparent 1px), linear-gradient(to bottom, rgba(56,189,248,.09) 1px, transparent 1px)",
+              "linear-gradient(to right, var(--acceso-grid) 1px, transparent 1px), linear-gradient(to bottom, var(--acceso-grid) 1px, transparent 1px)",
             backgroundSize: "48px 48px",
             maskImage: "radial-gradient(ellipse 70% 60% at 50% 45%, #000 30%, transparent 100%)",
             WebkitMaskImage: "radial-gradient(ellipse 70% 60% at 50% 45%, #000 30%, transparent 100%)",
             ...intro?.malla,
           }}
         />
-        <svg style={intro?.rutas} className="absolute inset-0 size-full opacity-50" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1200 800" fill="none">
+        <svg style={intro?.rutas} className="absolute inset-0 size-full opacity-60 dark:opacity-50" preserveAspectRatio="xMidYMid slice" viewBox="0 0 1200 800" fill="none">
           <path className="jsl-ruta" d="M-20 620 C 220 560, 300 300, 560 340 S 900 520, 1220 180" stroke="url(#jslRuta)" strokeWidth="1.5" strokeDasharray="6 10" />
           <path className="jsl-ruta jsl-ruta-2" d="M-20 220 C 200 260, 360 120, 620 190 S 960 80, 1220 360" stroke="url(#jslRuta)" strokeWidth="1.2" strokeDasharray="4 12" />
           {[[560, 340], [300, 330], [900, 505], [620, 190], [960, 120]].map(([x, y], i) => (
             <g key={i}>
-              <circle cx={x} cy={y} r="3.5" fill="#38bdf8" style={intro?.nodos[i]?.punto} />
-              <circle className="jsl-pulso" cx={x} cy={y} r="3.5" stroke="#38bdf8" strokeWidth="1.2" style={{ animationDelay: `${i * 0.7}s`, ...intro?.nodos[i]?.pulso }} />
+              <circle cx={x} cy={y} r="3.5" fill="var(--acceso-red)" style={intro?.nodos[i]?.punto} />
+              <circle className="jsl-pulso" cx={x} cy={y} r="3.5" stroke="var(--acceso-red)" strokeWidth="1.2" style={{ animationDelay: `${i * 0.7}s`, ...intro?.nodos[i]?.pulso }} />
             </g>
           ))}
           <defs>
             <linearGradient id="jslRuta" x1="0" x2="1">
               <stop offset="0" stopColor="#0284c7" stopOpacity="0" />
-              <stop offset=".5" stopColor="#38bdf8" />
+              <stop offset=".5" stopColor="var(--acceso-red)" />
               <stop offset="1" stopColor="#0284c7" stopOpacity="0" />
             </linearGradient>
           </defs>
@@ -118,9 +119,9 @@ export function CabeceraAcceso({ titulo, descripcion, intro }: { titulo: string;
           </div>
         </div>
       </div>
-      <p style={intro?.ceja} className="-mt-1 mb-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-[#38bdf8]">Logistics · Cali</p>
-      <h1 ref={intro?.titulo.ref} style={intro?.titulo.style} className="text-2xl font-bold tracking-tight text-white sm:text-4xl">{titulo}{intro?.letras}</h1>
-      <p style={intro?.descripcion} className="mx-auto mt-1 max-w-[19rem] text-xs sm:mt-2.5 sm:text-sm leading-relaxed text-slate-300">{descripcion}</p>
+      <p style={intro?.ceja} className="-mt-1 mb-2 text-[11px] font-bold dark:font-semibold uppercase tracking-[0.32em] text-sky-600 dark:text-[#38bdf8]">Logistics · Cali</p>
+      <h1 ref={intro?.titulo.ref} style={intro?.titulo.style} className="text-2xl font-black dark:font-bold tracking-tight text-slate-900 dark:text-white sm:text-4xl">{titulo}{intro?.letras}</h1>
+      <p style={intro?.descripcion} className="mx-auto mt-1 max-w-[19rem] text-xs sm:mt-2.5 sm:text-sm leading-relaxed text-slate-500 dark:text-slate-300">{descripcion}</p>
     </header>
   );
 }
@@ -154,7 +155,7 @@ export function BotonAcceso({ cargando, children, cargandoTexto, intro }: { carg
 /** Aviso de error con el mismo formato del ingreso. */
 export function AvisoError({ children }: { children: ReactNode }) {
   return (
-    <div role="alert" className="flex gap-2.5 rounded-xl border border-red-400/30 bg-red-500/10 px-3.5 py-3 text-sm text-red-200">
+    <div role="alert" className="flex gap-2.5 rounded-xl border border-red-400/30 bg-red-500/10 px-3.5 py-3 text-sm text-red-700 dark:text-red-200">
       <IcAlerta />
       <span>{children}</span>
     </div>

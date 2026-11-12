@@ -1,7 +1,6 @@
 /* Tema claro/oscuro de la app interna. Sin elección guardada se usa la preferencia del sistema;
    al tocar el botón se fija "light" o "dark" y se recuerda en este navegador. */
-import { useCallback, useEffect, useState } from "react";
-import { guardarLocal } from "./estado";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 
 export type Tema = "sistema" | "light" | "dark";
 
@@ -33,11 +32,16 @@ export function useTema() {
 
   const oscuro = tema === "dark" || (tema === "sistema" && sistemaOscuro);
 
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle("dark", oscuro);
+    document.documentElement.style.colorScheme = oscuro ? "dark" : "light";
+  }, [oscuro]);
+
   const cambiar = useCallback(() => {
     setTema(actual => {
       const efectivo = actual === "sistema" ? (sistemaOscuro ? "dark" : "light") : actual;
       const nuevo: Tema = efectivo === "dark" ? "light" : "dark";
-      guardarLocal(CLAVE, nuevo);
+      try { localStorage.setItem(CLAVE, nuevo); } catch { /* sin almacenamiento */ }
       return nuevo;
     });
   }, [sistemaOscuro]);

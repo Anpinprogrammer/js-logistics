@@ -1,4 +1,5 @@
 /* Marco de la app interna, igual al prototipo: menú lateral en computador, barra arriba y pestañas abajo en el celular. */
+import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSesion, useUsuario } from "../auth/Sesion";
 import { necesarias, ProveedorDatos, useColecciones, useDatos } from "./datos";
@@ -10,6 +11,7 @@ import { S, fechaLarga, hoy, horaActual, type Pedido } from "./motor";
 import { pendientesMios, porRecogerMios, devolucionesPorDefinirMios } from "./mensajero/pendientes";
 import { useEscritorio } from "../lib/pantalla";
 import { perezoso } from "../lib/perezoso";
+import { useEventos } from "./eventos";
 import { CLAVE_NAV_ADMIN, usePersistedTab } from "../hooks/usePersistedTab";
 import { navegacionActual, restaurarNavegacion } from "./navegacion";
 import { precargarPestana } from "./oficina/pestanas";
@@ -56,6 +58,7 @@ export default function AppInterna() {
 }
 
 function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boolean; cambiarTema: () => void; colapsado: boolean; alternarMenu: () => void }) {
+  useEventos();
   const { usuario, salir } = useSesion();
   const { version, tocar, error } = useDatos();
   const ventana = useVentana();
@@ -96,6 +99,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     <button key={k} aria-current={actual === k ? "page" : undefined} aria-label={t} title={t} onClick={() => ir(k)} onPointerEnter={() => intencion(k)} onFocus={() => intencion(k)} onTouchStart={() => intencion(k)}><Icono n={k} /><span className="t">{t}</span>{n ? <span className="num">{n}</span> : null}</button>
   );
   // Solo se piden al servidor las colecciones que usa la vista abierta (las demás, al abrirla).
+  const cargaVista = !enMensajero && E.tabA === "inicio" ? <DashboardSkeleton /> : cargando;
   const listo = useColecciones(necesarias(E.rol, enMensajero ? E.tabM : E.tabA));
   // La pestaña y sub-pestaña quedan en la URL y en sessionStorage para la próxima recarga.
   usePersistedTab(CLAVE_NAV_ADMIN, usuario?.id || "", navegacionActual());
@@ -185,7 +189,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     </header>
     <main id="vista" className={!enMensajero && E.tabA === "pedidos" ? "vista-pedidos-oficina" : !enMensajero && E.tabA === "solicitudes" ? "vista-solicitudes-oficina" : !enMensajero && E.tabA === "clientes" ? "vista-clientes-oficina" : undefined}>
       {error && <div className="aviso alerta">No se pudieron traer los datos: {error} Se vuelve a intentar solo en unos segundos.</div>}
-      {!listo && !error ? cargando : <Suspense fallback={cargando}>{enMensajero ? <Mensajero pintar={pintar} /> : <Oficina pintar={pintar} />}</Suspense>}
+      {!listo && !error ? cargaVista : <Suspense fallback={cargaVista}>{enMensajero ? <Mensajero pintar={pintar} /> : <Oficina pintar={pintar} />}</Suspense>}
     </main>
     <nav className="pestanas" id="pestanas" aria-label="Secciones">
       {vis.map(boton)}
