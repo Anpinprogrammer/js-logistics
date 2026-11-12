@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   S, yo, hora, pesos, listaOrdenada, esRepartidor, tipoDe, cambioPendiente, sinServicio, delDia, nombreCliente, sinTildes, cerrado, gastoDe, pagoDomi,
-  saldoPedido, metodoTxt, pedidoLiquidado, cambiaLoContado, corteCaja, CUENTAS_JS, METODOS, MEDIOS, MOTIVOS, type Metodo, type Medio, type Motivo, type Pedido,
+  saldoPedido, metodoTxt, pedidoLiquidado, cambiaLoContado, CUENTAS_JS, METODOS, MEDIOS, MOTIVOS, type Metodo, type Medio, type Motivo, type Pedido,
 } from "../motor";
 import { Cab, EtqEstado, FiltroDia, FilaPedido, FotosGuia, IconoCamara, IconoFiltro, IconoInfo, Paginador, pl, useVentana } from "../ui";
 import { E } from "../estado";
@@ -12,14 +12,11 @@ import { aPedido, motivoError, useDatos } from "../datos";
 import { DEMO } from "../demo";
 import { usePorPagina } from "../../lib/pantalla";
 import { pedidos as apiPedidos, type FiltrosPedidos } from "../../api/servicios";
-import { abrirEntregaEn, abrirDevolucionEn } from "../mensajero/Entrega";
-import { BloqueDevolucion } from "../mensajero/Reintento";
-import { DlgRecoger } from "../mensajero/Recoger";
-import { FormCliente } from "./Clientes";
+import { abrirEntregaEn, abrirDevolucionEn, BloqueDevolucion, DlgRecoger } from "../mensajero/modales";
+import { FormCliente } from "./modales";
+import { avisoContado } from "./comun";
 import type { CambiosPedido } from "../../api/servicios";
 
-type Ventana = ReturnType<typeof useVentana>;
-export const avisoContado = (v: Ventana) => v.avisar("Eso ya quedó contado en el arqueo del " + hora(corteCaja()) + ". Para corregirlo, registra un movimiento nuevo.");
 
 /** Lo que pide cada filtro de la pestaña al servidor. */
 function filtrosServidor(f: string, buscar: string, mensajeroId: string, dia: string): Omit<FiltrosPedidos, "limite" | "cursor"> {
@@ -65,7 +62,8 @@ function usePaginaPedidos(f: string, buscar: string, mensajeroId: string, dia: s
         return { pedidos: todos.slice((actual - 1) * porPagina, actual * porPagina), pagina: actual, porPagina, total: todos.length, paginas };
       }
       const r = await apiPedidos.pagina(filtros, pagina, porPagina);
-      return { ...r, pedidos: r.pedidos.map(p => S.pedidos[p.guia] || aPedido(p)) };
+      // La carga completa de la oficina no trae miniaturas (sinMini): se toman de esta página.
+      return { ...r, pedidos: r.pedidos.map(p => { const x = S.pedidos[p.guia]; return !x ? aPedido(p) : p.mini && !x.mini ? { ...x, mini: p.mini } : x; }) };
     },
   });
 }

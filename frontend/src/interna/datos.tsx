@@ -10,6 +10,8 @@ import type * as T from "../api/tipos";
 import { S, yo, type Almacen, type Pedido, type Cliente, type Persona, type Movimiento, type Recaudo, type Liquidacion, type Jornada, type CajaMov, type Cuenta, type UsuarioS } from "./motor";
 import { DEMO, datosDemo } from "./demo";
 import { conectar } from "./acciones";
+import { E } from "./estado";
+import { crearCacheConsultas } from "../lib/queryCache";
 
 const ms = (x: string | null | undefined) => (x ? new Date(x).getTime() || 0 : 0);
 const msONulo = (x: string | null | undefined) => (x ? new Date(x).getTime() || null : null);
@@ -39,90 +41,169 @@ export const aCaja = (c: T.CajaMovimiento): CajaMov => ({
 export const aUsuario = (u: T.Usuario): UsuarioS => ({ uid: u.id, email: u.email, nombre: u.nombre, rol: u.rol, clienteId: u.clienteId || "", mensajeroId: u.mensajeroId || "", activo: u.activo !== false, status: u.status });
 const porId = <X, K extends keyof X>(xs: X[], k: K) => Object.fromEntries(xs.map(x => [String(x[k]), x])) as Record<string, X>;
 
-/** Todas las guías que el usuario puede ver, de 500 en 500. */
-async function todosLosPedidos() {
+/* ---------- Carga por colección, bajo demanda ----------
+   Antes, al entrar se traía todo (todas las guías, clientes, movimientos, caja, sueldos…) y se volvía a traer todo
+   cada 45 segundos, aunque la pantalla abierta no lo usara. Ahora cada vista dice qué colecciones necesita
+   (`necesarias()`), se traen solo esas, y una colección traída hace menos de 30 segundos no se vuelve a pedir al
+   cambiar de pestaña (queryCache.ts). La recarga periódica y la de después de guardar solo piden lo que está en uso. */
+
+export type Coleccion = "pedidos" | "clientes" | "mensajeros" | "usuarios" | "movimientos" | "recaudos" | "liquidaciones" | "jornadas" | "cajamovs" | "cuentas" | "corte";
+const TODAS: Coleccion[] = ["pedidos", "clientes", "mensajeros", "usuarios", "movimientos", "recaudos", "liquidaciones", "jornadas", "cajamovs", "cuentas", "corte"];
+/* Qué usa cada pestaña de la oficina, contando los cálculos de motor.ts que llama (saldos, períodos, lo ya contado
+   en un arqueo…) y las ventanas que abre. Ante la duda se incluye: una colección de más solo cuesta una petición;
+   una de menos daría cifras equivocadas. */
+const BASE: Coleccion[] = ["pedidos", "mensajeros", "corte"];
+const DE_PESTANA: Record<string, Coleccion[]> = {
+  pedidos: [...BASE, "clientes", "cajamovs", "liquidaciones"],
+  solicitudes: [...BASE, "clientes"],
+  clientes: [...BASE, "clientes", "movimientos", "cajamovs", "usuarios"],
+};
+/** Colecciones que necesita la vista. El modo mensajero y las pestañas que muestran el resumen de la caja o los sueldos
+    (Inicio, Caja, Cuentas, Sueldos, Más) piden todas: esos cálculos cruzan pedidos, movimientos, caja, jornadas y usuarios. */
+export function necesarias(modo: string, tab: string): Coleccion[] {
+  return modo === "mensajero" ? TODAS : DE_PESTANA[tab] ?? TODAS;
+}
+
+/** Todas las guías que el usuario puede ver, de 1000 en 1000. La oficina no pide miniaturas (sus pantallas no las pintan
+    desde aquí); el mensajero sí, porque las ve en sus listas. */
+async function todosLosPedidos(sinMini: boolean) {
   const out: T.Pedido[] = [];
   let cursor: number | undefined;
   for (let i = 0; i < 200; i++) {
-    const r = await api.pedidos.listar({ limite: 500, cursor });
+    const r = await api.pedidos.listar({ limite: 1000, cursor, ...(sinMini ? { sinMini: true } : {}) });
     out.push(...r.pedidos);
     if (!r.siguiente) break;
     cursor = r.siguiente;
   }
   return out;
 }
+/** Todos los clientes, de 500 en 500 (antes se pedían solo los primeros 500). */
+async function todosLosClientes() {
+  const out: T.Cliente[] = [];
+  for (let desde = 0; desde < 200_000; desde += 500) {
+    const xs = await api.clientes.listarDesde(desde, 500);
+    out.push(...xs);
+    if (xs.length < 500) break;
+  }
+  return out;
+}
 
-async function cargarTodo(u: T.Usuario): Promise<Almacen> {
+/** Trae una colección y la deja en S con la forma del prototipo. Lo que el rol no puede ver queda vacío, como antes. */
+function cargadorDe(u: T.Usuario, col: Coleccion, modo: string): () => Promise<(s: Almacen) => void> {
   const oficina = u.rol === "admin" || u.rol === "asistente";
-  const [pedidos, clientes, mensajeros, usuarios, movimientos, recaudos, liquidaciones, jornadas, cajamovs, cuentas, corte] = await Promise.all([
-    todosLosPedidos(),
-    oficina ? api.clientes.listar() : Promise.resolve([] as T.Cliente[]),
-    oficina ? api.mensajeros.listar() : u.mensajeroId ? api.mensajeros.obtener(u.mensajeroId).then(m => [m]).catch(() => [] as T.Mensajero[]) : Promise.resolve([] as T.Mensajero[]),
-    u.rol === "admin" ? api.usuarios.listar() : Promise.resolve([u]),
-    oficina ? api.movimientos.listar() : Promise.resolve([] as T.Movimiento[]),
-    api.recaudos.listar(), api.liquidaciones.listar(), api.jornadas.listar(), api.cajaMovimientos.listar(),
-    oficina ? api.cuentasInternas.listar() : Promise.resolve([] as T.CuentaInterna[]),
-    api.caja.corte(),
-  ]);
-  yo.corteRemoto = ms(corte);
-  const us = usuarios.map(aUsuario);
-  return {
-    pedidos: porId(pedidos.map(aPedido), "guia"), clientes: porId(clientes.map(aCliente), "id"), mensajeros: porId(mensajeros.map(aPersona), "id"),
-    movimientos: porId(movimientos.map(aMov), "id"), recaudos: porId(recaudos.map(aRec), "id"), liquidaciones: porId(liquidaciones.map(aLiq), "id"),
-    jornadas: porId(jornadas as Jornada[], "id"), cajamovs: porId(cajamovs.map(aCaja), "id"), cuentas: porId(cuentas as Cuenta[], "id"),
-    usuarios: porId(us, "uid"), vinculos: Object.fromEntries(us.filter(x => x.mensajeroId).map(x => [x.uid, { uid: x.uid, mensajeroId: x.mensajeroId }])),
-  };
+  switch (col) {
+    case "pedidos": return async () => { const xs = (await todosLosPedidos(oficina && modo !== "mensajero")).map(aPedido); return s => { s.pedidos = porId(xs, "guia"); }; };
+    case "clientes": return async () => { const xs = oficina ? await todosLosClientes() : []; return s => { s.clientes = porId(xs.map(aCliente), "id"); }; };
+    case "mensajeros": return async () => {
+      const xs = oficina ? await api.mensajeros.listar() : u.mensajeroId ? await api.mensajeros.obtener(u.mensajeroId).then(m => [m]).catch(() => [] as T.Mensajero[]) : [];
+      return s => { s.mensajeros = porId(xs.map(aPersona), "id"); };
+    };
+    case "usuarios": return async () => {
+      const us = (u.rol === "admin" ? await api.usuarios.listar() : [u]).map(aUsuario);
+      return s => { s.usuarios = porId(us, "uid"); s.vinculos = Object.fromEntries(us.filter(x => x.mensajeroId).map(x => [x.uid, { uid: x.uid, mensajeroId: x.mensajeroId }])); };
+    };
+    case "movimientos": return async () => { const xs = oficina ? await api.movimientos.listar() : []; return s => { s.movimientos = porId(xs.map(aMov), "id"); }; };
+    case "recaudos": return async () => { const xs = await api.recaudos.listar(); return s => { s.recaudos = porId(xs.map(aRec), "id"); }; };
+    case "liquidaciones": return async () => { const xs = await api.liquidaciones.listar(); return s => { s.liquidaciones = porId(xs.map(aLiq), "id"); }; };
+    case "jornadas": return async () => { const xs = await api.jornadas.listar(); return s => { s.jornadas = porId(xs as Jornada[], "id"); }; };
+    case "cajamovs": return async () => { const xs = await api.cajaMovimientos.listar(); return s => { s.cajamovs = porId(xs.map(aCaja), "id"); }; };
+    case "cuentas": return async () => { const xs = oficina ? await api.cuentasInternas.listar() : []; return s => { s.cuentas = porId(xs as Cuenta[], "id"); }; };
+    case "corte": return async () => { const c = await api.caja.corte(); return () => { yo.corteRemoto = ms(c); }; };
+  }
 }
 
 interface Datos {
   version: number;
-  cargado: boolean;
+  /** Sube cuando llega una colección que faltaba (solo para volver a pintar). */
+  pinta: number;
   error: string;
-  /** Vuelve a pedir todo al servidor. */
+  /** Vuelve a pedir al servidor lo que está en pantalla (lo demás queda vencido y se pide al abrirlo). */
   recargar: () => Promise<void>;
   /** Cambia el almacén aquí mismo (con lo que respondió el servidor) y vuelve a pintar. */
   tocar: (fn?: (s: Almacen) => void) => void;
+  /** Una vista avisa qué colecciones usa: se traen las que falten o estén vencidas. Devuelve la función para soltarlas. */
+  usar: (cols: readonly Coleccion[]) => () => void;
+  /** ¿Están ya en memoria (aunque se estén actualizando)? */
+  tiene: (cols: readonly Coleccion[]) => boolean;
 }
 const Ctx = createContext<Datos | null>(null);
 const CADA = 45_000;
+/** Cuánto se considera fresca una colección al cambiar de pestaña. */
+const TTL = 30_000;
 
 export function ProveedorDatos({ usuario, children }: { usuario: T.Usuario; children: ReactNode }) {
   const [version, setVersion] = useState(0);
-  const [cargado, setCargado] = useState(false);
+  const [pinta, setPinta] = useState(0);
   const [error, setError] = useState("");
-  const enCurso = useRef<Promise<void> | null>(null);
-  const cargadoUnaVez = useRef(false);
+  const cache = useRef(crearCacheConsultas<Coleccion>(TTL)).current;
+  const enUso = useRef(new Map<Coleccion, number>());
+  const demoCargado = useRef(false);
+  const modo = useRef(E.rol);
 
   Object.assign(yo, { uid: usuario.id, nombre: usuario.nombre || usuario.email, esAdmin: usuario.rol === "admin", esAsistente: usuario.rol === "asistente" });
 
+  /** Trae las colecciones pedidas (las frescas se saltan, salvo con `forzar`) y vuelve a pintar una sola vez al final. */
+  const traer = useCallback(async (cols: readonly Coleccion[], forzar = false) => {
+    if (DEMO) { // en demo todo está en memoria desde el principio y los cambios no se reemplazan
+      if (!demoCargado.current) { Object.assign(S, datosDemo(usuario)); demoCargado.current = true; TODAS.forEach(c => void cache.obtener(c, async () => true)); setVersion(v => v + 1); }
+      return;
+    }
+    // Si el modo cambió (oficina ↔ mensajero), los pedidos se vuelven a pedir con o sin miniaturas.
+    if (modo.current !== E.rol) { modo.current = E.rol; cache.invalidar("pedidos"); }
+    const faltan = cols.filter(c => forzar || !cache.fresco(c));
+    if (!faltan.length) return;
+    try {
+      const aplicar = await Promise.all(faltan.map(c => cache.obtener(c, cargadorDe(usuario, c, E.rol), { forzar })));
+      aplicar.forEach(fn => fn(S));
+      // `version` está en las claves de las listas paginadas: solo sube cuando se actualiza lo que ya había (recarga
+      // periódica o después de guardar). Traer una colección nueva al abrir otra pestaña solo vuelve a pintar.
+      setError(""); if (forzar) setVersion(v => v + 1); else setPinta(v => v + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudieron cargar los datos.");
+    }
+  }, [usuario, cache]);
+
+  const enPantalla = () => [...enUso.current.keys()];
+  // Después de guardar: lo que está en pantalla se vuelve a pedir ya; lo demás se olvida, para que al abrirlo
+  // se espere la versión nueva en vez de mostrar por un momento cifras de antes del cambio.
   const recargar = useCallback(() => {
-    if (enCurso.current) return enCurso.current;
-    const p = (async () => {
-      try {
-        const nuevo = DEMO ? datosDemo(usuario) : await cargarTodo(usuario);
-        if (DEMO && cargadoUnaVez.current) return; // en demo los cambios viven en memoria: no se reemplazan
-        Object.assign(S, nuevo);
-        cargadoUnaVez.current = true;
-        setError(""); setCargado(true); setVersion(v => v + 1);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "No se pudieron cargar los datos.");
-      } finally { enCurso.current = null; }
-    })();
-    enCurso.current = p;
-    return p;
-  }, [usuario]);
+    const usadas = enPantalla();
+    TODAS.forEach(c => (usadas.includes(c) ? cache.invalidar(c) : cache.olvidar(c)));
+    return traer(usadas, true);
+  }, [cache, traer]);
+
+  const usar = useCallback((cols: readonly Coleccion[]) => {
+    cols.forEach(c => enUso.current.set(c, (enUso.current.get(c) || 0) + 1));
+    void traer(cols);
+    return () => cols.forEach(c => { const n = (enUso.current.get(c) || 1) - 1; if (n > 0) enUso.current.set(c, n); else enUso.current.delete(c); });
+  }, [traer]);
+  const tiene = useCallback((cols: readonly Coleccion[]) => DEMO ? demoCargado.current : cols.every(c => cache.cargado(c)), [cache]);
 
   useEffect(() => {
-    recargar();
-    const t = setInterval(() => { if (document.visibilityState === "visible") recargar(); }, CADA);
-    const alVolver = () => { if (document.visibilityState === "visible") recargar(); };
+    // Cada 45 segundos (y al volver a la app) se actualiza solo lo que está en pantalla.
+    const t = setInterval(() => { if (document.visibilityState === "visible") void traer(enPantalla(), true); }, CADA);
+    const alVolver = () => { if (document.visibilityState === "visible") void traer(enPantalla()); };
     document.addEventListener("visibilitychange", alVolver);
     return () => { clearInterval(t); document.removeEventListener("visibilitychange", alVolver); };
-  }, [recargar]);
+  }, [traer]);
 
-  const tocar = useCallback((fn?: (s: Almacen) => void) => { fn?.(S); setVersion(v => v + 1); }, []);
+  // Con `fn` cambió el almacén (lo que respondió el servidor, o la demo): sube `version` y las listas se vuelven a pedir.
+  // Sin `fn` es solo volver a pintar (cambió la pestaña o un filtro de `E`): antes eso también volvía a pedir la página.
+  const tocar = useCallback((fn?: (s: Almacen) => void) => { if (fn) { fn(S); setVersion(v => v + 1); } else setPinta(v => v + 1); }, []);
   conectar(tocar, recargar);
-  return <Ctx.Provider value={{ version, cargado, error, recargar, tocar }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ version, pinta, error, recargar, tocar, usar, tiene }}>{children}</Ctx.Provider>;
+}
+
+/** Muestra "Cargando…" hasta que estén las colecciones (para las ventanas que se abren desde otra pestaña). */
+export function ConColecciones({ cols, children }: { cols: readonly Coleccion[]; children: ReactNode }) {
+  return useColecciones(cols) ? <>{children}</> : <div className="vacio" role="status">Cargando…</div>;
+}
+
+/** Pide las colecciones que usa una vista mientras está montada. Devuelve true cuando ya están en memoria. */
+export function useColecciones(cols: readonly Coleccion[]) {
+  const d = useDatos(), clave = cols.join(",");
+  useEffect(() => d.usar(cols), [clave, d.usar]);
+  return d.tiene(cols);
 }
 
 export function useDatos() {

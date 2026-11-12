@@ -10,7 +10,8 @@ import "./index.css";
 const qc = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 15_000,
+      // 30 s: al ir y volver entre pestañas no se repite la consulta de una página que se acaba de traer.
+      staleTime: 30_000,
       refetchOnWindowFocus: true,
       // Los errores 4xx no se reintentan (permiso, datos inválidos, no existe); los de red, hasta 2 veces.
       retry: (n, e) => n < 2 && !(e instanceof FalloApi && e.status >= 400 && e.status < 500)

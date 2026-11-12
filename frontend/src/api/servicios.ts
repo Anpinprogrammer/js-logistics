@@ -39,8 +39,11 @@ export interface FiltrosPedidos {
   sinServicio?: boolean;
   /** AAAA-MM-DD: salió, se entregó o se devolvió ese día (hora de Colombia). */
   dia?: string;
+  /** 1 a 1000. */
   limite?: number;
   cursor?: number;
+  /** No firmar las miniaturas (`mini` llega en null): para la carga completa de la oficina. */
+  sinMini?: boolean;
 }
 
 export interface DatosEntrega {
@@ -104,6 +107,8 @@ export const clientes = {
   /** Búsqueda corta para elegir el remitente desde la recogida: solo nombre e id (también para el mensajero). */
   buscar: (q: string) => datos<{ clientes: ClienteBreve[] }>(api.get("/clientes/buscar", { params: { q } })).then(d => d.clientes),
   listar: (buscar = "") => datos<{ clientes: Cliente[] }>(api.get("/clientes", { params: limpio({ buscar, limite: 500 }) })).then(d => d.clientes),
+  /** Un pedazo de la lista completa (la carga de la app interna los recorre todos). */
+  listarDesde: (desde: number, limite = 500) => datos<{ clientes: Cliente[] }>(api.get("/clientes", { params: { desde, limite } })).then(d => d.clientes),
   /** Una página de la pestaña Clientes, con saldos y totales calculados por el servidor. */
   pagina: (f: { filtro?: string; dia?: string; buscar?: string }, pagina: number, porPagina: number) =>
     datos<PaginaClientes>(api.get("/clientes/saldos", { params: limpio({ ...f, pagina, porPagina }) })),
