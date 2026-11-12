@@ -16,6 +16,7 @@ import { clientes as apiClientes } from "../../api/servicios";
 import { usePorPagina } from "../../lib/pantalla";
 import type { ClienteConSaldo, PaginaClientes } from "../../api/tipos";
 import { avisoContado } from "./Pedidos";
+import { SelectorFecha } from "../Calendario";
 
 type Ventana = ReturnType<typeof useVentana>;
 /** La caja ya se contó ese día: no se registran movimientos de días anteriores al arqueo. */
@@ -228,6 +229,30 @@ export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: b
     {s ? (telWhatsApp(c.telefono) ? <div className="acciones" style={{ margin: "0 0 6px" }}><a className="btn ok" id="cWa" href={linkSaldo(cid)} target="_blank" rel="noopener" onClick={marcarEnviado}><WhatsAppIcon />Enviar {s < 0 ? "cobro" : "saldo a favor"} por WhatsApp</a>
       <button className="btn sec" id="cWaCopiar" type="button" onClick={async () => { try { await navigator.clipboard.writeText(textoSaldo(cid)); v.avisar("Mensaje copiado. Pégalo en WhatsApp."); } catch { v.avisar("No se pudo copiar en este navegador"); } }}>Copiar mensaje</button></div>
       : <div className="aviso">Agrega el celular del cliente para enviarle el saldo por WhatsApp.</div>) : null}
+    {enFicha ? <>
+    <div className="cuenta-form">
+      <h2>{yo.esAdmin ? "Registrar pago o ajuste" : "Registrar pago, compra o ganancia"}</h2>
+      <div className="campo"><label htmlFor="mTipo">Tipo</label><div className="cuenta-select"><select id="mTipo" value={tipo} onChange={e => setTipo(e.target.value as TipoMov)}>{tipos.map(x => <option key={x} value={x}>{MOVS[x].t}</option>)}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></div></div>
+      <div className="cuenta-fila cuenta-fila-dia">
+        <div className="campo"><label htmlFor="mFecha">Día</label><SelectorFecha id="mFecha" valor={dia} alCambiar={setDia} etiqueta="Día" vacio="Elige el día" obligatorio alinear="izquierda" /></div>
+        <div className="campo"><label htmlFor="mVal">Valor</label><div className="cuenta-pesos"><span aria-hidden="true">$</span><input id="mVal" type="number" inputMode="numeric" min="0" step="100" placeholder="0" value={val} onChange={e => setVal(e.target.value)} /></div></div>
+      </div>
+      <div className="cuenta-fila cuenta-fila-medio">
+        <div className="campo"><label htmlFor="mMedio">Medio</label><div className="cuenta-select"><select id="mMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{Object.entries(MEDIOS).map(([x, t]) => <option key={x} value={x}>{t}</option>)}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></div></div>
+        <div className="campo"><label htmlFor="mNota">Nota (opcional)</label><input id="mNota" placeholder="Ej: compra, transferencia" value={nota} onChange={e => setNota(e.target.value)} /></div>
+      </div>
+      <button className="btn ok cuenta-registrar" id="mReg" onClick={registrar}>Registrar movimiento</button>
+    </div>
+    <div className="acciones"><button className="btn sec" id="cEdit" onClick={() => v.abrir(<FormCliente id={cid} alGuardar={enFicha ? id => v.abrir(<FichaCliente cid={id} pestana="cuenta" />, "cliente") : undefined} />, "centrada")}>Editar cliente</button></div>
+    <h2>Movimientos</h2>
+    {rows.length ? <ul className="cuenta-movs">
+      {rows.map((r, i) => <li key={(r.pid || r.mid || "") + i}>
+        <div className="cuenta-mov-det"><b title={r.det}>{r.det}</b><small>{hora(r.fecha)}</small></div>
+        <div className="cuenta-mov-fin"><span className={r.v < 0 ? "neg" : "pos"}>{pesos(r.v)}</span>
+          {r.mid ? (yo.esAdmin ? <button type="button" className="cuenta-mov-quitar" onClick={() => quitarMov(r.mid!)}>Quitar</button> : null) : r.pid && (r.v < 0 || r.dp) ? <button type="button" className="cuenta-mov-domi" onClick={() => domi(r.pid!)}>{r.dp ? "Desmarcar" : "Pagó domicilio"}</button> : null}</div>
+      </li>)}
+    </ul> : <div className="vacio">Sin movimientos.</div>}
+    </> : <>
     <h2>{yo.esAdmin ? "Registrar pago o ajuste" : "Registrar pago, compra o ganancia"}</h2>
     <div className="campo"><label htmlFor="mTipo">Tipo</label><select id="mTipo" value={tipo} onChange={e => setTipo(e.target.value as TipoMov)}>{tipos.map(x => <option key={x} value={x}>{MOVS[x].t}</option>)}</select></div>
     <div className="linea2"><div className="campo"><label htmlFor="mFecha">Día</label><input id="mFecha" type="date" value={dia} onChange={e => setDia(e.target.value)} /></div>
@@ -240,6 +265,7 @@ export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: b
       {rows.map((r, i) => <tr key={(r.pid || r.mid || "") + i}><td>{hora(r.fecha)}</td><td>{r.det}</td><td className={"n " + (r.v < 0 ? "neg" : "pos")}>{pesos(r.v)}</td>
         <td>{r.mid ? (yo.esAdmin ? <button className="btn peligro chico" onClick={() => quitarMov(r.mid!)}>Quitar</button> : null) : r.pid && (r.v < 0 || r.dp) ? <button className="btn sec chico" onClick={() => domi(r.pid!)}>{r.dp ? "Desmarcar pago" : "Ya pagó domicilio"}</button> : null}</td></tr>)}
     </tbody></table></div> : <div className="vacio">Sin movimientos.</div>}
+    </>}
   </>;
 }
 

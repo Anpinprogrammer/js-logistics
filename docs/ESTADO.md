@@ -4,6 +4,13 @@ Este archivo es la **memoria compartida** entre sesiones y agentes. Léelo despu
 
 Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/ESTADO.md`.
 
+## Ver cuenta en la ficha móvil de Clientes — 2026-11-12
+
+- Dentro de `FichaCliente` (solo celular), `AbrirCuenta` con `enFicha` pinta su propio formulario (`.cuenta-form`) y la lista de movimientos (`.cuenta-movs`). La ventana suelta de escritorio (y la que abre Panel) sigue con el formulario y la tabla de siempre. La lógica no cambió: mismos estados, `registrar`, `quitarMov` (con `v.confirmar`), `domi` y recálculo del saldo.
+- El día usa `SelectorFecha` (no `<input type="date">`, que en iOS invadía "Valor"). Día/Valor van 7/5 y Medio/Nota 5/7 con `minmax(0,…)`; bajo 360 px Día/Valor quedan 1/1, Medio y Nota se apilan y cada movimiento pasa el valor y su botón a una segunda línea. Los selects llevan chevrón SVG propio a 12 px del borde.
+- **Trampa:** el calendario se ancla a la fila completa (`.cuenta-fila{position:relative}` y `.fecha-picker{position:static}`), si no queda del ancho de la columna de 7/12.
+- La librería de íconos y un `SingleDatePicker` no existen en este repo: se usan SVG en línea y `SelectorFecha` de `interna/Calendario.tsx`.
+
 ## Lista y ficha móvil de Clientes — 2026-11-12
 
 - Bajo 768 px la tabla de Clientes se cambia por filas (`.cli-fila`): nombre y domicilio, saldo con color (rojo por cobrar, verde por pagar, neutro en paz y salvo) con su estado debajo, y flecha. Con día elegido, la fila suma "Ese día: …". Desde 768 px la tabla con "Ver cuenta" no cambia.
