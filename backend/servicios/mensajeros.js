@@ -7,6 +7,7 @@ import { diaDe, hora } from "../helpers/fechas.js";
 import { datosInvalidos, noEncontrado, permisoNegado, conflicto } from "./errores.js";
 import { enTransaccion, guardar, actualizar, borrar } from "./transaccion.js";
 import { calculosDe, exigirAdmin, exigirOficina, esMio, valorPositivo, medioValido, texto, exigirNoContado, numero } from "./contexto.js";
+import * as CajaPatinador from "../models/cajaPatinador.model.js";
 import { totales, ganaPorcentaje, sueldoPedidos, tipoDe } from "../helpers/calculos.js";
 
 const COLS_PERIODO = ["pedidos", "recaudos", "cajamovs", "liquidaciones", "mensajeros"];
@@ -57,7 +58,7 @@ export async function periodo(ctx, mid) {
   return vistaPeriodo(calc, mid);
 }
 
-/** Recibir dinero de un mensajero. Si lo recibe un asistente, la plata queda en su caja de oficina. */
+/** Recibir dinero de un mensajero o de un patinador (entra igual a la caja). Si lo recibe un asistente, la plata queda en su caja de oficina. */
 export async function recibir(ctx, { mensajeroId, valor, medio, nota }) {
   const a = ctx.actor;
   exigirOficina(a);
@@ -67,6 +68,9 @@ export async function recibir(ctx, { mensajeroId, valor, medio, nota }) {
     if (!(await Mensajeros.existe(t.c, mensajeroId))) throw datosInvalidos("Elige el mensajero.");
     const id = nuevoId();
     const recaudo = await guardar(t, "recaudos", { id, mensajeroId, valor: val, medio, nota: texto(nota, 200), fecha: ahora(), porUid: a.uid, porNombre: a.nombre });
+    // Un patinador no tiene período de pedidos: lo que debe es lo que anotó de los clientes menos lo que ya entregó.
+    const pat = await CajaPatinador.resumenDe(mensajeroId, t.c);
+    if (pat) return { recaudo, debe: pat.debe };
     const calc = await calculosDe(t.c, COLS_PERIODO);
     return { recaudo, debe: calc.periodoMensajero(mensajeroId).debe };
   });

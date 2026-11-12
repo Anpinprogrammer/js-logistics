@@ -10,7 +10,9 @@ import {
 import { Cab, Paginador, TablaEntregas, pl, useVentana } from "../ui";
 import { E, guardarLocal } from "../estado";
 import { usePorPaginaLiquidaciones } from "../../lib/pantalla";
-import { liquidaciones as apiLiquidaciones } from "../../api/servicios";
+import { liquidaciones as apiLiquidaciones, patinador as apiPatinador } from "../../api/servicios";
+import type { ResumenPatinador } from "../../api/tipos";
+import { resumenPatinadoresDemo } from "../patinador/demoCaja";
 import { SelectorFecha } from "../Calendario";
 
 import { borrarDe, cambiarMedio, cierreOficina, deshacerArqueo, quitarDevolucion, liquidar, movCaja, reabrirLiquidacion, recibirDinero, arqueo } from "../acciones";
@@ -141,6 +143,7 @@ export default function Caja({ pintar }: { pintar: () => void }) {
         </dl>
         <div className="liq"><span className={"liq-est " + (pm.ul && pm.ul.debe > 0 ? "neg" : "")}>{pm.ul ? "Última: " + textoLiq(pm.ul.debe) : "Sin liquidaciones"}</span>{yo.esAdmin && <button className="btn chico" onClick={() => v.abrir(<Liquidar mid={id} />, "centrada")}>Liquidar</button>}</div>
       </div>; })}</div> : <div className="vacio">No hay mensajeros con movimiento pendiente.</div>}
+      <BloquePatinadores />
       <h2>Dinero recibido de mensajeros</h2>
       <div className="campo" style={{ maxWidth: 220 }}><label>Día</label><SelectorFecha id="diaC" valor={E.diaCaja} alCambiar={d => { E.diaCaja = d || hoy(); pintar(); }} etiqueta="Día" maximo={hoy()} obligatorio /></div>
       <div className="cifras" style={{ marginBottom: 12 }}><div className="cifra fuerte"><span>Dinero recibido</span><b>{pesos(cajaDia)}</b><span>{Object.entries(porMedio).map(([m, x]) => `${MEDIOS[m as Medio] || m}: ${pesos(x)}`).join(" · ") || "Sin entregas de dinero este día"}</span></div></div>
@@ -360,22 +363,51 @@ export function MovCaja({ tipo, pre = {} }: { tipo: "entra" | "sale"; pre?: { ca
   </div>;
 }
 
+/* ---------- Patinadores: lo que anotan de los clientes y lo que le entregan a la oficina ---------- */
+/** Debajo de los mensajeros: igual que ellos, el patinador va entregando dinero en el día y aquí se registra lo que se recibe (entra a la caja
+    como cualquier entrega de dinero). Lo que debe es lo anotado en su caja menos lo ya entregado; no tiene período ni liquidación. */
+function BloquePatinadores() {
+  const v = useVentana(), { version } = useDatos();
+  const q = useQuery({ queryKey: ["patinador", "resumen", version], queryFn: () => (DEMO ? Promise.resolve(resumenPatinadoresDemo()) : apiPatinador.resumen()), placeholderData: keepPreviousData });
+  const lista = q.data ?? [];
+  const pendiente = lista.reduce((a, p) => a + Math.max(0, p.debe), 0);
+  return <>
+    <h2>Patinadores</h2>
+    <p className="sub">Cada patinador anota desde su celular el dinero que le pagan los clientes en su ruta. Toca “Recibir dinero” cada vez que te entregue plata: entra a la caja igual que la de los mensajeros.</p>
+    {q.isError ? <div className="aviso alerta">No se pudo traer lo de los patinadores: {motivoError(q.error)}</div> : null}
+    <div className="cifras"><div className="cifra fuerte"><span>Pendiente por entregar (patinadores)</span><b>{pesos(pendiente)}</b></div></div>
+    <div style={{ height: 14 }} />
+    {lista.length ? <div className="mgrid mgrid-mens">{lista.map(p => <div className="mcard mcard-mens" key={p.mensajeroId}>
+      <div className="mcard-top"><b>{p.nombre}</b><span className="acciones"><button className="btn ok chico" onClick={() => v.abrir(<RecibirDinero mid={p.mensajeroId} pat={p} />, "centrada")}>Recibir dinero</button></span></div>
+      <dl className="datos">
+        <dt>Pagos anotados</dt><dd>{p.registros}</dd>
+        <dt>Recibido de clientes</dt><dd>{pesos(p.recibido)}</dd>
+        <dt>Hoy anotó / entregó</dt><dd>{pesos(p.recibidoHoy)} / {pesos(p.entregadoHoy)}</dd>
+        <dt>Ya entregó</dt><dd>{pesos(p.entregado)}</dd>
+        <div className="debe" style={{ display: "contents" }}><dt>{p.debe < 0 ? "A favor" : "Debe"}</dt><dd>{pesos(Math.abs(p.debe))}</dd></div>
+      </dl>
+    </div>)}</div> : <div className="vacio">{q.isLoading ? "Cargando…" : "Todavía no hay patinadores. Créalos en Más → Personal con el tipo Patinador."}</div>}
+  </>;
+}
+
 /* ---------- Mensajeros: recibir dinero, liquidar ---------- */
-export function RecibirDinero({ mid }: { mid: string }) {
-  const v = useVentana(), m = S.mensajeros[mid], pm = periodoMensajero(mid);
-  const [val, setVal] = useState(pm.debe > 0 ? String(pm.debe) : ""), [medio, setMedio] = useState<Medio>("efectivo"), [nota, setNota] = useState(""), [guardando, setGuardando] = useState(false);
+/** `pat` = es un patinador: se muestra y se calcula con lo que anotó de los clientes, no con pedidos. La entrega se guarda igual. */
+export function RecibirDinero({ mid, pat }: { mid: string; pat?: ResumenPatinador }) {
+  const v = useVentana(), m = S.mensajeros[mid], pm = periodoMensajero(mid), debe = pat ? pat.debe : pm.debe;
+  const [val, setVal] = useState(debe > 0 ? String(debe) : ""), [medio, setMedio] = useState<Medio>("efectivo"), [nota, setNota] = useState(""), [guardando, setGuardando] = useState(false);
   if (!m) return null;
   const guardar = async () => {
     const valor = Number(val); if (!(valor > 0)) return v.avisar("Escribe un valor mayor a cero");
     setGuardando(true);
-    try { await recibirDinero({ mensajeroId: mid, valor, medio, nota: nota.trim() }); const falta = pm.debe - valor; v.cerrar();
+    try { await recibirDinero({ mensajeroId: mid, valor, medio, nota: nota.trim() }); const falta = debe - valor; v.cerrar();
       v.avisar(`Recibido ${pesos(valor)} de ${m.nombre}. ${falta > 0 ? "Le falta " + pesos(falta) : falta < 0 ? "Entregó " + pesos(-falta) + " de más" : "Quedó a paz y salvo"}`); }
     catch (e) { setGuardando(false); noSePudo(v, "No se pudo guardar")(e); }
   };
   return <div className="recibir">
     <Cab sub={<span className="sub">{m.nombre}</span>}><h2>Recibir dinero</h2></Cab>
-    <dl className="datos"><dt>Efectivo cobrado</dt><dd>{pesos(pm.efectivo)}</dd>{pm.base ? <><dt>Base para vueltos</dt><dd>{pesos(pm.base)}</dd></> : null}{pm.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(pm.gastos)}</dd></> : null}
-      {pm.anterior ? <><dt>Pendiente anterior</dt><dd>{pesos(pm.anterior)}</dd></> : null}<FilaAjuste a={pm.ajuste} /><dt>Ya entregó</dt><dd>{pesos(pm.recibido)}</dd><dt>Debe</dt><dd className="neg">{pesos(pm.debe)}</dd></dl>
+    {pat ? <dl className="datos"><dt>Recibido de clientes</dt><dd>{pesos(pat.recibido)}</dd><dt>Ya entregó</dt><dd>{pesos(pat.entregado)}</dd><dt>Debe</dt><dd className="neg">{pesos(pat.debe)}</dd></dl>
+    : <dl className="datos"><dt>Efectivo cobrado</dt><dd>{pesos(pm.efectivo)}</dd>{pm.base ? <><dt>Base para vueltos</dt><dd>{pesos(pm.base)}</dd></> : null}{pm.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(pm.gastos)}</dd></> : null}
+      {pm.anterior ? <><dt>Pendiente anterior</dt><dd>{pesos(pm.anterior)}</dd></> : null}<FilaAjuste a={pm.ajuste} /><dt>Ya entregó</dt><dd>{pesos(pm.recibido)}</dd><dt>Debe</dt><dd className="neg">{pesos(pm.debe)}</dd></dl>}
     <div className="linea2"><div className="campo"><label htmlFor="rVal">Valor que entrega</label><input id="rVal" type="number" inputMode="numeric" min="0" step="1000" autoFocus value={val} onFocus={e => e.target.select()} onChange={e => setVal(e.target.value)} /></div>
       <div className="campo"><label htmlFor="rMedio">Medio</label><select id="rMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{MEDIOS_K.map(k => <option key={k} value={k}>{MEDIOS[k]}</option>)}</select></div></div>
     <div className="campo"><label htmlFor="rNota">Nota (opcional)</label><input id="rNota" placeholder="Ej: primera entrega de la tarde" value={nota} onChange={e => setNota(e.target.value)} /></div>

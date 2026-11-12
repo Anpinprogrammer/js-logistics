@@ -306,3 +306,6 @@ export interface RegistroCajaPatinador { id: string; mensajeroId: string; client
 /** Total acumulado de su caja y lo de hoy (día de Colombia), calculados por el servidor. */
 export interface ResumenCajaPatinador { total: number; registros: number; totalHoy: number; registrosHoy: number }
 export interface CajaPatinador { resumen: ResumenCajaPatinador; registros: RegistroCajaPatinador[]; pagina: number; porPagina: number; total: number; paginas: number }
+
+/** Un patinador en Caja → Mensajeros (GET /patinador/resumen): lo anotado de los clientes, lo ya entregado a la oficina y lo que debe (puede ser negativo). */
+export interface ResumenPatinador { mensajeroId: string; nombre: string; activo: boolean; recibido: number; recibidoHoy: number; registros: number; entregado: number; entregadoHoy: number; debe: number }

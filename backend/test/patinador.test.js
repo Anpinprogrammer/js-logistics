@@ -133,3 +133,39 @@ test("al unir clientes repetidos, los pagos del patinador pasan al cliente que q
   assert.deepEqual([...new Set(c.body.registros.map(x => x.clienteId))], [idCliente]);
   assert.equal(c.body.resumen.total, 32000);
 });
+
+test("la oficina ve cuánto recibió cada patinador y cuánto debe entregar", async () => {
+  const r = await oficina.get("/api/patinador/resumen");
+  assert.equal(r.status, 200);
+  const t = r.body.patinadores.find(p => p.mensajeroId === idPatinador);
+  assert.equal(t.nombre, "Tomás Vélez");
+  assert.equal(t.recibido, 32000);
+  assert.equal(t.recibidoHoy, 32000);
+  assert.equal(t.entregado, 0);
+  assert.equal(t.debe, 32000);
+  // Un patinador sin pagos también aparece; los mensajeros no.
+  const otro = r.body.patinadores.find(p => p.mensajeroId === idOtroPatinador);
+  assert.deepEqual([otro.recibido, otro.debe], [0, 0]);
+  assert.equal(r.body.patinadores.some(p => p.mensajeroId === idMensajero), false);
+  assert.equal((await asistente.get("/api/patinador/resumen")).status, 200);
+  assert.equal((await patinador.get("/api/patinador/resumen")).status, 403);
+  assert.equal((await mensajero.get("/api/patinador/resumen")).status, 403);
+});
+
+test("recibir dinero de un patinador usa la misma entrega de los mensajeros y baja lo que debe", async () => {
+  const a = await oficina.post("/api/recaudos").send({ mensajeroId: idPatinador, valor: 20000, medio: "efectivo", nota: "Primera entrega" });
+  assert.equal(a.status, 201);
+  assert.equal(a.body.debe, 12000); // 32.000 recibidos − 20.000 entregados
+  const b = await asistente.post("/api/recaudos").send({ mensajeroId: idPatinador, valor: 15000, medio: "nequi" });
+  assert.equal(b.body.debe, -3000); // entregó de más: queda a favor
+  const t = (await oficina.get("/api/patinador/resumen")).body.patinadores.find(p => p.mensajeroId === idPatinador);
+  assert.deepEqual([t.entregado, t.entregadoHoy, t.debe], [35000, 35000, -3000]);
+  // La entrega es un recaudo normal: la oficina la ve en la lista y entra a la caja como la de un mensajero.
+  const recs = (await oficina.get("/api/recaudos")).body.recaudos;
+  assert.equal(recs.filter(x => x.mensajeroId === idPatinador).length, 2);
+  // El patinador no registra entregas de dinero (eso lo hace la oficina).
+  assert.equal((await patinador.post("/api/recaudos").send({ mensajeroId: idPatinador, valor: 1000, medio: "efectivo" })).status, 403);
+  // Corregir o quitar sigue siendo de administración y se refleja en el resumen.
+  assert.equal((await oficina.delete(`/api/recaudos/${b.body.recaudo.id}`)).status, 200);
+  assert.equal((await oficina.get("/api/patinador/resumen")).body.patinadores.find(p => p.mensajeroId === idPatinador).debe, 12000);
+});

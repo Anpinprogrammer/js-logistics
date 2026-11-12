@@ -45,3 +45,29 @@ export async function listarPagina({ mensajeroId, pagina = 1, porPagina = 8 }) {
   });
   return { registros: r.filas.map(filaAObjeto), pagina: r.pagina, porPagina, total: r.total, paginas: r.paginas };
 }
+
+/* ---- lo que ve la oficina: cuánto recibió cada patinador de los clientes y cuánto ya le entregó al admin ----
+   Lo entregado son los mismos `recaudos` de los mensajeros (así entra a la caja de la empresa); lo que debe
+   es lo recibido menos lo entregado, sin períodos: los patinadores no se liquidan. */
+const FILAS_RESUMEN = `
+  SELECT m.id AS mensajero_id, m.nombre, m.activo,
+    coalesce((SELECT sum(valor) FROM caja_patinador r WHERE r.mensajero_id = m.id), 0)::bigint AS recibido,
+    coalesce((SELECT sum(valor) FROM caja_patinador r WHERE r.mensajero_id = m.id AND ${ES_HOY}), 0)::bigint AS recibido_hoy,
+    (SELECT count(*) FROM caja_patinador r WHERE r.mensajero_id = m.id)::int AS registros,
+    coalesce((SELECT sum(valor) FROM recaudos r WHERE r.mensajero_id = m.id), 0)::bigint AS entregado,
+    coalesce((SELECT sum(valor) FROM recaudos r WHERE r.mensajero_id = m.id AND ${ES_HOY}), 0)::bigint AS entregado_hoy
+  FROM mensajeros m WHERE m.tipo = 'patinador'`;
+
+const conDebe = f => { const o = filaAObjeto(f); o.debe = o.recibido - o.entregado; return o; };
+
+/** Todos los patinadores activos (aunque no hayan anotado nada) y los inactivos que aún deben o tienen de más. */
+export async function resumenPatinadores(db = { query }) {
+  const { rows } = await db.query(`SELECT * FROM (${FILAS_RESUMEN}) x WHERE activo OR recibido <> entregado ORDER BY lower(nombre)`);
+  return rows.map(conDebe);
+}
+
+/** Lo mismo para uno (null si esa ficha no es de un patinador). */
+export async function resumenDe(mensajeroId, db = { query }) {
+  const { rows } = await db.query(`${FILAS_RESUMEN} AND m.id = $1`, [mensajeroId]);
+  return rows[0] ? conDebe(rows[0]) : null;
+}
