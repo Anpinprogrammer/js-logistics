@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Pagos del patinador abonan a la cuenta del cliente — 2026-11-12
+
+- Cada pago que anota el patinador (`POST /patinador/caja`) crea, en la misma transacción, un movimiento `abono` ("A favor", en verde) en la cuenta del cliente, con la nota "Recibido por <patinador>: <concepto>"; `caja_patinador.movimiento_id` los enlaza. Se usa `abono` y no `pago_de_cliente` a propósito: el abono no mueve la caja de JS (el dinero entra a la caja cuando el patinador lo entrega, como `recaudo`), así no se cuenta dos veces.
+- **Requiere `npm run db:migrar`:** agrega la columna y crea, una sola vez (marca `migracion_abonos_patinador` en `ajustes`), los abonos de los pagos ya anotados que no lo tenían.
+- Si un abono se borra desde la cuenta del cliente, el pago del patinador y lo que debe entregar no cambian (`movimiento_id` queda en NULL).
+
 ## Sub-pestaña Patinadores y cierre del día — 2026-11-12
 
 - Caja tiene una sub-pestaña propia **Patinadores** (entre Mensajeros y Liquidaciones recientes; `E.tabCaja = "patinadores"`, también en `navegacion.ts` y `js_caja`): tarjetas por patinador con "Recibir dinero" y la tabla "Dinero recibido de patinadores" del día. La tabla de Mensajeros ya no lista las entregas de los patinadores: son las mismas entregas (`recaudos`), repartidas por tipo de ficha (función `dineroRecibido` de `Caja.tsx`).
