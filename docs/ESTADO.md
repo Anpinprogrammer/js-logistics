@@ -1,5 +1,12 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Modo Patinador de administración — 2026-11-12
+
+- El admin tiene un tercer modo de vista, **Patinador**, junto a Mensajero y Administración (botones de la barra en computador y "Cambiar modo de vista" del perfil en el celular). Como en el modo Mensajero, elige el patinador (`E.miPatinador`, guardado en `js_patinador`, con "cambiar") y ve sus pestañas Caja e Historial (`E.tabP`). El asistente no tiene este modo (tampoco tiene el de Mensajero).
+- Las pantallas son las mismas del patinador: `interna/patinador/Vista.tsx` (`VistaPatinador`, con `ajeno` = el patinador elegido). El formulario y la lista son los de `interna/pagos.tsx` (compartidos con Recepción del mensajero); `FormPago` tiene `deOtro` para decir "le pagó". `Patinador.tsx` es solo el marco de la app del patinador; `DesdeOficina.tsx` es el selector del admin, cargado aparte por `Marco.tsx`. El modo solo pide la colección `mensajeros` (`necesarias("patinador")`). `navegacion.ts` guarda `?modo=patinador&tab=caja|historial`.
+- Backend: `POST /patinador/caja` acepta al admin con `mensajeroId` (ficha de tipo `patinador`); el abono del cliente dice "Recibido por <patinador>" y el historial "Anotó en la caja de <patinador>: …". El patinador que mande `mensajeroId` recibe 400. Sin cambios de esquema: **no hace falta `db:migrar`**.
+- El selector de modos del perfil móvil ahora usa columnas a la medida del texto (`.perfil-modos`), para que quepan los tres a 320 px.
+
 ## Recepción del mensajero: Nuevo pedido y Recibir dinero — 2026-11-12
 
 - La pestaña **Nuevo** del mensajero ahora es **Recepción** (`E.tabM = "recepcion"`, ícono de bandeja) con dos sub-pestañas en `E.subRecM` (`pedido` | `dinero`), recordadas en la URL por `navegacion.ts`. Una pestaña guardada como `nuevo` se abre en Recepción. *Nuevo pedido* es exactamente lo de antes (foto y galería).

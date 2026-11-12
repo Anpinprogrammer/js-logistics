@@ -19,8 +19,8 @@ const conMiles = (t: string) => { const n = aPesos(t); return n ? n.toLocaleStri
 export type Anotar = (d: { clienteId: string; clienteNombre: string; concepto: string; valor: number }) => Promise<string>;
 
 /** Formulario "¿Quién te pagó? · Concepto · Valor". Lo usan el patinador (Mi caja) y el mensajero (Recepción → Recibir dinero). */
-export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un pago", boton = "Anotar pago" }: { anotar: Anotar; invalidar: readonly unknown[]; titulo?: string; boton?: string }) {
-  const v = useVentana(), qc = useQueryClient();
+export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un pago", boton = "Anotar pago", deOtro = false }: { anotar: Anotar; invalidar: readonly unknown[]; titulo?: string; boton?: string; /** Administración anota por el patinador: "le pagó" en vez de "te pagó". */ deOtro?: boolean }) {
+  const v = useVentana(), qc = useQueryClient(), te = deOtro ? "le" : "te";
   const [cliente, setCliente] = useState<ClienteBreve | null>(null);
   const [busca, setBusca] = useState(""), [abierto, setAbierto] = useState(false), [opciones, setOpciones] = useState<ClienteBreve[]>([]);
   const [concepto, setConcepto] = useState(""), [valor, setValor] = useState("");
@@ -52,9 +52,9 @@ export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un p
   const enviar = (e: React.FormEvent) => {
     e.preventDefault();
     const n = aPesos(valor);
-    if (!cliente) return v.avisar("Elige el cliente que te pagó");
+    if (!cliente) return v.avisar(`Elige el cliente que ${te} pagó`);
     if (!concepto.trim()) return v.avisar("Escribe el concepto");
-    if (n <= 0) return v.avisar("Escribe cuánto te pagó");
+    if (n <= 0) return v.avisar(`Escribe cuánto ${te} pagó`);
     guardar.mutate({ clienteId: cliente.id, clienteNombre: cliente.nombre, concepto: concepto.trim(), valor: n });
   };
 
@@ -62,7 +62,7 @@ export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un p
     <form className="tarjeta form-pago" onSubmit={enviar} noValidate aria-label={titulo}>
       <h2>{titulo}</h2>
       <div className="campo">
-        <label htmlFor="pgCliente">¿Quién te pagó?</label>
+        <label htmlFor="pgCliente">¿Quién {te} pagó?</label>
         <div className="combo-cliente" ref={comboRef}>
           {cliente
             ? <div className="combo-chip"><span><b>{cliente.nombre}</b></span><button type="button" onClick={() => { setCliente(null); setAbierto(true); }}>Cambiar</button></div>
