@@ -20,7 +20,8 @@ export function estadoInicialPedidos() {
 }
 
 export const E = {
-  rol: (leer("js_rol") || "admin") as "mensajero" | "admin",
+  // Modo de la app de administración: oficina, mensajero o patinador (los dos últimos, "como si fuera" esa persona).
+  rol: (leer("js_rol") || "admin") as "mensajero" | "admin" | "patinador",
   filtroSol: "todas" as EstadoFiltroSolicitudes, paginaSol: 1, buscarSol: "", origenSol: "todos" as OrigenFiltroSolicitudes, diaSol: "",
   tabA: "inicio", tabM: "inicio", subMas: "resultados",
   // Oficina → Pedidos
@@ -38,6 +39,8 @@ export const E = {
   // subPedM: sub-pestaña de Pedidos (Todos, Por entregar, Por recoger), guardada en js_pedidos_m
   subPedM: (subPedMGuardada === "entregar" || subPedMGuardada === "recoger" ? subPedMGuardada : "todos") as "todos" | "entregar" | "recoger",
   miMensajero: leer("js_mensajero"), actuarComo: false, diaPedM: "", diaEntM: hoy(), semM: semanaDe(hoy()), ultimaGuia: "",
+  // Modo Patinador de administración: pestaña (Caja o Historial) y el patinador elegido, guardado en js_patinador
+  tabP: "caja" as "caja" | "historial", miPatinador: leer("js_patinador"),
   // Más → Resultados
   rangoPanel: "mes",
   // Más → Historial

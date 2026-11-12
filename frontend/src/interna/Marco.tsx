@@ -22,6 +22,7 @@ import "./ajustes.css";
 // Cada modo se descarga solo cuando se usa: el mensajero en el celular no baja las pantallas de la oficina, y al revés.
 const Oficina = perezoso(() => import("./oficina/Oficina"));
 const Mensajero = perezoso(() => import("./mensajero/Mensajero"));
+const Patinador = perezoso(() => import("./patinador/DesdeOficina"));
 const cargando = <div className="vacio" role="status">Cargando…</div>;
 
 export type ItemNav = [clave: string, nombre: string, num?: number];
@@ -35,6 +36,9 @@ const SECCIONES: [string, string[]][] = [
   ["Gestión financiera", ["caja", "cuentas", "sueldo", "sueldos"]],
   ["Administración", ["mas", ...ADMIN_ESCRITORIO.map(([k]) => k)]],
 ];
+/** Modo Patinador de administración: las dos pestañas del patinador, en su propio grupo. */
+const SECCIONES_PATINADOR: [string, string[]][] = [["Patinador", ["caja", "historial"]]];
+const NOMBRE_MODO = { admin: "Administración", mensajero: "Mensajero", patinador: "Patinador" } as const;
 
 const iconoTema = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
 const IconoSol = () => <svg {...iconoTema}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg>;
@@ -68,7 +72,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
   const esAdmin = usuario?.rol === "admin", esAsistente = usuario?.rol === "asistente";
   if (esAsistente) E.rol = "admin"; else if (!esAdmin) E.rol = "mensajero";
   const pintar = () => tocar();
-  const enMensajero = E.rol === "mensajero";
+  const enMensajero = E.rol === "mensajero", enPatinador = E.rol === "patinador", enOficina = !enMensajero && !enPatinador;
   // Misma consulta que la campanita (comparten caché): el número de la pestaña Solicitudes.
   const solicitudesAbiertas = useSolicitudes(!enMensajero);
 
@@ -77,6 +81,9 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
   if (enMensajero) {
     items = [["inicio", "Inicio"], ["nuevo", "Nuevo"], ["pend", "Pedidos", pendientesMios().length + porRecogerMios().length + devolucionesPorDefinirMios().length], ["caja", "Mi caja"], ["sueldo", "Mi sueldo"], ["entregados", "Entregados"]];
     actual = E.tabM; elegir = k => { E.tabM = k; };
+  } else if (enPatinador) {
+    items = [["caja", "Caja"], ["historial", "Historial"]];
+    actual = E.tabP; elegir = k => { E.tabP = k === "historial" ? "historial" : "caja"; };
   } else {
     const sin = Object.values(S.pedidos).filter((p: Pedido) => !p.clienteId).length;
     const nSol = solicitudesAbiertas.data ? solicitudesAbiertas.data.conteo.pendiente + solicitudesAbiertas.data.conteo.cotizada + solicitudesAbiertas.data.conteo.confirmada : 0;
@@ -90,16 +97,16 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     elegir = k => { if (ADMIN_ESCRITORIO.some(([x]) => x === k)) { E.tabA = "mas"; E.subMas = k; } else E.tabA = k; };
   }
   // Apuntar o tocar un botón del menú ya empieza a bajar esa pestaña (solo en la oficina; el mensajero va en un solo archivo).
-  const intencion = (k: string) => { if (!enMensajero) precargarPestana(k); };
+  const intencion = (k: string) => { if (enOficina) precargarPestana(k); };
   const ir = (k: string) => {
-    if (k === "pedidos" && !enMensajero) Object.assign(E, { filtroA: estadoInicialPedidos(), buscarA: "", mensPedA: "", diaPedA: "", paginaA: 1 });
+    if (k === "pedidos" && enOficina) Object.assign(E, { filtroA: estadoInicialPedidos(), buscarA: "", mensPedA: "", diaPedA: "", paginaA: 1 });
     elegir(k); pintar(); scrollTo(0, 0);
   };
   const boton = ([k, t, n]: ItemNav) => (
     <button key={k} aria-current={actual === k ? "page" : undefined} aria-label={t} title={t} onClick={() => ir(k)} onPointerEnter={() => intencion(k)} onFocus={() => intencion(k)} onTouchStart={() => intencion(k)}><Icono n={k} /><span className="t">{t}</span>{n ? <span className="num">{n}</span> : null}</button>
   );
   // Solo se piden al servidor las colecciones que usa la vista abierta (las demás, al abrirla).
-  const cargaVista = !enMensajero && E.tabA === "inicio" ? <DashboardSkeleton /> : cargando;
+  const cargaVista = enOficina && E.tabA === "inicio" ? <DashboardSkeleton /> : cargando;
   const listo = useColecciones(necesarias(E.rol, enMensajero ? E.tabM : E.tabA));
   // La pestaña y sub-pestaña quedan en la URL y en sessionStorage para la próxima recarga.
   usePersistedTab(CLAVE_NAV_ADMIN, usuario?.id || "", navegacionActual());
@@ -120,7 +127,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
   const nom = usuario?.nombre || usuario?.email || "", h = horaActual();
   const corto = nom.includes("@") ? nom.split("@")[0] : nom.split(" ")[0];
   const iniciales = nom.replace(/@.*/, "").split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase();
-  const cambiarRol = (r: "mensajero" | "admin") => { E.rol = r; guardarLocal("js_rol", r); pintar(); scrollTo(0, 0); };
+  const cambiarRol = (r: typeof E.rol) => { E.rol = r; guardarLocal("js_rol", r); pintar(); scrollTo(0, 0); };
   const pendientesMensajero = pendientesMios().length + porRecogerMios().length + devolucionesPorDefinirMios().length;
 
   useEffect(() => {
@@ -135,7 +142,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
 
   useEffect(() => { document.title = "JS Logistics"; }, []);
   // Mientras llegan los datos, se baja la pantalla del modo actual: así no se espera una cosa después de la otra.
-  useEffect(() => { (enMensajero ? Mensajero : Oficina).precargar().catch(() => { /* se reintenta al pintarla */ }); }, [enMensajero]);
+  useEffect(() => { (enMensajero ? Mensajero : enPatinador ? Patinador : Oficina).precargar().catch(() => { /* se reintenta al pintarla */ }); }, [enMensajero, enPatinador]);
   // Cuando el navegador queda libre se baja la librería de avisos, para que el primer aviso no espere (sobre todo sin señal).
   useEffect(() => {
     if ("requestIdleCallback" in window) { const id = requestIdleCallback(precargarAvisos, { timeout: 5000 }); return () => cancelIdleCallback(id); }
@@ -148,7 +155,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     <aside className="lateral" id="lateral">
       <div className="marca-lat"><img src="/logo_JS_sin_texto.webp" alt="" /><div className="marca-lat-txt"><b className="marca-lat-nombre">JS Logistics</b><small className="marca-lat-eslogan">Servir es nuestra labor</small></div></div>
       <nav id="navLateral" aria-label="Menú principal">
-        {SECCIONES.map(([titulo, claves]) => { const xs = items.filter(([k]) => claves.includes(k)); return xs.length ? <div className="lat-grupo" key={titulo}><span className="lat-titulo">{titulo}</span>{xs.map(boton)}</div> : null; })}
+        {(enPatinador ? SECCIONES_PATINADOR : SECCIONES).map(([titulo, claves]) => { const xs = items.filter(([k]) => claves.includes(k)); return xs.length ? <div className="lat-grupo" key={titulo}><span className="lat-titulo">{titulo}</span>{xs.map(boton)}</div> : null; })}
       </nav>
       <div className="lat-pie">
         <button type="button" className="plegar" onClick={alternarMenu} aria-label={colapsado ? "Expandir menú" : "Colapsar menú"} title={colapsado ? "Expandir menú" : "Colapsar menú"}>
@@ -163,6 +170,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
         {!esAsistente && (
           <div className="rol" id="rol" role="group" aria-label="Modo">
             <button aria-pressed={E.rol === "mensajero"} onClick={() => cambiarRol("mensajero")}>Mensajero</button>
+            {esAdmin && <button aria-pressed={enPatinador} onClick={() => cambiarRol("patinador")}>Patinador</button>}
             {esAdmin && <button aria-pressed={E.rol === "admin"} id="btnAdmin" onClick={() => cambiarRol("admin")}>Administración</button>}
           </div>
         )}
@@ -178,8 +186,8 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
           <div className="perfil-area" ref={perfilRef}>
             <button type="button" className="perfil-disparador avatar" aria-label="Menú de perfil y opciones" aria-expanded={perfilAbierto} aria-controls="perfil-movil" onClick={() => setPerfilAbierto(v => !v)}>{iniciales || "JS"}</button>
             {perfilAbierto && <div className="perfil-popover" id="perfil-movil" role="group" aria-label="Opciones de perfil">
-              <div className="perfil-info"><b>{nom}</b><small>Vista: {enMensajero ? "Mensajero" : "Administración"}</small></div>
-              {esAdmin && <div className="perfil-modos"><span>Cambiar modo de vista</span><div role="group" aria-label="Modo"><button type="button" aria-pressed={enMensajero} onClick={() => { cambiarRol("mensajero"); setPerfilAbierto(false); }}>Mensajero</button><button type="button" aria-pressed={!enMensajero} onClick={() => { cambiarRol("admin"); setPerfilAbierto(false); }}>Administración</button></div></div>}
+              <div className="perfil-info"><b>{nom}</b><small>Vista: {NOMBRE_MODO[E.rol]}</small></div>
+              {esAdmin && <div className="perfil-modos"><span>Cambiar modo de vista</span><div role="group" aria-label="Modo"><button type="button" aria-pressed={enMensajero} onClick={() => { cambiarRol("mensajero"); setPerfilAbierto(false); }}>Mensajero</button><button type="button" aria-pressed={enPatinador} onClick={() => { cambiarRol("patinador"); setPerfilAbierto(false); }}>Patinador</button><button type="button" aria-pressed={enOficina} onClick={() => { cambiarRol("admin"); setPerfilAbierto(false); }}>Administración</button></div></div>}
               <button type="button" className="perfil-opcion" onClick={() => { cambiarTema(); setPerfilAbierto(false); }}>{oscuro ? <IconoSol /> : <IconoLuna />}<span>{oscuro ? "Modo claro" : "Modo oscuro"}</span></button>
               <button type="button" className="perfil-opcion perfil-salir" onClick={() => { setPerfilAbierto(false); void salir(); }}><IconoSalir /><span>Cerrar sesión</span></button>
             </div>}
@@ -187,9 +195,9 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
         </div>
       </div>
     </header>
-    <main id="vista" className={!enMensajero && E.tabA === "pedidos" ? "vista-pedidos-oficina" : !enMensajero && E.tabA === "solicitudes" ? "vista-solicitudes-oficina" : !enMensajero && E.tabA === "clientes" ? "vista-clientes-oficina" : undefined}>
+    <main id="vista" className={enOficina && E.tabA === "pedidos" ? "vista-pedidos-oficina" : enOficina && E.tabA === "solicitudes" ? "vista-solicitudes-oficina" : enOficina && E.tabA === "clientes" ? "vista-clientes-oficina" : undefined}>
       {error && <div className="aviso alerta">No se pudieron traer los datos: {error} Se vuelve a intentar solo en unos segundos.</div>}
-      {!listo && !error ? cargaVista : <Suspense fallback={cargaVista}>{enMensajero ? <Mensajero pintar={pintar} /> : <Oficina pintar={pintar} />}</Suspense>}
+      {!listo && !error ? cargaVista : <Suspense fallback={cargaVista}>{enMensajero ? <Mensajero pintar={pintar} /> : enPatinador ? <Patinador pintar={pintar} /> : <Oficina pintar={pintar} />}</Suspense>}
     </main>
     <nav className="pestanas" id="pestanas" aria-label="Secciones">
       {vis.map(boton)}

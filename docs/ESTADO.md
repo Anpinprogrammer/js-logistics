@@ -1,5 +1,12 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Modo Patinador de administración — 2026-11-12
+
+- El admin tiene un tercer modo de vista, **Patinador**, junto a Mensajero y Administración (botones de la barra en computador y "Cambiar modo de vista" del perfil en el celular). Como en el modo Mensajero, elige el patinador (`E.miPatinador`, guardado en `js_patinador`, con "cambiar") y ve sus pestañas Caja e Historial (`E.tabP`). El asistente no tiene este modo (tampoco tiene el de Mensajero).
+- Las pantallas son las mismas del patinador: `interna/patinador/Vista.tsx` (`VistaPatinador`, con `ajeno` = el patinador elegido). `Patinador.tsx` es solo el marco de la app del patinador; `DesdeOficina.tsx` es el selector del admin, cargado aparte por `Marco.tsx`. El modo solo pide la colección `mensajeros` (`necesarias("patinador")`). `navegacion.ts` guarda `?modo=patinador&tab=caja|historial`.
+- Backend: `POST /patinador/caja` acepta al admin con `mensajeroId` (ficha de tipo `patinador`); el abono del cliente dice "Recibido por <patinador>" y el historial "Anotó en la caja de <patinador>: …". El patinador que mande `mensajeroId` recibe 400. Sin cambios de esquema: **no hace falta `db:migrar`**.
+- El selector de modos del perfil móvil ahora usa columnas a la medida del texto (`.perfil-modos`), para que quepan los tres a 320 px.
+
 ## Pagos del patinador abonan a la cuenta del cliente — 2026-11-12
 
 - Cada pago que anota el patinador (`POST /patinador/caja`) crea, en la misma transacción, un movimiento `abono` ("A favor", en verde) en la cuenta del cliente, con la nota "Recibido por <patinador>: <concepto>"; `caja_patinador.movimiento_id` los enlaza. Se usa `abono` y no `pago_de_cliente` a propósito: el abono no mueve la caja de JS (el dinero entra a la caja cuando el patinador lo entrega, como `recaudo`), así no se cuenta dos veces.
