@@ -203,3 +203,112 @@ test("una solicitud del formulario público queda con origen publico y sin ficha
   assert.ok(xs.length > 0);
   assert.ok(xs.every(s => s.clienteTarifa == null || s.estado === "asignada"));
 });
+
+test("la consulta administrativa filtra en la base y pagina sin cargar todo el historial", async () => {
+  const r = await oficina.get("/api/solicitudes?page=1&limit=1&status=todas&source=portal");
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.length, 1);
+  assert.ok(r.body.data.every(s => s.origen === "portal"));
+  assert.equal(r.body.pagination.limit, 1);
+  assert.equal(r.body.pagination.totalItems, r.body.counts.todas);
+  assert.ok(r.body.pagination.totalPages >= 1);
+  const siguiente = await oficina.get("/api/solicitudes?page=2&limit=1&status=todas&source=portal");
+  assert.equal(siguiente.status, 200);
+  assert.ok(!siguiente.body.data.some(s => r.body.data.some(primera => primera.id === s.id)));
+
+  const buscada = r.body.data[0];
+  assert.ok(buscada);
+  const nombre = await oficina.get("/api/solicitudes").query({ page: 1, limit: 15, search: buscada.nombre, source: "portal" });
+  assert.equal(nombre.status, 200);
+  assert.ok(nombre.body.data.some(s => s.id === buscada.id));
+  assert.ok(nombre.body.data.every(s => s.nombre.toLowerCase().includes(buscada.nombre.toLowerCase())));
+  const asignada = (await oficina.get("/api/solicitudes?page=1&source=portal&status=aceptadas")).body.data.find(s => s.guia);
+  assert.ok(asignada?.guia);
+  const guia = await oficina.get("/api/solicitudes").query({ page: 1, search: asignada.guia, status: "aceptadas" });
+  assert.equal(guia.status, 200);
+  assert.ok(guia.body.data.some(s => s.id === asignada.id));
+  const porConfirmar = await oficina.get("/api/solicitudes?page=1&status=por_confirmar&source=portal");
+  assert.equal(porConfirmar.status, 200);
+  assert.ok(porConfirmar.body.data.every(s => s.estado === "cotizada" && s.origen === "portal"));
+  assert.equal(porConfirmar.body.pagination.totalItems, porConfirmar.body.counts.por_confirmar);
+  const web = await oficina.get("/api/solicitudes?page=1&source=web");
+  assert.equal(web.status, 200);
+  assert.ok(web.body.data.length > 0 && web.body.data.every(s => s.origen === "publico"));
+  assert.equal((await oficina.get("/api/solicitudes?page=1&search=%25")).body.pagination.totalItems, 0);
+  const dia = new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(buscada.creado));
+  const fecha = await oficina.get("/api/solicitudes").query({ page: 1, date: dia, source: "portal" });
+  assert.equal(fecha.status, 200);
+  assert.ok(fecha.body.data.some(s => s.id === buscada.id));
+  assert.ok(fecha.body.data.every(s => new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(s.creado)) === dia));
+  assert.equal((await oficina.get("/api/solicitudes?page=0")).status, 400);
+  assert.equal((await oficina.get("/api/solicitudes?page=1&source=ajeno")).status, 400);
+});
+
+/* ---- El cliente responde la propuesta desde su portal ---- */
+const responder = (quien, id, cuerpo) => quien.post(`/api/solicitudes/mias/${id}/responder`).send(cuerpo);
+const pendientePorNombre = async nombre =>
+  (await oficina.get("/api/solicitudes?estado=pendiente")).body.solicitudes.find(s => s.destinatarioNombre === nombre);
+
+test("portal: el cliente acepta la propuesta solo de una solicitud suya", async () => {
+  assert.equal((await portal(cliente, { destinatarioNombre: "Respuesta Acepta", direccionEntrega: "Calle 81 # 8-18, Cali" })).status, 201);
+  const s = await pendientePorNombre("Respuesta Acepta");
+  assert.ok(s);
+  assert.equal((await oficina.post(`/api/solicitudes/${s.id}/aceptar`).send({ valor: 12000 })).body.solicitud.estado, "cotizada");
+
+  // Otra cuenta cliente no puede responder una solicitud ajena (ni siquiera sabe si existe).
+  const idOtro = (await oficina.post("/api/clientes").send({ nombre: "Otra tienda", telefono: "3007778899", tarifa: 5000 })).body.cliente.id;
+  await crearCuenta({ email: "otro@js.co", rol: "cliente", clienteId: idOtro });
+  const otro = await sesion("otro@js.co");
+  assert.equal((await responder(otro, s.id, { aceptar: true })).status, 404);
+
+  // La oficina usa sus propias rutas; esta es solo de cliente y el cuerpo es estricto.
+  assert.equal((await responder(oficina, s.id, { aceptar: true })).status, 403);
+  assert.equal((await responder(cliente, s.id, { aceptar: true, clienteId: idOtro })).status, 400);
+  assert.equal((await responder(cliente, s.id, {})).status, 400);
+  assert.equal((await responder(cliente, s.id, { aceptar: "sí" })).status, 400);
+
+  const r = await responder(cliente, s.id, { aceptar: true });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.solicitud.estado, "confirmada");
+  assert.equal(r.body.solicitud.valor, 12000);
+  // La respuesta trae solo lo que ve el portal, no datos internos.
+  assert.equal(r.body.solicitud.revisadoPor, undefined);
+  assert.equal(r.body.solicitud.telefono, undefined);
+  assert.equal(r.body.solicitud.clienteTarifa, undefined);
+
+  // Ya respondida: repetir da 409 y la oficina puede asignarla.
+  assert.equal((await responder(cliente, s.id, { aceptar: true })).status, 409);
+  const asignada = await oficina.post(`/api/solicitudes/${s.id}/asignar`).send({ mensajeroId: idMensajero });
+  assert.equal(asignada.status, 200);
+  assert.equal(asignada.body.solicitud.estado, "asignada");
+});
+
+test("portal: rechazar la propuesta guarda la razón del cliente o una genérica", async () => {
+  assert.equal((await portal(cliente, { destinatarioNombre: "Respuesta Rechaza", direccionEntrega: "Calle 82 # 8-18, Cali" })).status, 201);
+  const s = await pendientePorNombre("Respuesta Rechaza");
+  assert.ok(s);
+  assert.equal((await oficina.post(`/api/solicitudes/${s.id}/aceptar`).send({ valor: 9000 })).body.solicitud.estado, "cotizada");
+
+  const r = await responder(cliente, s.id, { aceptar: false, motivo: "El valor me parece alto" });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.solicitud.estado, "rechazada");
+  assert.equal(r.body.solicitud.motivoRechazo, "El valor me parece alto");
+  assert.equal((await responder(cliente, s.id, { aceptar: true })).status, 409);
+
+  assert.equal((await portal(cliente, { destinatarioNombre: "Respuesta Sin Motivo", direccionEntrega: "Calle 83 # 8-18, Cali" })).status, 201);
+  const s2 = await pendientePorNombre("Respuesta Sin Motivo");
+  assert.ok(s2);
+  assert.equal((await oficina.post(`/api/solicitudes/${s2.id}/aceptar`).send({ valor: 10000 })).body.solicitud.estado, "cotizada");
+  const r2 = await responder(cliente, s2.id, { aceptar: false });
+  assert.equal(r2.status, 200);
+  assert.equal(r2.body.solicitud.motivoRechazo, "El cliente no aceptó la propuesta de domicilio.");
+});
+
+test("portal: no se puede responder una propuesta antes de que la oficina la haga", async () => {
+  assert.equal((await portal(cliente, { destinatarioNombre: "Aún Pendiente", direccionEntrega: "Calle 84 # 8-18, Cali" })).status, 201);
+  const s = await pendientePorNombre("Aún Pendiente");
+  assert.ok(s);
+  const r = await responder(cliente, s.id, { aceptar: true });
+  assert.equal(r.status, 409);
+  assert.equal(r.body.error.code, "ESTADO_SOLICITUD");
+});

@@ -11,6 +11,8 @@ const r = Router();
 r.post("/portal", permitir("cliente"), validar({ body: V.crearPortal }), C.crearDesdePortal);
 // "Mis solicitudes": el cliente ve solo las suyas (va antes de /:id para que "mias" no se lea como un id).
 r.get("/mias", permitir("cliente"), validar({ query: V.mias }), C.listarMias);
+// El cliente acepta o rechaza la propuesta de domicilio desde su portal. La ficha sale de la sesión.
+r.post("/mias/:id/responder", permitir("cliente"), validar({ params: paramId, body: V.responderCliente }), C.responderMia);
 r.get("/", permitir(OFICINA), validar({ query: V.listar }), C.listar);
 r.get("/:id", permitir(OFICINA), validar({ params: paramId }), C.obtener);
 r.post("/:id/aceptar", permitir(OFICINA), validar({ params: paramId, body: V.aceptar }), C.aceptar);

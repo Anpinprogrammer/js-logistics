@@ -4,6 +4,36 @@ Este archivo es la **memoria compartida** entre sesiones y agentes. Léelo despu
 
 Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/ESTADO.md`.
 
+## Avisos con SweetAlert2 — 2026-11-12
+
+- La app interna ya no pinta su propio "toast" ni su diálogo de confirmación: `useVentana().avisar` y `.confirmar` (`interna/ui.tsx`) llaman a `lib/alertasAdmin.ts`, que usa SweetAlert2. Los ~190 `avisar(...)` y las ~30 `confirmar(...)` de las pantallas no cambiaron. Dependencia nueva: `sweetalert2`.
+- `avisar` sale arriba a la derecha, sin oscurecer la pantalla; el tono se elige por cómo empieza el texto (`tonoDeAviso`: "No se pudo…" error, "Escribe…/Elige…" advertencia, lo demás éxito). `confirmar` siempre pinta el botón en rojo (todas las confirmaciones actuales borran, quitan o deshacen) y deja el foco en Cancelar. Para algo distinto usa `alertaAdmin.confirmar({ peligro: false })`.
+- **Trampa:** un `<dialog>` abierto con `showModal()` vuelve inerte todo lo que está fuera de él, así que la alerta se monta dentro del diálogo abierto (`target` de SweetAlert2, ver `opcionesBase`); si no, la confirmación sale tapada y sin poder tocarse. El contenedor lleva `position: fixed` en `lib/alertas.css` para cubrir la pantalla.
+- Los colores salen de las variables de `.jsl` (`--papel`, `--tinta`, `--linea`…), que se copian al contenedor al abrir porque fuera de `.jsl` no existen. Tema claro y oscuro revisados.
+- Cambió el comportamiento de una confirmación: cancelar ya no cierra ni cambia el drawer que estaba debajo (antes la confirmación reemplazaba su contenido). Las pantallas que hacían `return v.abrir(...)` al cancelar siguen funcionando: solo vuelven a abrir el mismo drawer.
+- El portal de clientes y la landing usan react-toastify en su propio repo (ver su `docs/ESTADO.md`).
+
+## Filtros de fecha unificados — 2026-11-12
+
+- Todos los filtros de fecha de oficina usan el calendario de Pedidos (`interna/Calendario.tsx`): Solicitudes (escritorio y hoja móvil), la hoja móvil de Pedidos y el rango de Cuentas → Movimientos. Ya no queda ningún `<input type="date">` en un filtro; solo en formularios de captura (modales de Clientes y Cuentas), que siguen nativos a propósito.
+- Nuevo `RangoFechas` (en `Calendario.tsx`): un solo botón con el rango ("11 oct 2026 – 09 nov 2026"), una X para limpiar y un solo calendario con atajos (Hoy, Últimos 7 días, Este mes, Mes pasado, Ver todo) y botón Aplicar. El primer clic marca el inicio y el segundo el final; un clic anterior al inicio lo vuelve el nuevo inicio, así `desde <= hasta`. No deja elegir fechas futuras. En el celular sube como hoja desde abajo con fondo oscuro.
+- En Cuentas → Movimientos reemplaza a los dos inputs Desde/Hasta; junto a él va "Ver todo" cuando hay rango activo. El tipo (Todos, Pagos, Compras, Ganancias) pasó de control segmentado a píldoras independientes, iguales a las de Pedidos. Siguen sin contadores porque la lista se pagina en el servidor.
+- **Trampa:** en las hojas de filtros (`.tp-hoja`) el cuerpo hace scroll y recortaba el calendario flotante. Ahí el calendario se muestra en el flujo, debajo del campo (`.tp-hoja .filtro-dia.compacto .fecha-pop` en `ajustes.css`), y `SelectorFecha` se desplaza solo hasta dejarlo a la vista.
+- El calendario empieza la semana en domingo (igual que el de Pedidos); no mezcles uno que empiece en lunes.
+
+## Respuesta del cliente a la propuesta — 2026-11-12
+
+- Nuevo endpoint `POST /solicitudes/mias/:id/responder` (solo rol `cliente`): el cliente acepta o rechaza desde su portal el valor que propuso la oficina. Solo acepta solicitudes propias y en estado `cotizada`: una ajena responde 404 y fuera de estado 409 `ESTADO_SOLICITUD`. Aceptar la deja `confirmada` (lista para asignar); rechazar la deja `rechazada` con el motivo opcional del cliente o uno genérico.
+- La respuesta usa `Solicitud.buscarDeCliente`/`bloquearDeCliente` para no devolver ni permitir tocar datos internos (quién revisó, teléfono del remitente, tarifa del cliente). Emite `solicitudes` por SSE para que la oficina actualice la campanita y la pantalla.
+- El flujo ya no depende solo de WhatsApp: `POST /solicitudes/:id/confirmar` sigue existiendo para cuando el cliente responde por fuera del portal, pero el portal ahora puede hacerlo directamente. Las pruebas de `test/solicitudes.test.js` cubren aceptar, rechazar con y sin motivo, solicitud ajena, cuerpo estricto y estados inválidos.
+
+## Aviso automático de solicitud nueva — 2026-11-12
+
+- En la oficina, cuando la consulta compartida `useSolicitudes` empieza a devolver un `id` **pendiente** que no estaba en la primera carga, se abre solo un modal centrado con la misma caja y acciones de la campanita/pestaña (`TarjetaSolicitud`). La campana y la pestaña Solicitudes no cambiaron.
+- El aviso se monta con `createPortal` dentro de `.jsl`, no en `document.body`: fuera de ese contenedor se pierden las variables del tema y el CSS con ámbito, y el modal queda invisible.
+- Dura 10 s con barra de progreso que se vacía. Cualquier interacción real (`pointerdown`, foco, tecla, `change`, rueda) detiene el tiempo de forma permanente y muestra “Tiempo detenido”; se cierra con la X, Escape o al completar aceptar/rechazar/asignar. Si llegan varias, se encolan y se muestran de a una.
+- Solo aplica a la vista de oficina (`!enMensajero`) y sigue el mismo sondeo de 30 s de la campanita; no hay transporte nuevo. La primera carga no dispara avisos por solicitudes que ya existían.
+
 ## Filtros de Pedidos de oficina — 2026-11-11
 
 - Detalle de pedido: el drawer de administración usa una hoja inferior de hasta 92dvh en móvil y un modal centrado de hasta 896 px desde 1024 px. El formulario financiero queda a la izquierda y la trazabilidad, ubicación y fotos a la derecha; la cabecera y las acciones permanecen visibles mientras se desplaza el cuerpo. Se conservaron los controles y manejadores existentes.
@@ -15,6 +45,7 @@ Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/EST
 
 ## Filtros de Solicitudes de oficina — 2026-11-11
 
+- Nueva consulta de oficina `GET /solicitudes?page=&limit=&status=&search=&source=&date=`: SQL devuelve 15 filas por página, busca y filtra por origen y día colombiano, y calcula conteos por estado con `GROUP BY` sin traer el historial. Conserva el contrato anterior de `/solicitudes` para la campanita y otros clientes. En la pantalla hay búsqueda con debounce de 400 ms, toolbar de escritorio, hoja de filtros móvil, cinco filas de carga y paginador compartido; el modo demo aplica los mismos filtros en memoria. `db:migrar` crea el índice `(origen, creado DESC)` para el filtro de canal. Demo revisada a 320, 390, 768, 1024 y 1440 px sin desbordes; filtro móvil por portal y búsqueda comprobados. La integración SQL requiere `TEST_DATABASE_URL` de una base de pruebas, ausente en este entorno.
 - Se elevó la escala de Solicitudes: encabezado 24/30 px, nombre y valor de filas 14/16 px, metadatos 12/14 px, badges y contadores desde 12 px; el detalle usa pares clave-valor de 12/14 px. Entre 768 y 1150 px las acciones bajan a una segunda fila para evitar que las columnas compriman el texto.
 - La tira de estados en móvil tiene píldoras más compactas, un degradado al borde derecho con el color real del tema y centra suavemente la opción tocada. La página reserva espacio inferior para la navegación fija; conteos y filtro activo siguen usando el mismo estado.
 
@@ -93,7 +124,7 @@ El orden de trabajo de siempre: backend primero (con prueba y documentado en `ba
 
 - **Backend:** completo para lo que usan las apps: auth, usuarios, clientes, mensajeros, pedidos (con paginador), movimientos, recaudos, liquidaciones, caja (arqueos, oficinas, adelantos), cuentas, jornadas, sueldos, historial, papelera, tiempo real por SSE y correo con Resend (enlaces de activación y de contraseña). Todas las rutas registradas están en la tabla de `backend/README.md` (se comprobó que ninguna falta).
 - **App de oficina y mensajeros (`frontend/`):** igual al prototipo viejo, reescrita en React (`src/interna/`), con carga diferida por pestaña. El ingreso (`pages/Ingreso.tsx`) es un rediseño aparte, en Tailwind.
-- **Landing y portal de clientes:** rediseño oscuro de la portada (carrusel de fotos), del menú móvil y del login; dos portales (propuesta y clásico) con los mismos datos.
+- **Landing y portal de clientes:** rediseño oscuro de la portada (carrusel de fotos), del menú móvil y del login; un solo portal (`clasico/`); la vista de propuesta se retiró.
 
 ## Qué falta
 
@@ -103,7 +134,7 @@ Está en la sección "Qué falta" de [`CLAUDE.md`](../CLAUDE.md) (la fuente úni
 
 1. **El logo `icono-96.webp` solo se ve sobre fondo claro.** Es un PNG/WebP transparente con el isotipo "JS" en azul oscuro y las letras "LOGISTICS CALI" en **blanco**. Sobre fondo oscuro el isotipo se pierde, y sobre un badge blanco las letras desaparecen. Solución usada en el ingreso de la oficina y, en el repo de clientes, en el login y el menú móvil: un **badge claro** (degradado blanco → `sky-100`, halo cian) y la imagen **recortada y agrandada** (`absolute left-[-10%] top-[3%] w-[120%] max-w-none` dentro de un contenedor `overflow-hidden`) para mostrar solo el isotipo. El texto "LOGISTICS · CALI" se escribe aparte como texto real. Copia ese patrón si necesitas el logo en otra pantalla.
 2. **`pages/Ingreso.tsx` es siempre oscura y usa colores propios** (`#070B19`/`#0b0f19`, `#38bdf8`, `#0284c7`), a propósito: la regla de "usar solo tokens" de `frontend/CLAUDE.md` aplica a la app interna, no a esta pantalla. Fondo: malla animada, rutas SVG con nodos que pulsan y esferas de luz; las animaciones (`jsl-*`) están en `src/index.css` y se apagan con `prefers-reduced-motion`.
-3. **"Recordar mi sesión" no existe.** La sesión es una cookie `HttpOnly` que decide el backend; el frontend no puede alargarla. No pongas una casilla que prometa eso. Tampoco hay flujo de "olvidé mi contraseña": administración asigna una nueva (así lo dice el texto de la pantalla).
+3. **"Recordar mi sesión" no existe.** La sesión es una cookie `HttpOnly` que decide el backend; el frontend no puede alargarla. No pongas una casilla que prometa eso. El flujo de "olvidé mi contraseña" existe: el ingreso lleva a `/recuperar` y el correo abre `/restablecer` (ver decisión 5).
 4. **Sin desbordes laterales en móvil.** Dos causas reales ya corregidas: (a) un `grid` sin columna base se ensancha al contenido más largo: usa `grid grid-cols-1 md:grid-cols-N`; (b) correos y nombres largos en flex: `min-w-0` y `[overflow-wrap:anywhere]`. `html { overflow-x: clip }` es solo red de seguridad, no sustituye arreglar la causa.
 5. **Los enlaces de correo son de un solo uso y se guardan hasheados.** En la tabla `enlaces` queda el SHA-256 del token, nunca el token en claro. La contraseña vence en 60 minutos y la activación en 7 días; al usarlos se cierran las sesiones abiertas. Los clientes reciben enlaces a `URL_CLIENTES` y los trabajadores a `URL_EQUIPO`. Sin `RESEND_API_KEY` la API funciona, pero no manda correos (en desarrollo el enlace sale en la consola). Para probar sin verificar el dominio, `CORREO_REMITENTE=onboarding@resend.dev`: Resend solo deja enviar así al correo de la cuenta de Resend. Si el envío falla en desarrollo, el enlace también queda en la consola.
 6. **Las pantallas de acceso comparten el marco del ingreso.** `frontend/src/pages/AccesoComun.tsx` tiene el fondo, la tarjeta, los íconos y los campos con las mismas clases del ingreso; `Recuperar.tsx` y `Restablecer.tsx` lo reutilizan. No se cambió el diseño: si hay que ajustar algo visual, se hace en `AccesoComun.tsx` para las tres pantallas.
@@ -140,6 +171,10 @@ Para revisar anchos de celular y desbordes se usó Chrome headless con `puppetee
 Es una receta, no un script del repo. Si lo conviertes en prueba automática, guárdalo en una carpeta `scripts/` y documéntalo aquí.
 
 ## Registro de sesiones (lo más reciente arriba)
+
+- **2026-11-12:** el cliente puede aceptar o rechazar desde su portal la propuesta de domicilio (`POST /solicitudes/mias/:id/responder`). El endpoint valida que la solicitud sea suya, que esté `cotizada` y responde solo campos del portal; aceptar pasa a `confirmada` y rechazar a `rechazada` con motivo opcional. Se actualizó el flujo, el README y las pruebas; la oficina recibe el cambio por SSE y sigue pudiendo confirmar manualmente lo que respondan por WhatsApp. El portal del cliente (otro repo) agrega campanita y aviso automático de 10 s con esta acción.
+
+- **2026-11-12:** aviso automático de solicitud nueva en la oficina (`frontend/src/interna/Solicitudes.tsx`, `Marco.tsx`, `ajustes.css`). Detecta ids `pendiente` nuevos frente a la primera carga de `useSolicitudes`, los encola y abre un modal centrado con la misma `TarjetaSolicitud` de la campanita/pestaña. La barra de 10 s se detiene al interactuar y el aviso se cierra solo, con X, Escape o al aceptar/rechazar/asignar. Se porta a `.jsl` (en `document.body` pierde estilos y tema). La campana y la pestaña no se tocaron; verificado en demo a 1440 con pausa real y cierre automático.
 
 - **2026-11-11:** login más compacto en celular (menos de 640 px): tarjeta de 510 a 436 px de alto, badge de 56 px (`size-14`), título `text-2xl`, descripción `text-xs`, `p-4` y menos aire entre campos; de `sm:` en adelante todo queda igual que antes (se comprobó pixel a pixel a 1440×900). Los campos y el botón siguen en 44 px de alto (zona de toque del mensajero) y con letra de 16 px (si baja de eso Safari hace zoom). Lo mismo aplica a Recuperar y Restablecer porque comparten `TARJETA`/`ENTRADA`. La animación de entrada no se tocó: mide el ingreso real y se adapta sola al nuevo tamaño.
 

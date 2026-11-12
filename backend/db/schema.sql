@@ -314,8 +314,8 @@ CREATE INDEX IF NOT EXISTS papelera_fecha_idx ON papelera (fecha DESC);
 
 -- ---------- Solicitudes de envío (formulario público de la landing) ----------
 -- Un visitante pide una recogida sin tener cuenta. La oficina la revisa: la acepta poniendo el valor del domicilio
--- (se le confirma al cliente por WhatsApp) o la rechaza; cuando el cliente está de acuerdo se asigna a un mensajero
--- y se crea la guía. Estados: pendiente → cotizada → confirmada → asignada, o rechazada.
+-- (se le confirma al cliente por WhatsApp o desde su portal) o la rechaza; cuando el cliente está de acuerdo se asigna
+-- a un mensajero y se crea la guía. Estados: pendiente → cotizada → confirmada → asignada, o rechazada.
 CREATE TABLE IF NOT EXISTS solicitudes (
   id                    TEXT PRIMARY KEY,
   estado                TEXT NOT NULL DEFAULT 'pendiente'
@@ -343,6 +343,7 @@ CREATE TABLE IF NOT EXISTS solicitudes (
 ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT 'publico' CHECK (origen IN ('publico', 'portal'));
 CREATE INDEX IF NOT EXISTS solicitudes_estado_idx ON solicitudes (estado, creado DESC);
 CREATE INDEX IF NOT EXISTS solicitudes_creado_idx ON solicitudes (creado DESC);
+CREATE INDEX IF NOT EXISTS solicitudes_origen_creado_idx ON solicitudes (origen, creado DESC);
 CREATE INDEX IF NOT EXISTS solicitudes_cliente_idx ON solicitudes (cliente_id, creado DESC);
 CREATE INDEX IF NOT EXISTS solicitudes_guia_idx ON solicitudes (guia) WHERE guia IS NOT NULL;
 

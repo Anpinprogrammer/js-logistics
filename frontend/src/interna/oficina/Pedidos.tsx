@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
-  S, yo, hora, hoy, moverDia, pesos, listaOrdenada, esRepartidor, tipoDe, cambioPendiente, sinServicio, delDia, nombreCliente, sinTildes, cerrado, gastoDe, pagoDomi,
+  S, yo, hora, pesos, listaOrdenada, esRepartidor, tipoDe, cambioPendiente, sinServicio, delDia, nombreCliente, sinTildes, cerrado, gastoDe, pagoDomi,
   saldoPedido, metodoTxt, pedidoLiquidado, cambiaLoContado, corteCaja, CUENTAS_JS, METODOS, MEDIOS, MOTIVOS, type Metodo, type Medio, type Motivo, type Pedido,
 } from "../motor";
 import { Cab, EtqEstado, FiltroDia, FilaPedido, FotosGuia, IconoCamara, IconoFiltro, IconoInfo, Paginador, pl, useVentana } from "../ui";
@@ -169,7 +169,7 @@ export default function Pedidos({ pintar }: { pintar: () => void }) {
         <div className="tp-hoja-cuerpo">
           <div className="campo"><label htmlFor="tp-mensajero">Mensajero</label><div className="tp-hoja-select"><select id="tp-mensajero" value={borrador.mensajero} onChange={e => setBorrador(b => ({ ...b, mensajero: e.target.value }))}><option value="">Todos los mensajeros</option>{repartidores.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></div></div>
           <div className="campo"><label htmlFor="tp-estado">Estado del pedido</label><div className="tp-hoja-select"><select id="tp-estado" value={borrador.estado} onChange={e => setBorrador(b => ({ ...b, estado: e.target.value }))}>{estados.map(([k, t, n]) => <option key={k} value={k}>{t}{n ? ` (${n})` : ""}</option>)}{borrador.estado === "serv" && <option value="serv">Sin valor de servicio</option>}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></div></div>
-          <div className="campo"><label htmlFor="tp-dia">Fecha</label><div className="tp-hoja-fecha"><button type="button" aria-label="Día anterior" onClick={() => setBorrador(b => ({ ...b, dia: moverDia(b.dia || hoy(), -1) }))}>‹</button><input type="date" id="tp-dia" value={borrador.dia} max={hoy()} onChange={e => setBorrador(b => ({ ...b, dia: e.target.value }))} /><button type="button" aria-label="Día siguiente" disabled={!borrador.dia || borrador.dia >= hoy()} onClick={() => setBorrador(b => ({ ...b, dia: moverDia(b.dia, 1) }))}>›</button><button type="button" onClick={() => setBorrador(b => ({ ...b, dia: hoy() }))}>Hoy</button></div></div>
+          <div className="campo"><label htmlFor="tp-dia">Fecha</label><FiltroDia compacto id="tp-dia" d={borrador.dia} poner={d => setBorrador(b => ({ ...b, dia: d }))} /></div>
         </div>
         <footer><button type="button" className="btn sec" onClick={() => setBorrador({ mensajero: "", estado: "todos", dia: "" })}>Limpiar filtros</button><button type="button" className="btn" onClick={aplicarFiltros}>Aplicar filtros</button></footer>
       </div>

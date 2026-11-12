@@ -136,7 +136,7 @@ export default function Caja({ pintar }: { pintar: () => void }) {
         <div className="liq"><span className={"liq-est " + (pm.ul && pm.ul.debe > 0 ? "neg" : "")}>{pm.ul ? "Última: " + textoLiq(pm.ul.debe) : "Sin liquidaciones"}</span>{yo.esAdmin && <button className="btn chico" onClick={() => v.abrir(<Liquidar mid={id} />, "centrada")}>Liquidar</button>}</div>
       </div>; })}</div> : <div className="vacio">No hay mensajeros con movimiento pendiente.</div>}
       <h2>Dinero recibido de mensajeros</h2>
-      <div className="campo" style={{ maxWidth: 220 }}><label htmlFor="diaC">Día</label><input type="date" id="diaC" value={E.diaCaja} onChange={e => { E.diaCaja = e.target.value || hoy(); pintar(); }} /></div>
+      <div className="campo" style={{ maxWidth: 220 }}><label>Día</label><SelectorFecha id="diaC" valor={E.diaCaja} alCambiar={d => { E.diaCaja = d || hoy(); pintar(); }} etiqueta="Día" maximo={hoy()} obligatorio /></div>
       <div className="cifras" style={{ marginBottom: 12 }}><div className="cifra fuerte"><span>Dinero recibido</span><b>{pesos(cajaDia)}</b><span>{Object.entries(porMedio).map(([m, x]) => `${MEDIOS[m as Medio] || m}: ${pesos(x)}`).join(" · ") || "Sin entregas de dinero este día"}</span></div></div>
       {recsDia.length ? <div className="tabla-env"><table><thead><tr><th>Hora</th><th>Mensajero</th><th>Medio</th><th>Nota</th><th className="n">Valor</th>{yo.esAdmin ? <th></th> : <th>Recibió</th>}</tr></thead><tbody>
         {recsDia.map(r => <tr key={r.id}><td>{hora(r.fecha)}</td><td>{S.mensajeros[r.mensajeroId]?.nombre || ""}</td><td>{MEDIOS[r.medio] || ""}{medioAntes(r)}</td><td>{r.nota || ""}</td><td className="n"><b>{pesos(r.valor)}</b></td>
@@ -264,7 +264,7 @@ function CajaGeneral({ pintar }: { pintar: () => void }) {
     </div>
     <div className="acciones acciones-caja"><button className="btn" id="cjArqueo" onClick={() => v.abrir(<HacerArqueo />, "centrada")}>Hacer arqueo</button><button className="btn ok" id="cjEntra" onClick={() => v.abrir(<MovCaja tipo="entra" />, "centrada")}>Registrar entrada</button><button className="btn sec" id="cjSale" onClick={() => v.abrir(<MovCaja tipo="sale" />, "centrada")}>Registrar salida o gasto</button></div>
     <h2>Movimientos de caja</h2>
-    <div className="campo" style={{ maxWidth: 220 }}><label htmlFor="diaL">Día</label><input type="date" id="diaL" value={E.diaLibro} onChange={e => { E.diaLibro = e.target.value || hoy(); pintar(); }} /></div>
+    <div className="campo" style={{ maxWidth: 220 }}><label>Día</label><SelectorFecha id="diaL" valor={E.diaLibro} alCambiar={d => { E.diaLibro = d || hoy(); pintar(); }} etiqueta="Día" maximo={hoy()} obligatorio /></div>
     {delDia.length ? <div className="tabla-env"><table><thead><tr><th>Hora</th><th>Concepto</th><th>Tipo</th><th>Medio</th><th className="n">Valor</th><th></th></tr></thead><tbody>
       {delDia.map((x, i) => <tr key={(x.ref || "") + i}><td>{hora(x.fecha)}</td><td>{x.concepto}</td><td>{x.cat}</td><td>{MEDIOS_CAJA[x.medio] || ""}</td><td className={"n " + (x.valor < 0 ? "neg" : "pos")}>{pesos(x.valor)}</td><td>{x.ref ? <button className="btn peligro chico" onClick={() => quitar(x.ref!)}>Quitar</button> : null}</td></tr>)}
       <tr><td></td><td><b>Entradas {pesos(ent)} · Salidas {pesos(sal)}</b></td><td></td><td></td><td className="n"><b>{pesos(ent - sal)}</b></td><td></td></tr>
@@ -347,7 +347,7 @@ export function MovCaja({ tipo, pre = {} }: { tipo: "entra" | "sale"; pre?: { ca
     <div className="linea2"><div className="campo"><label htmlFor="cjVal">Valor</label><input id="cjVal" type="number" inputMode="numeric" min="0" step="1000" autoFocus value={val} onChange={e => setVal(e.target.value)} /></div>
       <div className="campo"><label htmlFor="cjMedio">Medio</label><select id="cjMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{MEDIOS_K.map(k => <option key={k} value={k}>{MEDIOS[k]}</option>)}</select></div></div>
     <div className={"campo " + (conSemana ? "" : "oculto")} id="cjSemC"><label htmlFor="cjSem">Semana del sueldo</label><select id="cjSem" value={sem} onChange={e => setSem(e.target.value)}>{sems.map(([w, t]) => <option key={w} value={w}>{t}</option>)}</select></div>
-    <div className="linea2"><div className="campo"><label htmlFor="cjDia">Día en que salió o entró la plata</label><input id="cjDia" type="date" value={dia} min={diaMinCaja()} max={hoy()} onChange={e => setDia(e.target.value)} /></div>
+    <div className="linea2"><div className="campo"><label>Día en que salió o entró la plata</label><SelectorFecha id="cjDia" valor={dia} alCambiar={setDia} etiqueta="Día" minimo={diaMinCaja()} maximo={hoy()} obligatorio /></div>
       <div className="campo"><label htmlFor="cjCon">Detalle (opcional)</label><input id="cjCon" placeholder="Ej: gasolina, arriendo de mayo" value={con} onChange={e => setCon(e.target.value)} /></div></div>
     <button className="btn form-guardar" id="cjGuardar" disabled={guardando} onClick={guardar}>Guardar</button>
   </div>;

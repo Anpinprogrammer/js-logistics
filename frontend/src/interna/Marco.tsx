@@ -5,7 +5,7 @@ import { ProveedorDatos, useDatos } from "./datos";
 import { ProveedorVentana, Icono, IconoSalir, useVentana } from "./ui";
 import { E, estadoInicialPedidos, guardarLocal } from "./estado";
 import { useTema } from "./tema";
-import { Campanita, IconoCampana, useSolicitudes } from "./Solicitudes";
+import { AvisoSolicitud, Campanita, IconoCampana, useSolicitudes } from "./Solicitudes";
 import { S, fechaLarga, hoy, horaActual, type Pedido } from "./motor";
 import { pendientesMios, porRecogerMios, devolucionesPorDefinirMios } from "./mensajero/pendientes";
 import { useEscritorio } from "../lib/pantalla";
@@ -173,5 +173,6 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
       {vis.map(boton)}
       {resto.length > 0 && <button aria-current={enResto ? "page" : undefined} onClick={abrirMenu}><Icono n={enResto ? enResto[0] : "menu"} /><span className="t">{enResto ? enResto[1] : "Menú"}</span>{nResto ? <span className="num">{nResto}</span> : null}</button>}
     </nav>
+    {!enMensajero && <AvisoSolicitud solicitudes={solicitudesAbiertas.data?.solicitudes} />}
   </>;
 }

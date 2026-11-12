@@ -327,14 +327,11 @@
 .jsl .tp-hoja-cuerpo{display:grid;gap:16px;min-height:0;overflow-y:auto;padding:18px 20px}
 .jsl .tp-hoja .campo{margin:0;min-width:0}
 .jsl .tp-hoja .campo label{display:block;margin-bottom:6px;font-size:.78rem;font-weight:700}
-.jsl .tp-hoja .campo select,.jsl .tp-hoja .campo input[type="date"]{width:100%;min-width:0;min-height:44px;padding:8px 12px;border:1px solid var(--linea);border-radius:12px;background:var(--hueco);color:var(--tinta);font:inherit;font-size:.8rem;font-weight:600}
+.jsl .tp-hoja .campo select{width:100%;min-width:0;min-height:44px;padding:8px 12px;border:1px solid var(--linea);border-radius:12px;background:var(--hueco);color:var(--tinta);font:inherit;font-size:.8rem;font-weight:600}
 .jsl .tp-hoja-select{position:relative;min-width:0}
 .jsl .tp-hoja .tp-hoja-select select{appearance:none;-webkit-appearance:none;padding:10px 40px 10px 16px;background-image:none;cursor:pointer}
 .jsl .tp-hoja-select svg{position:absolute;right:14px;top:50%;width:16px;height:16px;transform:translateY(-50%);pointer-events:none;color:var(--suave)}
 .jsl .tp-hoja .campo select:focus,.jsl .tp-hoja .campo input:focus{outline:2px solid var(--marca2);outline-offset:1px}
-.jsl .tp-hoja-fecha{display:grid;grid-template-columns:38px minmax(0,1fr) 38px 44px;gap:6px;align-items:center}
-.jsl .tp-hoja-fecha button{min-height:44px;padding:5px;border:1px solid var(--linea);border-radius:11px;background:var(--hueco);color:var(--tinta);font:inherit;font-size:.8rem;font-weight:700;cursor:pointer}
-.jsl .tp-hoja-fecha button:disabled{opacity:.45;cursor:default}
 .jsl .tp-hoja footer{display:flex;gap:9px;flex:none;padding:14px 20px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--linea)}
 .jsl .tp-hoja footer .btn{flex:1;min-width:0;min-height:44px;justify-content:center;font-size:.78rem}
 @media (min-width:768px){.jsl .tp-movil,.jsl .tp-capa{display:none}.jsl .tp-escritorio{display:flex}}
@@ -445,29 +442,15 @@
 /* Toolbar de "Movimientos y ganancias": columna en móvil, 2 filas en tablet y 1 fila en escritorio. */
 .jsl .toolbar-cuentas{display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;gap:12px;width:100%;background:var(--hueco);border:1px solid var(--linea);border-radius:12px;padding:12px;margin:16px 0}
 .jsl .toolbar-cuentas .campo{width:100%;margin:0;min-width:0}
-.jsl .toolbar-cuentas .seg-tipo{display:inline-flex;align-items:center;justify-content:center;gap:4px;width:100%;padding:4px;border-radius:8px;background:var(--papel);box-shadow:inset 0 0 0 1px var(--linea);flex:none}
-.jsl .toolbar-cuentas .seg-tipo button{flex:1 1 0;justify-content:center;padding:6px 12px;font-size:.75rem;font-weight:600;white-space:nowrap;border-radius:6px;color:var(--suave);background:transparent}
-.jsl .toolbar-cuentas .seg-tipo button:hover{background:var(--hueco);color:var(--tinta)}
-.jsl .toolbar-cuentas .seg-tipo button[aria-pressed="true"]{background:var(--marca2);color:#fff;box-shadow:0 1px 2px rgba(16,24,40,.25)}
-.jsl .toolbar-cuentas .filtro-dia.rango-cuentas{display:flex;align-items:center;justify-content:flex-end;gap:8px;width:100%;margin:0;flex-wrap:wrap;min-width:0}
-.jsl .toolbar-cuentas .filtro-dia.rango-cuentas .sub{margin:0}
 .jsl .acciones-cuentas{justify-content:flex-end;margin:16px 0}
 .jsl .ayuda-cuentas{margin:0 0 14px}
 .jsl .ayuda-cuentas summary{cursor:pointer;font-size:.84rem;font-weight:600;color:var(--suave)}
 .jsl .ayuda-cuentas .sub{margin:8px 0 0;font-size:.84rem}
 @media (max-width:600px){
-  .jsl .toolbar-cuentas .filtro-dia.rango-cuentas{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center}
-  .jsl .toolbar-cuentas .filtro-dia.rango-cuentas .sub{display:none}
-  .jsl .toolbar-cuentas .filtro-dia.rango-cuentas .dia-pill{width:100%;min-width:0}
-  .jsl .toolbar-cuentas .filtro-dia.rango-cuentas .dia-pill input{flex:1;min-width:0}
-  .jsl .toolbar-cuentas .filtro-dia.rango-cuentas .btn{grid-column:1/-1;justify-content:center}
 }
 @media (min-width:768px){
   .jsl .toolbar-cuentas{flex-direction:row;flex-wrap:wrap;align-items:center}
   .jsl .toolbar-cuentas .campo{flex:0 1 288px;width:288px}
-  .jsl .toolbar-cuentas .seg-tipo{width:auto}
-  .jsl .toolbar-cuentas .seg-tipo button{flex:0 0 auto}
-  .jsl .toolbar-cuentas .filtro-dia.rango-cuentas{width:auto;margin-left:auto}
 }
 @media (min-width:1280px){
   .jsl .toolbar-cuentas{flex-wrap:nowrap}
@@ -1018,6 +1001,24 @@
 @media (prefers-reduced-motion:reduce){.jsl .ng-girador{animation-duration:2s}.jsl .ng-capa.ok{animation:none}}
 
 /* Solicitudes de oficina: filas para explorar y detalle completo en la ventana compartida. */
+.jsl .sol-filtros-movil{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.jsl .sol-filtros-movil input,.jsl .sol-filtros-escritorio input[type="search"],.jsl .sol-filtros-escritorio select{min-width:0;min-height:44px;padding:9px 12px;border:1px solid var(--linea);border-radius:13px;background:var(--papel);color:var(--tinta);font:inherit;font-size:.85rem;box-shadow:var(--sombra)}
+.jsl .sol-filtros-movil input{flex:1;width:100%}
+.jsl .sol-filtros-movil button{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;min-height:44px;padding:8px 12px;border:1px solid var(--linea);border-radius:13px;background:var(--papel);color:var(--tinta);font:inherit;font-size:.8rem;font-weight:700;box-shadow:var(--sombra);cursor:pointer}
+.jsl .sol-filtros-movil button svg{width:17px;height:17px}
+.jsl .sol-filtros-movil button b{display:grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border-radius:50%;background:var(--marca2);color:#fff;font-size:.68rem}
+.jsl .sol-filtros-escritorio{display:none}
+.jsl .sol-filtros-fila{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,190px);gap:10px;min-width:0;margin-bottom:10px}
+.jsl .sol-filtros-fecha{display:flex;align-items:center;gap:5px;min-width:0}
+.jsl .sol-filtros-fecha{grid-column:1/-1}
+.jsl .sol-filtros-movil input:focus,.jsl .sol-filtros-escritorio input:focus,.jsl .sol-filtros-escritorio select:focus{outline:2px solid var(--marca2);outline-offset:1px}
+.jsl .sol-esqueleto{display:grid;gap:9px;pointer-events:none}
+.jsl .sol-esqueleto span{height:13px;border-radius:999px;background:var(--linea);animation:sol-esqueleto-pulso 1.4s ease-in-out infinite alternate}
+.jsl .sol-esqueleto span:nth-child(1){width:38%}.jsl .sol-esqueleto span:nth-child(2){width:70%}.jsl .sol-esqueleto span:nth-child(3){width:52%}
+@keyframes sol-esqueleto-pulso{to{opacity:.42}}
+@media (prefers-reduced-motion:reduce){.jsl .sol-esqueleto span{animation:none}}
+@media (min-width:768px){.jsl .sol-filtros-movil{display:none}.jsl .sol-filtros-escritorio{display:block}}
+@media (min-width:1200px){.jsl .sol-filtros-fila{grid-template-columns:minmax(0,1fr) minmax(160px,200px) auto}.jsl .sol-filtros-fecha{grid-column:auto}}
 .jsl .cab-solicitudes h1{font-size:1.5rem;font-weight:800;letter-spacing:-.025em;color:var(--tinta)}
 .jsl .cab-solicitudes .sub{margin-top:4px;font-size:.875rem;color:var(--suave)}
 .jsl .solicitudes-lista{display:grid;gap:10px;margin-top:14px}
@@ -1118,3 +1119,77 @@
 .jsl .destinos{display:flex;flex-direction:column;gap:10px;margin-top:12px}
 .jsl .destinos .btn{width:100%;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
 .jsl .destinos .btn small{font-weight:400;opacity:.85}
+
+/* Aviso automático cuando entra una solicitud nueva.
+   Se centra, dura 10 s y el tiempo se detiene en cuanto la oficina interactúa con la caja. */
+.jsl .aviso-solicitud-fondo{z-index:60}
+.jsl .aviso-solicitud{display:flex;flex-direction:column;max-width:560px;max-height:calc(100dvh - 32px);padding:20px 20px 0;overflow:hidden}
+.jsl .aviso-solicitud-cab{padding-right:32px}
+.jsl .aviso-solicitud-eyebrow{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;background:var(--mango-claro);color:var(--marca);font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.jsl .aviso-solicitud-eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.jsl .aviso-solicitud-cab h2{margin:8px 0 0;font-size:1.15rem}
+.jsl .aviso-solicitud-cab .modal-sub{margin:6px 0 14px;font-size:.78rem}
+.jsl .aviso-solicitud-cuerpo{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 0 12px}
+.jsl .aviso-solicitud .solicitud{margin:0}
+.jsl .aviso-solicitud-progreso{flex:none;margin:0 -20px;padding:12px 20px calc(14px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--linea);background:var(--papel)}
+.jsl .aviso-solicitud-barra{height:6px;border-radius:999px;background:var(--hueco);overflow:hidden}
+.jsl .aviso-solicitud-barra i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--marca2),#38bdf8);transition:width .1s linear}
+.jsl .aviso-solicitud-progreso small{display:block;margin-top:6px;font-size:.72rem;color:var(--suave);line-height:1.35}
+.jsl .aviso-solicitud-progreso.detenido .aviso-solicitud-barra i{background:var(--amarillo)}
+.jsl .aviso-solicitud-progreso.detenido small{color:var(--amarillo);font-weight:600}
+@media (max-width:600px){
+  .jsl .aviso-solicitud{max-height:calc(100dvh - 24px);padding:16px 16px 0}
+  .jsl .aviso-solicitud-cab{padding-right:30px}
+  .jsl .aviso-solicitud-cab h2{font-size:1.05rem}
+  .jsl .aviso-solicitud-progreso{margin:0 -16px;padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+}
+
+/* Filtros de fecha unificados: mismo control que Pedidos (cápsula + calendario) en hojas, Solicitudes y rangos. */
+/* En las hojas el cuerpo hace scroll y recortaría el calendario flotante: se muestra debajo, dentro del flujo. */
+.jsl .tp-hoja .filtro-dia.compacto{flex-wrap:wrap;justify-content:space-between;width:100%;min-width:0}
+.jsl .tp-hoja .filtro-dia.compacto .fecha-picker{display:contents}
+.jsl .tp-hoja .filtro-dia.compacto .fecha-btn{flex:1;width:auto;min-width:0}
+.jsl .tp-hoja .filtro-dia.compacto .fecha-pop{order:9;flex:0 0 100%;position:static;width:auto;margin:6px 0 0;box-shadow:none;background:var(--hueco)}
+.jsl .sol-filtros-fecha .filtro-dia.compacto{justify-content:flex-start}
+@media (max-width:639px){
+  }
+
+/* Cuentas → Movimientos: píldoras independientes (igual que Pedidos y Solicitudes) y rango de fechas en un solo selector. */
+.jsl .toolbar-cuentas .seg-tipo{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%;padding:0;border-radius:0;background:transparent;box-shadow:none}
+.jsl .toolbar-cuentas .seg-tipo button{flex:1 1 auto;justify-content:center;padding:7px 14px;border:1px solid var(--linea);border-radius:999px;background:var(--papel);color:var(--suave);font-size:.78rem;font-weight:600;white-space:nowrap;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.jsl .toolbar-cuentas .seg-tipo button:hover{border-color:var(--suave);color:var(--tinta)}
+.jsl .toolbar-cuentas .seg-tipo button[aria-pressed="true"]{border-color:var(--marca2);background:var(--marca2);color:#fff;box-shadow:0 1px 2px rgba(16,24,40,.28)}
+.jsl .rango-cuentas{display:flex;align-items:center;gap:8px;min-width:0;width:100%}
+.jsl .rango-cuentas .rango-picker{flex:1;min-width:0}
+.jsl .rango-picker{display:flex;align-items:center;gap:6px}
+.jsl .rango-picker .fecha-btn{flex:1;min-width:0}
+.jsl .rango-texto{overflow:hidden;text-overflow:ellipsis}
+.jsl .rango-limpiar{display:grid;place-items:center;flex:none;width:30px;height:30px;padding:0;border:1px solid var(--linea);border-radius:50%;background:var(--papel);color:var(--suave);cursor:pointer}
+.jsl .rango-limpiar:hover{color:var(--tinta);border-color:var(--suave)}
+.jsl .rango-limpiar svg{width:14px;height:14px}
+.jsl .rango-pop{width:320px;max-width:calc(100vw - 24px)}
+.jsl .rango-fondo{display:none}
+.jsl .rango-atajos{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--linea)}
+.jsl .rango-atajos button{padding:5px 10px;border:1px solid var(--linea);border-radius:999px;background:var(--hueco);color:var(--tinta);font:inherit;font-size:.7rem;font-weight:600;cursor:pointer}
+.jsl .rango-atajos button:hover{border-color:var(--marca2);color:var(--marca2)}
+.jsl .rango-grid{column-gap:0}
+.jsl .rango-grid .fecha-dia{width:100%;max-width:40px}
+.jsl .rango-grid .fecha-dia.en-rango{border-radius:0;max-width:none;background:color-mix(in srgb,var(--marca2) 15%,transparent);color:var(--tinta);transform:none}
+.jsl .rango-grid .fecha-dia.ini{border-radius:50% 0 0 50%;max-width:none}
+.jsl .rango-grid .fecha-dia.fin{border-radius:0 50% 50% 0;max-width:none}
+.jsl .rango-pie{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--linea);font-size:.7rem;color:var(--suave)}
+.jsl .rango-pie .btn{flex:none;min-height:34px}
+.jsl .rango-pie .btn:disabled{opacity:.45;cursor:default}
+@media (min-width:768px){
+  .jsl .toolbar-cuentas .seg-tipo{width:auto}
+  .jsl .toolbar-cuentas .seg-tipo button{flex:0 0 auto}
+  .jsl .rango-cuentas{width:auto;margin-left:auto}
+  .jsl .rango-cuentas .rango-picker{flex:none}
+  .jsl .rango-picker .fecha-btn{min-width:210px}
+}
+/* Celular: el calendario sube como hoja desde abajo, con fondo que oscurece lo demás. */
+@media (max-width:639px){
+  .jsl .rango-fondo{display:block;position:fixed;inset:0;z-index:49;background:rgba(2,6,23,.6)}
+  .jsl .rango-pop{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));top:auto;width:auto;max-width:none;margin:0;z-index:50;max-height:85dvh;overflow-y:auto}
+  .jsl .rango-pop .fecha-dia{width:100%;max-width:44px;height:36px}
+}

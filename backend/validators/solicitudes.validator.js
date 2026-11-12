@@ -32,10 +32,22 @@ export const listar = z.object({
   // Pantalla de Solicitudes: con `grupo` o `pagina` responde una página del filtro.
   grupo: z.enum(["todas", "pendientes", "por-confirmar", "aceptadas", "rechazadas"]).optional(),
   pagina: z.coerce.number().int().min(1).optional(),
-  porPagina: z.coerce.number().int().min(1).max(100).default(20)
+  porPagina: z.coerce.number().int().min(1).max(100).default(20),
+  // Consulta filtrada de la pantalla administrativa; la API anterior sigue disponible.
+  page: z.coerce.number().int().min(1).max(100_000).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  status: z.enum(["todas", "pendientes", "por_confirmar", "aceptadas", "rechazadas"]).optional(),
+  search: z.string().trim().max(120).optional(),
+  source: z.enum(["todos", "portal", "web"]).optional(),
+  date: z.iso.date().optional()
 });
 
 export const aceptar = z.object({ valor: pesos.refine(v => v > 0, "Escribe el valor del domicilio") });
+// El cliente responde la propuesta: acepta o rechaza. La razón es opcional; si no la escribe, se guarda una genérica.
+export const responderCliente = z.object({
+  aceptar: z.boolean(),
+  motivo: texto(300).refine(v => v.length === 0 || v.length >= 3, "Si escribes una razón, que tenga al menos 3 letras").optional()
+}).strict();
 // La razón es obligatoria: el cliente la ve en "Mis solicitudes" de su portal.
 export const rechazar = z.object({ motivo: texto(300).min(3, "Escribe la razón del rechazo: el cliente la va a ver") });
 export const mias = z.object({

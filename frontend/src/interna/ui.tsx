@@ -5,6 +5,8 @@ import { pedidos as apiPedidos } from "../api/servicios";
 import { DEMO } from "./demo";
 import type { Archivo } from "../api/tipos";
 import { pesos, hoy, moverDia, hora, diaDe, gastoDe, servicio, nombreCliente, metodoTxt, S, type Pedido } from "./motor";
+import { SelectorFecha } from "./Calendario";
+import { alertaAdmin, avisoRapido, tonoDeAviso } from "../lib/alertasAdmin";
 
 /* ---------- iconos ---------- */
 const svg = (hijos: ReactNode, extra?: { width?: number; height?: number }) => (
@@ -60,13 +62,10 @@ export function ProveedorVentana({ children }: { children: ReactNode }) {
   const dlg = useRef<HTMLDialogElement>(null), cont = useRef<HTMLDivElement>(null);
   const [contenido, setContenido] = useState<ReactNode>(null);
   const [clave, setClave] = useState(0);
-  const [toasts, setToasts] = useState<{ id: number; msg: string }[]>([]);
   const [visor, setVisor] = useState("");
-  const resolver = useRef<((x: boolean) => void) | null>(null);
 
   const cerrar = useCallback(() => { dlg.current?.close(); }, []);
   const abrir = useCallback((c: ReactNode, variante?: "drawer" | "drawer-ancho" | "centrada" | "centrada-ancha" | "entrega" | "devolucion" | "solicitud") => {
-    if (resolver.current) { resolver.current(false); resolver.current = null; }
     setContenido(c); setClave(k => k + 1);
     const d = dlg.current;
     if (d) {
@@ -75,31 +74,19 @@ export function ProveedorVentana({ children }: { children: ReactNode }) {
     }
     if (cont.current) cont.current.scrollTop = 0;
   }, []);
-  const avisar = useCallback((msg: string) => {
-    const id = Date.now() + Math.random();
-    setToasts(t => [...t, { id, msg }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 2600);
-  }, []);
-  const confirmar = useCallback((titulo: string, msg: string, boton: string) => new Promise<boolean>(ok => {
-    abrir(<>
-      <header><h2>{titulo}</h2><button className="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
-      <p>{msg}</p>
-      <div className="acciones"><button className="btn peligro" data-si>{boton}</button><button className="btn sec" data-cerrar>Cancelar</button></div>
-    </>, "centrada");
-    resolver.current = ok;
-  }), [abrir]);
+  const avisar = useCallback((msg: string) => { void avisoRapido(msg, tonoDeAviso(msg)); }, []);
+  const confirmar = useCallback((titulo: string, msg: string, boton: string) => alertaAdmin.confirmar({ titulo, texto: msg, boton, peligro: true }), []);
 
-  // Botones con data-cerrar cierran la ventana; data-si responde "sí" a la confirmación.
+  // Botones con data-cerrar cierran la ventana.
   const alClic = (e: React.MouseEvent) => {
     const t = e.target as HTMLElement;
-    if (t.closest("[data-si]") && resolver.current) { const r = resolver.current; resolver.current = null; cerrar(); r(true); return; }
     if (t.closest("[data-cerrar]")) { cerrar(); return; }
     const im = t.closest<HTMLImageElement>("img[data-ampliar], .fotos img");
     if (im?.src) setVisor(im.src);
   };
   useEffect(() => {
     const d = dlg.current; if (!d) return;
-    const alCerrar = () => { if (resolver.current) { resolver.current(false); resolver.current = null; } setContenido(null); setVisor(""); if (dlg.current) delete dlg.current.dataset.variante; };
+    const alCerrar = () => { setContenido(null); setVisor(""); if (dlg.current) delete dlg.current.dataset.variante; };
     d.addEventListener("close", alCerrar);
     return () => d.removeEventListener("close", alCerrar);
   }, []);
@@ -112,7 +99,6 @@ export function ProveedorVentana({ children }: { children: ReactNode }) {
         {visor && <Visor src={visor} cerrar={() => setVisor("")} />}
       </dialog>
       {visor && !dlg.current?.open && <Visor src={visor} cerrar={() => setVisor("")} />}
-      {toasts.map(t => <div key={t.id} className="toast" role="status">{t.msg}</div>)}
     </CtxV.Provider>
   );
 }
@@ -160,12 +146,8 @@ export function FiltroDia({ d, poner, compacto, id }: { d: string; poner: (d: st
   const anterior = <button className="btn sec chico" aria-label="Día anterior" onClick={() => poner(moverDia(d, -1))}>‹</button>;
   const siguiente = <button className="btn sec chico" aria-label="Día siguiente" disabled={!d || d >= hoy()} onClick={() => poner(moverDia(d, 1))}>›</button>;
   const atajo = d ? <button className="btn sec chico" onClick={() => poner("")}>Ver todos</button> : <button className="btn sec chico" onClick={() => poner(hoy())}>Hoy</button>;
-  if (!compacto) return <div className="filtro-dia">{anterior}
-    <input type="date" id={id || "diaPed"} value={d} max={hoy()} aria-label="Filtrar por día" onChange={e => poner(e.target.value)} />
-    {siguiente}{atajo}</div>;
-  return <div className="filtro-dia compacto">{anterior}
-    <label className="dia-pill"><IconoCalendario />
-      <input type="date" id={id || "diaCli"} value={d} max={hoy()} aria-label="Filtrar por día" onChange={e => poner(e.target.value)} /></label>
+  return <div className={"filtro-dia" + (compacto ? " compacto" : "")}>{anterior}
+    <SelectorFecha id={id} valor={d} alCambiar={poner} etiqueta="Día" vacio="Todos los días" maximo={hoy()} />
     {siguiente}{atajo}</div>;
 }
 

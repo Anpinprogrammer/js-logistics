@@ -4,7 +4,7 @@ Primero lee el [`CLAUDE.md` de la raíz](../CLAUDE.md). Aquí está cómo se esc
 
 ## Stack
 
-Node.js ≥ 20 · Express 5 · JavaScript con **módulos ES** (`import`, sin TypeScript) · `pg` (SQL a mano, sin ORM) · Zod 4 · `jsonwebtoken` · `bcryptjs` · `helmet` · `cors` · `express-rate-limit` · pruebas con `node:test` + `supertest` contra un Postgres real.
+Node.js ≥ 20 · Express 5 · JavaScript con **módulos ES** (`import`, sin TypeScript) · `pg` (SQL a mano, sin ORM) · Zod 4 · `jsonwebtoken` · `bcryptjs` · `helmet` · `cors` · `express-rate-limit` · `bullmq` + `ioredis` (cola de correos masivos, `queues/`; sin `REDIS_URL` el lote corre en segundo plano en el mismo proceso) · `@anthropic-ai/sdk` (JSBot, `servicios/chatbot.js` y `chatbot/`) · pruebas con `node:test` + `supertest` contra un Postgres real.
 
 No agregues dependencias sin una razón clara. Si lo haces, explícala en el PR.
 
@@ -20,8 +20,11 @@ No agregues dependencias sin una razón clara. Si lo haces, explícala en el PR.
 | `controllers/` | Un caso de uso por función: quién puede, qué se valida contra la base, qué se calcula, transacción, historial y respuesta. Los de dinero solo llaman a un servicio con `responder(...)` de `accion.js`. | SQL. |
 | `servicios/` | Reglas del negocio portadas de `app/js/app.js` (pedidos, caja, clientes, mensajeros, movimientos, sueldos, historial, papelera). Reciben `ctx = { actor, db, eventos }`, escriben con `enTransaccion` + `guardar/actualizar/borrar` de `transaccion.js` (historial y papelera automáticos) y calculan con `calculosDe`. `enlaces.js` crea y consume los enlaces de correo (activación y contraseña). | Express (`req`, `res`). |
 | `models/` | SQL de una tabla (`<entidad>.model.js`). Devuelve objetos camelCase con `filaAObjeto`. Las funciones que escriben aceptan un `db` opcional para participar en una transacción. | Permisos ni reglas de negocio. |
-| `helpers/` | Utilidades puras: `errores.js`, `jwt.js`, `cookies.js`, `claves.js`, `ids.js`, `sql.js`, `storage.js`, `negocio.js` (listas cerradas para validar). `calculos.js`, `constantes.js`, `fechas.js`, `texto.js` y `reloj.js` son **copia fiel** de `app/js/app.js`: no los "mejores"; si cambia la regla, cámbiala igual que en la app y corre `test/equivalencia.test.js`. `correo.js` habla con Resend y arma las plantillas. | Estado ni acceso a la base. |
+| `helpers/` | Utilidades puras: `errores.js`, `jwt.js`, `cookies.js`, `claves.js`, `ids.js`, `sql.js`, `storage.js`, `negocio.js` (listas cerradas para validar). `calculos.js`, `constantes.js`, `fechas.js`, `texto.js` y `reloj.js` son **copia fiel** de `app/js/app.js`: no los "mejores"; si cambia la regla, cámbiala igual que en la app y corre `test/equivalencia.test.js`. `correo.js` habla con Resend y arma las plantillas. `imagenes.js` reconoce el tipo real de una foto por sus bytes y `textoSeguro.js` limpia el texto que va hacia el modelo (JSBot). | Estado ni acceso a la base. |
 | `middleware/` | `autenticar`, `autorizar` (`permitir`, `OFICINA`, `EQUIPO`), `validar`, `seguridad`, `errores`. | |
+| `queues/` | `emailQueue.js`: cola de correos masivos de restablecimiento (BullMQ + Redis, con respaldo en el mismo proceso). | Lógica de negocio. |
+| `chatbot/` | `informacion-empresa.md`: lo que JSBot sabe de la empresa (ver `chatbot/README.md`). Lo usan `servicios/chatbot.js`, `controllers/chatbot.controller.js` y las rutas `chatbot*.routes.js`. | Código. |
+| `migracion/` | `exportar-firestore.js`: exporta Firebase para `db:importar`. Tiene su propio `package.json`. | Código de la API. |
 | `db/` | `schema.sql` (fuente de verdad del esquema), `migrar.js`, `crear-admin.js`, `demo.js`. | |
 | `test/` | Pruebas de integración por recurso (`<recurso>.test.js`) y `ayuda.js`. | |
 

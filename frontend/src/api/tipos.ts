@@ -293,4 +293,8 @@ export interface ConteoSolicitudes { pendiente: number; cotizada: number; confir
 export type GrupoSolicitud = "todas" | "pendientes" | "por-confirmar" | "aceptadas" | "rechazadas";
 export type ConteoGrupos = Record<"todas" | "pendientes" | "porConfirmar" | "aceptadas" | "rechazadas", number>;
 export interface PaginaSolicitudes { solicitudes: Solicitud[]; pagina: number; porPagina: number; total: number; paginas: number; grupos: ConteoGrupos }
+export type EstadoFiltroSolicitudes = "todas" | "pendientes" | "por_confirmar" | "aceptadas" | "rechazadas";
+export type OrigenFiltroSolicitudes = "todos" | "portal" | "web";
+export interface FiltrosSolicitudes { page: number; limit: number; status: EstadoFiltroSolicitudes; search: string; source: OrigenFiltroSolicitudes; date: string }
+export interface PaginaSolicitudesFiltradas { data: Solicitud[]; pagination: { page: number; limit: number; totalItems: number; totalPages: number }; counts: Record<EstadoFiltroSolicitudes, number> }
 export interface ListaSolicitudes { solicitudes: Solicitud[]; conteo: ConteoSolicitudes }

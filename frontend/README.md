@@ -1,6 +1,6 @@
 # Frontend de JS Logistics (oficina y mensajeros)
 
-App de operación y administración en **React 19 + TypeScript + Tailwind CSS 4**, con **axios** contra el backend (`../backend`). El portal de los clientes es otro proyecto (`jslogistics-cliente-frontend`): si una cuenta de cliente intenta entrar aquí, se le indica que use el portal.
+App de operación y administración en **React 19 + TypeScript + Tailwind CSS 4**, con **axios** contra el backend (`../backend`) y **SweetAlert2** para los avisos y confirmaciones. El portal de los clientes es otro proyecto (`jslogistics-cliente-frontend`): si una cuenta de cliente intenta entrar aquí, se le indica que use el portal.
 
 ## Qué hay
 
@@ -36,7 +36,8 @@ src/
 ├── api/                cliente.ts (axios), servicios.ts (llamadas por recurso), tipos.ts
 ├── auth/Sesion.tsx     Sesión (/auth/yo, ingresar, salir; cuentas de prueba en modo demo)
 ├── pages/              Ingreso, Recuperar, Restablecer y AccesoComun (marco compartido del acceso); intro/ es la animación de entrada del ingreso
-├── lib/imagen.ts       Comprimir fotos y firma
+├── lib/                imagen.ts (comprimir fotos y firma), pantalla.ts (tamaños de página y corte de escritorio), perezoso.ts (carga diferida),
+│                       alertasAdmin.ts y alertas.css (avisos y confirmaciones con SweetAlert2)
 └── interna/            La app igual al prototipo
     ├── estilos.css     Copia de app/css/estilos.css dentro de .jsl (generada, no editar)
     ├── ajustes.css     Ajustes propios
@@ -44,7 +45,11 @@ src/
     ├── datos.tsx       Carga desde la API (cada 45 s y al volver a la pestaña)
     ├── acciones.ts     Escrituras (con su versión en memoria para el modo demo)
     ├── demo.ts         Datos inventados para VITE_DEMO=true
-    ├── ui.tsx          Ventana, avisos, íconos, KPIs, dona, columnas, fotos
+    ├── ui.tsx          Ventana (`avisar` y `confirmar` con SweetAlert2), íconos, KPIs, dona, columnas, fotos, FiltroDia
+    ├── Calendario.tsx  SelectorFecha (un día) y RangoFechas (un rango): el calendario de todos los filtros de fecha
+    ├── Solicitudes.tsx Tarjeta, filtros y aviso automático de solicitudes de envío (campanita y pestaña)
+    ├── estado.ts       Estado de la interfaz (`E`): pestañas, filtros y días elegidos
+    ├── tema.ts         Tema claro/oscuro (`data-theme` en `.jsl`)
     ├── Marco.tsx       Menú lateral, barra y pestañas
     ├── mensajero/      Modo mensajero
     └── oficina/        Panel, Pedidos, Clientes, Caja, Cuentas, Sueldos, Más

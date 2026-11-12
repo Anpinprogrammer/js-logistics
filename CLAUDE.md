@@ -37,6 +37,7 @@ El portal de **clientes** es otro repositorio: [`jslogistics-cliente-frontend`](
 - **Sesión:** JWT en una cookie `HttpOnly` que pone el backend. Ningún frontend guarda tokens en `localStorage` ni en JavaScript.
 - **Mismo sitio:** cada frontend llama a `/api` en su propio dominio, y una regla de reescritura lo manda al backend. Así la cookie funciona con `SameSite=Lax`, también en Safari de iPhone.
 - **CSRF:** toda petición que no sea GET lleva la cabecera `X-JSL: 1`.
+- **Avisos al usuario:** la app interna (`frontend/`) usa SweetAlert2 desde `frontend/src/lib/alertasAdmin.ts`; el portal de clientes y la landing usan react-toastify (`jslogistics-cliente-frontend/src/utils/clientToast.ts`). Ninguno de los dos usa `alert` ni `confirm` del navegador.
 - **Contrato de la API:** está en [`backend/README.md`](backend/README.md). Si un frontend necesita algo nuevo, primero se agrega en el backend (con prueba) y se documenta ahí; después se usa.
 
 ## Convenciones de todo el proyecto

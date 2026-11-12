@@ -113,6 +113,50 @@ export async function contarGrupos() {
   };
 }
 
+/** Filtros de la pantalla administrativa. Los conteos comparten búsqueda, origen y día,
+    pero no estado para que cada pestaña muestre cuántas solicitudes encontraría. */
+function condicionesPantalla({ search = "", source = "todos", date = "", status = "todas" }, conEstado = false) {
+  const partes = [], valores = [];
+  if (search) {
+    const patron = `%${search.replace(/[\\%_]/g, "\\$&")}%`;
+    valores.push(patron);
+    const n = valores.length;
+    partes.push(`(s.nombre ILIKE $${n} OR s.destinatario_nombre ILIKE $${n} OR s.telefono ILIKE $${n}
+      OR s.destinatario_telefono ILIKE $${n} OR s.direccion_recogida ILIKE $${n}
+      OR s.direccion_entrega ILIKE $${n} OR s.guia ILIKE $${n})`);
+  }
+  if (source !== "todos") { valores.push(source === "web" ? "publico" : "portal"); partes.push(`s.origen = $${valores.length}`); }
+  if (date) {
+    valores.push(date);
+    const n = valores.length;
+    partes.push(`s.creado >= ($${n}::date AT TIME ZONE 'America/Bogota') AND s.creado < (($${n}::date + 1) AT TIME ZONE 'America/Bogota')`);
+  }
+  if (conEstado && GRUPOS[status]) { valores.push(GRUPOS[status]); partes.push(`s.estado = ANY($${valores.length})`); }
+  return { sql: partes.length ? `WHERE ${partes.join(" AND ")}` : "", valores };
+}
+
+export async function listarFiltradas({ page = 1, limit = 15, status = "todas", search = "", source = "todos", date = "" } = {}) {
+  const filtros = { status, search, source, date };
+  const base = condicionesPantalla(filtros);
+  const { rows: estados } = await query(`SELECT s.estado, count(*)::int AS n FROM solicitudes s ${base.sql} GROUP BY s.estado`, base.valores);
+  const por = Object.fromEntries(estados.map(f => [f.estado, f.n]));
+  const suma = estados => estados.reduce((total, estado) => total + (por[estado] || 0), 0);
+  const counts = {
+    todas: suma(["pendiente", "cotizada", "confirmada", "asignada", "rechazada"]),
+    pendientes: suma(GRUPOS.pendientes), por_confirmar: suma(GRUPOS["por-confirmar"]),
+    aceptadas: suma(GRUPOS.aceptadas), rechazadas: suma(GRUPOS.rechazadas)
+  };
+  const totalItems = counts[status === "por_confirmar" ? "por_confirmar" : status];
+  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+  const actual = Math.min(page, totalPages);
+  const lista = condicionesPantalla({ ...filtros, status: status === "por_confirmar" ? "por-confirmar" : status }, true);
+  const { rows } = await query(
+    `${CON_NOMBRES} ${lista.sql} ORDER BY s.creado DESC, s.id DESC LIMIT $${lista.valores.length + 1} OFFSET $${lista.valores.length + 2}`,
+    [...lista.valores, limit, (actual - 1) * limit]
+  );
+  return { data: rows.map(aObjeto), pagination: { page: actual, limit, totalItems, totalPages }, counts };
+}
+
 /** Cuántas hay en cada estado abierto (para la campanita). */
 export async function contarAbiertas() {
   const { rows } = await query(
@@ -123,9 +167,15 @@ export async function contarAbiertas() {
   return c;
 }
 
+/** Columnas de una solicitud que puede ver el cliente: nada de quién la revisó ni datos internos.
+    `pedidoEstado` es el estado de la guía que salió de la solicitud, si ya se asignó. */
+const CAMPOS_CLIENTE = `s.id, s.estado, s.origen, s.direccion_recogida, s.paquetes, s.peso_kg, s.destinatario_nombre,
+  s.destinatario_telefono, s.direccion_entrega, s.valor, s.motivo_rechazo, s.guia, s.creado, s.actualizado,
+  p.estado AS pedido_estado`;
+const DESDE_CLIENTE = `FROM solicitudes s LEFT JOIN pedidos p ON p.guia = s.guia`;
+
 /** Las solicitudes de un cliente, para su portal ("Mis solicitudes"). Solo las ligadas a su ficha (cliente_id lo pone
-    el servidor desde la sesión) y solo los campos que le sirven: nada de quién la revisó ni datos internos.
-    `pedidoEstado` es el estado de la guía que salió de la solicitud, si ya se asignó.
+    el servidor desde la sesión).
     Con `sinTotal` no consulta el total: trae una fila extra y responde `hayMas`. */
 export async function listarDeCliente(clienteId, { pagina = 1, porPagina = 20, sinTotal = false } = {}) {
   let actual = pagina, total, paginas;
@@ -137,9 +187,7 @@ export async function listarDeCliente(clienteId, { pagina = 1, porPagina = 20, s
   }
   const limite = sinTotal ? porPagina + 1 : porPagina;
   const { rows } = await query(
-    `SELECT s.id, s.estado, s.origen, s.direccion_recogida, s.paquetes, s.peso_kg, s.destinatario_nombre, s.destinatario_telefono,
-       s.direccion_entrega, s.valor, s.motivo_rechazo, s.guia, s.creado, s.actualizado, p.estado AS pedido_estado
-     FROM solicitudes s LEFT JOIN pedidos p ON p.guia = s.guia
+    `SELECT ${CAMPOS_CLIENTE} ${DESDE_CLIENTE}
      WHERE s.cliente_id = $1 ORDER BY s.creado DESC LIMIT $2 OFFSET $3`,
     [clienteId, limite, (actual - 1) * porPagina]
   );
@@ -150,6 +198,24 @@ export async function listarDeCliente(clienteId, { pagina = 1, porPagina = 20, s
     porPagina,
     ...(sinTotal ? { hayMas } : { total, paginas })
   };
+}
+
+/** Una solicitud con la forma que ve el cliente, solo si es suya. */
+export async function buscarDeCliente(id, clienteId, db = { query }) {
+  const { rows } = await db.query(
+    `SELECT ${CAMPOS_CLIENTE} ${DESDE_CLIENTE} WHERE s.id = $1 AND s.cliente_id = $2`,
+    [id, clienteId]
+  );
+  return aObjeto(rows[0]);
+}
+
+/** Bloquea la solicitud hasta el fin de la transacción, solo si pertenece a ese cliente. */
+export async function bloquearDeCliente(id, clienteId, db) {
+  const { rows } = await db.query(
+    `SELECT s.* FROM solicitudes s WHERE s.id = $1 AND s.cliente_id = $2 FOR UPDATE OF s`,
+    [id, clienteId]
+  );
+  return aObjeto(rows[0]);
 }
 
 // Columnas que se pueden cambiar. La lista la fija el código, no la petición.

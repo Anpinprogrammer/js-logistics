@@ -1,6 +1,6 @@
 /* Solicitudes de envío: el visitante las crea desde la landing (sin sesión), o un cliente con cuenta desde su
    portal (origen 'portal', ligada a su ficha), y la oficina las atiende.
-   Flujo: pendiente → (aceptar con valor) cotizada → (el cliente confirma por WhatsApp) confirmada
+   Flujo: pendiente → (aceptar con valor) cotizada → (el cliente confirma por WhatsApp o desde su portal) confirmada
    → (asignar mensajero) asignada, con su guía (en estado "aceptado", por recoger). En cualquier punto antes de asignar
    se puede rechazar, siempre con la razón: el cliente la ve en su portal (GET /solicitudes/mias). */
 import * as Solicitud from "../models/solicitud.model.js";
@@ -81,8 +81,44 @@ export async function listarMias(req, res) {
   res.json(await Solicitud.listarDeCliente(clienteId, { pagina, porPagina }));
 }
 
+/** El cliente responde la propuesta de domicilio desde su portal. Solo puede tocar una solicitud propia y solo
+    mientras esté `cotizada`; aceptar la deja lista para asignar y rechazar la cierra con su motivo. */
+export async function responderMia(req, res) {
+  const clienteId = req.usuario.clienteId;
+  if (!clienteId) throw prohibido("Tu cuenta no está vinculada con un cliente. Escríbenos por WhatsApp.");
+  const { id } = req.valido.params, { aceptar, motivo } = req.valido.body;
+  const s = await transaccion(async db => {
+    const antes = await Solicitud.bloquearDeCliente(id, clienteId, db);
+    if (!antes) throw noEncontrado("La solicitud no existe");
+    if (antes.estado !== "cotizada") {
+      throw conflicto(antes.estado === "pendiente"
+        ? "La oficina todavía no te ha propuesto el valor del domicilio."
+        : `Esta solicitud ya está ${ESTADO_CLIENTE[antes.estado]}. Actualiza la lista.`, "ESTADO_SOLICITUD");
+    }
+    const razon = aceptar ? "" : (limpio(motivo || "") || MOTIVO_CLIENTE);
+    if (!aceptar && razon.length > 300) throw invalido("La razón no puede pasar de 300 letras");
+    await Solicitud.actualizar(id, aceptar ? { estado: "confirmada" } : { estado: "rechazada", motivoRechazo: razon }, db);
+    await Auditoria.registrar({
+      uid: req.usuario.id,
+      accion: aceptar
+        ? `Aceptó desde su portal la propuesta de domicilio de ${antes.valor ? `$${antes.valor}` : "su solicitud"}`
+        : `Rechazó desde su portal la propuesta de domicilio: ${razon}`,
+      tabla: "solicitudes", registro: id
+    }, db);
+    return Solicitud.buscarDeCliente(id, clienteId, db);
+  });
+  eventos.emitir(["solicitudes"]);
+  res.json({ solicitud: s });
+}
+
+const ESTADO_CLIENTE = { pendiente: "pendiente de revisión", cotizada: "esperando tu respuesta", confirmada: "confirmada", asignada: "asignada a un mensajero", rechazada: "rechazada" };
+const MOTIVO_CLIENTE = "El cliente no aceptó la propuesta de domicilio.";
+
 export async function listar(req, res) {
   const q = req.valido.query;
+  if (q.page !== undefined || q.limit !== undefined || q.status !== undefined || q.search !== undefined || q.source !== undefined || q.date !== undefined) {
+    return res.json(await Solicitud.listarFiltradas(q));
+  }
   if (q.pagina || q.grupo) {
     const pagina = q.pagina || 1;
     const [r, grupos] = await Promise.all([Solicitud.listarPagina({ grupo: q.grupo, pagina, porPagina: q.porPagina }), Solicitud.contarGrupos()]);

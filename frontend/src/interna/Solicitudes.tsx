@@ -1,9 +1,10 @@
 /* Campanita de la barra: solicitudes de envío que llegan de la landing. La oficina las acepta poniendo el valor del
    domicilio (se le avisa al cliente por WhatsApp), marca cuándo el cliente está de acuerdo y las asigna a un mensajero. */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "../api/servicios";
-import type { Solicitud, ListaSolicitudes, ConteoSolicitudes, GrupoSolicitud, PaginaSolicitudes } from "../api/tipos";
+import type { Solicitud, ListaSolicitudes, ConteoSolicitudes, GrupoSolicitud, PaginaSolicitudes, FiltrosSolicitudes, PaginaSolicitudesFiltradas, EstadoFiltroSolicitudes } from "../api/tipos";
 import { mensajeDe } from "../api/cliente";
 import { DEMO } from "./demo";
 import { S, hora, pesos, linkWhatsApp, telWhatsApp } from "./motor";
@@ -34,6 +35,27 @@ const paginaDemo = (grupo: GrupoSolicitud, pagina: number, porPagina: number): P
 export const useSolicitudesPagina = (grupo: GrupoSolicitud, pagina: number, porPagina: number) => useQuery({
   queryKey: ["solicitudes", "pagina", grupo, pagina, porPagina],
   queryFn: () => (DEMO ? Promise.resolve(paginaDemo(grupo, pagina, porPagina)) : api.solicitudes.pagina(grupo, pagina, porPagina)),
+  placeholderData: keepPreviousData, refetchInterval: 30_000, refetchOnWindowFocus: true,
+});
+
+/** La misma consulta filtrada de la oficina, aplicada en memoria únicamente en modo demo. */
+function filtradasDemo(f: FiltrosSolicitudes): PaginaSolicitudesFiltradas {
+  const buscar = f.search.trim().toLocaleLowerCase("es-CO");
+  const base = demo.filter(s => {
+    if (f.source !== "todos" && s.origen !== (f.source === "web" ? "publico" : "portal")) return false;
+    if (f.date && new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(s.creado)) !== f.date) return false;
+    return !buscar || [s.nombre, s.destinatarioNombre, s.telefono, s.destinatarioTelefono, s.direccionRecogida, s.direccionEntrega, s.guia].some(x => x?.toLocaleLowerCase("es-CO").includes(buscar));
+  });
+  const estados: Record<EstadoFiltroSolicitudes, string[]> = { todas: [], pendientes: ["pendiente"], por_confirmar: ["cotizada"], aceptadas: ["confirmada", "asignada"], rechazadas: ["rechazada"] };
+  const counts = Object.fromEntries((Object.keys(estados) as EstadoFiltroSolicitudes[]).map(k => [k, base.filter(s => !estados[k].length || estados[k].includes(s.estado)).length])) as Record<EstadoFiltroSolicitudes, number>;
+  const filtradas = base.filter(s => !estados[f.status].length || estados[f.status].includes(s.estado)).sort((a, b) => b.creado.localeCompare(a.creado) || b.id.localeCompare(a.id));
+  const totalItems = filtradas.length, totalPages = Math.max(1, Math.ceil(totalItems / f.limit)), page = Math.min(f.page, totalPages);
+  return { data: filtradas.slice((page - 1) * f.limit, page * f.limit), pagination: { page, limit: f.limit, totalItems, totalPages }, counts };
+}
+
+export const useSolicitudesFiltradas = (f: FiltrosSolicitudes) => useQuery({
+  queryKey: ["solicitudes", "filtradas", f],
+  queryFn: () => (DEMO ? Promise.resolve(filtradasDemo(f)) : api.solicitudes.filtradas(f)),
   placeholderData: keepPreviousData, refetchInterval: 30_000, refetchOnWindowFocus: true,
 });
 
@@ -200,5 +222,110 @@ export function TarjetaSolicitud({ s, enDetalle = false, alCompletar }: { s: Sol
         </div>
       </>}
     </article>
+  );
+}
+
+/** Aviso automático de solicitud nueva: uno a la vez, con cola si llegan varias. */
+export function AvisoSolicitud({ solicitudes }: { solicitudes?: Solicitud[] }) {
+  const [actual, setActual] = useState<Solicitud | null>(null);
+  const actualRef = useRef<Solicitud | null>(null);
+  const conocidos = useRef<Set<string> | null>(null);
+  const cola = useRef<Solicitud[]>([]);
+
+  const mostrar = (s: Solicitud) => {
+    if (actualRef.current) {
+      if (actualRef.current.id !== s.id && !cola.current.some(x => x.id === s.id)) cola.current.push(s);
+      return;
+    }
+    actualRef.current = s;
+    setActual(s);
+  };
+
+  const cerrar = () => {
+    const siguiente = cola.current.shift() ?? null;
+    actualRef.current = siguiente;
+    setActual(siguiente);
+  };
+
+  useEffect(() => {
+    if (!solicitudes) return;
+    const ids = new Set(solicitudes.map(s => s.id));
+    if (conocidos.current === null) { conocidos.current = ids; return; } // La primera carga no avisa de lo que ya existía.
+    const nuevas = solicitudes.filter(s => s.estado === "pendiente" && !conocidos.current!.has(s.id));
+    conocidos.current = ids;
+    nuevas.forEach(mostrar);
+    const id = actualRef.current?.id;
+    if (!id) return;
+    const actualizada = solicitudes.find(s => s.id === id);
+    if (actualizada?.estado === "pendiente") {
+      if (actualizada !== actualRef.current) { actualRef.current = actualizada; setActual(actualizada); }
+    } else {
+      cerrar(); // Otro usuario la movió de estado o la sacó de abiertas.
+    }
+  }, [solicitudes]);
+
+  if (!actual) return null;
+  return <ModalSolicitud key={actual.id} s={actual} alCerrar={cerrar} />;
+}
+
+function ModalSolicitud({ s, alCerrar }: { s: Solicitud; alCerrar: () => void }) {
+  const [restante, setRestante] = useState(100);
+  const [detenido, setDetenido] = useState(false);
+  const alCerrarRef = useRef(alCerrar);
+  alCerrarRef.current = alCerrar;
+
+  useEffect(() => {
+    if (detenido) return;
+    const inicio = performance.now();
+    const id = window.setInterval(() => {
+      const pct = Math.max(0, 100 - ((performance.now() - inicio) / 10_000) * 100);
+      setRestante(pct);
+      if (pct <= 0) { window.clearInterval(id); alCerrarRef.current(); }
+    }, 50);
+    return () => window.clearInterval(id);
+  }, [detenido]);
+
+  useEffect(() => {
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") alCerrarRef.current(); };
+    document.addEventListener("keydown", tecla);
+    return () => { document.body.style.overflow = anterior; document.removeEventListener("keydown", tecla); };
+  }, []);
+
+  const detener = () => setDetenido(true);
+  const segundos = Math.max(0, Math.ceil((restante / 100) * 10));
+  const transcurrido = Math.round(10 - (restante / 100) * 10);
+
+  const destino = document.querySelector(".jsl") ?? document.body;
+  return createPortal(
+    <div className="modal-fondo aviso-solicitud-fondo">
+      <div
+        className="modal-caja aviso-solicitud"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={`aviso-solicitud-${s.id}`}
+        onPointerDown={detener}
+        onFocusCapture={detener}
+        onKeyDown={detener}
+        onChange={detener}
+        onWheel={detener}
+      >
+        <button type="button" className="modal-cerrar" aria-label="Cerrar aviso de solicitud" onClick={alCerrar}>×</button>
+        <header className="aviso-solicitud-cab">
+          <span className="aviso-solicitud-eyebrow">Solicitud nueva</span>
+          <h2 id={`aviso-solicitud-${s.id}`}>Llegó una solicitud de envío</h2>
+          <p className="modal-sub">Revisa los datos y acepta o rechaza. También puedes verla después en la campana o en Solicitudes.</p>
+        </header>
+        <div className="aviso-solicitud-cuerpo"><TarjetaSolicitud s={s} alCompletar={alCerrar} /></div>
+        <div className={`aviso-solicitud-progreso${detenido ? " detenido" : ""}`}>
+          <div className="aviso-solicitud-barra" role="progressbar" aria-valuemin={0} aria-valuemax={10} aria-valuenow={transcurrido} aria-label="Tiempo antes de cerrar el aviso">
+            <i style={{ width: `${restante}%` }} />
+          </div>
+          <small>{detenido ? "Tiempo detenido. Revisa la solicitud y ciérrala cuando termines." : `Se cierra en ${segundos} s.`}</small>
+        </div>
+      </div>
+    </div>,
+    destino
   );
 }

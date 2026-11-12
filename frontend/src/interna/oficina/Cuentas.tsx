@@ -3,9 +3,10 @@ import { useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, listaOrdenada, textoCuenta, yaContado, mueveCaja, esPago, nombreCliente, saldoCliente, sinTildes, cajaOficina, puedoCambiarMedio,
-  fechaCaja, fechaDia, diaMinCaja, MEDIOS, MOVS, MOVS_OFICINA, TIPOS_CUENTA, resumenCaja, MEDIOS_CAJA, moverDia, type Medio, type Movimiento, type TipoMov, type CajaMov,
+  fechaCaja, fechaDia, diaMinCaja, MEDIOS, MOVS, MOVS_OFICINA, TIPOS_CUENTA, resumenCaja, MEDIOS_CAJA, type Medio, type Movimiento, type TipoMov, type CajaMov,
 } from "../motor";
-import { Cab, FiltroDia, Icono, IconoCalendario, Paginador, useVentana } from "../ui";
+import { Cab, FiltroDia, Icono, Paginador, useVentana } from "../ui";
+import { RangoFechas } from "../Calendario";
 import { E, guardarLocal } from "../estado";
 import { borrarDe, crearCuenta, guardarMovimiento, movCaja } from "../acciones";
 import { aCaja, aMov, motivoError, useDatos } from "../datos";
@@ -206,12 +207,9 @@ export default function Cuentas({ pintar }: { pintar: () => void }) {
         <div className="seg seg-tipo" role="group" aria-label="Tipo de movimiento">
           {([["todos", "Todos"], ["pagos", "Pagos"], ["compras", "Compras"], ["ganancias", "Ganancias"]] as const).map(([k, t]) => <button key={k} aria-pressed={E.tipoCue === k} onClick={() => poner({ tipoCue: k, paginaCue: 1 })}>{t}</button>)}
         </div>
-        <div className="filtro-dia compacto rango-cuentas">
-          <label className="dia-pill"><IconoCalendario /><input type="date" aria-label="Desde" value={E.desdeCue} max={E.hastaCue || hoy()} onChange={e => poner({ desdeCue: e.target.value, paginaCue: 1, paginaGan: 1 })} /></label>
-          <span className="sub">a</span>
-          <label className="dia-pill"><IconoCalendario /><input type="date" aria-label="Hasta" value={E.hastaCue} min={E.desdeCue} max={hoy()} onChange={e => poner({ hastaCue: e.target.value, paginaCue: 1, paginaGan: 1 })} /></label>
-          {conRango ? <button className="btn sec chico" onClick={() => poner({ desdeCue: "", hastaCue: "", paginaCue: 1, paginaGan: 1 })}>Ver todo</button>
-            : <button className="btn sec chico" onClick={() => poner({ desdeCue: moverDia(hoy(), -30), hastaCue: hoy(), paginaCue: 1, paginaGan: 1 })}>Últimos 30 días</button>}
+        <div className="rango-cuentas">
+          <RangoFechas id="rangoCue" desde={E.desdeCue} hasta={E.hastaCue} alCambiar={r => poner({ desdeCue: r.desde, hastaCue: r.hasta, paginaCue: 1, paginaGan: 1 })} />
+          {conRango ? <button type="button" className="btn sec chico" onClick={() => poner({ desdeCue: "", hastaCue: "", paginaCue: 1, paginaGan: 1 })}>Ver todo</button> : null}
         </div>
       </div>
       <div className="cifras cifras-cuentas">

@@ -1,0 +1,30 @@
+/* Aspecto de las alertas de la app interna (SweetAlert2). Usa las variables del tema que copia `alertasAdmin.ts`. */
+.jsl-swal.swal2-container{z-index:2000;font-family:inherit}
+.jsl-swal.swal2-backdrop-show{background:rgba(2,6,23,.62);backdrop-filter:blur(3px)}
+/* El aviso corto no oscurece la pantalla. */
+.jsl-swal.jsl-swal-aviso.swal2-backdrop-show{background:none;backdrop-filter:none}
+/* Dentro de un <dialog> abierto el contenedor cubre la pantalla, no el diálogo. */
+dialog .jsl-swal.swal2-container{position:fixed;inset:0}
+.jsl-swal-popup{width:min(92vw,26rem);padding:1.4rem 1.2rem 1.2rem;border:1px solid var(--linea,#e2e8f0);border-radius:24px;box-shadow:0 24px 60px rgba(2,6,23,.35);font-family:inherit}
+.jsl-swal-titulo{padding:.2rem 0 0;font-size:1.05rem;font-weight:800;letter-spacing:-.01em;line-height:1.3;color:var(--tinta,#0f172a)}
+.jsl-swal-texto{margin:.5rem 0 0;font-size:.84rem;line-height:1.5;color:var(--suave,#64748b)}
+.jsl-swal-popup .swal2-icon{width:3.6rem;height:3.6rem;margin:.6rem auto .4rem}
+.jsl-swal-popup .swal2-icon .swal2-icon-content{font-size:2.2rem}
+.jsl-swal-acciones{gap:.6rem;margin-top:1.1rem;width:100%}
+.jsl-swal-acciones button{flex:1 1 0;min-height:44px;padding:.6rem 1rem;border:1px solid transparent;border-radius:12px;font:inherit;font-size:.82rem;font-weight:800;cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
+.jsl-swal-acciones button:active{transform:scale(.98)}
+.jsl-swal-ok{background:#0284c7;color:#fff;box-shadow:0 4px 12px rgba(2,132,199,.25)}
+.jsl-swal-ok:hover{background:#0369a1}
+.jsl-swal-ok.peligro{background:#e11d48;box-shadow:0 4px 12px rgba(225,29,72,.25)}
+.jsl-swal-ok.peligro:hover{background:#be123c}
+.jsl-swal-cancelar{background:var(--hueco,#f1f5f9);border-color:var(--linea,#e2e8f0)!important;color:var(--tinta,#0f172a)}
+.jsl-swal-cancelar:hover{border-color:var(--suave,#64748b)!important}
+.jsl-swal-acciones button:focus-visible{outline:2px solid var(--marca2,#0ea5e9);outline-offset:2px}
+/* Aviso corto (toast) */
+.jsl-swal-toast.swal2-toast{width:auto;max-width:min(92vw,24rem);padding:.7rem .9rem;border-radius:16px;box-shadow:0 12px 30px rgba(2,6,23,.3)}
+.jsl-swal-toast .swal2-icon{width:1.6rem;height:1.6rem;margin:0 .6rem 0 0}
+.jsl-swal-toast .swal2-icon .swal2-icon-content{font-size:1.1rem}
+.jsl-swal-toast .jsl-swal-titulo{margin:0;padding:0;font-size:.82rem;font-weight:700;text-align:left}
+.jsl-swal.swal2-container.swal2-top-end{padding:max(12px,env(safe-area-inset-top,0px)) 12px 0}
+@media (max-width:639px){.jsl-swal.swal2-container.swal2-top-end{align-items:center}}
+@media (prefers-reduced-motion:reduce){.jsl-swal *{animation-duration:.01ms!important}}
