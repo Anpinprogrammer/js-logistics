@@ -4,6 +4,19 @@ Este archivo es la **memoria compartida** entre sesiones y agentes. Léelo despu
 
 Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/ESTADO.md`.
 
+## Filtros de Pedidos de oficina — 2026-11-11
+
+- Detalle de pedido: el drawer de administración usa una hoja inferior de hasta 92dvh en móvil y un modal centrado de hasta 896 px desde 1024 px. El formulario financiero queda a la izquierda y la trazabilidad, ubicación y fotos a la derecha; la cabecera y las acciones permanecen visibles mientras se desplaza el cuerpo. Se conservaron los controles y manejadores existentes.
+- Las filas de Pedidos bajo 768 px muestran miniatura de paquete si falta foto, fecha corta y flecha de detalle; el remitente y mensajero ocupan la segunda línea. El área de Pedidos tiene espacio inferior para que la paginación no quede detrás de la navegación fija. Revisado a 320, 390, 768 y 1024 px.
+- Captura de guías: bajo 768 px los botones de cámara y galería comparten una fila 7/5, y el selector de oficina queda en una barra contextual debajo. Ambos selectores (móvil/escritorio) usan el mismo estado de oficina para crear las guías; desde 768 px el bloque conserva su disposición anterior. Revisado a 320, 390, 768, 1024 y 1440 px sin desbordes.
+- El filtro de estado inicial es `todos`; al abrir Pedidos desde menú lateral o inferior se limpian búsqueda, mensajero y fecha. Un enlace con `?estado=` o `?filtroEstado=` válido puede indicar otro estado; las navegaciones contextuales del panel conservan sus filtros explícitos.
+- Bajo 768 px la toolbar se reemplazó por búsqueda y botón Filtros con contador. La hoja inferior permite preparar mensajero, estado y fecha, y aplicar o limpiar juntos; bloquea el scroll de fondo y cierra con Escape o al pasar a escritorio. Desde 768 px permanece la toolbar anterior. Verificado en demo a 320, 390, 768, 1024 y 1440 px, sin desbordes; aplicar, limpiar y volver desde el menú funcionan.
+- Los selectores de mensajero y estado de esa hoja móvil eliminan la flecha nativa y usan un chevrón SVG alineado a 14 px del borde, con 40 px de espacio para el texto; la lista y el estado de filtros no cambian.
+
+## Filtros de Solicitudes de oficina — 2026-11-11
+
+- La tira de estados en móvil tiene píldoras más compactas, un degradado al borde derecho con el color real del tema y centra suavemente la opción tocada. La página reserva espacio inferior para la navegación fija; conteos y filtro activo siguen usando el mismo estado.
+
 ## Cabecera móvil de la app interna — 2026-11-11
 
 - El logo del sidebar de escritorio y de las cabeceras de la app interna usa `frontend/public/logo_JS_sin_texto.webp` en los tres modos (administración, oficina y mensajero).

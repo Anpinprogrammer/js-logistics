@@ -35,8 +35,14 @@ export default function Solicitudes({ pintar }: { pintar: () => void }) {
     <header className="cab-pedidos">
       <div className="cab-pedidos-txt"><h1>Solicitudes</h1><p className="sub">Pedidos de recogida de la página web y del portal de clientes.</p></div>
     </header>
-    <div className="seg seg-estado seg-solicitudes" role="group" aria-label="Filtrar solicitudes">
-      {FILTROS.map(([k, t, c]) => <button key={k} aria-pressed={f === k} onClick={() => poner(k)}>{t}{pag ? <> <span className={k === "pendientes" && pag.grupos[c] ? "num" : "num neu"}>{pag.grupos[c]}</span></> : null}</button>)}
+    <div className="seg-solicitudes-marco">
+      <div className="seg seg-estado seg-solicitudes" role="group" aria-label="Filtrar solicitudes">
+        {FILTROS.map(([k, t, c]) => <button key={k} type="button" aria-pressed={f === k} onClick={e => {
+          e.currentTarget.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+          poner(k);
+        }}>{t}{pag ? <> <span className={k === "pendientes" && pag.grupos[c] ? "num" : "num neu"}>{pag.grupos[c]}</span></> : null}</button>)}
+      </div>
+      <span className="seg-solicitudes-degrade" aria-hidden="true" />
     </div>
     {f === "por-confirmar" && <p className="sub">Ya tienen el valor del domicilio: estamos esperando que el cliente responda si está de acuerdo.</p>}
     <div ref={arriba} style={{ scrollMarginTop: 90 }} />

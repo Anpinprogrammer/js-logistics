@@ -4,7 +4,7 @@ import { useDatos } from "./datos";
 import { pedidos as apiPedidos } from "../api/servicios";
 import { DEMO } from "./demo";
 import type { Archivo } from "../api/tipos";
-import { pesos, hoy, moverDia, hora, gastoDe, servicio, nombreCliente, metodoTxt, S, type Pedido } from "./motor";
+import { pesos, hoy, moverDia, hora, diaDe, gastoDe, servicio, nombreCliente, metodoTxt, S, type Pedido } from "./motor";
 
 /* ---------- iconos ---------- */
 const svg = (hijos: ReactNode, extra?: { width?: number; height?: number }) => (
@@ -141,14 +141,16 @@ export const EtqDev = ({ p }: { p: Pedido }) => <>
   {p.estado === "devuelto" && p.destinoDev === "por_definir" ? <>{" "}<span className="etq sin">Sin confirmar</span></> : null}
 </>;
 export const EtqDash = ({ p }: { p: Pedido }) => p.estado === "pendiente" ? <span className="etq ruta">En ruta</span> : <EtqEstado p={p} />;
-export const Mini = ({ p }: { p: Pedido }) => p.mini ? <img src={p.mini} alt="" /> : <span className="sinfoto" />;
+export const Mini = ({ p }: { p: Pedido }) => p.mini ? <img src={p.mini} alt="" /> : <span className="sinfoto" aria-hidden="true">{svg(<><path d="m3 7 9-4 9 4-9 4-9-4z" /><path d="M3 7v10l9 4 9-4V7M12 11v10" /></>)}</span>;
 
 export function FilaPedido({ p, onClick }: { p: Pedido; onClick: () => void }) {
+  const fechaCorta = new Date(p.creado).toLocaleDateString("es-CO", { day: "numeric", month: "short", timeZone: "America/Bogota" }).replace(" de ", " ");
   return (
-    <button className="fila" onClick={onClick}><Mini p={p} />
-      <span className="info"><span className="guia">{p.guia}</span> <EtqEstado p={p} /><EtqDev p={p} /><EtqCambio p={p} />{Number(p.difCobro) ? <>{" "}<span className="etq sin">Diferencia {pesos(p.difCobro)}</span></> : null}
+    <button className="fila fila-pedido-oficina" onClick={onClick}><Mini p={p} />
+      <span className="info fila-pedido-escritorio"><span className="guia">{p.guia}</span> <EtqEstado p={p} /><EtqDev p={p} /><EtqCambio p={p} />{Number(p.difCobro) ? <>{" "}<span className="etq sin">Diferencia {pesos(p.difCobro)}</span></> : null}
         <p>{p.clienteId ? nombreCliente(p.clienteId) : <span className="etq sin">Sin remitente</span>} · {S.mensajeros[p.mensajeroId]?.nombre || ""} · {hora(p.creado)}</p></span>
-      <span className="n" style={{ textAlign: "right", fontWeight: 700 }}>{p.estado === "entregado" ? pesos(p.valorCobrado) : ""}</span></button>
+      <span className="fila-pedido-movil"><span className="fila-pedido-cab"><span className="fila-pedido-etiquetas"><span className="guia">{p.guia}</span> <EtqEstado p={p} /><EtqDev p={p} /><EtqCambio p={p} />{Number(p.difCobro) ? <> <span className="etq sin">Diferencia {pesos(p.difCobro)}</span></> : null}</span><time dateTime={diaDe(p.creado)}>{fechaCorta}</time></span><span className="fila-pedido-sub"><span>{p.clienteId ? nombreCliente(p.clienteId) : <span className="etq sin">Sin remitente</span>} · {S.mensajeros[p.mensajeroId]?.nombre || ""}</span>{p.estado === "entregado" && <b>{pesos(p.valorCobrado)}</b>}</span></span>
+      <span className="n fila-pedido-valor" style={{ textAlign: "right", fontWeight: 700 }}>{p.estado === "entregado" ? pesos(p.valorCobrado) : ""}</span><span className="fila-pedido-flecha" aria-hidden="true">{svg(<path d="m9 18 6-6-6-6" />)}</span></button>
   );
 }
 

@@ -3,7 +3,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSesion, useUsuario } from "../auth/Sesion";
 import { ProveedorDatos, useDatos } from "./datos";
 import { ProveedorVentana, Icono, IconoSalir, useVentana } from "./ui";
-import { E, guardarLocal } from "./estado";
+import { E, estadoInicialPedidos, guardarLocal } from "./estado";
 import { useTema } from "./tema";
 import { Campanita, IconoCampana, useSolicitudes } from "./Solicitudes";
 import { S, fechaLarga, hoy, horaActual, type Pedido } from "./motor";
@@ -80,7 +80,10 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     actual = escritorio && esAdmin && E.tabA === "mas" ? E.subMas : E.tabA;
     elegir = k => { if (ADMIN_ESCRITORIO.some(([x]) => x === k)) { E.tabA = "mas"; E.subMas = k; } else E.tabA = k; };
   }
-  const ir = (k: string) => { elegir(k); pintar(); scrollTo(0, 0); };
+  const ir = (k: string) => {
+    if (k === "pedidos" && !enMensajero) Object.assign(E, { filtroA: estadoInicialPedidos(), buscarA: "", mensPedA: "", diaPedA: "", paginaA: 1 });
+    elegir(k); pintar(); scrollTo(0, 0);
+  };
   const boton = ([k, t, n]: ItemNav) => (
     <button key={k} aria-current={actual === k ? "page" : undefined} aria-label={t} title={t} onClick={() => ir(k)}><Icono n={k} /><span className="t">{t}</span>{n ? <span className="num">{n}</span> : null}</button>
   );
@@ -162,7 +165,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
         </div>
       </div>
     </header>
-    <main id="vista">
+    <main id="vista" className={!enMensajero && E.tabA === "pedidos" ? "vista-pedidos-oficina" : !enMensajero && E.tabA === "solicitudes" ? "vista-solicitudes-oficina" : undefined}>
       {error && <div className="aviso alerta">No se pudieron traer los datos: {error} Se vuelve a intentar solo en unos segundos.</div>}
       {!cargado && !error ? cargando : <Suspense fallback={cargando}>{enMensajero ? <Mensajero pintar={pintar} /> : <Oficina pintar={pintar} />}</Suspense>}
     </main>

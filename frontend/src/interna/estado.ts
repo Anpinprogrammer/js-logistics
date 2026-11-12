@@ -9,12 +9,22 @@ const tabCajaGuardada = leer("js_caja");
 const tabCuentasGuardada = leer("js_cuentas");
 const subPedMGuardada = leer("js_pedidos_m");
 
+/** Un enlace puede abrir Pedidos con un estado explícito; en cualquier otro caso empieza en Todos. */
+export function estadoInicialPedidos() {
+  if (typeof window === "undefined") return "todos";
+  const q = new URLSearchParams(window.location.search);
+  const estado = q.get("estado") || q.get("filtroEstado") || "";
+  const alias: Record<string, string> = { sin_remitente: "sin", por_recoger: "rec", por_entregar: "pend", entregados: "ent", devueltos: "dev", con_diferencia: "dif", cambios: "cambio" };
+  const filtro = alias[estado] || estado;
+  return ["todos", "sin", "rec", "pend", "ent", "dev", "dif", "cambio", "serv"].includes(filtro) ? filtro : "todos";
+}
+
 export const E = {
   rol: (leer("js_rol") || "admin") as "mensajero" | "admin",
   filtroSol: "todas" as GrupoSolicitud, paginaSol: 1,
   tabA: "inicio", tabM: "inicio", subMas: "resultados",
   // Oficina → Pedidos
-  filtroA: "sin", buscarA: "", diaPedA: "", mensPedA: "", paginaA: 1,
+  filtroA: estadoInicialPedidos(), buscarA: "", diaPedA: "", mensPedA: "", paginaA: 1,
   // Oficina → Clientes
   filtroCli: "todos", buscarCli: "", diaCliF: "", paginaCli: 1,
   // Oficina → Caja y Sueldos
