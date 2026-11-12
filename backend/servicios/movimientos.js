@@ -1,6 +1,6 @@
 /* Cuenta de los clientes: pagos, pagos a clientes, compras por encargo, ganancias, cargos y abonos.
    También el cambio de medio que hace el asistente (24 h) y los reversos de pagos. */
-import { Movimientos, Recaudos, Clientes } from "../models/documentos.js";
+import { Movimientos, Recaudos, Clientes, Mensajeros } from "../models/documentos.js";
 import { MOVS, MOVS_OFICINA, MEDIOS, VENTANA_CORRECCION_MS } from "../helpers/constantes.js";
 import { nuevoId } from "../helpers/ids.js";
 import { ahora } from "../helpers/reloj.js";
@@ -9,7 +9,7 @@ import { sinTildes } from "../helpers/texto.js";
 import { datosInvalidos, noEncontrado, permisoNegado, yaContadoError } from "./errores.js";
 import { enTransaccion, guardar, actualizar, borrar } from "./transaccion.js";
 import { calculosDe, exigirAdmin, exigirOficina, valorPositivo, diaValido, texto, exigirNoContado, exigirDiaAbierto } from "./contexto.js";
-import { esPago, mueveCaja } from "../helpers/calculos.js";
+import { esPago, mueveCaja, esRepartidor } from "../helpers/calculos.js";
 
 /** Valida y arma los datos comunes de crear y editar. soloHoy: el pago que registra el asistente queda con la hora del momento. */
 async function armar(t, a, datos, soloHoy) {
@@ -45,6 +45,30 @@ export async function crear(ctx, datos) {
   });
 }
 
+/** Recepción → Recibir dinero: el mensajero anota el pago que le hizo un cliente en la calle (cliente, concepto y valor).
+    Es el mismo pago del cliente de la oficina (`pago_de_cliente`, abona a su cuenta), en efectivo y con la hora del
+    servidor, pero con `mensajeroId`: no entra a la caja hasta que el mensajero lo entrega y mientras tanto suma a lo que
+    debe en su período (periodoMensajero). El mensajero solo anota en su nombre; administración puede hacerlo por otro. */
+export async function recibirDeMensajero(ctx, { clienteId, concepto, valor, mensajeroId }) {
+  const a = ctx.actor;
+  const mid = a.esAdmin ? mensajeroId || a.mensajeroId : a.rol === "mensajero" ? a.mensajeroId : "";
+  if (!a.esAdmin && a.rol !== "mensajero") throw permisoNegado();
+  if (!mid) throw datosInvalidos(a.esAdmin ? "Elige el mensajero que recibió el dinero." : "Tu cuenta no está vinculada con tu nombre en Personal. Pídele a administración que la vincule.");
+  return enTransaccion(ctx, async t => {
+    const m = await Mensajeros.obtener(t.c, mid);
+    if (!m) throw datosInvalidos("Elige el mensajero que recibió el dinero.");
+    if (!esRepartidor(m)) throw datosInvalidos("Solo un mensajero puede recibir dinero aquí.");
+    const cli = clienteId ? await Clientes.obtener(t.c, clienteId) : null;
+    if (!cli) throw noEncontrado("Ese cliente ya no existe. Búscalo de nuevo.");
+    const movimiento = await guardar(t, "movimientos", {
+      id: nuevoId(), tipo: "pago_de_cliente", clienteId: cli.id, valor: valorPositivo(valor), medio: "efectivo",
+      nota: texto(concepto, 80), fecha: ahora(), porUid: a.uid, porNombre: a.nombre, mensajeroId: mid
+    });
+    const calc = await calculosDe(t.c, ["pedidos", "recaudos", "cajamovs", "liquidaciones", "mensajeros", "movimientos", "clientes"]);
+    return { movimiento, clienteNombre: cli.nombre, saldoCliente: calc.saldoCliente(cli.id), debe: calc.periodoMensajero(mid).debe };
+  });
+}
+
 /** Editar un movimiento (solo administración). Lo que ya se contó en un arqueo no se cambia. */
 export async function editar(ctx, id, datos) {
   const a = ctx.actor;
@@ -60,7 +84,9 @@ export async function editar(ctx, id, datos) {
 
 /** Reversar un pago: si todavía no se contó en un arqueo, se borra; si ya se contó, se registra hoy un pago contrario. */
 async function reversarPago(t, calc, m) {
-  if (!calc.yaContado(m.fecha)) {
+  // El pago que recibió un mensajero no entró a la caja (no lo toca el arqueo): se borra y, si ya estaba en una
+  // liquidación cerrada, la diferencia pasa sola a lo que debe en su período abierto (ajuste de periodoMensajero).
+  if (!mueveCaja(m) || !calc.yaContado(m.fecha)) {
     if (!t.actor.esAdmin) throw permisoNegado("Solo administración puede quitar un pago.");
     await borrar(t, "movimientos", m.id);
     return { id: m.id, accion: "borrado" };

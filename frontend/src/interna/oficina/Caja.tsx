@@ -150,7 +150,7 @@ export default function Caja({ pintar }: { pintar: () => void }) {
         <dl className="datos">
           <dt>Entregas / en ruta</dt><dd>{pm.ps.length} / {pendM[id] || 0}</dd>
           <dt>Efectivo cobrado</dt><dd>{pesos(tt.efectivo)}</dd>
-          {pm.base ? <><dt>Base para vueltos</dt><dd>{pesos(pm.base)}</dd></> : null}{pm.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(pm.gastos)}</dd></> : null}
+          {pm.base ? <><dt>Base para vueltos</dt><dd>{pesos(pm.base)}</dd></> : null}{pm.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(pm.gastos)}</dd></> : null}{pm.cobros ? <><dt>Pagos de clientes que recibió</dt><dd>{pesos(pm.cobros)}</dd></> : null}
           {pm.anterior ? <><dt>Pendiente anterior</dt><dd>{pesos(pm.anterior)}</dd></> : null}<FilaAjuste a={pm.ajuste} />
           <dt>Ya entregó</dt><dd>{pesos(pm.recibido)}</dd>
           <div className="debe" style={{ display: "contents" }}><dt>Debe</dt><dd>{pesos(pm.debe)}</dd></div>
@@ -434,7 +434,7 @@ export function RecibirDinero({ mid, pat }: { mid: string; pat?: ResumenPatinado
   return <div className="recibir">
     <Cab sub={<span className="sub">{m.nombre}</span>}><h2>Recibir dinero</h2></Cab>
     {pat ? <dl className="datos"><dt>Recibido de clientes</dt><dd>{pesos(pat.recibido)}</dd><dt>Ya entregó</dt><dd>{pesos(pat.entregado)}</dd><dt>Debe</dt><dd className="neg">{pesos(pat.debe)}</dd></dl>
-    : <dl className="datos"><dt>Efectivo cobrado</dt><dd>{pesos(pm.efectivo)}</dd>{pm.base ? <><dt>Base para vueltos</dt><dd>{pesos(pm.base)}</dd></> : null}{pm.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(pm.gastos)}</dd></> : null}
+    : <dl className="datos"><dt>Efectivo cobrado</dt><dd>{pesos(pm.efectivo)}</dd>{pm.base ? <><dt>Base para vueltos</dt><dd>{pesos(pm.base)}</dd></> : null}{pm.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(pm.gastos)}</dd></> : null}{pm.cobros ? <><dt>Pagos de clientes que recibió</dt><dd>{pesos(pm.cobros)}</dd></> : null}
       {pm.anterior ? <><dt>Pendiente anterior</dt><dd>{pesos(pm.anterior)}</dd></> : null}<FilaAjuste a={pm.ajuste} /><dt>Ya entregó</dt><dd>{pesos(pm.recibido)}</dd><dt>Debe</dt><dd className="neg">{pesos(pm.debe)}</dd></dl>}
     <div className="linea2"><div className="campo"><label htmlFor="rVal">Valor que entrega</label><input id="rVal" type="number" inputMode="numeric" min="0" step="1000" autoFocus value={val} onFocus={e => e.target.select()} onChange={e => setVal(e.target.value)} /></div>
       <div className="campo"><label htmlFor="rMedio">Medio</label><select id="rMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{MEDIOS_K.map(k => <option key={k} value={k}>{MEDIOS[k]}</option>)}</select></div></div>
@@ -497,7 +497,7 @@ function Liquidar({ mid }: { mid: string }) {
     setGuardando(true);
     try {
       const queda = pm.debe - valor, ad = adelanto(queda);
-      const id = await liquidar({ mensajeroId: mid, desde: pm.desde, dia: hoy(), entregas: pm.ps.length, guias: pm.ps.map(p => p.guia), efectivo: t.efectivo, base: pm.base, gastos: pm.gastos, anterior: pm.anterior,
+      const id = await liquidar({ mensajeroId: mid, desde: pm.desde, dia: hoy(), entregas: pm.ps.length, guias: pm.ps.map(p => p.guia), efectivo: t.efectivo, base: pm.base, gastos: pm.gastos, cobros: pm.cobros, anterior: pm.anterior,
         recibidoAntes: pm.recibido, entregaFinal: valor, recibido: pm.recibido + valor, debe: queda - ad, adelanto: ad, ajuste: pm.ajuste, transfJs: t.transfJs, transfCli: t.transfCli, sueldo, enRuta, medio, semanaAdelanto: ad ? sem : "" });
       v.avisar(`${m.nombre}: ${ad ? "adelanto de " + pesos(ad) + " en su sueldo" : textoLiq(queda).toLowerCase()}`); v.abrir(<VerLiquidacion id={id} />, "centrada");
     } catch (e) { setGuardando(false); noSePudo(v, "No se pudo guardar")(e); }
@@ -509,7 +509,7 @@ function Liquidar({ mid }: { mid: string }) {
     <dl className="datos">
       <dt>Entregas</dt><dd>{pm.ps.length}</dd>
       <dt>Efectivo cobrado</dt><dd>{pesos(t.efectivo)}</dd>
-      {pm.base ? <><dt>Base para vueltos</dt><dd>{pesos(pm.base)}</dd></> : null}{pm.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(pm.gastos)}</dd></> : null}
+      {pm.base ? <><dt>Base para vueltos</dt><dd>{pesos(pm.base)}</dd></> : null}{pm.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(pm.gastos)}</dd></> : null}{pm.cobros ? <><dt>Pagos de clientes que recibió</dt><dd>{pesos(pm.cobros)}</dd></> : null}
       {pm.anterior ? <><dt>Pendiente de la liquidación anterior</dt><dd>{pesos(pm.anterior)}</dd></> : null}<FilaAjuste a={pm.ajuste} />
       <dt>Ya entregó</dt><dd>{pesos(pm.recibido)}</dd>
       <dt>Pendiente por entregar</dt><dd className="neg">{pesos(pm.debe)}</dd>
@@ -540,6 +540,7 @@ export function VerLiquidacion({ id }: { id: string }) {
       <dt>Efectivo cobrado</dt><dd>{pesos(l.efectivo)}</dd>
       {l.base ? <><dt>Base para vueltos</dt><dd>{pesos(l.base)}</dd></> : null}
       {l.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(l.gastos)}</dd></> : null}
+      {l.cobros ? <><dt>Pagos de clientes que recibió</dt><dd>{pesos(l.cobros)}</dd></> : null}
       {l.anterior ? <><dt>Pendiente anterior</dt><dd>{pesos(l.anterior)}</dd></> : null}
       {l.ajuste ? <><dt>Correcciones a liquidaciones anteriores</dt><dd>{ajusteTxt(l.ajuste)}</dd></> : null}
       <dt>Entregó durante el período</dt><dd>{pesos(l.recibidoAntes ?? l.recibido)}</dd>

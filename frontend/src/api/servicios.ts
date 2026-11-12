@@ -146,6 +146,16 @@ export const patinador = {
     datos<{ registro: RegistroCajaPatinador; resumen: ResumenCajaPatinador }>(api.post("/patinador/caja", d))
 };
 
+/** Recepción → Recibir dinero del mensajero: misma forma que la caja del patinador. */
+export const recibidos = {
+  /** Lo que ha recibido (el servidor pone el mensajero si quien pide es mensajero; la oficina o un admin dicen cuál). */
+  listar: (pagina: number, porPagina: number, mensajeroId?: string) =>
+    datos<CajaPatinador>(api.get("/movimientos/recibidos", { params: limpio({ pagina, porPagina, mensajeroId }) })),
+  /** Anota un pago de un cliente. Efectivo y con la hora del servidor; abona a la cuenta del cliente. */
+  registrar: (d: { clienteId: string; concepto: string; valor: number; mensajeroId?: string }) =>
+    datos<{ movimiento: Movimiento; clienteNombre: string; saldoCliente: number; debe: number }>(api.post("/movimientos/recibidos", d))
+};
+
 export const usuarios = {
   listar: () => datos<{ usuarios: Usuario[] }>(api.get("/usuarios")).then(d => d.usuarios),
   /** Sub-pestaña Acceso de Personal: búsqueda, rol y 5 filas en celular, 10 en computador. */

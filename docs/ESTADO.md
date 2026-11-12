@@ -3,9 +3,17 @@
 ## Modo Patinador de administración — 2026-11-12
 
 - El admin tiene un tercer modo de vista, **Patinador**, junto a Mensajero y Administración (botones de la barra en computador y "Cambiar modo de vista" del perfil en el celular). Como en el modo Mensajero, elige el patinador (`E.miPatinador`, guardado en `js_patinador`, con "cambiar") y ve sus pestañas Caja e Historial (`E.tabP`). El asistente no tiene este modo (tampoco tiene el de Mensajero).
-- Las pantallas son las mismas del patinador: `interna/patinador/Vista.tsx` (`VistaPatinador`, con `ajeno` = el patinador elegido). `Patinador.tsx` es solo el marco de la app del patinador; `DesdeOficina.tsx` es el selector del admin, cargado aparte por `Marco.tsx`. El modo solo pide la colección `mensajeros` (`necesarias("patinador")`). `navegacion.ts` guarda `?modo=patinador&tab=caja|historial`.
+- Las pantallas son las mismas del patinador: `interna/patinador/Vista.tsx` (`VistaPatinador`, con `ajeno` = el patinador elegido). El formulario y la lista son los de `interna/pagos.tsx` (compartidos con Recepción del mensajero); `FormPago` tiene `deOtro` para decir "le pagó". `Patinador.tsx` es solo el marco de la app del patinador; `DesdeOficina.tsx` es el selector del admin, cargado aparte por `Marco.tsx`. El modo solo pide la colección `mensajeros` (`necesarias("patinador")`). `navegacion.ts` guarda `?modo=patinador&tab=caja|historial`.
 - Backend: `POST /patinador/caja` acepta al admin con `mensajeroId` (ficha de tipo `patinador`); el abono del cliente dice "Recibido por <patinador>" y el historial "Anotó en la caja de <patinador>: …". El patinador que mande `mensajeroId` recibe 400. Sin cambios de esquema: **no hace falta `db:migrar`**.
 - El selector de modos del perfil móvil ahora usa columnas a la medida del texto (`.perfil-modos`), para que quepan los tres a 320 px.
+
+## Recepción del mensajero: Nuevo pedido y Recibir dinero — 2026-11-12
+
+- La pestaña **Nuevo** del mensajero ahora es **Recepción** (`E.tabM = "recepcion"`, ícono de bandeja) con dos sub-pestañas en `E.subRecM` (`pedido` | `dinero`), recordadas en la URL por `navegacion.ts`. Una pestaña guardada como `nuevo` se abre en Recepción. *Nuevo pedido* es exactamente lo de antes (foto y galería).
+- *Recibir dinero* usa el mismo formulario y lista del patinador, que se movieron a `interna/pagos.tsx` (`FormPago`, `Lista`). Cada pago es un `pago_de_cliente` normal (efectivo, hora del servidor) con **`movimientos.mensajero_id`**: abona a la cuenta del cliente igual que un pago de oficina (`POST /movimientos/recibidos`).
+- **Cuadre:** `mueveCaja(m)` es falso si `m.mensajeroId` (backend `calculos.js` y `motor.ts`): ese pago no entra al libro de caja ni al arqueo. Entra cuando el mensajero lo entrega en Caja → Mensajeros (recaudo de siempre). Mientras tanto `periodoMensajero` lo suma a `debe` (`cobros`, `cobrosCli`), así sale en "Todavía en manos de mensajeros", en el cierre del día y en la liquidación (`liquidaciones.cobros`; corregirlo después de liquidar pasa al ajuste como el resto). `cajaOficina` los ignora. Quitar uno lo borra aunque haya arqueo (nunca estuvo en la caja).
+- `equivalencia.test.js` quita `cobros`/`cobrosCli` al comparar: la app vieja no tiene estos pagos. El mensajero ahora lee `GET /movimientos`, pero el servidor solo le da los que él recibió.
+- Requiere `npm run db:migrar` (columnas `movimientos.mensajero_id` y `liquidaciones.cobros`). El patinador sigue con su caja (`caja_patinador`), aparte.
 
 ## Pagos del patinador abonan a la cuenta del cliente — 2026-11-12
 

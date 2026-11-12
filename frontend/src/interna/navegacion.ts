@@ -9,7 +9,7 @@ import { SUBMAS } from "./motor";
 
 const TABS_ADMIN = ["inicio", "pedidos", "solicitudes", "clientes", "caja", "cuentas", "sueldos", "mas"];
 const TABS_ASISTENTE = ["inicio", "pedidos", "solicitudes", "clientes", "caja", "cuentas"];
-const TABS_MENSAJERO = ["inicio", "nuevo", "pend", "caja", "sueldo", "entregados"];
+const TABS_MENSAJERO = ["inicio", "recepcion", "pend", "caja", "sueldo", "entregados"];
 const TABS_PATINADOR = ["caja", "historial"];
 const FILTROS_PEDIDOS = ["todos", "sin", "rec", "pend", "ent", "dev", "dif", "cambio", "serv"];
 
@@ -24,6 +24,7 @@ const SUB_OFICINA: Record<string, Sub> = {
   pedidos: { leer: () => E.filtroA, poner: v => { E.filtroA = v; }, validos: FILTROS_PEDIDOS },
 };
 const SUB_MENSAJERO: Record<string, Sub> = {
+  recepcion: { leer: () => E.subRecM, poner: v => { E.subRecM = v as typeof E.subRecM; }, validos: ["pedido", "dinero"] },
   pend: { leer: () => E.subPedM, poner: v => { E.subPedM = v as typeof E.subPedM; }, validos: ["todos", "entregar", "recoger"] },
 };
 
@@ -39,6 +40,7 @@ export function restaurarNavegacion(uid: string, rol: Rol) {
   E.tabA = "inicio"; E.tabM = "inicio"; E.tabP = "caja"; // nada de la sesión anterior en esta misma pestaña del navegador
   const nav = leerNavegacion(CLAVE_NAV_ADMIN, uid);
   if (!nav) return;
+  if (nav.tab === "nuevo") nav.tab = "recepcion"; // la pestaña Nuevo del mensajero ahora es Recepción → Nuevo pedido
   const modos = modosDe(rol);
   const modo = nav.modo && modos.includes(nav.modo) ? nav.modo : modos.includes(E.rol) ? E.rol : modos[0];
   E.rol = modo as typeof E.rol;

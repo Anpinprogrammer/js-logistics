@@ -2,7 +2,7 @@
    Aquí se revisa la forma (tipos y largos). Las reglas del negocio, con los mismos mensajes que la app,
    las revisan los servicios (servicios/*.js), porque muchas dependen de lo que hay en la base. */
 import { z } from "zod";
-import { id, texto } from "./comunes.js";
+import { id, pesos, texto } from "./comunes.js";
 
 const valor = z.union([z.number(), z.string().max(20)]);
 const fecha = z.union([z.string().max(40), z.number()]).nullish();
@@ -14,6 +14,18 @@ export const paramUid = z.object({ uid: id });
 export const movimiento = z.looseObject({
   clienteId: id.nullish(), tipo: z.string().max(40).optional(), valor: valor.optional(), medio: z.string().max(20).nullish(),
   nota: texto(300).optional(), dia: dia.optional(), fecha
+});
+/** Recepción → Recibir dinero (mensajero). El medio (efectivo) y la hora los pone el servidor: no se aceptan campos de más. */
+export const recibido = z.object({
+  clienteId: id,
+  concepto: z.string().trim().min(1, "Escribe el concepto").max(80, "El concepto es muy largo (máximo 80 letras)"),
+  valor: pesos.refine(v => v > 0, "Escribe un valor mayor a cero"),
+  mensajeroId: id.optional() // solo administración (cuando actúa como un mensajero); al mensajero se le ignora
+}).strict();
+export const recibidos = z.object({
+  mensajeroId: id.optional(),
+  pagina: z.coerce.number().int().min(1).default(1),
+  porPagina: z.coerce.number().int().min(1).max(100).default(8)
 });
 export const reversar = z.object({ ids: z.array(id).min(1).max(500) });
 

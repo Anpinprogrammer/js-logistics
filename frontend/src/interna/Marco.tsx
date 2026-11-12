@@ -32,7 +32,7 @@ const ADMIN_ESCRITORIO: ItemNav[] = [["resultados", "Resultados"], ["personal", 
 
 /** Grupos del menú lateral en computador (las mismas pestañas de siempre, agrupadas). */
 const SECCIONES: [string, string[]][] = [
-  ["Principal", ["inicio", "nuevo", "pend", "entregados", "pedidos", "solicitudes", "clientes"]],
+  ["Principal", ["inicio", "recepcion", "pend", "entregados", "pedidos", "solicitudes", "clientes"]],
   ["Gestión financiera", ["caja", "cuentas", "sueldo", "sueldos"]],
   ["Administración", ["mas", ...ADMIN_ESCRITORIO.map(([k]) => k)]],
 ];
@@ -79,7 +79,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
   // Pestañas de cada modo, como en el prototipo
   let items: ItemNav[], actual: string, elegir: (k: string) => void;
   if (enMensajero) {
-    items = [["inicio", "Inicio"], ["nuevo", "Nuevo"], ["pend", "Pedidos", pendientesMios().length + porRecogerMios().length + devolucionesPorDefinirMios().length], ["caja", "Mi caja"], ["sueldo", "Mi sueldo"], ["entregados", "Entregados"]];
+    items = [["inicio", "Inicio"], ["recepcion", "Recepción"], ["pend", "Pedidos", pendientesMios().length + porRecogerMios().length + devolucionesPorDefinirMios().length], ["caja", "Mi caja"], ["sueldo", "Mi sueldo"], ["entregados", "Entregados"]];
     actual = E.tabM; elegir = k => { E.tabM = k; };
   } else if (enPatinador) {
     items = [["caja", "Caja"], ["historial", "Historial"]];

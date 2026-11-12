@@ -2,11 +2,14 @@ import { Router } from "express";
 import * as C from "../controllers/movimientos.controller.js";
 import * as V from "../validators/dinero.validator.js";
 import { validar } from "../middleware/validar.js";
-import { permitir, OFICINA } from "../middleware/autorizar.js";
+import { permitir, OFICINA, EQUIPO } from "../middleware/autorizar.js";
 
 // Movimientos de la cuenta de los clientes. El cliente ve los suyos en GET /clientes/:id/movimientos.
 const r = Router();
-r.get("/", permitir(OFICINA), C.listar);
+r.get("/", permitir(EQUIPO), C.listar); // cada rol lee lo suyo (lecturasDe): el mensajero, solo los pagos que él recibió
+// Recepción → Recibir dinero: el mensajero anota lo que le paga un cliente en la calle y ve lo que ha recibido.
+r.get("/recibidos", permitir(EQUIPO), validar({ query: V.recibidos }), C.recibidos);
+r.post("/recibidos", permitir("mensajero", "admin"), validar({ body: V.recibido }), C.recibir);
 r.get("/pagina", permitir(OFICINA), validar({ query: V.movimientosPagina }), C.pagina);
 r.get("/ganancias", permitir(OFICINA), validar({ query: V.gananciasPagina }), C.ganancias);
 r.post("/", permitir(OFICINA), validar({ body: V.movimiento }), C.crear);
