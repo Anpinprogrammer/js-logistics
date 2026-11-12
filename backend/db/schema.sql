@@ -405,3 +405,11 @@ BEGIN
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;
 END $$;
+
+-- ---------- Índices de rendimiento (2026-11-12) ----------
+-- Lista del mensajero y carga por cursor (ORDER BY n DESC con el filtro de mensajero).
+CREATE INDEX IF NOT EXISTS pedidos_mensajero_n_idx ON pedidos (mensajero_id, n DESC);
+-- Filtros por hora de entrega o devolución (entregadoDesde/Hasta y el filtro de día de Pedidos).
+CREATE INDEX IF NOT EXISTS pedidos_entregado_idx ON pedidos (entregado DESC) WHERE entregado IS NOT NULL;
+-- Guías sin remitente (contador de la oficina y filtro "Sin remitente").
+CREATE INDEX IF NOT EXISTS pedidos_sin_remitente_idx ON pedidos (n DESC) WHERE cliente_id IS NULL;

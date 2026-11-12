@@ -1,6 +1,6 @@
 /* Personal: mensajeros, oficina, patinadores, dueño y empresa. */
 import { query } from "../config/db.js";
-import { filaAObjeto, armarSet } from "../helpers/sql.js";
+import { filaAObjeto, armarSet, paginaEnParalelo } from "../helpers/sql.js";
 import { nuevoId } from "../helpers/ids.js";
 
 export async function listar({ incluirInactivos = false } = {}) {
@@ -16,18 +16,18 @@ export async function paginar({ buscar = "", tipo = "", pagina = 1, porPagina = 
   if (buscar) { params.push(`%${buscar}%`); cond.push(`(nombre ILIKE $${params.length} OR telefono ILIKE $${params.length})`); }
   if (tipo) { params.push(tipo); cond.push(`tipo = $${params.length}`); }
   const where = "WHERE " + cond.join(" AND ");
-  const total = (await query(`SELECT count(*)::int AS total FROM mensajeros ${where}`, params)).rows[0]?.total || 0;
   const tam = Math.max(1, Math.min(100, Number(porPagina) || 7));
-  const paginas = Math.max(1, Math.ceil(total / tam));
-  const actual = Math.min(Math.max(1, Number(pagina) || 1), paginas);
-  const valores = [...params, tam, (actual - 1) * tam];
-  const { rows } = await query(
-    `SELECT * FROM mensajeros ${where}
-     ORDER BY CASE tipo WHEN 'mensajero' THEN 0 WHEN 'dueno' THEN 1 WHEN 'oficina' THEN 2 WHEN 'patinador' THEN 3 ELSE 4 END, lower(nombre)
-     LIMIT $${valores.length - 1} OFFSET $${valores.length}`,
-    valores
-  );
-  return { filas: rows.map(filaAObjeto), total, pagina: actual, porPagina: tam, paginas };
+  const r = await paginaEnParalelo({
+    pagina, porPagina: tam,
+    contar: async () => (await query(`SELECT count(*)::int AS total FROM mensajeros ${where}`, params)).rows[0]?.total || 0,
+    traer: async offset => (await query(
+      `SELECT * FROM mensajeros ${where}
+       ORDER BY CASE tipo WHEN 'mensajero' THEN 0 WHEN 'dueno' THEN 1 WHEN 'oficina' THEN 2 WHEN 'patinador' THEN 3 ELSE 4 END, lower(nombre)
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, tam, offset]
+    )).rows
+  });
+  return { filas: r.filas.map(filaAObjeto), total: r.total, pagina: r.pagina, porPagina: tam, paginas: r.paginas };
 }
 
 export async function buscarPorId(id, db = { query }) {

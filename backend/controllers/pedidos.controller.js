@@ -44,15 +44,18 @@ export async function listar(req, res) {
     if (!u.clienteId) throw prohibido("Tu cuenta no está vinculada con un cliente");
     filtros.clienteId = u.clienteId;
   }
-  if (filtros.pagina) { // paginador: el servidor filtra, cuenta y corta; la pantalla solo dibuja
-    const { cursor: _c, limite: _l, ...resto } = filtros;
+  const { sinMini, ...resto0 } = filtros;
+  // Sin miniaturas no se le pide nada a Storage: la respuesta trae `mini: null`.
+  const minis = ps => (sinMini ? ps.map(({ miniRuta: _m, ...p }) => ({ ...p, mini: null })) : conMini(ps));
+  if (resto0.pagina) { // paginador: el servidor filtra, cuenta y corta; la pantalla solo dibuja
+    const { cursor: _c, limite: _l, ...resto } = resto0;
     const r = await Pedido.listarPagina(resto);
-    return res.json({ ...r, pedidos: await conMini(r.pedidos) });
+    return res.json({ ...r, pedidos: await minis(r.pedidos) });
   }
-  delete filtros.porPagina;
-  const pedidos = await Pedido.listar(filtros);
-  const siguiente = pedidos.length === filtros.limite ? pedidos[pedidos.length - 1].n : null;
-  res.json({ pedidos: await conMini(pedidos), siguiente });
+  delete resto0.porPagina;
+  const pedidos = await Pedido.listar(resto0);
+  const siguiente = pedidos.length === resto0.limite ? pedidos[pedidos.length - 1].n : null;
+  res.json({ pedidos: await minis(pedidos), siguiente });
 }
 
 export async function obtener(req, res) {
