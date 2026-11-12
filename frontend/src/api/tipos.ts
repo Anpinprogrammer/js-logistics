@@ -275,6 +275,8 @@ export interface Solicitud {
   direccionEntrega: string;
   /** Domicilio que puso la oficina al aceptarla. */
   valor: number | null;
+  /** true solo si el cliente aceptó la propuesta desde su portal. */
+  confirmadaPorCliente?: boolean;
   motivoRechazo: string;
   clienteId: string | null;
   clienteNombre: string | null;

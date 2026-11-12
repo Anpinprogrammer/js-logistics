@@ -176,9 +176,9 @@ export async function contarAbiertas() {
 /** Columnas de una solicitud que puede ver el cliente: nada de quién la revisó ni datos internos.
     `pedidoEstado` es el estado de la guía que salió de la solicitud, si ya se asignó. */
 const CAMPOS_CLIENTE = `s.id, s.estado, s.origen, s.direccion_recogida, s.paquetes, s.peso_kg, s.destinatario_nombre,
-  s.destinatario_telefono, s.direccion_entrega, s.valor, s.motivo_rechazo, s.guia, s.creado, s.actualizado,
-  p.estado AS pedido_estado`;
-const DESDE_CLIENTE = `FROM solicitudes s LEFT JOIN pedidos p ON p.guia = s.guia`;
+  s.destinatario_telefono, s.direccion_entrega, s.valor, s.motivo_rechazo, s.guia, s.confirmada_por_cliente, s.creado, s.actualizado,
+  m.nombre AS mensajero_nombre, p.estado AS pedido_estado`;
+const DESDE_CLIENTE = `FROM solicitudes s LEFT JOIN pedidos p ON p.guia = s.guia LEFT JOIN mensajeros m ON m.id = s.mensajero_id`;
 
 /** Las solicitudes de un cliente, para su portal ("Mis solicitudes"). Solo las ligadas a su ficha (cliente_id lo pone
     el servidor desde la sesión).
@@ -225,7 +225,7 @@ export async function bloquearDeCliente(id, clienteId, db) {
 }
 
 // Columnas que se pueden cambiar. La lista la fija el código, no la petición.
-const CAMPOS = ["estado", "valor", "motivoRechazo", "clienteId", "mensajeroId", "guia", "revisadoPor"];
+const CAMPOS = ["estado", "valor", "motivoRechazo", "clienteId", "mensajeroId", "guia", "revisadoPor", "confirmadaPorCliente"];
 
 export async function actualizar(id, datos, db = { query }) {
   const set = armarSet(datos, CAMPOS, 2);

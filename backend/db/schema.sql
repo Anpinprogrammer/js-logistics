@@ -335,12 +335,15 @@ CREATE TABLE IF NOT EXISTS solicitudes (
   mensajero_id          TEXT REFERENCES mensajeros(id) ON DELETE SET NULL,
   guia                  TEXT REFERENCES pedidos(guia) ON DELETE SET NULL,
   revisado_por          TEXT REFERENCES usuarios(id) ON DELETE SET NULL,
+  -- true solo cuando el cliente aceptó la propuesta desde su portal (no cuando la oficina confirmó por WhatsApp).
+  confirmada_por_cliente BOOLEAN NOT NULL DEFAULT false,
   creado                TIMESTAMPTZ NOT NULL DEFAULT now(),
   actualizado           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 -- De dónde llegó: 'publico' (formulario de la landing, sin sesión) o 'portal' (un cliente con cuenta, desde su portal;
 -- en ese caso cliente_id es su ficha desde el principio).
 ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT 'publico' CHECK (origen IN ('publico', 'portal'));
+ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS confirmada_por_cliente BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS solicitudes_estado_idx ON solicitudes (estado, creado DESC);
 CREATE INDEX IF NOT EXISTS solicitudes_creado_idx ON solicitudes (creado DESC);
 CREATE INDEX IF NOT EXISTS solicitudes_origen_creado_idx ON solicitudes (origen, creado DESC);

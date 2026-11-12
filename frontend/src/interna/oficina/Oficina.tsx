@@ -1,4 +1,5 @@
 /* Modo administración (pintarAdmin del prototipo): cada pestaña de la oficina. */
+import { DashboardSkeleton } from "../../components/skeletons/DashboardSkeleton";
 import { Suspense } from "react";
 import { DEMO } from "../demo";
 import { E } from "../estado";
@@ -12,7 +13,7 @@ export default function Oficina({ pintar }: { pintar: () => void }) {
   const t = E.tabA;
   return <>
     <AvisoDemo />
-    <Suspense fallback={<div className="vacio" role="status">Cargando…</div>}>
+    <Suspense fallback={t === "inicio" ? <DashboardSkeleton /> : <div className="vacio" role="status">Cargando…</div>}>
       {t === "pedidos" ? <Pedidos pintar={pintar} /> : t === "clientes" ? <Clientes pintar={pintar} /> : t === "caja" ? <Caja pintar={pintar} />
         : t === "cuentas" ? <Cuentas pintar={pintar} /> : t === "sueldos" ? <Sueldos pintar={pintar} /> : t === "solicitudes" ? <Solicitudes pintar={pintar} /> : t === "mas" ? <Mas pintar={pintar} /> : <Panel pintar={pintar} />}
     </Suspense>

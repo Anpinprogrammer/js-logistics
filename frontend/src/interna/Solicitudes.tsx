@@ -134,7 +134,8 @@ export function TarjetaSolicitud({ s, enDetalle = false, alCompletar }: { s: Sol
       const nueva = DEMO ? cambiarDemo(s.id, { estado: tarifa && monto === tarifa ? "confirmada" : "cotizada", valor: monto }) : await api.solicitudes.aceptar(s.id, monto);
       await qc.invalidateQueries({ queryKey: ["solicitudes"] });
       v.avisar(nueva.estado === "confirmada" ? "Solicitud aceptada con su domicilio de siempre. Asígnala a un mensajero." : "Solicitud aceptada. Envía el valor al cliente por WhatsApp.");
-      alCompletar?.();
+      // Si quedó confirmada, el aviso cambia a la tarjeta de asignación; si quedó cotizada, se cierra y espera al cliente.
+      if (nueva.estado !== "confirmada") alCompletar?.();
     } catch (e) { setError(mensajeDe(e)); }
     finally { setOcupado(false); }
   };
@@ -226,50 +227,87 @@ export function TarjetaSolicitud({ s, enDetalle = false, alCompletar }: { s: Sol
   );
 }
 
-/** Aviso automático de solicitud nueva: uno a la vez, con cola si llegan varias. */
-export function AvisoSolicitud({ solicitudes }: { solicitudes?: Solicitud[] }) {
-  const [actual, setActual] = useState<Solicitud | null>(null);
-  const actualRef = useRef<Solicitud | null>(null);
-  const conocidos = useRef<Set<string> | null>(null);
-  const cola = useRef<Solicitud[]>([]);
+type AvisoOficina = { tipo: "nueva" | "confirmada"; s: Solicitud; clave: string };
 
-  const mostrar = (s: Solicitud) => {
+const estadoDeAviso = (tipo: AvisoOficina["tipo"]) => tipo === "nueva" ? "pendiente" : "confirmada";
+const claveDeAviso = (tipo: AvisoOficina["tipo"], s: Solicitud) => `${tipo}:${s.id}:${s.actualizado}`;
+const fechaDeAviso = (s: Solicitud) => new Date(s.actualizado).getTime() || new Date(s.creado).getTime() || 0;
+
+/** Aviso automático de la oficina: solicitud nueva o el cliente aceptó la propuesta desde su portal.
+   Se muestran de a uno; el siguiente espera a que el anterior se cierre o se agoten los 10 s. */
+export function AvisoSolicitud({ solicitudes }: { solicitudes?: Solicitud[] }) {
+  const [actual, setActual] = useState<AvisoOficina | null>(null);
+  const actualRef = useRef<AvisoOficina | null>(null);
+  const previos = useRef<Map<string, string> | null>(null);
+  const cola = useRef<AvisoOficina[]>([]);
+
+  const mostrar = (a: AvisoOficina) => {
     if (actualRef.current) {
-      if (actualRef.current.id !== s.id && !cola.current.some(x => x.id === s.id)) cola.current.push(s);
+      if (actualRef.current.s.id === a.s.id) { actualRef.current = a; setActual(a); return; }
+      const i = cola.current.findIndex(x => x.s.id === a.s.id);
+      if (i >= 0) cola.current[i] = a;
+      else cola.current.push(a);
       return;
     }
-    actualRef.current = s;
-    setActual(s);
+    actualRef.current = a;
+    setActual(a);
   };
-
   const cerrar = () => {
     const siguiente = cola.current.shift() ?? null;
     actualRef.current = siguiente;
     setActual(siguiente);
   };
+  // Cierra solo si ese aviso sigue en pantalla: el refresco y la acción del modal pueden coincidir.
+  const cerrarDe = (id: string) => { if (actualRef.current?.s.id === id) cerrar(); };
 
   useEffect(() => {
     if (!solicitudes) return;
-    const ids = new Set(solicitudes.map(s => s.id));
-    if (conocidos.current === null) { conocidos.current = ids; return; } // La primera carga no avisa de lo que ya existía.
-    const nuevas = solicitudes.filter(s => s.estado === "pendiente" && !conocidos.current!.has(s.id));
-    conocidos.current = ids;
-    nuevas.forEach(mostrar);
-    const id = actualRef.current?.id;
-    if (!id) return;
-    const actualizada = solicitudes.find(s => s.id === id);
-    if (actualizada?.estado === "pendiente") {
-      if (actualizada !== actualRef.current) { actualRef.current = actualizada; setActual(actualizada); }
-    } else {
-      cerrar(); // Otro usuario la movió de estado o la sacó de abiertas.
+    const mapa = new Map(solicitudes.map(s => [s.id, s]));
+    const versiones = new Map(solicitudes.map(s => [s.id, `${s.estado}:${s.actualizado}`]));
+    if (previos.current === null) { previos.current = versiones; return; } // La primera carga no avisa de lo que ya existía.
+
+    const eventos: AvisoOficina[] = [];
+    for (const s of solicitudes) {
+      const antes = previos.current.get(s.id);
+      if (antes === undefined) {
+        // Una solicitud nueva mientras la oficina está conectada.
+        if (s.estado === "pendiente") eventos.push({ tipo: "nueva", s, clave: claveDeAviso("nueva", s) });
+        continue;
+      }
+      const estadoAntes = antes.split(":")[0];
+      // Quedó confirmada (el cliente aceptó en el portal o la oficina la aprobó): ventana para asignar mensajero.
+      if (s.estado === "confirmada" && (estadoAntes === "pendiente" || estadoAntes === "cotizada")) {
+        eventos.push({ tipo: "confirmada", s, clave: claveDeAviso("confirmada", s) });
+      }
+    }
+    previos.current = versiones;
+    eventos.sort((a, b) => fechaDeAviso(a.s) - fechaDeAviso(b.s));
+    eventos.forEach(mostrar);
+
+    cola.current = cola.current.filter(a => {
+      const cur = mapa.get(a.s.id);
+      return !!cur && cur.estado === estadoDeAviso(a.tipo);
+    });
+
+    const enPantalla = actualRef.current;
+    if (!enPantalla) return;
+    const ahora = mapa.get(enPantalla.s.id);
+    const vigente = !!ahora && ahora.estado === estadoDeAviso(enPantalla.tipo);
+    if (!vigente) { cerrar(); return; }
+    if (ahora.actualizado !== enPantalla.s.actualizado) {
+      const actualizado: AvisoOficina = { ...enPantalla, s: ahora, clave: claveDeAviso(enPantalla.tipo, ahora) };
+      actualRef.current = actualizado;
+      setActual(actualizado);
     }
   }, [solicitudes]);
 
   if (!actual) return null;
-  return <ModalSolicitud key={actual.id} s={actual} alCerrar={cerrar} />;
+  return <ModalSolicitud key={actual.clave} aviso={actual} alCerrar={() => cerrarDe(actual.s.id)} />;
 }
 
-function ModalSolicitud({ s, alCerrar }: { s: Solicitud; alCerrar: () => void }) {
+function ModalSolicitud({ aviso, alCerrar }: { aviso: AvisoOficina; alCerrar: () => void }) {
+  const { s } = aviso;
+  const esCliente = !!s.confirmadaPorCliente;
   const [restante, setRestante] = useState(100);
   const [detenido, setDetenido] = useState(false);
   const alCerrarRef = useRef(alCerrar);
@@ -297,6 +335,7 @@ function ModalSolicitud({ s, alCerrar }: { s: Solicitud; alCerrar: () => void })
   const detener = () => setDetenido(true);
   const segundos = Math.max(0, Math.ceil((restante / 100) * 10));
   const transcurrido = Math.round(10 - (restante / 100) * 10);
+  const valor = s.valor != null ? pesos(s.valor) : "el domicilio propuesto";
 
   const destino = document.querySelector(".jsl") ?? document.body;
   return createPortal(
@@ -314,9 +353,15 @@ function ModalSolicitud({ s, alCerrar }: { s: Solicitud; alCerrar: () => void })
       >
         <button type="button" className="modal-cerrar" aria-label="Cerrar aviso de solicitud" onClick={alCerrar}>×</button>
         <header className="aviso-solicitud-cab">
-          <span className="aviso-solicitud-eyebrow">Solicitud nueva</span>
-          <h2 id={`aviso-solicitud-${s.id}`}>Llegó una solicitud de envío</h2>
-          <p className="modal-sub">Revisa los datos y acepta o rechaza. También puedes verla después en la campana o en Solicitudes.</p>
+          <span className="aviso-solicitud-eyebrow">{aviso.tipo === "nueva" ? "Solicitud nueva" : esCliente ? "El cliente aceptó" : "Solicitud confirmada"}</span>
+          <h2 id={`aviso-solicitud-${s.id}`}>{aviso.tipo === "nueva" ? "Llegó una solicitud de envío" : esCliente ? "El cliente aceptó la propuesta" : "Solicitud lista para asignar"}</h2>
+          <p className="modal-sub">
+            {aviso.tipo === "nueva"
+              ? "Revisa los datos y acepta o rechaza. También puedes verla después en la campana o en Solicitudes."
+              : esCliente
+                ? `Aceptó ${valor} desde el portal. Asigna el mensajero para dejar el pedido listo; si no, sigue en Solicitudes.`
+                : `Quedó confirmada con ${valor}. Asigna el mensajero para dejar el pedido listo para recoger.`}
+          </p>
         </header>
         <div className="aviso-solicitud-cuerpo"><TarjetaSolicitud s={s} alCompletar={alCerrar} /></div>
         <div className={`aviso-solicitud-progreso${detenido ? " detenido" : ""}`}>

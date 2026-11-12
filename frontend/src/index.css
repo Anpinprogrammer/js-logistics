@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Colores de la marca, los mismos de la app actual (app/css/estilos.css), con modo oscuro automático. */
 @theme {
   --font-sans: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

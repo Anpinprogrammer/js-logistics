@@ -42,7 +42,7 @@ export async function crear(req, res) {
     throw new HttpError(503, "SOLICITUDES_SATURADAS", "Tenemos muchas solicitudes por revisar. Escríbenos por WhatsApp y te atendemos.");
   }
   await Solicitud.crear(d);
-  eventos.emitir(["solicitudes"]);
+  eventos.emitir(["solicitudes"], { solicitudClienteId: null });
   recibida();
 }
 
@@ -69,7 +69,7 @@ export async function crearDesdePortal(req, res) {
   }
   const s = await Solicitud.crear(d);
   await Auditoria.registrar({ uid: req.usuario.id, accion: `Pidió un envío desde su portal (${d.direccionRecogida} → ${d.direccionEntrega})`, tabla: "solicitudes", registro: s.id });
-  eventos.emitir(["solicitudes"]);
+  eventos.emitir(["solicitudes"], { solicitudClienteId: clienteId });
   res.status(201).json({ solicitud: { recibida: true } });
 }
 
@@ -90,6 +90,7 @@ export async function responderMia(req, res) {
   const s = await transaccion(async db => {
     const antes = await Solicitud.bloquearDeCliente(id, clienteId, db);
     if (!antes) throw noEncontrado("La solicitud no existe");
+    if (antes.origen !== "portal") throw conflicto("Esta solicitud se está atendiendo por WhatsApp, no desde el portal.", "SOLICITUD_PUBLICA");
     if (antes.estado !== "cotizada") {
       throw conflicto(antes.estado === "pendiente"
         ? "La oficina todavía no te ha propuesto el valor del domicilio."
@@ -97,7 +98,9 @@ export async function responderMia(req, res) {
     }
     const razon = aceptar ? "" : (limpio(motivo || "") || MOTIVO_CLIENTE);
     if (!aceptar && razon.length > 300) throw invalido("La razón no puede pasar de 300 letras");
-    await Solicitud.actualizar(id, aceptar ? { estado: "confirmada" } : { estado: "rechazada", motivoRechazo: razon }, db);
+    await Solicitud.actualizar(id, aceptar
+      ? { estado: "confirmada", confirmadaPorCliente: true }
+      : { estado: "rechazada", motivoRechazo: razon, confirmadaPorCliente: false }, db);
     await Auditoria.registrar({
       uid: req.usuario.id,
       accion: aceptar
@@ -107,7 +110,7 @@ export async function responderMia(req, res) {
     }, db);
     return Solicitud.buscarDeCliente(id, clienteId, db);
   });
-  eventos.emitir(["solicitudes"]);
+  eventos.emitir(["solicitudes"], { solicitudClienteId: clienteId });
   res.json({ solicitud: s });
 }
 
@@ -146,19 +149,19 @@ const yaEsta = s => `Esta solicitud ya está ${ESTADO_TXT[s.estado]}. Actualiza 
 
 /** Aceptar: la oficina pone el valor del domicilio. Se puede cambiar el valor mientras no esté asignada.
     Si la pidió un cliente desde su portal y el valor es el domicilio que ya tiene asignado, no hay nada que consultarle:
-    queda confirmada y lista para asignar. Si la oficina propone otro valor, se le pregunta por WhatsApp como siempre. */
+    queda confirmada y lista para asignar. Si la oficina propone otro valor, el cliente lo responde por WhatsApp o desde su portal. */
 export async function aceptar(req, res) {
   const { id } = req.valido.params, { valor } = req.valido.body;
   const s = await transaccion(async db => {
     const antes = await bloquearEn(db, id, ABIERTAS, yaEsta);
     const suTarifa = antes.origen === "portal" && antes.clienteId && antes.clienteTarifa > 0 && valor === antes.clienteTarifa;
-    const s = await Solicitud.actualizar(id, { estado: suTarifa ? "confirmada" : "cotizada", valor, revisadoPor: req.usuario.id }, db);
+    const s = await Solicitud.actualizar(id, { estado: suTarifa ? "confirmada" : "cotizada", valor, revisadoPor: req.usuario.id, confirmadaPorCliente: false }, db);
     await Auditoria.registrar({ uid: req.usuario.id, accion: suTarifa
       ? `Aceptó la solicitud de ${antes.nombre} con su domicilio de siempre (${valor})`
       : `Aceptó la solicitud de ${antes.nombre} con domicilio de ${valor}`, tabla: "solicitudes", registro: id }, db);
     return s;
   });
-  eventos.emitir(["solicitudes"]);
+  eventos.emitir(["solicitudes"], { solicitudClienteId: s.clienteId ?? null });
   res.json({ solicitud: s });
 }
 
@@ -167,11 +170,11 @@ export async function confirmar(req, res) {
   const { id } = req.valido.params;
   const s = await transaccion(async db => {
     const antes = await bloquearEn(db, id, ["cotizada"], s => s.estado === "pendiente" ? "Primero acepta la solicitud y ponle el valor del domicilio." : yaEsta(s));
-    const s = await Solicitud.actualizar(id, { estado: "confirmada" }, db);
+    const s = await Solicitud.actualizar(id, { estado: "confirmada", confirmadaPorCliente: false }, db);
     await Auditoria.registrar({ uid: req.usuario.id, accion: `Marcó como confirmada por el cliente la solicitud de ${antes.nombre}`, tabla: "solicitudes", registro: id }, db);
     return s;
   });
-  eventos.emitir(["solicitudes"]);
+  eventos.emitir(["solicitudes"], { solicitudClienteId: s.clienteId ?? null });
   res.json({ solicitud: s });
 }
 
@@ -183,7 +186,7 @@ export async function rechazar(req, res) {
     await Auditoria.registrar({ uid: req.usuario.id, accion: `Rechazó la solicitud de ${antes.nombre}`, tabla: "solicitudes", registro: id }, db);
     return s;
   });
-  eventos.emitir(["solicitudes"]);
+  eventos.emitir(["solicitudes"], { solicitudClienteId: s.clienteId ?? null });
   res.json({ solicitud: s });
 }
 
@@ -213,6 +216,6 @@ export async function asignar(req, res) {
     await Auditoria.registrar({ uid: req.usuario.id, accion: `Asignó la solicitud de ${s.nombre} a ${m.nombre} (guía ${pedido.guia})`, tabla: "solicitudes", registro: id }, db);
     return { solicitud, pedido };
   });
-  eventos.emitir(["solicitudes", "pedidos", "clientes"]);
+  eventos.emitir(["solicitudes", "pedidos", "clientes"], { solicitudClienteId: solicitud.clienteId ?? null });
   res.json({ solicitud, pedido });
 }

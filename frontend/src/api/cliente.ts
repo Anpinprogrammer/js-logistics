@@ -12,8 +12,10 @@ function direccionApi(valor?: string): string {
   return v.endsWith("/api") ? v : `${v}/api`;
 }
 
+export const BASE = direccionApi(import.meta.env.VITE_API_URL);
+
 export const api = axios.create({
-  baseURL: direccionApi(import.meta.env.VITE_API_URL),
+  baseURL: BASE,
   withCredentials: true,
   timeout: 20_000,
   headers: { "X-JSL": "1" } // protección CSRF que exige el backend en todo lo que no sea GET
