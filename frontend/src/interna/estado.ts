@@ -28,7 +28,7 @@ export const E = {
   // Oficina → Clientes
   filtroCli: "todos", buscarCli: "", diaCliF: "", paginaCli: 1,
   // Oficina → Caja y Sueldos
-  tabCaja: (tabCajaGuardada === "mensajeros" || tabCajaGuardada === "liquidaciones" || tabCajaGuardada === "arqueos" ? tabCajaGuardada : "caja") as "caja" | "mensajeros" | "liquidaciones" | "arqueos",
+  tabCaja: (tabCajaGuardada === "mensajeros" || tabCajaGuardada === "patinadores" || tabCajaGuardada === "liquidaciones" || tabCajaGuardada === "arqueos" ? tabCajaGuardada : "caja") as "caja" | "mensajeros" | "patinadores" | "liquidaciones" | "arqueos",
   diaCaja: hoy(), diaLibro: hoy(), semA: semanaDe(hoy()), paginaLiq: 1, diaLiq: "", estadoLiq: "todos" as "todos" | "cobrar" | "favor" | "paz", buscarLiq: "",
   // Oficina → Cuentas
   tabCuentas: (tabCuentasGuardada === "movimientos" || tabCuentasGuardada === "ganancias" ? tabCuentasGuardada : "cuentas") as "cuentas" | "movimientos" | "ganancias",

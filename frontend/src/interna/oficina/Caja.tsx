@@ -49,17 +49,34 @@ export default function Caja({ pintar }: { pintar: () => void }) {
   // los mensajeros siempre, para poder darles base al empezar el día
   const ids = !verMens ? [] : listaOrdenada(S.mensajeros, "nombre").filter(esRepartidor).map(m => m.id).filter(id => { const pm = pms[id]; return tipoDe(S.mensajeros[id]) === "mensajero" || pm.ps.length || pm.recs.length || pm.debe || pendM[id]; });
   const tot = { debe: 0, ef: 0, tj: 0, tc: 0 }; ids.forEach(id => { const pm = pms[id], tt = totales(pm.ps); tot.debe += pm.debe; tot.ef += tt.efectivo; tot.tj += tt.transfJs; tot.tc += tt.transfCli; });
-  const recsDia = !verMens ? [] : Object.values(S.recaudos).filter(r => diaDe(r.fecha) === E.diaCaja).sort((a, b) => a.fecha - b.fecha);
-  const cajaDia = recsDia.reduce((a, r) => a + (Number(r.valor) || 0), 0);
-  const porMedio: Record<string, number> = {}; recsDia.forEach(r => (porMedio[r.medio] = (porMedio[r.medio] || 0) + (Number(r.valor) || 0)));
+  // El dinero recibido del día se reparte: mensajeros en su sub-pestaña y patinadores en la suya (son las mismas entregas de dinero).
+  const verPat = E.tabCaja === "patinadores";
+  const recsTodos = !verMens && !verPat ? [] : Object.values(S.recaudos).filter(r => diaDe(r.fecha) === E.diaCaja).sort((a, b) => a.fecha - b.fecha);
+  const esDePatinador = (r: { mensajeroId: string }) => tipoDe(S.mensajeros[r.mensajeroId]) === "patinador";
   const base = (id: string) => (yo.esAdmin ? v.abrir(<MovCaja tipo="sale" pre={{ cat: "base", personaId: id }} />, "centrada") : v.abrir(<BaseDesdeOficina mid={id} />, "centrada"));
   const quitarRec = async (id: string) => {
     const r = S.recaudos[id]; if (!r) return; if (yaContado(r.fecha)) return avisoContado(v);
     if (!await v.confirmar("Quitar dinero recibido", `${S.mensajeros[r.mensajeroId]?.nombre || ""} · ${pesos(r.valor)} · ${hora(r.fecha)}. Se quita de la caja y vuelve a sumarse a lo que debe.`, "Quitar")) return;
     try { await borrarDe("recaudos", id); v.avisar("Entrega de dinero quitada"); } catch (e) { noSePudo(v, "No se pudo quitar")(e); }
   };
+  /** Tabla de "Dinero recibido" del día elegido para un grupo (mensajeros o patinadores): son las mismas entregas de dinero, repartidas por tipo. */
+  const dineroRecibido = (lista: typeof recsTodos, grupo: "mensajeros" | "patinadores", quien: "Mensajero" | "Patinador") => {
+    const total = lista.reduce((a, r) => a + (Number(r.valor) || 0), 0);
+    const porMedio: Record<string, number> = {}; lista.forEach(r => (porMedio[r.medio] = (porMedio[r.medio] || 0) + (Number(r.valor) || 0)));
+    return <>
+      <h2>Dinero recibido de {grupo}</h2>
+      <div className="campo" style={{ maxWidth: 220 }}><label htmlFor={"diaC-" + grupo}>Día</label><SelectorFecha id={"diaC-" + grupo} valor={E.diaCaja} alCambiar={d => { E.diaCaja = d || hoy(); pintar(); }} etiqueta="Día" maximo={hoy()} obligatorio /></div>
+      <div className="cifras" style={{ marginBottom: 12 }}><div className="cifra fuerte"><span>Dinero recibido</span><b>{pesos(total)}</b><span>{Object.entries(porMedio).map(([m, x]) => `${MEDIOS[m as Medio] || m}: ${pesos(x)}`).join(" · ") || "Sin entregas de dinero este día"}</span></div></div>
+      {lista.length ? <div className="tabla-env"><table><thead><tr><th>Hora</th><th>{quien}</th><th>Medio</th><th>Nota</th><th className="n">Valor</th>{yo.esAdmin ? <th></th> : <th>Recibió</th>}</tr></thead><tbody>
+        {lista.map(r => <tr key={r.id}><td>{hora(r.fecha)}</td><td>{S.mensajeros[r.mensajeroId]?.nombre || ""}</td><td>{MEDIOS[r.medio] || ""}{medioAntes(r)}</td><td>{r.nota || ""}</td><td className="n"><b>{pesos(r.valor)}</b></td>
+          {yo.esAdmin ? <td style={{ whiteSpace: "nowrap" }}><button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<EditarRecaudo id={r.id} />, "centrada"))}>Editar</button> <button className="btn peligro chico" onClick={() => quitarRec(r.id)}>Quitar</button></td>
+            : <td>{r.porNombre || ""}{puedoCambiarMedio(r) ? <> <button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<CambiarMedio col="recaudos" id={r.id} />, "centrada"))}>Cambiar medio</button></> : null}</td>}</tr>)}
+      </tbody></table></div> : <div className="vacio">Toca “Recibir dinero” en un {quien.toLowerCase()} cada vez que te entregue plata.</div>}
+      {!yo.esAdmin && lista.length ? <p className="sub" style={{ marginTop: 8 }}>Si algo quedó mal registrado, avísale al administrador para que lo corrija.</p> : null}
+    </>;
+  };
   // El asistente solo ve lo de los mensajeros y registra lo que le entregan; la caja de la empresa, los sueldos y las liquidaciones son de administración
-  const tabs = [["caja", "Caja"], ["mensajeros", "Mensajeros"], ["liquidaciones", "Liquidaciones recientes"], ["arqueos", "Arqueos"]] as const;
+  const tabs = [["caja", "Caja"], ["mensajeros", "Mensajeros"], ["patinadores", "Patinadores"], ["liquidaciones", "Liquidaciones recientes"], ["arqueos", "Arqueos"]] as const;
   const barraTabs = useRef<HTMLDivElement>(null);
   // En el celular la barra se desplaza: deja siempre visible la pestaña activa.
   useEffect(() => {
@@ -143,16 +160,14 @@ export default function Caja({ pintar }: { pintar: () => void }) {
         </dl>
         <div className="liq"><span className={"liq-est " + (pm.ul && pm.ul.debe > 0 ? "neg" : "")}>{pm.ul ? "Última: " + textoLiq(pm.ul.debe) : "Sin liquidaciones"}</span>{yo.esAdmin && <button className="btn chico" onClick={() => v.abrir(<Liquidar mid={id} />, "centrada")}>Liquidar</button>}</div>
       </div>; })}</div> : <div className="vacio">No hay mensajeros con movimiento pendiente.</div>}
+      {dineroRecibido(recsTodos.filter(r => !esDePatinador(r)), "mensajeros", "Mensajero")}
+</>}
+    </div>
+
+    <div role="tabpanel" id="panelCaja-patinadores" aria-labelledby="tabCaja-patinadores" hidden={E.tabCaja !== "patinadores"}>
+      {verPat && <>
       <BloquePatinadores />
-      <h2>Dinero recibido de mensajeros</h2>
-      <div className="campo" style={{ maxWidth: 220 }}><label>Día</label><SelectorFecha id="diaC" valor={E.diaCaja} alCambiar={d => { E.diaCaja = d || hoy(); pintar(); }} etiqueta="Día" maximo={hoy()} obligatorio /></div>
-      <div className="cifras" style={{ marginBottom: 12 }}><div className="cifra fuerte"><span>Dinero recibido</span><b>{pesos(cajaDia)}</b><span>{Object.entries(porMedio).map(([m, x]) => `${MEDIOS[m as Medio] || m}: ${pesos(x)}`).join(" · ") || "Sin entregas de dinero este día"}</span></div></div>
-      {recsDia.length ? <div className="tabla-env"><table><thead><tr><th>Hora</th><th>Mensajero</th><th>Medio</th><th>Nota</th><th className="n">Valor</th>{yo.esAdmin ? <th></th> : <th>Recibió</th>}</tr></thead><tbody>
-        {recsDia.map(r => <tr key={r.id}><td>{hora(r.fecha)}</td><td>{S.mensajeros[r.mensajeroId]?.nombre || ""}</td><td>{MEDIOS[r.medio] || ""}{medioAntes(r)}</td><td>{r.nota || ""}</td><td className="n"><b>{pesos(r.valor)}</b></td>
-          {yo.esAdmin ? <td style={{ whiteSpace: "nowrap" }}><button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<EditarRecaudo id={r.id} />, "centrada"))}>Editar</button> <button className="btn peligro chico" onClick={() => quitarRec(r.id)}>Quitar</button></td>
-            : <td>{r.porNombre || ""}{puedoCambiarMedio(r) ? <> <button className="btn sec chico" onClick={() => (yaContado(r.fecha) ? avisoContado(v) : v.abrir(<CambiarMedio col="recaudos" id={r.id} />, "centrada"))}>Cambiar medio</button></> : null}</td>}</tr>)}
-      </tbody></table></div> : <div className="vacio">Toca “Recibir dinero” en un mensajero cada vez que te entregue plata.</div>}
-      {!yo.esAdmin && recsDia.length ? <p className="sub" style={{ marginTop: 8 }}>Si algo quedó mal registrado, avísale al administrador para que lo corrija.</p> : null}
+      {dineroRecibido(recsTodos.filter(esDePatinador), "patinadores", "Patinador")}
       </>}
     </div>
 
@@ -206,14 +221,15 @@ function Paso({ n, titulo, ok, detalle, boton }: { n: number; titulo: string; ok
 }
 
 function CierreDia({ pintar }: { pintar: () => void }) {
-  const v = useVentana(), x = pendientesCierre(), listo = !x.mens.length && !x.ofis.length && !x.sinRem.length && !x.sinServ.length;
+  const v = useVentana(), x = pendientesCierre(), pats = (usePatinadores().data ?? []).filter(p => p.debe > 0).sort((a, b) => b.debe - a.debe);
+  const listo = !x.mens.length && !pats.length && !x.ofis.length && !x.sinRem.length && !x.sinServ.length;
   const aPedidos = (f: "sin" | "serv") => {
     E.tabA = "pedidos"; E.filtroA = f; E.buscarA = ""; E.mensPedA = ""; E.diaPedA = ""; E.paginaA = 1; pintar(); scrollTo(0, 0);
     const ps = Object.values(S.pedidos).filter(f === "sin" ? p => !p.clienteId : sinServicio).sort((a, b) => b.creado - a.creado); if (ps.length) v.abrir(<EnBloque modo={f} lista={ps} />);
   };
   const arquear = async () => {
     const y = pendientesCierre();
-    if ((y.mens.length || y.ofisEf.length) && !await v.confirmar("Hacer arqueo con pendientes", `Todavía ${[y.mens.length ? `hay ${y.mens.length} ${pl(y.mens.length, "mensajero")} con plata` : "", y.ofisEf.length ? `hay ${y.ofisEf.length} ${pl(y.ofisEf.length, "caja")} de oficina con efectivo sin cerrar` : ""].filter(Boolean).join(" y ")}. No cuentes esa plata: la app todavía la tiene a nombre de ellos.`, "Hacer arqueo igual")) return;
+    if ((y.mens.length || pats.length || y.ofisEf.length) && !await v.confirmar("Hacer arqueo con pendientes", `Todavía ${[y.mens.length ? `hay ${y.mens.length} ${pl(y.mens.length, "mensajero")} con plata` : "", pats.length ? `hay ${pats.length} ${pl(pats.length, "patinador", "patinadores")} con plata` : "", y.ofisEf.length ? `hay ${y.ofisEf.length} ${pl(y.ofisEf.length, "caja")} de oficina con efectivo sin cerrar` : ""].filter(Boolean).join(" y ")}. No cuentes esa plata: la app todavía la tiene a nombre de ellos.`, "Hacer arqueo igual")) return;
     v.abrir(<HacerArqueo />, "centrada");
   };
   return <section className="cierre" id="cierreDia" aria-labelledby="cierreTitulo">
@@ -228,24 +244,30 @@ function CierreDia({ pintar }: { pintar: () => void }) {
           <button className="btn chico recibir" onClick={() => v.abrir(<RecibirDinero mid={m.id} />, "centrada")}>Recibir</button>
         </div>)}</div>
         : "Ningún mensajero tiene plata pendiente."} />
-      <Paso n={2} titulo="Cajas de oficina" ok={!x.ofis.length} detalle={x.ofis.length
+      <Paso n={2} titulo="Plata de los patinadores" ok={!pats.length} detalle={pats.length
+        ? <div className="fichas">{pats.map(p => <div className="ficha" key={p.mensajeroId}>
+          <div className="ficha-info"><b>{p.nombre}</b><span className="neg">{pesos(p.debe)}</span></div>
+          <button className="btn chico recibir" onClick={() => v.abrir(<RecibirDinero mid={p.mensajeroId} pat={p} />, "centrada")}>Recibir</button>
+        </div>)}</div>
+        : "Ningún patinador tiene plata pendiente."} />
+      <Paso n={3} titulo="Cajas de oficina" ok={!x.ofis.length} detalle={x.ofis.length
         ? x.ofis.map(({ u, s }, i) => <span key={u.uid}>{i ? " · " : ""}{u.nombre || u.email}: {MEDIOS_K.filter(k => Math.round(s[k])).map(k => MEDIOS[k] + " " + pesos(s[k])).join(", ")} <button className="btn chico recibir" onClick={() => v.abrir(<MovOficina auid={u.uid} tipo="entrega" />, "centrada")}>Recibir cierre</button></span>)
         : "Todas en $ 0."} />
-      <Paso n={3} titulo="Pedidos sin remitente" ok={!x.sinRem.length} detalle={x.sinRem.length ? `${x.sinRem.length} ${pl(x.sinRem.length, "guía")}: el saldo de esos clientes no está completo.` : "Todos tienen remitente."}
+      <Paso n={4} titulo="Pedidos sin remitente" ok={!x.sinRem.length} detalle={x.sinRem.length ? `${x.sinRem.length} ${pl(x.sinRem.length, "guía")}: el saldo de esos clientes no está completo.` : "Todos tienen remitente."}
         boton={x.sinRem.length ? <button className="btn sec chico" onClick={() => aPedidos("sin")}>Asignar</button> : null} />
-      <Paso n={4} titulo="Entregas sin valor de domicilio" ok={!x.sinServ.length} detalle={x.sinServ.length ? `${x.sinServ.length} ${pl(x.sinServ.length, "entrega")}: no se descuenta el domicilio ni suma al sueldo.` : "Todas tienen domicilio."}
+      <Paso n={5} titulo="Entregas sin valor de domicilio" ok={!x.sinServ.length} detalle={x.sinServ.length ? `${x.sinServ.length} ${pl(x.sinServ.length, "entrega")}: no se descuenta el domicilio ni suma al sueldo.` : "Todas tienen domicilio."}
         boton={x.sinServ.length ? <button className="btn sec chico" onClick={() => aPedidos("serv")}>Completar</button> : null} />
-      <Paso n={5} titulo="Gastos, adelantos o pagos sin registrar" ok detalle="Regístralos ahora: después del arqueo ya no se pueden poner con fecha de días anteriores."
+      <Paso n={6} titulo="Gastos, adelantos o pagos sin registrar" ok detalle="Regístralos ahora: después del arqueo ya no se pueden poner con fecha de días anteriores."
         boton={<button className="btn sec chico" id="cdSalida" onClick={() => v.abrir(<MovCaja tipo="sale" />, "centrada")}>Registrar salida</button>} />
-      <Paso n={6} titulo="Arqueo" ok={x.arqueoHoy} detalle={(x.arqueoHoy && x.a ? `Hecho hoy a las ${horaCorta(x.a.fecha)}: ${resultadoArqueo(x.a)}.` : (x.mens.length || x.ofisEf.length ? "Primero recibe la plata de los pasos 1 y 2: si cuentas plata que la app todavía tiene en otra parte, el arqueo sale descuadrado." : "Cuenta efectivo, Nequi, Bancolombia y la Base de JS.") + (x.enRuta.length ? ` Hay ${x.enRuta.length} ${pl(x.enRuta.length, "pedido")} en ruta: esa plata todavía no ha llegado.` : ""))}
-        boton={<button className={"btn " + (x.mens.length || x.ofisEf.length ? "sec" : "ok") + " chico"} id="cdArqueo" onClick={arquear}>Hacer arqueo</button>} />
+      <Paso n={7} titulo="Arqueo" ok={x.arqueoHoy} detalle={(x.arqueoHoy && x.a ? `Hecho hoy a las ${horaCorta(x.a.fecha)}: ${resultadoArqueo(x.a)}.` : (x.mens.length || pats.length || x.ofisEf.length ? "Primero recibe la plata de los pasos 1, 2 y 3: si cuentas plata que la app todavía tiene en otra parte, el arqueo sale descuadrado." : "Cuenta efectivo, Nequi, Bancolombia y la Base de JS.") + (x.enRuta.length ? ` Hay ${x.enRuta.length} ${pl(x.enRuta.length, "pedido")} en ruta: esa plata todavía no ha llegado.` : ""))}
+        boton={<button className={"btn " + (x.mens.length || pats.length || x.ofisEf.length ? "sec" : "ok") + " chico"} id="cdArqueo" onClick={arquear}>Hacer arqueo</button>} />
     </div>
   </section>;
 }
 
 /* ---------- Caja general (solo administración) ---------- */
 function CajaGeneral({ pintar }: { pintar: () => void }) {
-  const v = useVentana(), R = resumenCaja();
+  const v = useVentana(), R = resumenCaja(), enPatinadores = (usePatinadores().data ?? []).reduce((a, p) => a + Math.max(0, p.debe), 0);
   const delDia = R.L.filter(x => diaDe(x.fecha) === E.diaLibro);
   const ent = delDia.filter(x => x.valor > 0).reduce((a, x) => a + x.valor, 0), sal = delDia.filter(x => x.valor < 0).reduce((a, x) => a - x.valor, 0);
   const a0 = arqueosCaja()[0], mes = hoy().slice(0, 7), A = arqueosCaja().filter(a => diaDe(a.fecha).startsWith(mes));
@@ -267,6 +289,7 @@ function CajaGeneral({ pintar }: { pintar: () => void }) {
       <div className="cifra"><span>Sueldos por pagar esta semana</span><b>{pesos(R.sueldosPend)}</b></div>
       <div className="cifra"><span>Disponible de JS</span><b className={R.disponible < 0 ? "neg" : ""}>{pesos(R.disponible)}</b><span>Caja − clientes − sueldos</span></div>
       <div className="cifra"><span>Todavía en manos de mensajeros</span><b>{pesos(R.enMens)}</b></div>
+      <div className="cifra"><span>Todavía en manos de patinadores</span><b>{pesos(enPatinadores)}</b></div>
       <div className="cifra"><span>Cuentas por cobrar a clientes</span><b>{pesos(R.porCobrar)}</b></div>
       <div className="cifra"><span>Último arqueo</span><b>{a0 ? hora(a0.fecha) : "Nunca"}</b><span>{a0 ? resultadoArqueo(a0) : "Cuenta la plata real para comprobar que cuadra"}</span></div>
       {A.length ? <div className="cifra"><span>Faltantes y sobrantes de arqueos</span><b className={falto + sobro < 0 ? "neg" : "pos"}>{falto || sobro ? (falto + sobro < 0 ? "− " : "+ ") + pesos(Math.abs(falto + sobro)) : "$ 0"}</b><span>Este mes · faltó {pesos(-falto)} · sobró {pesos(sobro)} · {A.length} {pl(A.length, "arqueo")}</span></div> : null}
@@ -366,9 +389,14 @@ export function MovCaja({ tipo, pre = {} }: { tipo: "entra" | "sale"; pre?: { ca
 /* ---------- Patinadores: lo que anotan de los clientes y lo que le entregan a la oficina ---------- */
 /** Debajo de los mensajeros: igual que ellos, el patinador va entregando dinero en el día y aquí se registra lo que se recibe (entra a la caja
     como cualquier entrega de dinero). Lo que debe es lo anotado en su caja menos lo ya entregado; no tiene período ni liquidación. */
+/** Lo que recibió, entregó y debe cada patinador. Lo comparten su sub-pestaña y el cierre del día (misma clave: una sola consulta). */
+function usePatinadores() {
+  const { version } = useDatos();
+  return useQuery({ queryKey: ["patinador", "resumen", version], queryFn: () => (DEMO ? Promise.resolve(resumenPatinadoresDemo()) : apiPatinador.resumen()), placeholderData: keepPreviousData });
+}
+
 function BloquePatinadores() {
-  const v = useVentana(), { version } = useDatos();
-  const q = useQuery({ queryKey: ["patinador", "resumen", version], queryFn: () => (DEMO ? Promise.resolve(resumenPatinadoresDemo()) : apiPatinador.resumen()), placeholderData: keepPreviousData });
+  const v = useVentana(), q = usePatinadores();
   const lista = q.data ?? [];
   const pendiente = lista.reduce((a, p) => a + Math.max(0, p.debe), 0);
   return <>

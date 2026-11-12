@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Sub-pestaña Patinadores y cierre del día — 2026-11-12
+
+- Caja tiene una sub-pestaña propia **Patinadores** (entre Mensajeros y Liquidaciones recientes; `E.tabCaja = "patinadores"`, también en `navegacion.ts` y `js_caja`): tarjetas por patinador con "Recibir dinero" y la tabla "Dinero recibido de patinadores" del día. La tabla de Mensajeros ya no lista las entregas de los patinadores: son las mismas entregas (`recaudos`), repartidas por tipo de ficha (función `dineroRecibido` de `Caja.tsx`).
+- El **Cierre del día** (sub-pestaña Caja) tiene un paso nuevo, **2 · Plata de los patinadores**, igual al de los mensajeros (ficha con lo que debe y botón Recibir); los pasos siguientes se renumeraron (3 Cajas de oficina … 7 Arqueo). El aviso "Hacer arqueo con pendientes" y el estado "Listo para el arqueo" también cuentan a los patinadores con plata. Caja general muestra "Todavía en manos de patinadores".
+- Los pendientes de patinadores salen de `GET /patinador/resumen` (`usePatinadores()`, una sola consulta compartida), no de `motor.ts`: la caja del patinador aún no está en `S`. Sin cambios de backend ni de esquema.
+
 ## Caja de oficina: bloque Patinadores — 2026-11-12
 
 - En Caja → Mensajeros, debajo de las tarjetas de mensajeros, hay un bloque **Patinadores** con la misma lógica: el patinador va entregando dinero en el día y la oficina (admin o asistente) toca "Recibir dinero". Se guarda como un `recaudo` normal (mismo `POST /recaudos`), así entra a la caja de la empresa, al libro y a las cajas de oficina como el de un mensajero, y se edita o quita en la tabla "Dinero recibido de mensajeros".
