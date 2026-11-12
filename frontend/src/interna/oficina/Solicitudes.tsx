@@ -32,7 +32,7 @@ export default function Solicitudes({ pintar }: { pintar: () => void }) {
   const irA = (n: number) => { E.paginaSol = n; pintar(); arriba.current?.scrollIntoView({ block: "start", behavior: "smooth" }); };
   const detalle = (s: Solicitud) => ventana.abrir(<DetalleSolicitud s={s} cerrar={ventana.cerrar} />, "solicitud");
   return <>
-    <header className="cab-pedidos">
+    <header className="cab-pedidos cab-solicitudes">
       <div className="cab-pedidos-txt"><h1>Solicitudes</h1><p className="sub">Pedidos de recogida de la página web y del portal de clientes.</p></div>
     </header>
     <div className="seg-solicitudes-marco">

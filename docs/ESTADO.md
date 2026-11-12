@@ -15,6 +15,7 @@ Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/EST
 
 ## Filtros de Solicitudes de oficina — 2026-11-11
 
+- Se elevó la escala de Solicitudes: encabezado 24/30 px, nombre y valor de filas 14/16 px, metadatos 12/14 px, badges y contadores desde 12 px; el detalle usa pares clave-valor de 12/14 px. Entre 768 y 1150 px las acciones bajan a una segunda fila para evitar que las columnas compriman el texto.
 - La tira de estados en móvil tiene píldoras más compactas, un degradado al borde derecho con el color real del tema y centra suavemente la opción tocada. La página reserva espacio inferior para la navegación fija; conteos y filtro activo siguen usando el mismo estado.
 
 ## Cabecera móvil de la app interna — 2026-11-11
