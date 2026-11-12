@@ -36,7 +36,12 @@ export const listar = z.object({
 });
 
 export const aceptar = z.object({ valor: pesos.refine(v => v > 0, "Escribe el valor del domicilio") });
-export const rechazar = z.object({ motivo: texto(300).default("") });
+// La razón es obligatoria: el cliente la ve en "Mis solicitudes" de su portal.
+export const rechazar = z.object({ motivo: texto(300).min(3, "Escribe la razón del rechazo: el cliente la va a ver") });
+export const mias = z.object({
+  pagina: z.coerce.number().int().min(1).max(100_000).default(1),
+  porPagina: z.coerce.number().int().min(1).max(50).default(10)
+});
 export const asignar = z.object({
   mensajeroId: id,
   // Remitente: un cliente que ya existe o, sin clienteId, uno nuevo con los datos de la solicitud.

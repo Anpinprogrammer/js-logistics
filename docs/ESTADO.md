@@ -1,8 +1,17 @@
 # Estado del proyecto y memoria para agentes de IA
 
-Este archivo es la **memoria compartida** entre sesiones y agentes. Léelo después de `CLAUDE.md` y antes de tocar nada. Si cambias algo que otro agente necesitaría saber (una decisión, una trampa, algo pendiente), **actualiza este archivo en el mismo PR**. Última revisión: 2026-11-10.
+Este archivo es la **memoria compartida** entre sesiones y agentes. Léelo después de `CLAUDE.md` y antes de tocar nada. Si cambias algo que otro agente necesitaría saber (una decisión, una trampa, algo pendiente), **actualiza este archivo en el mismo PR**. Última revisión: 2026-11-12.
 
 Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/ESTADO.md`.
+
+## Estado "aceptado" y recogida con foto — 2026-11-12
+
+- Estados del pedido: `aceptado` (por recoger) → `pendiente` (en ruta; en pantalla "En ruta" / "Por entregar") → `entregado` o `devuelto`. **No se renombró `pendiente`**: lo usan `calculos.js` (copia de `app/js/app.js`), la importación de Firestore y todas las cuentas; solo se agregó `aceptado` antes.
+- Solo nacen `aceptado` las guías creadas al asignar una solicitud (`POST /solicitudes/:id/asignar`). Las que crea el mensajero (o la oficina) con la foto siguen naciendo en ruta, porque la foto ya está.
+- `POST /pedidos/:guia/recogida` (su mensajero u oficina): exige la foto `salida` ya subida (con el bucket configurado), pasa a `pendiente` y **cambia `creado` a la hora de la recogida** (`creado` es la salida: así el día del sueldo, "salió hoy" y "más de un día en ruta" cuentan desde que de verdad salió). Entregar o devolver una `aceptado` da 409 `POR_RECOGER`.
+- `db:migrar` cambia los `CHECK` de `pedidos` y, **una sola vez** (marca `migracion_aceptado` en `ajustes`), pasa a `aceptado` las guías de solicitudes que seguían por entregar sin foto de salida ni intentos.
+- Mensajero: la pestaña "Por entregar" ahora es **Pedidos** con sub-pestañas Todos / Por entregar / Por recoger (`E.subPedM`, guardada en `js_pedidos_m`). "Recoger" abre `mensajero/Recoger.tsx` (mismas piezas `ng-*` de la foto de salida): sube la foto a esa guía, no crea otra. Los pedidos traen `solicitud` (dónde recoger y a quién entregar) si salieron de una solicitud.
+- Oficina: filtro "Por recoger" en Pedidos y, en la ficha, "Recoger (foto del paquete)" en vez de entregar o devolver. Rechazar una solicitud **pide la razón** (el backend la exige): el cliente la ve en "Mis solicitudes" (`GET /solicitudes/mias`) de su portal.
 
 ## Remitente desde la recogida — 2026-11-11
 

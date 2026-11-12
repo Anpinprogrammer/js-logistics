@@ -40,6 +40,31 @@ async function exigirPruebas(t, guia) {
   if (!tipos.includes("entrega")) throw datosInvalidos("Falta la foto de entrega");
 }
 
+/** Una guía "aceptado" todavía no se ha recogido: no se puede entregar ni devolver hasta que tenga la foto. */
+function exigirEnRuta(p) {
+  if (p.estado === "aceptado") throw conflicto("Primero recoge el pedido: pulsa “Recoger” y tómale la foto al paquete.", undefined, "POR_RECOGER");
+  if (p.estado !== "pendiente") throw conflicto("Ese pedido ya está " + (p.estado === "devuelto" ? "devuelto" : "entregado") + ".", undefined, "YA_CERRADA");
+}
+
+/** Recoger: el mensajero (su guía) o la oficina confirma que tiene el paquete de una guía "aceptado" (creada desde una
+    solicitud). Con el bucket configurado exige la foto de salida ya subida. Pasa a "pendiente" (en ruta) y la salida
+    (`creado`) queda con la hora de la recogida, que es cuando de verdad sale: así el día del sueldo, "salió hoy" y
+    "más de un día en ruta" cuentan desde ahí. La hora en que se asignó queda en el historial y en la solicitud. */
+export async function recoger(ctx, guia) {
+  const a = ctx.actor;
+  exigirEquipo(a);
+  return enTransaccion(ctx, async t => {
+    const p = await pedidoBloqueado(t, guia, delEquipo(a));
+    if (p.estado === "pendiente") throw conflicto("Ese pedido ya está recogido y en ruta.", undefined, "YA_RECOGIDO");
+    if (cerrado(p)) throw conflicto("Ese pedido ya está " + (p.estado === "devuelto" ? "devuelto" : "entregado") + ".", undefined, "YA_CERRADA");
+    if (storageConfigurado()) {
+      const r = await t.c.query(`SELECT 1 FROM pedido_archivos WHERE guia = $1 AND tipo = 'salida' LIMIT 1`, [guia]);
+      if (!r.rowCount) throw datosInvalidos("Falta la foto del paquete");
+    }
+    return actualizar(t, "pedidos", guia, { estado: "pendiente", creado: ahora() }, { antes: p });
+  });
+}
+
 /** Confirmar entrega: el mensajero (su pedido) o la oficina. La diferencia de cobro la calcula el servidor. */
 export async function entregar(ctx, guia, datos) {
   const a = ctx.actor;
@@ -54,7 +79,7 @@ export async function entregar(ctx, guia, datos) {
   if (gasto < 0) throw datosInvalidos("El gasto no puede ser negativo");
   return enTransaccion(ctx, async t => {
     const p = await pedidoBloqueado(t, guia, delEquipo(a));
-    if (p.estado !== "pendiente") throw conflicto("Ese pedido ya está " + (p.estado === "devuelto" ? "devuelto" : "entregado") + ".", undefined, "YA_CERRADA");
+    exigirEnRuta(p);
     await exigirPruebas(t, guia);
     const aC = Number(p.aCobrar) || 0, dif = aC ? v - (metodo === "transf_cliente" ? 0 : aC) : 0;
     return actualizar(t, "pedidos", guia, {
@@ -72,7 +97,7 @@ export async function noEntregado(ctx, guia, datos) {
   if (motivo === "otro" && !nota) throw datosInvalidos("Escribe qué pasó");
   return enTransaccion(ctx, async t => {
     const p = await pedidoBloqueado(t, guia, delEquipo(a));
-    if (p.estado !== "pendiente") throw conflicto("Ese pedido ya está " + (p.estado === "devuelto" ? "devuelto" : "entregado") + ".", undefined, "YA_CERRADA");
+    exigirEnRuta(p);
     const fecha = ahora(), intentos = [...(p.intentos || []), { fecha, motivo, nota, uid: a.uid }];
     if (motivo === "reprogramar") return actualizar(t, "pedidos", guia, { intentos }, { antes: p });
     return actualizar(t, "pedidos", guia, { estado: "devuelto", entregado: fecha, motivoDev: motivo, notaDev: nota, valorCobrado: 0, metodo: "devuelto",
@@ -89,7 +114,7 @@ export async function asignarRemitente(ctx, guia, { clienteId }) {
   return enTransaccion(ctx, async t => {
     const p = await pedidoBloqueado(t, guia, x => esMio(a, x.mensajeroId));
     if (p.clienteId === clienteId) return p;
-    if (p.estado !== "pendiente") throw conflicto("Esa guía ya está cerrada: pídele a administración que ponga el remitente.");
+    if (cerrado(p)) throw conflicto("Esa guía ya está cerrada: pídele a administración que ponga el remitente.");
     if (p.clienteId) throw conflicto("Esa guía ya tiene remitente: pídele a administración que lo cambie.");
     const cli = await Clientes.obtener(t.c, clienteId);
     if (!cli) throw datosInvalidos("Ese cliente no existe. Deja la guía sin remitente y administración lo pone.");

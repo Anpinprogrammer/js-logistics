@@ -18,6 +18,7 @@ r.post("/:guia/archivos/:tipo", permitir(EQUIPO), validar({ params: V.paramArchi
 r.post("/", permitir(EQUIPO), validar({ body: V.crear }), C.crear);
 r.post("/en-bloque", permitir(OFICINA), validar({ body: V.enBloque }), C.enBloque);
 r.patch("/:guia", permitir(OFICINA), validar({ ...guia, body: V.actualizar }), C.actualizar);
+r.post("/:guia/recogida", permitir(EQUIPO), validar(guia), C.recoger);
 r.post("/:guia/entrega", permitir(EQUIPO), validar({ ...guia, body: V.entrega }), C.entregar);
 r.post("/:guia/no-entregado", permitir(EQUIPO), validar({ ...guia, body: V.noEntregado }), C.noEntregado);
 r.patch("/:guia/remitente", permitir("mensajero"), validar({ ...guia, body: V.remitente }), C.asignarRemitente);

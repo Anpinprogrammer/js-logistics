@@ -1,7 +1,8 @@
 /* Solicitudes de envío: el visitante las crea desde la landing (sin sesión), o un cliente con cuenta desde su
    portal (origen 'portal', ligada a su ficha), y la oficina las atiende.
    Flujo: pendiente → (aceptar con valor) cotizada → (el cliente confirma por WhatsApp) confirmada
-   → (asignar mensajero) asignada, con su guía. En cualquier punto antes de asignar se puede rechazar. */
+   → (asignar mensajero) asignada, con su guía (en estado "aceptado", por recoger). En cualquier punto antes de asignar
+   se puede rechazar, siempre con la razón: el cliente la ve en su portal (GET /solicitudes/mias). */
 import * as Solicitud from "../models/solicitud.model.js";
 import * as Pedido from "../models/pedido.model.js";
 import * as Mensajero from "../models/mensajero.model.js";
@@ -70,6 +71,14 @@ export async function crearDesdePortal(req, res) {
   await Auditoria.registrar({ uid: req.usuario.id, accion: `Pidió un envío desde su portal (${d.direccionRecogida} → ${d.direccionEntrega})`, tabla: "solicitudes", registro: s.id });
   eventos.emitir(["solicitudes"]);
   res.status(201).json({ solicitud: { recibida: true } });
+}
+
+/** "Mis solicitudes" del portal: solo las del cliente de la sesión, nunca las de otro (el filtro no sale de la petición). */
+export async function listarMias(req, res) {
+  const clienteId = req.usuario.clienteId;
+  if (!clienteId) throw prohibido("Tu cuenta no está vinculada con un cliente. Escríbenos por WhatsApp.");
+  const { pagina, porPagina } = req.valido.query;
+  res.json(await Solicitud.listarDeCliente(clienteId, { pagina, porPagina }));
 }
 
 export async function listar(req, res) {
@@ -162,7 +171,8 @@ export async function asignar(req, res) {
       cid = filaAObjeto(rows[0]).id;
       await Auditoria.registrar({ uid: req.usuario.id, accion: `Creó el cliente ${s.nombre} desde una solicitud`, tabla: "clientes", registro: cid }, db);
     }
-    const pedido = await Pedido.crear({ mensajeroId, clienteId: cid, valorServicio: s.valor || 0, aCobrar: 0, creadoPor: req.usuario.id }, db);
+    // La guía nace "aceptado": el mensajero la ve en "Por recoger" y pasa a en ruta cuando le toma la foto al paquete.
+    const pedido = await Pedido.crear({ mensajeroId, clienteId: cid, valorServicio: s.valor || 0, aCobrar: 0, creadoPor: req.usuario.id, estado: "aceptado" }, db);
     const solicitud = await Solicitud.actualizar(id, { estado: "asignada", mensajeroId, clienteId: cid, guia: pedido.guia }, db);
     await Auditoria.registrar({ uid: req.usuario.id, accion: `Asignó la solicitud de ${s.nombre} a ${m.nombre} (guía ${pedido.guia})`, tabla: "solicitudes", registro: id }, db);
     return { solicitud, pedido };

@@ -123,6 +123,22 @@ export async function contarAbiertas() {
   return c;
 }
 
+/** Las solicitudes de un cliente, para su portal ("Mis solicitudes"). Solo las ligadas a su ficha (cliente_id lo pone
+    el servidor desde la sesión) y solo los campos que le sirven: nada de quién la revisó ni datos internos.
+    `pedidoEstado` es el estado de la guía que salió de la solicitud, si ya se asignó. */
+export async function listarDeCliente(clienteId, { pagina = 1, porPagina = 20 } = {}) {
+  const { rows: [{ n }] } = await query(`SELECT count(*)::int AS n FROM solicitudes WHERE cliente_id = $1`, [clienteId]);
+  const paginas = Math.max(1, Math.ceil(n / porPagina)), actual = Math.min(pagina, paginas);
+  const { rows } = await query(
+    `SELECT s.id, s.estado, s.origen, s.direccion_recogida, s.paquetes, s.peso_kg, s.destinatario_nombre, s.destinatario_telefono,
+       s.direccion_entrega, s.valor, s.motivo_rechazo, s.guia, s.creado, s.actualizado, p.estado AS pedido_estado
+     FROM solicitudes s LEFT JOIN pedidos p ON p.guia = s.guia
+     WHERE s.cliente_id = $1 ORDER BY s.creado DESC LIMIT $2 OFFSET $3`,
+    [clienteId, porPagina, (actual - 1) * porPagina]
+  );
+  return { solicitudes: rows.map(aObjeto), pagina: actual, porPagina, total: n, paginas };
+}
+
 // Columnas que se pueden cambiar. La lista la fija el código, no la petición.
 const CAMPOS = ["estado", "valor", "motivoRechazo", "clienteId", "mensajeroId", "guia", "revisadoPor"];
 

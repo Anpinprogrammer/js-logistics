@@ -72,14 +72,15 @@ export async function archivos(req, res) {
 }
 
 /** Sube una foto o firma (cuerpo binario JPEG, PNG o WebP) y la deja en el pedido.
-    Oficina: cualquier guía. Mensajero: las suyas, mientras estén en ruta o dentro de las 24 horas de corrección. */
+    Oficina: cualquier guía. Mensajero: las suyas, mientras estén por recoger, en ruta o dentro de las 24 horas de corrección. */
 export async function subirArchivo(req, res) {
   const { guia, tipo } = req.valido.params, u = req.usuario;
   if (!storageConfigurado())
     throw new HttpError(503, "FOTOS_NO_CONFIGURADAS", "Las fotos todavía no están configuradas en el servidor. Avísale a administración.");
   const p = await Pedido.buscarPorGuia(guia);
   if (!p || !(esOficina(u) || esMio(u, p))) throw noEncontrado("La guía no existe");
-  if (!esOficina(u) && p.estado !== "pendiente" && Date.now() - new Date(p.entregado).getTime() > VENTANA_CORRECCION_MS)
+  const cerrada = p.estado === "entregado" || p.estado === "devuelto"; // "aceptado" (por recoger) y "pendiente" siguen abiertas
+  if (!esOficina(u) && cerrada && Date.now() - new Date(p.entregado).getTime() > VENTANA_CORRECCION_MS)
     throw prohibido("Ya pasaron 24 horas: pídele a administración que agregue la foto");
 
   // El tipo se decide por el contenido, no por lo que diga el navegador.
@@ -131,6 +132,8 @@ const conPedido = fn => async (req, res) => {
 
 /** Lo que organiza la oficina: remitente, valores, mensajero, domicilio pagado y (administración) la corrección de lo cobrado. */
 export const actualizar = conPedido(Servicio.editarOficina);
+/** El mensajero (o la oficina) recoge una guía "aceptado": con la foto de salida ya subida, pasa a en ruta. */
+export const recoger = conPedido(Servicio.recoger);
 /** El mensajero (o la oficina) registra la entrega de una guía pendiente. Con el bucket configurado, exige la foto y la firma. */
 export const entregar = conPedido(Servicio.entregar);
 /** No se pudo entregar: "reprogramar" deja la guía en ruta y anota el intento; los demás motivos la devuelven. */

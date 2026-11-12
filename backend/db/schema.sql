@@ -101,7 +101,9 @@ CREATE TABLE IF NOT EXISTS ajustes (
 CREATE TABLE IF NOT EXISTS pedidos (
   guia            TEXT PRIMARY KEY,                -- JS-00001
   n               BIGINT NOT NULL UNIQUE,
-  estado          TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'entregado', 'devuelto')),
+  -- aceptado: guía de una solicitud, asignada pero sin recoger (el mensajero no ha tomado la foto del paquete);
+  -- pendiente: en ruta, por entregar; entregado o devuelto: cerrada. Ver la migración al final de las solicitudes.
+  estado          TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('aceptado', 'pendiente', 'entregado', 'devuelto')),
   creado          TIMESTAMPTZ NOT NULL DEFAULT now(),          -- salida
   creado_por      TEXT REFERENCES usuarios(id) ON DELETE SET NULL,
   mensajero_id    TEXT REFERENCES mensajeros(id) ON DELETE RESTRICT,
@@ -135,7 +137,7 @@ CREATE TABLE IF NOT EXISTS pedidos (
   domi_pago_uid   TEXT REFERENCES usuarios(id) ON DELETE SET NULL,
   fotos_borradas  BOOLEAN NOT NULL DEFAULT false,
   actualizado     TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CHECK (estado = 'pendiente' OR entregado IS NOT NULL)
+  CHECK (estado IN ('aceptado', 'pendiente') OR entregado IS NOT NULL)
 );
 CREATE INDEX IF NOT EXISTS pedidos_mensajero_idx ON pedidos (mensajero_id, creado DESC);
 CREATE INDEX IF NOT EXISTS pedidos_cliente_idx   ON pedidos (cliente_id, creado DESC);
@@ -341,6 +343,42 @@ CREATE TABLE IF NOT EXISTS solicitudes (
 ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS origen TEXT NOT NULL DEFAULT 'publico' CHECK (origen IN ('publico', 'portal'));
 CREATE INDEX IF NOT EXISTS solicitudes_estado_idx ON solicitudes (estado, creado DESC);
 CREATE INDEX IF NOT EXISTS solicitudes_creado_idx ON solicitudes (creado DESC);
+CREATE INDEX IF NOT EXISTS solicitudes_cliente_idx ON solicitudes (cliente_id, creado DESC);
+CREATE INDEX IF NOT EXISTS solicitudes_guia_idx ON solicitudes (guia) WHERE guia IS NOT NULL;
+
+-- ---------- Estado "aceptado" (por recoger) — 2026-11-11 ----------
+-- Una guía creada desde una solicitud nace "aceptado" y solo pasa a "pendiente" (en ruta) cuando el mensajero
+-- la recoge y le toma la foto (POST /pedidos/:guia/recogida). Las bases creadas antes tienen los CHECK viejos:
+-- se cambian una sola vez (si ya incluyen 'aceptado', no se tocan).
+DO $$
+DECLARE c RECORD;
+BEGIN
+  FOR c IN SELECT conname, pg_get_constraintdef(oid) AS def FROM pg_constraint
+           WHERE conrelid = 'pedidos'::regclass AND contype = 'c' AND pg_get_constraintdef(oid) LIKE '%pendiente%'
+             AND pg_get_constraintdef(oid) NOT LIKE '%aceptado%'
+  LOOP
+    EXECUTE format('ALTER TABLE pedidos DROP CONSTRAINT %I', c.conname);
+    IF c.def LIKE '%entregado IS NOT NULL%' THEN
+      ALTER TABLE pedidos ADD CONSTRAINT pedidos_check CHECK (estado IN ('aceptado', 'pendiente') OR entregado IS NOT NULL);
+    ELSE
+      ALTER TABLE pedidos ADD CONSTRAINT pedidos_estado_check CHECK (estado IN ('aceptado', 'pendiente', 'entregado', 'devuelto'));
+    END IF;
+  END LOOP;
+END $$;
+-- Datos de antes del cambio (una sola vez, marcado en ajustes): las guías que salieron de una solicitud, siguen
+-- por entregar y no tienen foto de salida ni intentos nunca se recogieron con foto; pasan a "aceptado" para que el
+-- mensajero las vea en "Por recoger". Si se vuelve a correr db:migrar no se repite.
+DO $$
+BEGIN
+  INSERT INTO ajustes (clave, valor) VALUES ('migracion_aceptado', jsonb_build_object('fecha', now())) ON CONFLICT (clave) DO NOTHING;
+  IF FOUND THEN
+    UPDATE pedidos p SET estado = 'aceptado', actualizado = now()
+    WHERE p.estado = 'pendiente'
+      AND EXISTS (SELECT 1 FROM solicitudes s WHERE s.guia = p.guia)
+      AND NOT EXISTS (SELECT 1 FROM pedido_archivos a WHERE a.guia = p.guia AND a.tipo = 'salida')
+      AND NOT EXISTS (SELECT 1 FROM pedido_intentos i WHERE i.guia = p.guia);
+  END IF;
+END $$;
 
 -- ---------- Supabase: cerrar la API pública ----------
 -- Supabase expone las tablas de "public" por su Data API (PostgREST) con la anon key.
