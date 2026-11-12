@@ -275,6 +275,9 @@ Lo ya contado en un arqueo no se cambia: responde `409 YA_CONTADO` con el texto 
 
 | Método y ruta | Quién | Qué hace |
 |---|---|---|
+| `POST /pedidos/:guia/destino-devolucion` | su mensajero (una vez) u oficina | Dónde quedó el paquete de un devuelto: `{ destino: "cliente" \| "oficina" }`. Un devuelto nuevo nace con `destinoDev: "por_definir"` |
+| `POST /pedidos/:guia/reintento` | su mensajero u oficina | Crea la **guía nueva** del reintento (`201`, `{ pedido, reintento }`). Mensajero: `{}`, con `destinoDev` por definir; queda en ruta a su nombre. Oficina: `{ mensajeroId }`; con el paquete con el cliente nace `aceptado` (por recoger), en la oficina nace en ruta. Hereda remitente, domicilio y `aCobrar`. La original conserva su devolución y su cobro; `409 YA_REINTENTADA` si ya tiene reintento |
+| `POST /pedidos/:guia/pedir-reintento` | cliente (su pedido) | El cliente pide el reintento de un devuelto: deja `reintentoPedido` para que la oficina lo asigne. `409 DESTINO_SIN_DEFINIR` si el mensajero aún no dijo dónde está el paquete |
 | `POST /pedidos/:guia/reabrir` | admin | Vuelve a "por entregar". La foto y la firma pasan a `previa` |
 | `POST /pedidos/en-bloque` | oficina | `{ modo: "sin", guias, clienteId, valorServicio? }` pone remitente; `{ modo: "serv", guias, valorServicio?, usarTarifaCliente }` pone el domicilio |
 | `POST/DELETE /pedidos/:guia/pago-domicilio` | oficina | `{ medio, valor }`: el cliente pagó el domicilio aparte |

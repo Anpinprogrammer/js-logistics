@@ -24,6 +24,9 @@ r.post("/:guia/no-entregado", permitir(EQUIPO), validar({ ...guia, body: V.noEnt
 r.patch("/:guia/remitente", permitir("mensajero"), validar({ ...guia, body: V.remitente }), C.asignarRemitente);
 r.patch("/:guia/correccion", permitir("mensajero"), validar({ ...guia, body: V.correccion }), C.corregir);
 r.post("/:guia/cambio-recibido", permitir(OFICINA, "cliente"), validar(guia), C.confirmarCambio);
+r.post("/:guia/destino-devolucion", permitir(EQUIPO), validar({ ...guia, body: V.destinoDevolucion }), C.destinoDevolucion);
+r.post("/:guia/reintento", permitir(EQUIPO), validar({ ...guia, body: V.reintento }), C.reintentar);
+r.post("/:guia/pedir-reintento", permitir("cliente"), validar(guia), C.pedirReintento);
 r.post("/:guia/reabrir", permitir("admin"), validar(guia), C.reabrir);
 r.post("/:guia/pago-domicilio", permitir(OFICINA), validar({ ...guia, body: V.pagoDomicilio }), C.pagoDomicilio);
 r.delete("/:guia/pago-domicilio", permitir(OFICINA), validar(guia), C.quitarPagoDomicilio);

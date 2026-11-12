@@ -171,7 +171,8 @@ const pedidosBase = crearModelo({
     valorServicio: "num", aCobrar: "num", entregado: "ms", destinatario: "texto", valorCobrado: "num", metodo: "texto", cuentaJs: "texto",
     difCobro: "num", difRevisada: "bool", entregoUid: "ref", motivoDev: "texto", notaDev: "texto", cobrarDev: "bool",
     cambio: "bool", cambioRecibido: "ms", cambioConfirmo: "ref", gasto: "num", gastoNota: "texto",
-    domiPagado: "bool", domiPagoMedio: "ref", domiPagoValor: "num?", domiPagoFecha: "ms", domiPagoUid: "ref", fotosBorradas: "bool"
+    domiPagado: "bool", domiPagoMedio: "ref", domiPagoValor: "num?", domiPagoFecha: "ms", domiPagoUid: "ref", fotosBorradas: "bool",
+    destinoDev: "texto", reintentoDe: "ref", reintentoPedido: "ms"
   },
   // El nombre del remitente sale de la tabla de clientes (la app lo copiaba en el pedido para los mensajeros).
   leer: (d, fila) => (fila.cliente_nombre ? { ...d, clienteNombre: fila.cliente_nombre } : d)

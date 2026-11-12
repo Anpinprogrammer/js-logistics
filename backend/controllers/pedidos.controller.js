@@ -146,6 +146,17 @@ export const asignarRemitente = conPedido(Servicio.asignarRemitente);
 export const confirmarCambio = conPedido(Servicio.cambioRecibido);
 /** Administración devuelve la guía a "por entregar". Las pruebas de la entrega quedan como "previas". */
 export const reabrir = conPedido(Servicio.reabrir);
+/** Dónde quedó el paquete de un devuelto: con el cliente o en la oficina. */
+export const destinoDevolucion = conPedido(Servicio.destinoDevolucion);
+/** Crea la guía del reintento de un devuelto (mensajero: el mismo; oficina: asigna mensajero). */
+export async function reintentar(req, res) {
+  const { guia } = req.valido.params;
+  const nueva = await Servicio.reintentar(ctxDe(req), guia, req.valido.body ?? {});
+  const [original, reintento] = await conMini([await Pedido.buscarPorGuia(guia), await Pedido.buscarPorGuia(nueva.guia)]);
+  res.status(201).json({ pedido: original, reintento });
+}
+/** El cliente pide el reintento de su devuelto; la oficina lo asigna. */
+export const pedirReintento = conPedido(Servicio.pedirReintento);
 export const pagoDomicilio = conPedido(Servicio.registrarPagoDomicilio);
 export const quitarPagoDomicilio = conPedido(Servicio.quitarPagoDomicilio);
 export const diferenciaRevisada = conPedido(Servicio.marcarDiferenciaRevisada);
