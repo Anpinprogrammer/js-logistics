@@ -139,13 +139,13 @@ function RecibirDinero({ mid }: { mid: string }) {
   const r = q.data?.resumen, pm = periodoMensajero(mid);
   const anotar: Anotar = d => recibirDeCliente({ ...d, mensajeroId: mid });
   return <>
-    <p className="sub">Anota cada pago que te hace un cliente en la calle. Se abona a su cuenta y queda en lo que debes entregar en la oficina.</p>
+    <p className="sub">Anota cada pago que te hace un cliente en la calle. Se abona a su cuenta; si es en efectivo, queda en lo que debes entregar en la oficina.</p>
     {q.isError && <div className="aviso alerta">No se pudo traer lo que has recibido: {motivoError(q.error)}</div>}
     <div className="kpis kpis-patinador">
       <Kpi ico="plata" lbl="Te falta entregar" val={pesos(pm.debe)} pie={<small>{pm.cobros ? `${pesos(pm.cobros)} de pagos de clientes` : "En tu período abierto"}</small>} />
       <Kpi ico="caja" lbl="Recibido hoy" val={r ? pesos(r.totalHoy) : "…"} pie={<small>{r ? `${r.registrosHoy} ${r.registrosHoy === 1 ? "pago" : "pagos"}` : ""}</small>} />
     </div>
-    <FormPago anotar={anotar} invalidar={["recibidos"]} titulo="Recibir dinero" boton="Registrar pago" />
+    <FormPago anotar={anotar} invalidar={["recibidos"]} titulo="Recibir dinero" boton="Registrar pago" conMedio />
     <h2>Lo que has recibido</h2>
     <Lista registros={q.data?.registros} cargando={q.isLoading} vacio="Todavía no has recibido pagos de clientes. Cuando te paguen, anótalo arriba." />
     {q.data && q.data.paginas > 1 && <Paginador pagina={q.data.pagina} paginas={q.data.paginas} total={q.data.total} porPagina={q.data.porPagina} cargando={q.isFetching} ir={p => setPagina(p)} />}

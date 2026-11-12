@@ -7,7 +7,9 @@ import type { ClienteBreve, RegistroCajaPatinador } from "../api/tipos";
 import { buscarRemitentes } from "./acciones";
 import { motivoError } from "./datos";
 import { useVentana } from "./ui";
-import { hora, pesos } from "./motor";
+import { hora, pesos, MEDIOS, type Medio } from "./motor";
+
+const MEDIOS_K = Object.keys(MEDIOS) as Medio[];
 
 const MAX_CONCEPTO = 80;
 
@@ -16,14 +18,16 @@ const aPesos = (t: string) => Number(t.replace(/\D/g, "")) || 0;
 const conMiles = (t: string) => { const n = aPesos(t); return n ? n.toLocaleString("es-CO") : ""; };
 
 /** Lo que anota un pago y el aviso que se muestra al guardarlo. */
-export type Anotar = (d: { clienteId: string; clienteNombre: string; concepto: string; valor: number }) => Promise<string>;
+export type Anotar = (d: { clienteId: string; clienteNombre: string; concepto: string; valor: number; medio: Medio }) => Promise<string>;
 
 /** Formulario "¿Quién te pagó? · Concepto · Valor". Lo usan el patinador (Mi caja) y el mensajero (Recepción → Recibir dinero). */
-export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un pago", boton = "Anotar pago", deOtro = false }: { anotar: Anotar; invalidar: readonly unknown[]; titulo?: string; boton?: string; /** Administración anota por el patinador: "le pagó" en vez de "te pagó". */ deOtro?: boolean }) {
+/** conMedio: pregunta cómo pagó (efectivo, Nequi o Bancolombia). Sin él, todo es efectivo (la caja del patinador).
+    deOtro: administración anota por el patinador ("le pagó" en vez de "te pagó"). */
+export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un pago", boton = "Anotar pago", conMedio = false, deOtro = false }: { anotar: Anotar; invalidar: readonly unknown[]; titulo?: string; boton?: string; conMedio?: boolean; deOtro?: boolean }) {
   const v = useVentana(), qc = useQueryClient(), te = deOtro ? "le" : "te";
   const [cliente, setCliente] = useState<ClienteBreve | null>(null);
   const [busca, setBusca] = useState(""), [abierto, setAbierto] = useState(false), [opciones, setOpciones] = useState<ClienteBreve[]>([]);
-  const [concepto, setConcepto] = useState(""), [valor, setValor] = useState("");
+  const [concepto, setConcepto] = useState(""), [valor, setValor] = useState(""), [medio, setMedio] = useState<Medio>("efectivo");
   const comboRef = useRef<HTMLDivElement>(null);
 
   // Busca en el servidor (desde 2 letras) esperando a que deje de escribir.
@@ -43,7 +47,7 @@ export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un p
     mutationFn: guardarPago,
     onSuccess: aviso => {
       qc.invalidateQueries({ queryKey: invalidar });
-      setCliente(null); setBusca(""); setConcepto(""); setValor("");
+      setCliente(null); setBusca(""); setConcepto(""); setValor(""); setMedio("efectivo");
       v.avisar(aviso);
     },
     onError: e => v.avisar("No se pudo anotar: " + (e instanceof FalloApi ? e.message : motivoError(e)))
@@ -55,7 +59,7 @@ export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un p
     if (!cliente) return v.avisar(`Elige el cliente que ${te} pagó`);
     if (!concepto.trim()) return v.avisar("Escribe el concepto");
     if (n <= 0) return v.avisar(`Escribe cuánto ${te} pagó`);
-    guardar.mutate({ clienteId: cliente.id, clienteNombre: cliente.nombre, concepto: concepto.trim(), valor: n });
+    guardar.mutate({ clienteId: cliente.id, clienteNombre: cliente.nombre, concepto: concepto.trim(), valor: n, medio });
   };
 
   return (
@@ -87,6 +91,13 @@ export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un p
         <label htmlFor="pgValor">Valor recibido</label>
         <input id="pgValor" type="text" inputMode="numeric" autoComplete="off" placeholder="$ 0" value={valor ? "$ " + conMiles(valor) : ""} onChange={e => setValor(e.target.value)} />
       </div>
+      {conMedio && <div className="campo">
+        <span className="etq-campo" id="pgMedioEtq">¿Cómo pagó?</span>
+        <div className="seg medios-pago" role="radiogroup" aria-labelledby="pgMedioEtq">
+          {MEDIOS_K.map(k => <button key={k} type="button" role="radio" aria-checked={medio === k} aria-selected={medio === k} onClick={() => setMedio(k)}>{MEDIOS[k]}</button>)}
+        </div>
+        {medio !== "efectivo" && <small className="sub">Entra directo a la cuenta de {MEDIOS[medio]} de JS: no lo tienes que entregar.</small>}
+      </div>}
       <button type="submit" className="btn btn-pago" disabled={guardar.isPending}>{guardar.isPending ? "Guardando…" : boton}</button>
     </form>
   );
@@ -98,7 +109,7 @@ export function Lista({ registros, cargando, vacio = "Todavía no has anotado pa
   if (!registros?.length) return <div className="vacio">{vacio}</div>;
   return <div className="lista lista-patinador">{registros.map(r => (
     <div className="fila fila-pago" key={r.id}>
-      <span className="info"><b className="min-w-0">{r.clienteNombre}</b><p>{r.concepto} · {hora(Date.parse(r.fecha))}</p></span>
+      <span className="info"><b className="min-w-0">{r.clienteNombre}</b><p>{r.concepto}{r.medio && r.medio !== "efectivo" ? " · " + (MEDIOS[r.medio as Medio] || r.medio) : ""} · {hora(Date.parse(r.fecha))}</p></span>
       <span className="n fila-pago-valor">{pesos(r.valor)}</span>
     </div>
   ))}</div>;

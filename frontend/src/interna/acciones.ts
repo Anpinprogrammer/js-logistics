@@ -4,7 +4,7 @@
  */
 import * as api from "../api/servicios";
 import type * as T from "../api/tipos";
-import { S, yo, type Pedido, type Medio, type Motivo, type Metodo, type TipoMov, type TipoPersonal, type Almacen, type CajaMov, type Liquidacion, hora, sinTildes, pesos, diaDe } from "./motor";
+import { S, yo, type Pedido, type Medio, type Motivo, type Metodo, type TipoMov, type TipoPersonal, type Almacen, type CajaMov, type Liquidacion, hora, sinTildes, pesos, diaDe, MEDIOS } from "./motor";
 import { aPedido, aPersona } from "./datos";
 import { DEMO, remitentesDemo } from "./demo";
 import { comprimir, firmaABlob, FOTO, MINI } from "../lib/imagen";
@@ -190,14 +190,14 @@ export async function recibirDinero(d: { mensajeroId: string; valor: number; med
 }
 /** Recepción → Recibir dinero: el mensajero anota lo que le pagó un cliente en la calle. Es un pago del cliente (abona a su
     cuenta) que no entra a la caja hasta que él lo entrega; mientras tanto suma a lo que debe. Devuelve el aviso. */
-export async function recibirDeCliente(d: { mensajeroId: string; clienteId: string; clienteNombre: string; concepto: string; valor: number }): Promise<string> {
-  const aviso = (nombre: string) => `Recibiste ${pesos(d.valor)} de ${nombre}. Ya quedó abonado a su cuenta; entrégalo en la oficina.`;
+export async function recibirDeCliente(d: { mensajeroId: string; clienteId: string; clienteNombre: string; concepto: string; valor: number; medio: Medio }): Promise<string> {
+  const aviso = (nombre: string) => `Recibiste ${pesos(d.valor)} de ${nombre}. Ya quedó abonado a su cuenta` + (d.medio === "efectivo" ? "; entrégalo en la oficina." : ` (${MEDIOS[d.medio]}).`);
   if (DEMO) {
     const k = id();
-    tocar(s => { s.movimientos[k] = { id: k, clienteId: d.clienteId, tipo: "pago_de_cliente", valor: d.valor, medio: "efectivo", nota: d.concepto, fecha: Date.now(), porUid: yo.uid, porNombre: yo.nombre, mensajeroId: d.mensajeroId }; });
+    tocar(s => { s.movimientos[k] = { id: k, clienteId: d.clienteId, tipo: "pago_de_cliente", valor: d.valor, medio: d.medio, nota: d.concepto, fecha: Date.now(), porUid: yo.uid, porNombre: yo.nombre, mensajeroId: d.mensajeroId }; });
     return aviso(d.clienteNombre);
   }
-  const r = await api.recibidos.registrar({ clienteId: d.clienteId, concepto: d.concepto, valor: d.valor, ...(yo.esAdmin ? { mensajeroId: d.mensajeroId } : {}) });
+  const r = await api.recibidos.registrar({ clienteId: d.clienteId, concepto: d.concepto, valor: d.valor, medio: d.medio, ...(yo.esAdmin ? { mensajeroId: d.mensajeroId } : {}) });
   await recargar();
   return aviso(r.clienteNombre);
 }
@@ -211,7 +211,7 @@ export async function recibidosDe(mensajeroId: string, pagina: number, porPagina
   const suma = (xs: typeof todos) => xs.reduce((a, m) => a + m.valor, 0);
   return {
     resumen: { total: suma(todos), registros: todos.length, totalHoy: suma(deHoy), registrosHoy: deHoy.length },
-    registros: todos.slice((p - 1) * porPagina, p * porPagina).map(m => ({ id: m.id, mensajeroId, clienteId: m.clienteId, clienteNombre: S.clientes[m.clienteId]?.nombre || remitentesDemo.find(c => c.id === m.clienteId)?.nombre || "", concepto: m.nota, valor: m.valor, fecha: new Date(m.fecha).toISOString() })),
+    registros: todos.slice((p - 1) * porPagina, p * porPagina).map(m => ({ id: m.id, mensajeroId, clienteId: m.clienteId, clienteNombre: S.clientes[m.clienteId]?.nombre || remitentesDemo.find(c => c.id === m.clienteId)?.nombre || "", concepto: m.nota, valor: m.valor, medio: (m.medio || "efectivo") as Medio, fecha: new Date(m.fecha).toISOString() })),
     pagina: p, porPagina, total: todos.length, paginas
   };
 }

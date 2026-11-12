@@ -17,7 +17,7 @@ export async function listarDeCliente(clienteId, { desde, hasta, limite = 200 } 
 
 /* ---- Recepción → Recibir dinero: pagos de clientes que recibió un mensajero en la calle ---- */
 const RECIBIDOS = `
-  SELECT m.id, m.mensajero_id, m.cliente_id, c.nombre AS cliente_nombre, m.nota AS concepto, m.valor, m.fecha
+  SELECT m.id, m.mensajero_id, m.cliente_id, c.nombre AS cliente_nombre, m.nota AS concepto, m.valor, coalesce(m.medio, 'efectivo') AS medio, m.fecha
   FROM movimientos m JOIN clientes c ON c.id = m.cliente_id
   WHERE m.mensajero_id = $1 AND m.tipo = 'pago_de_cliente'`;
 // "Hoy" es el día de Colombia, no el del servidor (que corre en UTC).

@@ -23,11 +23,14 @@ export const metodoTxt = p => (p.estado === "devuelto" ? "Devolución" + (p.moti
 export const textoDomi = p => (p.domiPagado ? "pagó domicilio " + pesos(pagoDomi(p)) : "domicilio " + pesos(servicio(p))) + (gastoDe(p) ? " · flete " + pesos(gastoDe(p)) : "");
 export const signoMov = m => (MOVS[m.tipo]?.s || -1) * (Number(m.valor) || 0);
 export const esPago = m => !!MOVS[m.tipo]?.pago;
-/** Un pago que recibió un mensajero en la calle (mensajeroId) abona al cliente pero no mueve la caja: entra cuando él lo
-    entrega (recaudo). Mientras tanto suma a lo que debe (periodoMensajero). La app vieja no tiene estos pagos. */
-export const mueveCaja = m => !m.mensajeroId && (esPago(m) || !!MOVS[m.tipo]?.caja);
-/** Pagos de clientes que recibió un mensajero: + lo que le dieron, − si se le devolvió al cliente. */
-export const esCobroMensajero = (m, mid) => !!m.mensajeroId && m.mensajeroId === mid && esPago(m);
+/** Pago que recibió un mensajero en la calle (mensajeroId) en efectivo: la plata la tiene él. Abona al cliente pero no
+    mueve la caja hasta que la entrega (recaudo); mientras tanto suma a lo que debe (periodoMensajero). Si el cliente
+    transfirió (Nequi o Bancolombia), la plata ya está en la cuenta de JS: mueve la caja como cualquier pago.
+    La app vieja no tiene estos pagos. */
+export const enManoDeMensajero = m => !!m.mensajeroId && (m.medio || "efectivo") === "efectivo";
+export const mueveCaja = m => !enManoDeMensajero(m) && (esPago(m) || !!MOVS[m.tipo]?.caja);
+/** Pagos en efectivo de clientes que tiene el mensajero `mid`: + lo que le dieron, − si se le devolvió al cliente. */
+export const esCobroMensajero = (m, mid) => enManoDeMensajero(m) && m.mensajeroId === mid && esPago(m);
 export const cambioPendiente = p => !!p.cambio && !p.cambioRecibido;
 export const sinServicio = p => p.estado === "entregado" && !!p.clienteId && !Number(p.valorServicio);
 export const textoLiq = d => (d > 0 ? "Debe " + pesos(d) : d < 0 ? "Sobró " + pesos(-d) : "Quedó en $ 0");

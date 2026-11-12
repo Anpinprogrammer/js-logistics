@@ -152,7 +152,7 @@ export const recibidos = {
   listar: (pagina: number, porPagina: number, mensajeroId?: string) =>
     datos<CajaPatinador>(api.get("/movimientos/recibidos", { params: limpio({ pagina, porPagina, mensajeroId }) })),
   /** Anota un pago de un cliente. Efectivo y con la hora del servidor; abona a la cuenta del cliente. */
-  registrar: (d: { clienteId: string; concepto: string; valor: number; mensajeroId?: string }) =>
+  registrar: (d: { clienteId: string; concepto: string; valor: number; medio: Medio; mensajeroId?: string }) =>
     datos<{ movimiento: Movimiento; clienteNombre: string; saldoCliente: number; debe: number }>(api.post("/movimientos/recibidos", d))
 };
 

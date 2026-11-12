@@ -15,11 +15,13 @@ export const movimiento = z.looseObject({
   clienteId: id.nullish(), tipo: z.string().max(40).optional(), valor: valor.optional(), medio: z.string().max(20).nullish(),
   nota: texto(300).optional(), dia: dia.optional(), fecha
 });
-/** Recepción → Recibir dinero (mensajero). El medio (efectivo) y la hora los pone el servidor: no se aceptan campos de más. */
+/** Recepción → Recibir dinero (mensajero). La hora la pone el servidor: no se aceptan campos de más. */
 export const recibido = z.object({
   clienteId: id,
   concepto: z.string().trim().min(1, "Escribe el concepto").max(80, "El concepto es muy largo (máximo 80 letras)"),
   valor: pesos.refine(v => v > 0, "Escribe un valor mayor a cero"),
+  // Efectivo: lo tiene el mensajero. Nequi o Bancolombia: el cliente transfirió a la cuenta de JS.
+  medio: z.enum(["efectivo", "nequi", "bancolombia"], { error: "Elige cómo pagó: efectivo, Nequi o Bancolombia" }).default("efectivo"),
   mensajeroId: id.optional() // solo administración (cuando actúa como un mensajero); al mensajero se le ignora
 }).strict();
 export const recibidos = z.object({

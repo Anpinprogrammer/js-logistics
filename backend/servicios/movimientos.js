@@ -45,11 +45,12 @@ export async function crear(ctx, datos) {
   });
 }
 
-/** Recepción → Recibir dinero: el mensajero anota el pago que le hizo un cliente en la calle (cliente, concepto y valor).
-    Es el mismo pago del cliente de la oficina (`pago_de_cliente`, abona a su cuenta), en efectivo y con la hora del
-    servidor, pero con `mensajeroId`: no entra a la caja hasta que el mensajero lo entrega y mientras tanto suma a lo que
-    debe en su período (periodoMensajero). El mensajero solo anota en su nombre; administración puede hacerlo por otro. */
-export async function recibirDeMensajero(ctx, { clienteId, concepto, valor, mensajeroId }) {
+/** Recepción → Recibir dinero: el mensajero anota el pago que le hizo un cliente en la calle (cliente, concepto, valor y
+    medio). Es el mismo pago del cliente de la oficina (`pago_de_cliente`, abona en verde a su cuenta), con la hora del
+    servidor y con `mensajeroId`. En efectivo no entra a la caja hasta que el mensajero lo entrega y mientras tanto suma
+    a lo que debe (periodoMensajero); por Nequi o Bancolombia entra a la caja de una vez, en ese medio (mueveCaja).
+    El mensajero solo anota en su nombre; administración puede hacerlo por otro. */
+export async function recibirDeMensajero(ctx, { clienteId, concepto, valor, medio = "efectivo", mensajeroId }) {
   const a = ctx.actor;
   const mid = a.esAdmin ? mensajeroId || a.mensajeroId : a.rol === "mensajero" ? a.mensajeroId : "";
   if (!a.esAdmin && a.rol !== "mensajero") throw permisoNegado();
@@ -60,8 +61,9 @@ export async function recibirDeMensajero(ctx, { clienteId, concepto, valor, mens
     if (!esRepartidor(m)) throw datosInvalidos("Solo un mensajero puede recibir dinero aquí.");
     const cli = clienteId ? await Clientes.obtener(t.c, clienteId) : null;
     if (!cli) throw noEncontrado("Ese cliente ya no existe. Búscalo de nuevo.");
+    if (!MEDIOS[medio]) throw datosInvalidos("Elige cómo pagó: efectivo, Nequi o Bancolombia");
     const movimiento = await guardar(t, "movimientos", {
-      id: nuevoId(), tipo: "pago_de_cliente", clienteId: cli.id, valor: valorPositivo(valor), medio: "efectivo",
+      id: nuevoId(), tipo: "pago_de_cliente", clienteId: cli.id, valor: valorPositivo(valor), medio,
       nota: texto(concepto, 80), fecha: ahora(), porUid: a.uid, porNombre: a.nombre, mensajeroId: mid
     });
     const calc = await calculosDe(t.c, ["pedidos", "recaudos", "cajamovs", "liquidaciones", "mensajeros", "movimientos", "clientes"]);

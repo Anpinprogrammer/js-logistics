@@ -63,6 +63,25 @@ test("el pago que recibe el mensajero abona al cliente, suma a lo que debe y no 
   assert.equal(c2.enMens, c0.enMens);
 });
 
+test("si el cliente transfiere (Nequi o Bancolombia) abona igual, entra a la caja de una vez y el mensajero no lo debe", async () => {
+  const [d0, s0, c0] = [await debe(idMensajero), await saldo(idCliente), await caja()];
+  const r = await mensajero.post("/api/movimientos/recibidos").send({ clienteId: idCliente, concepto: "Transferencia", valor: 20000, medio: "nequi" });
+  assert.equal(r.status, 201);
+  assert.equal(r.body.movimiento.medio, "nequi");
+  assert.equal(r.body.movimiento.mensajeroId, idMensajero);
+  assert.equal(await saldo(idCliente), s0 + 20000);
+  assert.equal(await debe(idMensajero), d0);
+  const c1 = await caja();
+  assert.equal(c1.total, c0.total + 20000);
+  assert.equal(c1.porMedio.nequi, (c0.porMedio.nequi || 0) + 20000);
+  assert.equal(c1.enMens, c0.enMens);
+  const lista = (await mensajero.get("/api/movimientos/recibidos")).body.registros;
+  assert.equal(lista[0].medio, "nequi");
+  assert.equal((await mensajero.post("/api/movimientos/recibidos").send({ clienteId: idCliente, concepto: "x", valor: 1000, medio: "daviplata" })).status, 400);
+  // Se quita para que las cuentas de las pruebas siguientes no cambien.
+  assert.equal((await admin.delete(`/api/movimientos/${r.body.movimiento.id}`)).status, 200);
+});
+
 test("lo que recibió queda en su período y en la liquidación", async () => {
   await mensajero.post("/api/movimientos/recibidos").send({ clienteId: idCliente, concepto: "Envío", valor: 12000 });
   const p = (await mensajero.get(`/api/mensajeros/${idMensajero}/periodo`)).body.periodo;
@@ -103,7 +122,7 @@ test("no anota en nombre de otro, ni con datos inválidos, ni otros roles", asyn
   assert.equal(r.body.movimiento.mensajeroId, idMensajero);           // se ignora: queda a su nombre
   assert.equal((await mensajero.post("/api/movimientos/recibidos").send({ clienteId: idCliente, concepto: "", valor: 1000 })).status, 400);
   assert.equal((await mensajero.post("/api/movimientos/recibidos").send({ clienteId: idCliente, concepto: "x", valor: 0 })).status, 400);
-  assert.equal((await mensajero.post("/api/movimientos/recibidos").send({ clienteId: idCliente, concepto: "x", valor: 1000, medio: "nequi" })).status, 400);
+  assert.equal((await mensajero.post("/api/movimientos/recibidos").send({ clienteId: idCliente, concepto: "x", valor: 1000, fecha: "2026-01-01" })).status, 400);
   assert.equal((await mensajero.post("/api/movimientos/recibidos").send({ clienteId: "no-existe", concepto: "x", valor: 1000 })).status, 404);
   assert.equal((await asistente.post("/api/movimientos/recibidos").send({ clienteId: idCliente, concepto: "x", valor: 1000 })).status, 403);
   assert.equal((await cliente.post("/api/movimientos/recibidos").send({ clienteId: idCliente, concepto: "x", valor: 1000 })).status, 403);

@@ -1314,5 +1314,11 @@
 .jsl .lista-patinador .fila-pago .info{min-width:0;flex:1;overflow-wrap:anywhere}
 .jsl .lista-patinador .fila-pago-valor{font-weight:700;white-space:nowrap}
 @media (min-width:960px){.jsl .form-pago{max-width:520px}}
+/* Recepción → Recibir dinero: cómo pagó el cliente (tres botones grandes, para el dedo en la calle) */
+.jsl .form-pago .etq-campo{display:block;margin-bottom:6px;font-size:.82rem;font-weight:600;color:var(--tinta)}
+.jsl .form-pago .medios-pago{display:flex;width:100%}
+.jsl .form-pago .medios-pago button{flex:1 1 auto;min-width:0;min-height:44px;padding-inline:6px;white-space:nowrap}
+.jsl .form-pago .medios-pago+small{display:block;margin-top:6px}
+@media (max-width:419px){.jsl .form-pago .medios-pago button{font-size:.8rem;padding-inline:4px}}
 /* Tres modos (Mensajero, Patinador, Administración): cada botón toma el ancho de su texto para que quepan a 320 px */
 .jsl .perfil-modos button{padding:6px 4px;white-space:nowrap;font-size:.7rem}
