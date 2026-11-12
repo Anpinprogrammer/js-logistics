@@ -54,7 +54,7 @@ test("cambiar a alguien a patinador exige que su ficha sea de tipo patinador", a
 test("la caja empieza vacía y el patinador puede buscar el cliente que le pagó", async () => {
   const r = await patinador.get("/api/patinador/caja");
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body.resumen, { total: 0, registros: 0, totalHoy: 0, registrosHoy: 0 });
+  assert.deepEqual(r.body.resumen, { total: 0, registros: 0, totalHoy: 0, registrosHoy: 0, entregado: 0, entregadoHoy: 0, enCaja: 0 });
   assert.deepEqual(r.body.registros, []);
   const b = await patinador.get("/api/clientes/buscar?q=espiga");
   assert.equal(b.status, 200);
@@ -68,7 +68,7 @@ test("cada pago que anota suma a su caja, con la hora del servidor y en el histo
   assert.equal(r1.body.registro.valor, 24000);
   assert.equal(r1.body.registro.mensajeroId, idPatinador);
   assert.ok(Math.abs(Date.parse(r1.body.registro.fecha) - Date.now()) < 60_000);
-  assert.deepEqual(r1.body.resumen, { total: 24000, registros: 1, totalHoy: 24000, registrosHoy: 1 });
+  assert.deepEqual(r1.body.resumen, { total: 24000, registros: 1, totalHoy: 24000, registrosHoy: 1, entregado: 0, entregadoHoy: 0, enCaja: 24000 });
 
   const r2 = await patinador.post("/api/patinador/caja").send({ clienteId: idOtroCliente, concepto: "  Envío  ", valor: "8000" });
   assert.equal(r2.status, 201);
@@ -197,6 +197,9 @@ test("recibir dinero de un patinador usa la misma entrega de los mensajeros y ba
   const a = await oficina.post("/api/recaudos").send({ mensajeroId: idPatinador, valor: 20000, medio: "efectivo", nota: "Primera entrega" });
   assert.equal(a.status, 201);
   assert.equal(a.body.debe, 12000); // 32.000 recibidos − 20.000 entregados
+  // Lo que ve el patinador en su caja baja en el acto, sin tocar sus pagos anotados.
+  const m1 = (await patinador.get("/api/patinador/caja")).body;
+  assert.deepEqual([m1.resumen.total, m1.resumen.entregado, m1.resumen.enCaja, m1.total], [32000, 20000, 12000, 2]);
   const b = await asistente.post("/api/recaudos").send({ mensajeroId: idPatinador, valor: 15000, medio: "nequi" });
   assert.equal(b.body.debe, -3000); // entregó de más: queda a favor
   const t = (await oficina.get("/api/patinador/resumen")).body.patinadores.find(p => p.mensajeroId === idPatinador);
@@ -209,4 +212,5 @@ test("recibir dinero de un patinador usa la misma entrega de los mensajeros y ba
   // Corregir o quitar sigue siendo de administración y se refleja en el resumen.
   assert.equal((await oficina.delete(`/api/recaudos/${b.body.recaudo.id}`)).status, 200);
   assert.equal((await oficina.get("/api/patinador/resumen")).body.patinadores.find(p => p.mensajeroId === idPatinador).debe, 12000);
+  assert.equal((await patinador.get("/api/patinador/caja")).body.resumen.enCaja, 12000);
 });

@@ -21,16 +21,21 @@ export async function crear({ mensajeroId, clienteId, concepto, valor, porUid, m
   return filaAObjeto(rows[0]);
 }
 
-/** Total acumulado y lo de hoy, con cuántos registros tiene cada uno. */
+/** Lo recibido (total, hoy), lo que ya entregó a la oficina (recaudos) y lo que le queda en la caja (`enCaja`, puede ser negativo
+    si la oficina registró de más). Cuando la oficina recibe su dinero (POST /recaudos), `enCaja` baja solo: no hay otro dato que sincronizar. */
 export async function resumen(mensajeroId, db = { query }) {
   const { rows } = await db.query(
     `SELECT coalesce(sum(r.valor), 0)::bigint AS total, count(*)::int AS registros,
             coalesce(sum(r.valor) FILTER (WHERE ${ES_HOY}), 0)::bigint AS total_hoy,
-            (count(*) FILTER (WHERE ${ES_HOY}))::int AS registros_hoy
+            (count(*) FILTER (WHERE ${ES_HOY}))::int AS registros_hoy,
+            coalesce((SELECT sum(e.valor) FROM recaudos e WHERE e.mensajero_id = $1), 0)::bigint AS entregado,
+            coalesce((SELECT sum(e.valor) FROM recaudos e WHERE e.mensajero_id = $1 AND (e.fecha AT TIME ZONE 'America/Bogota')::date = (now() AT TIME ZONE 'America/Bogota')::date), 0)::bigint AS entregado_hoy
      FROM caja_patinador r WHERE r.mensajero_id = $1`,
     [mensajeroId]
   );
-  return filaAObjeto(rows[0]);
+  const o = filaAObjeto(rows[0]);
+  o.enCaja = o.total - o.entregado;
+  return o;
 }
 
 /** Registros de un patinador, los más nuevos primero, por páginas (paginador de pantalla). */

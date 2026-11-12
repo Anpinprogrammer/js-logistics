@@ -8,9 +8,13 @@ export const registrosDemo: RegistroCajaPatinador[] = [
   { id: "demo-p2", mensajeroId: "m-pat", clienteId: "demo-c2", clienteNombre: "Moda Sol", concepto: "Envío", valor: 8000, fecha: ahoraMenos(90) },
 ];
 
-export function resumenDe(rs: RegistroCajaPatinador[]): ResumenCajaPatinador {
+/** `mensajeroId` es la ficha: lo entregado sale de las entregas de dinero (S.recaudos), como en el servidor. */
+export function resumenDe(rs: RegistroCajaPatinador[], mensajeroId: string): ResumenCajaPatinador {
   const h = hoy(), deHoy = rs.filter(r => diaDe(Date.parse(r.fecha)) === h);
-  return { total: rs.reduce((a, r) => a + r.valor, 0), registros: rs.length, totalHoy: deHoy.reduce((a, r) => a + r.valor, 0), registrosHoy: deHoy.length };
+  const es = Object.values(S.recaudos).filter(r => r.mensajeroId === mensajeroId), v = (r: { valor?: unknown }) => Number(r.valor) || 0;
+  const total = rs.reduce((a, r) => a + r.valor, 0), entregado = es.reduce((a, r) => a + v(r), 0);
+  return { total, registros: rs.length, totalHoy: deHoy.reduce((a, r) => a + r.valor, 0), registrosHoy: deHoy.length,
+    entregado, entregadoHoy: es.filter(r => diaDe(r.fecha) === h).reduce((a, r) => a + v(r), 0), enCaja: total - entregado };
 }
 
 /** Como GET /patinador/resumen: lo entregado sale de las entregas de dinero (S.recaudos), igual que en el servidor. */

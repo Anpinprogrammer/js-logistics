@@ -308,7 +308,8 @@ export interface ListaSolicitudes { solicitudes: Solicitud[]; conteo: ConteoSoli
 /** Un pago que el patinador recibió de un cliente en su ruta (GET/POST /patinador/caja). */
 export interface RegistroCajaPatinador { id: string; mensajeroId: string; clienteId: string; clienteNombre: string; concepto: string; valor: number; fecha: string }
 /** Total acumulado de su caja y lo de hoy (día de Colombia), calculados por el servidor. */
-export interface ResumenCajaPatinador { total: number; registros: number; totalHoy: number; registrosHoy: number }
+/** `total` es todo lo que recibió; `entregado` lo que ya le dio a la oficina (se descuenta solo cuando administración lo registra); `enCaja` lo que le queda en la mano. Solo los trae la caja del patinador (el recibido del mensajero no). */
+export interface ResumenCajaPatinador { total: number; registros: number; totalHoy: number; registrosHoy: number; entregado?: number; entregadoHoy?: number; enCaja?: number }
 export interface CajaPatinador { resumen: ResumenCajaPatinador; registros: RegistroCajaPatinador[]; pagina: number; porPagina: number; total: number; paginas: number }
 
 /** Un patinador en Caja → Mensajeros (GET /patinador/resumen): lo anotado de los clientes, lo ya entregado a la oficina y lo que debe (puede ser negativo). */
