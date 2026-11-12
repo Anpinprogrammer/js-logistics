@@ -23,6 +23,7 @@ export const aPedido = (p: T.Pedido): Pedido => ({
   gasto: p.gasto || 0, gastoNota: p.gastoNota || "", domiPagado: !!p.domiPagado, domiPagoMedio: p.domiPagoMedio || "",
   domiPagoValor: p.domiPagoValor ?? null, domiPagoFecha: ms(p.domiPagoFecha), domiPagoUid: p.domiPagoUid || "",
   intentos: (p.intentos || []).map(i => ({ fecha: ms(i.fecha), motivo: i.motivo || "", nota: i.nota || "" })), mini: p.mini || "",
+  solicitud: p.solicitud ?? null,
 });
 const aCliente = (c: T.Cliente): Cliente => ({ id: c.id, nombre: c.nombre, telefono: c.telefono || "", tarifa: c.tarifa || 0 });
 export const aPersona = (m: T.Mensajero): Persona => ({ id: m.id, nombre: m.nombre, telefono: m.telefono || "", tipo: m.tipo || "mensajero", tarifa: m.tarifa || 0 });

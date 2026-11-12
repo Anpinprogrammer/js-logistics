@@ -10,8 +10,12 @@ import {
 import { Columnas, Dona, EtqEstado, FiltroDia, Icono, IconoCamara, Kpi, Mini, TablaEntregas, pl, useVentana } from "../ui";
 import { abrirEntregaEn, VerEntregado } from "./Entrega";
 import { DlgNuevaGuia } from "./NuevaGuia";
+import { DlgRecoger } from "./Recoger";
+import { pendientesMios, porRecogerMios } from "./pendientes";
+import type { Pedido } from "../motor";
 
-import { pendientesMios } from "./pendientes";
+/** Sub-pestañas de Pedidos del mensajero. */
+const SUBS_PED: [k: "todos" | "entregar" | "recoger", t: string][] = [["todos", "Todos"], ["entregar", "Por entregar"], ["recoger", "Por recoger"]];
 const MAX_FOTOS = 30;
 
 export default function Mensajero({ pintar }: { pintar: () => void }) {
@@ -25,7 +29,10 @@ export default function Mensajero({ pintar }: { pintar: () => void }) {
   const elegir = (id: string) => { if (!id) return; E.actuarComo = !!vinc && id !== vinc; E.miMensajero = id; guardarLocal("js_mensajero", id); pintar(); };
   const cambiarYo = (e: React.MouseEvent) => { e.preventDefault(); if (E.actuarComo) { E.actuarComo = false; E.miMensajero = vinc; pintar(); return; } if (vinc && yo.esAdmin) E.actuarComo = true; E.miMensajero = ""; pintar(); };
   const enlaceCambiar = puedeCambiar ? <> · <a href="#" id="cambiarYo" onClick={cambiarYo}>{E.actuarComo ? "volver a mi nombre" : "cambiar"}</a></> : null;
-  const irM = (k: string) => { E.tabM = k; if (k === "pend") E.diaPedM = ""; pintar(); scrollTo(0, 0); };
+  const irM = (k: string) => {
+    if (k === "recoger" || k === "entregar") { E.subPedM = k; guardarLocal("js_pedidos_m", k); k = "pend"; }
+    E.tabM = k; if (k === "pend") E.diaPedM = ""; pintar(); scrollTo(0, 0);
+  };
 
   // Al tomar la foto solo se abre la ventana: la guía se crea cuando el mensajero pulsa "Crear guía".
   const fotos = (lista: FileList | null) => {
@@ -59,15 +66,7 @@ export default function Mensajero({ pintar }: { pintar: () => void }) {
       <button className="btn sec" id="btnGaleria" style={{ width: "100%", marginTop: 10 }} onClick={btnGaleria}>Subir fotos de la galería (puedes elegir varias)</button>
       {E.ultimaGuia && <div className="recien"><div><div className="guia">{E.ultimaGuia}</div><span>Guardado en por entregar. Escribe {E.ultimaGuia.includes(" a ") ? "cada número en su paquete" : "este número en el paquete"}.</span></div></div>}</>;
   } else if (E.tabM === "pend") {
-    const ps = pendientesMios().filter(p => delDia(p, E.diaPedM));
-    h = <><h1>Por entregar</h1><p className="sub">{ps.length} {pl(ps.length, "pedido")} en ruta{E.diaPedM ? " que salieron ese día" : ""}</p>
-      <FiltroDia d={E.diaPedM} poner={d => { E.diaPedM = d; pintar(); }} />
-      {ps.length ? <div className="lista">{ps.map(p => (
-        <button className="fila" key={p.guia} onClick={() => abrirEntregaEn(ventana, p.guia)}><Mini p={p} />
-          <span className="info"><span className="guia">{p.guia}</span>{Number(p.aCobrar) ? <> <b>Cobrar {pesos(p.aCobrar)}</b></> : null}{p.intentos.length ? <> <span className="etq sin">{p.intentos.length} {pl(p.intentos.length, "intento")}</span></> : null}
-            <p>{nombreCliente(p.clienteId) || p.clienteNombre || "Remitente sin asignar"} · salió {hora(p.creado)}</p></span>
-          <span className="btn chico ok">Entregar</span></button>))}</div>
-        : <div className="vacio">{E.diaPedM ? "No tienes pedidos pendientes de ese día." : "No tienes pedidos pendientes. Toma la foto en “Nuevo pedido” al salir."}</div>}</>;
+    h = <PedidosMensajero pintar={pintar} />;
   } else if (E.tabM === "sueldo") {
     h = <MiSueldo mid={E.miMensajero} pintar={pintar} />;
   } else if (E.tabM === "entregados") {
@@ -104,11 +103,52 @@ export default function Mensajero({ pintar }: { pintar: () => void }) {
   return <>{entradas}{h}</>;
 }
 
+/* ---- Pedidos del mensajero: Todos, Por entregar (en ruta) y Por recoger (guías de solicitudes sin foto) ---- */
+function PedidosMensajero({ pintar }: { pintar: () => void }) {
+  const ventana = useVentana(), barra = useRef<HTMLDivElement>(null);
+  const entregar = pendientesMios().filter(p => delDia(p, E.diaPedM)), recoger = porRecogerMios().filter(p => delDia(p, E.diaPedM));
+  const sub = E.subPedM, cuantos = { todos: entregar.length + recoger.length, entregar: entregar.length, recoger: recoger.length };
+  // En "Todos" primero lo que hay que recoger: sin la foto no se puede entregar.
+  const ps = sub === "entregar" ? entregar : sub === "recoger" ? recoger : [...recoger, ...entregar];
+  const ir = (k: typeof sub) => { E.subPedM = k; guardarLocal("js_pedidos_m", k); pintar(); };
+  const alTeclear = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    const i = SUBS_PED.findIndex(([k]) => k === sub), j = (i + (e.key === "ArrowRight" ? 1 : SUBS_PED.length - 1)) % SUBS_PED.length;
+    ir(SUBS_PED[j][0]); setTimeout(() => barra.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus(), 0);
+  };
+  const vacio = E.diaPedM ? (sub === "recoger" ? "No tienes pedidos por recoger de ese día." : "No tienes pedidos pendientes de ese día.")
+    : sub === "recoger" ? "No tienes pedidos por recoger. Cuando la oficina te asigne una solicitud, aparece aquí."
+    : sub === "entregar" ? "No tienes pedidos por entregar. Toma la foto en “Nuevo pedido” al salir."
+    : "No tienes pedidos pendientes. Toma la foto en “Nuevo pedido” al salir.";
+  const sub_ = (p: Pedido) => p.estado === "aceptado"
+    ? (p.solicitud?.direccionRecogida ? "Recoger en " + p.solicitud.direccionRecogida : "Asignado " + hora(p.creado))
+    : (p.solicitud?.direccionEntrega ? "Entregar en " + p.solicitud.direccionEntrega + " · " : "") + "salió " + hora(p.creado);
+  return <>
+    <h1>Pedidos</h1>
+    <p className="sub">{entregar.length} en ruta · {recoger.length} por recoger{E.diaPedM ? " de ese día" : ""}</p>
+    <div className="seg subtabs subtabs-mens" role="tablist" aria-label="Pedidos del mensajero" ref={barra}>
+      {SUBS_PED.map(([k, t]) => <button key={k} id={"subPedM-" + k} type="button" role="tab" aria-selected={sub === k} aria-controls="panelPedM" tabIndex={sub === k ? 0 : -1}
+        onClick={() => ir(k)} onKeyDown={alTeclear}>{t} <span className={"num" + (k === "recoger" && cuantos.recoger ? " amb" : "")}>{cuantos[k]}</span></button>)}
+    </div>
+    <FiltroDia d={E.diaPedM} poner={d => { E.diaPedM = d; pintar(); }} />
+    <div id="panelPedM" role="tabpanel" aria-labelledby={"subPedM-" + sub}>
+      {ps.length ? <div className="lista">{ps.map(p => {
+        const rec = p.estado === "aceptado";
+        return <button className="fila" key={p.guia} onClick={() => rec ? ventana.abrir(<DlgRecoger guia={p.guia} />, "centrada") : abrirEntregaEn(ventana, p.guia)}><Mini p={p} />
+          <span className="info"><span className="guia">{p.guia}</span>{rec ? <> <span className="etq rec">Por recoger</span></> : null}{Number(p.aCobrar) ? <> <b>Cobrar {pesos(p.aCobrar)}</b></> : null}{p.intentos.length ? <> <span className="etq sin">{p.intentos.length} {pl(p.intentos.length, "intento")}</span></> : null}
+            <p>{nombreCliente(p.clienteId) || p.clienteNombre || "Remitente sin asignar"} · {sub_(p)}</p></span>
+          {rec ? <span className="btn chico">Recoger</span> : <span className="btn chico ok">Entregar</span>}</button>;
+      })}</div> : <div className="vacio">{vacio}</div>}
+    </div>
+  </>;
+}
+
 /* ---- Panel del mensajero: su rendimiento y recomendaciones para mejorar (solo con sus propios pedidos) ---- */
 type Reco = [cls: "sin" | "ent" | "pend" | "ruta", ic: string, titulo: string, texto: string, ir?: string];
 function InicioMensajero({ mid, enlace, irM, btnFoto, btnGaleria }: { mid: string; enlace: React.ReactNode; irM: (k: string) => void; btnFoto: () => void; btnGaleria: () => void }) {
   const m = S.mensajeros[mid], h = hoy(), H = 36e5, desde = moverDia(h, -29), mis = Object.values(S.pedidos).filter(p => p.mensajeroId === mid);
   const enRuta = mis.filter(p => p.estado === "pendiente").sort((a, b) => a.creado - b.creado), viejos = enRuta.filter(p => Date.now() - p.creado > 24 * H);
+  const porRecoger = mis.filter(p => p.estado === "aceptado").length;
   const entHoy = mis.filter(p => p.estado === "entregado" && diaDe(p.entregado || 0) === h).length, devHoy = mis.filter(p => p.estado === "devuelto" && diaDe(p.entregado || 0) === h).length;
   const mes = mis.filter(p => cerrado(p) && diaDe(p.entregado || 0) >= desde), ent = mes.filter(p => p.estado === "entregado"), dev = mes.filter(p => p.estado === "devuelto");
   const efec = pct(ent.length, mes.length), [nivel, clsNivel] = nivelEfectividad(efec, mes.length);
@@ -127,7 +167,8 @@ function InicioMensajero({ mid, enlace, irM, btnFoto, btnGaleria }: { mid: strin
   const nomMotivo = (k: string) => MOTIVOS[k as keyof typeof MOTIVOS] || "Otro motivo";
   // recomendaciones: primero lo urgente, luego cómo mejorar, y siempre reconocer lo que va bien
   const R: Reco[] = [];
-  if (viejos.length) R.push(["sin", "pend", `Tienes ${viejos.length} ${pl(viejos.length, "pedido")} con más de un día en ruta`, "Entrégalos hoy o márcalos como “No se pudo entregar” con el motivo, para que la oficina le avise al remitente.", "pend"]);
+  if (porRecoger) R.push(["sin", "pedidos", `Tienes ${porRecoger} ${pl(porRecoger, "pedido")} por recoger`, "La oficina te los asignó desde una solicitud. Ve por ellos y pulsa “Recoger” para tomarle la foto al paquete: sin la foto no los puedes entregar.", "recoger"]);
+  if (viejos.length) R.push(["sin", "pend", `Tienes ${viejos.length} ${pl(viejos.length, "pedido")} con más de un día en ruta`, "Entrégalos hoy o márcalos como “No se pudo entregar” con el motivo, para que la oficina le avise al remitente.", "entregar"]);
   const ultimaEntregaPlata = Math.max(pm.ul?.fecha || 0, ...pm.recs.map(r => r.fecha)), desdeCuando = ultimaEntregaPlata || pm.ps[0]?.entregado || Date.now(), diasSinEntregar = Math.floor((Date.now() - desdeCuando) / (24 * H));
   if (pm.debe >= 100000 && diasSinEntregar >= 1) R.push(["sin", "plata", `Llevas ${pesos(pm.debe)} sin entregar a la oficina`, `Hace ${diasSinEntregar === 1 ? "más de un día" : diasSinEntregar + " días"} que no le pasas plata a la oficina. Entrégala hoy: andar con mucha plata es un riesgo para ti, y la caja de la empresa no cuadra hasta que la recibe.`, "caja"]);
   if (mes.length >= 10 && efec < 90 && motivos.length) { const [k, n] = motivos[0], c = CONSEJOS_MOTIVO[k] || CONSEJOS_MOTIVO.otro;
@@ -139,21 +180,21 @@ function InicioMensajero({ mid, enlace, irM, btnFoto, btnGaleria }: { mid: strin
   if (diasSem >= 2 && diasTrab >= 5 && porDiaSem < porDia * 0.8) R.push(["ruta", "pedidos", `Esta semana vas en ${coma(porDiaSem)} entregas por día`, `Tu promedio del último mes es ${coma(porDia)}. Pide en la oficina más pedidos de tu zona o arranca un poco más temprano.`]);
   if (mes.length >= 10 && efec >= 95) R.unshift(["ent", "ok", "¡Vas excelente!", `Entregaste ${efec}% de tus pedidos en los últimos 30 días. Sigue llamando antes de llegar y confirmando direcciones: eso es lo que hace la diferencia.`]);
   else if (!R.length && mes.length) R.push(["ent", "ok", "Vas bien", "No hay nada urgente. Sigue confirmando direcciones y llamando antes de llegar para mantener tus entregas al día."]);
-  if (!mes.length && !enRuta.length) R.push(["ruta", "nuevo", "Empieza tu día", "Toma la foto de cada pedido al salir. Aquí vas a ver cómo te va y consejos para mejorar."]);
+  if (!mes.length && !enRuta.length && !porRecoger) R.push(["ruta", "nuevo", "Empieza tu día", "Toma la foto de cada pedido al salir. Aquí vas a ver cómo te va y consejos para mejorar."]);
   const orden = { sin: 0, ent: 1, pend: 2, ruta: 3 }; R.sort((a, b) => orden[a[0]] - orden[b[0]]);
   const dias = entregasPorDia(mis, 14), tot14 = dias.reduce((a, d) => a + d.n, 0);
   return <>
     <div className="dash-cab"><div><h1>Hola, {m.nombre}</h1><p className="sub">Así va tu trabajo{enlace}</p></div></div>
     <div className="acciones" style={{ margin: "0 0 16px" }}><button className="btn" id="btnFoto" onClick={btnFoto}><Icono n="nuevo" /> Tomar foto del pedido</button><button className="btn sec" id="btnGaleria" onClick={btnGaleria}>Subir de la galería</button></div>
     <div className="kpis">
-      <Kpi ico="ruta" lbl="En ruta" val={enRuta.length} pie={<small>{viejos.length ? <span className="neg">{viejos.length} con más de un día</span> : "Por entregar ahora"}</small>} onClick={() => irM("pend")} />
+      <Kpi ico="ruta" lbl="En ruta" val={enRuta.length} pie={<small>{viejos.length ? <span className="neg">{viejos.length} con más de un día</span> : "Por entregar ahora"}</small>} onClick={() => irM("entregar")} />
       <Kpi ico="ok" lbl="Entregados hoy" val={entHoy} pie={<small>{devHoy ? devHoy + " " + pl(devHoy, "devuelto") + " hoy" : "Sin devoluciones hoy"}</small>} />
       {esMens ? <Kpi ico="sueldos" lbl="Sueldo de la semana" val={pesos(su.neto)} pie={<small>{su.adel ? "Ya descontados " + pesos(su.adel) + " de adelantos" : "Lo que te deben esta semana"}</small>} />
         : <Kpi ico="pedidos" lbl="Entregas del mes" val={ent.length} pie={<small>{coma(porDia)} por día trabajado</small>} />}
       <Kpi ico="plata" lbl="Te falta entregar" val={pesos(pm.debe)} pie={<small>{pm.debe > 0 ? "Plata que debes llevar a la oficina" : "Estás al día con la oficina"}</small>} onClick={() => irM("caja")} cls="oscuro" />
     </div>
     <section className="tarjeta" style={{ marginBottom: 16 }}><h3>Recomendaciones para ti</h3>
-      <div className="recos">{R.slice(0, 4).map(([cls, ic, t, txt, ir], i) => <div key={i} className={"reco " + cls}><span className="reco-ic"><Icono n={ic} /></span><div><b>{t}</b><p>{txt}</p>{ir && <button className="btn sec chico" onClick={() => irM(ir)}>{ir === "pend" ? "Ver por entregar" : "Ver mi caja"}</button>}</div></div>)}</div></section>
+      <div className="recos">{R.slice(0, 4).map(([cls, ic, t, txt, ir], i) => <div key={i} className={"reco " + cls}><span className="reco-ic"><Icono n={ic} /></span><div><b>{t}</b><p>{txt}</p>{ir && <button className="btn sec chico" onClick={() => irM(ir)}>{ir === "entregar" ? "Ver por entregar" : ir === "recoger" ? "Ver por recoger" : "Ver mi caja"}</button>}</div></div>)}</div></section>
     <div className="dash">
       <section className="tarjeta c4"><h3>Efectividad <span className={"etq " + clsNivel}>{nivel}</span></h3>
         <Dona segs={[{ t: "Entregados", n: ent.length, c: COLOR_ESTADO.entregado }, { t: "Devueltos", n: dev.length, c: COLOR_ESTADO.devuelto }]} centro={mes.length ? efec + "%" : "—"} sub="últimos 30 días" /></section>

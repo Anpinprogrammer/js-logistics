@@ -130,6 +130,7 @@ const pl = (n: number, uno: string, varios = uno + "s") => (n === 1 ? uno : vari
 export { pl };
 export const EtqEstado = ({ p }: { p: Pedido }) => p.estado === "entregado" ? <span className="etq ent">Entregado</span>
   : p.estado === "devuelto" ? <span className="etq dev">Devuelto</span>
+  : p.estado === "aceptado" ? <span className="etq rec">Por recoger</span>
   : <><span className="etq pend">Por entregar</span>{p.intentos.length ? <>{" "}<span className="etq sin">{p.intentos.length} {pl(p.intentos.length, "intento")}</span></> : null}</>;
 export const EtqCambio = ({ p }: { p: Pedido }) => p.cambio ? <>{" "}{p.cambioRecibido ? <span className="etq ent">Cambio recibido</span> : <span className="etq sin">Cambio por entregar</span>}</> : null;
 export const EtqDash = ({ p }: { p: Pedido }) => p.estado === "pendiente" ? <span className="etq ruta">En ruta</span> : <EtqEstado p={p} />;

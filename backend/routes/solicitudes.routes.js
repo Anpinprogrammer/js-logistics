@@ -9,6 +9,8 @@ import { permitir, OFICINA } from "../middleware/autorizar.js";
 const r = Router();
 // Un cliente con cuenta pide un envío desde su portal. Su ficha se toma de la sesión, nunca del cuerpo.
 r.post("/portal", permitir("cliente"), validar({ body: V.crearPortal }), C.crearDesdePortal);
+// "Mis solicitudes": el cliente ve solo las suyas (va antes de /:id para que "mias" no se lea como un id).
+r.get("/mias", permitir("cliente"), validar({ query: V.mias }), C.listarMias);
 r.get("/", permitir(OFICINA), validar({ query: V.listar }), C.listar);
 r.get("/:id", permitir(OFICINA), validar({ params: paramId }), C.obtener);
 r.post("/:id/aceptar", permitir(OFICINA), validar({ params: paramId, body: V.aceptar }), C.aceptar);

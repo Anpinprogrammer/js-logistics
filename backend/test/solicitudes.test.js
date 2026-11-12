@@ -109,12 +109,16 @@ test("aceptar con valor, confirmar y asignar crea el cliente y la guía", async 
   const suyas = (await mensajero.get("/api/pedidos")).body.pedidos.map(p => p.guia);
   assert.ok(suyas.includes(r.body.pedido.guia));
   // Ya asignada: no se puede rechazar ni volver a asignar
-  assert.equal((await oficina.post(`/api/solicitudes/${s.id}/rechazar`).send({})).status, 409);
+  assert.equal((await oficina.post(`/api/solicitudes/${s.id}/rechazar`).send({ motivo: "Ya no se necesita" })).status, 409);
   assert.equal((await oficina.post(`/api/solicitudes/${s.id}/asignar`).send({ mensajeroId: idMensajero })).status, 409);
 });
 
 test("rechazar guarda el motivo y la saca de las abiertas", async () => {
   const s = (await abiertas()).solicitudes[0];
+  // Sin razón no se rechaza: el cliente la ve en su portal.
+  const sin = await oficina.post(`/api/solicitudes/${s.id}/rechazar`).send({});
+  assert.equal(sin.status, 400);
+  assert.equal(sin.body.error.code, "DATOS_INVALIDOS");
   const r = await oficina.post(`/api/solicitudes/${s.id}/rechazar`).send({ motivo: "Fuera de la zona de cobertura" });
   assert.equal(r.status, 200);
   assert.equal(r.body.solicitud.estado, "rechazada");

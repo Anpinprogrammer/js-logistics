@@ -841,3 +841,18 @@
 .jsl .seg-solicitudes .num{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--rojo);color:#fff;font-size:.66rem;text-align:center;line-height:17px}
 .jsl .seg-solicitudes .num.neu{background:var(--linea);color:var(--tinta)}
 .jsl .seg-solicitudes button[aria-pressed="true"] .num{background:#fff;color:var(--lateral)}
+
+/* Estado "Por recoger" (guía de una solicitud sin foto del paquete) y la ventana "Recoger" del mensajero. */
+.jsl .etq.rec{background:color-mix(in srgb,var(--marca2) 14%,var(--papel));color:var(--marca2);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--marca2) 45%,transparent)}
+.jsl .rec-datos{margin:0 0 14px}
+.jsl .rec-datos > div{display:contents}
+.jsl .rec-datos dd{overflow-wrap:anywhere;min-width:0}
+.jsl .rec-camara{min-height:170px;font-size:1.1rem}
+.jsl .rec-camara svg{width:64px;height:64px}
+/* Pedidos del mensajero: Todos, Por entregar y Por recoger. Botones de 44 px para el dedo, a todo el ancho en el celular. */
+.jsl .subtabs-mens{display:flex;width:100%;margin:6px 0 12px}
+.jsl .subtabs-mens button{flex:1;min-height:44px;padding-inline:10px}
+.jsl .subtabs-mens .num{display:inline-block;min-width:18px;margin-left:4px;padding:0 5px;border-radius:999px;background:var(--linea);color:var(--tinta);font-size:.68rem;text-align:center;line-height:17px}
+.jsl .subtabs-mens .num.amb{background:var(--ambar,#f59e0b);color:#1c1917}
+.jsl .subtabs-mens button[aria-selected="true"] .num{background:rgba(255,255,255,.25);color:#fff}
+@media (min-width:600px){.jsl .subtabs-mens{display:inline-flex;width:auto}.jsl .subtabs-mens button{flex:none}}

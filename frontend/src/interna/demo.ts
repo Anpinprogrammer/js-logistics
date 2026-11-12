@@ -63,6 +63,15 @@ export function datosDemo(u: Usuario): Almacen {
       S.pedidos[guia] = p;
     }
   }
+  // Guías de solicitudes del portal, asignadas y sin recoger ("Por recoger" del mensajero).
+  ([["m1", "c1", "Cra 10 # 5-20, Barrio Granada", "Pedro Ruiz", "Calle 70 # 1-10, Floralia"], ["m1", "c3", "Av 6N # 20-15, Versalles", "Marta Díaz", "Cra 100 # 14-30, Ciudad Jardín"],
+    ["m2", "c2", "Calle 5 # 38-10, San Fernando", "Julián Mora", "Cra 1 # 62-20, Alcázares"]] as const).forEach(([mid, cid, rec, dest, ent], i) => {
+    const guia = "JS-" + String(n).padStart(5, "0");
+    S.pedidos[guia] = { guia, n: n++, estado: "aceptado", creado: ahora - (i + 1) * 40 * 6e4, entregado: null, mensajeroId: mid, clienteId: cid, clienteNombre: S.clientes[cid].nombre,
+      valorServicio: S.clientes[cid].tarifa, aCobrar: i === 1 ? 65000 : 0, destinatario: "", valorCobrado: 0, metodo: "", cuentaJs: "", difCobro: 0, difRevisada: false, motivoDev: "", notaDev: "",
+      cobrarDev: false, cambio: false, cambioRecibido: null, gasto: 0, gastoNota: "", domiPagado: false, domiPagoMedio: "", domiPagoValor: null, domiPagoFecha: 0, domiPagoUid: "", intentos: [], mini: "",
+      solicitud: { direccionRecogida: rec, direccionEntrega: ent, destinatarioNombre: dest, destinatarioTelefono: "311 000 00" + (10 + i), paquetes: 1 } };
+  });
   // Movimientos de clientes: pagos que hicieron y pagos que les hizo JS
   let m = 1; const nuevo = (pre: string) => pre + (m++);
   for (let d = 30; d >= 0; d -= 1) {

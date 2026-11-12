@@ -7,7 +7,12 @@ const CON_INTENTOS = `
   SELECT p.*, c.nombre AS cliente_nombre, m.nombre AS mensajero_nombre,
     COALESCE((SELECT json_agg(json_build_object('fecha', i.fecha, 'motivo', i.motivo, 'nota', i.nota) ORDER BY i.fecha)
               FROM pedido_intentos i WHERE i.guia = p.guia), '[]'::json) AS intentos,
-    (SELECT a.ruta FROM pedido_archivos a WHERE a.guia = p.guia AND a.tipo = 'mini' ORDER BY a.creado DESC LIMIT 1) AS mini_ruta
+    (SELECT a.ruta FROM pedido_archivos a WHERE a.guia = p.guia AND a.tipo = 'mini' ORDER BY a.creado DESC LIMIT 1) AS mini_ruta,
+    -- Si la guía salió de una solicitud: dónde recoger y a quién entregar (lo necesita el mensajero para "Recoger").
+    -- Solo lo ve quien puede ver la guía; no trae los datos de contacto del remitente.
+    (SELECT json_build_object('direccionRecogida', s.direccion_recogida, 'direccionEntrega', s.direccion_entrega,
+       'destinatarioNombre', s.destinatario_nombre, 'destinatarioTelefono', s.destinatario_telefono, 'paquetes', s.paquetes)
+     FROM solicitudes s WHERE s.guia = p.guia LIMIT 1) AS solicitud
   FROM pedidos p
   LEFT JOIN clientes c ON c.id = p.cliente_id
   LEFT JOIN mensajeros m ON m.id = p.mensajero_id`;
@@ -28,7 +33,7 @@ function filtrosSql({ estado, cerrados, mensajeroId, clienteId, desde, hasta, en
   if (clienteId) agregar("p.cliente_id = ?", clienteId);
   if (desde) agregar("p.creado >= ?", desde);
   if (hasta) agregar("p.creado < ?", hasta);
-  if (cerrados) cond.push("p.estado <> 'pendiente'");
+  if (cerrados) cond.push("p.estado IN ('entregado', 'devuelto')");
   if (entregadoDesde) agregar("p.entregado >= ?", entregadoDesde); // por hora de entrega o devolución
   if (entregadoHasta) agregar("p.entregado < ?", entregadoHasta);
   if (buscar) { // guía, quien recibió, remitente o mensajero, como el buscador de la app
@@ -97,16 +102,17 @@ export async function bloquear(guia, db) {
  * Crea la guía con el siguiente consecutivo, en una transacción: dos mensajeros a la vez nunca reciben
  * el mismo número y, si algo falla, el contador no avanza (no quedan huecos).
  */
-/** Crea una guía con el siguiente consecutivo. Con `db` participa en una transacción que ya está abierta. */
-export async function crear({ mensajeroId, clienteId = null, valorServicio = 0, aCobrar = 0, creadoPor }, dbExterno) {
+/** Crea una guía con el siguiente consecutivo. Con `db` participa en una transacción que ya está abierta.
+    `estado` "aceptado" es para las guías de una solicitud: quedan por recoger hasta que el mensajero les toma la foto. */
+export async function crear({ mensajeroId, clienteId = null, valorServicio = 0, aCobrar = 0, creadoPor, estado = "pendiente" }, dbExterno) {
   const enDb = fn => (dbExterno ? fn(dbExterno) : transaccion(fn));
   return enDb(async db => {
     const { rows: [c] } = await db.query(`UPDATE contadores SET n = n + 1 WHERE nombre = 'guia' RETURNING n`);
     const n = c.n, guia = formatoGuia(n);
     await db.query(
-      `INSERT INTO pedidos (guia, n, mensajero_id, cliente_id, valor_servicio, a_cobrar, creado_por)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [guia, n, mensajeroId, clienteId, valorServicio, aCobrar, creadoPor]
+      `INSERT INTO pedidos (guia, n, mensajero_id, cliente_id, valor_servicio, a_cobrar, creado_por, estado)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [guia, n, mensajeroId, clienteId, valorServicio, aCobrar, creadoPor, estado]
     );
     return buscarPorGuia(guia, db);
   });

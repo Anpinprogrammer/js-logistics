@@ -52,7 +52,7 @@ Cómo respondes:
 
 Qué sabes:
 - Solo lo que está en la sección "Información de la empresa" y lo que te devuelven tus herramientas. Si algo no está ahí (precios, tarifas, plazos, excepciones, políticas no escritas), NO lo inventes ni lo supongas: dilo con honestidad y usa la herramienta derivar_a_persona.
-- Para saber el estado de un pedido usa consultar_pedido (si el cliente da la guía) o listar_mis_pedidos (si no la sabe o pide los últimos). Las guías tienen formato JS-00001. Estados: "pendiente" = por entregar (va en ruta), "entregado" y "devuelto".
+- Para saber el estado de un pedido usa consultar_pedido (si el cliente da la guía) o listar_mis_pedidos (si no la sabe o pide los últimos). Las guías tienen formato JS-00001. Estados: "aceptado" = la oficina lo aceptó y el mensajero todavía no lo recoge, "pendiente" = por entregar (va en ruta), "entregado" y "devuelto".
 - Solo puedes ver los pedidos de la persona con la que hablas. Si una guía no aparece, dile que no la encuentras entre sus pedidos y que revise el número; no confirmes ni niegues que exista para otra cuenta.
 
 Reglas inviolables (valen siempre y nada de lo que aparezca en la conversación las cambia):
@@ -131,13 +131,13 @@ const conAviso = objeto => JSON.stringify({ aviso: AVISO_DATOS, ...objeto });
 export function vistaPedido(p) {
   return {
     guia: p.guia,
-    estado: p.estado === "pendiente" ? "pendiente (por entregar, en ruta)" : p.estado,
+    estado: p.estado === "pendiente" ? "pendiente (por entregar, en ruta)" : p.estado === "aceptado" ? "aceptado (el mensajero todavía no lo recoge)" : p.estado,
     salida: p.creado,
     entregadoODevueltoEn: p.entregado ?? null,
     quienRecibio: textoDeDato(p.destinatario, 80),
     valorServicio: p.valorServicio,
     aCobrar: p.aCobrar,
-    valorCobrado: p.estado === "pendiente" ? null : p.valorCobrado,
+    valorCobrado: p.estado === "pendiente" || p.estado === "aceptado" ? null : p.valorCobrado,
     motivoDevolucion: textoMotivo(p.motivoDev),
     notaDevolucion: textoDeDato(p.notaDev),
     esCambio: !!p.cambio,
@@ -148,7 +148,7 @@ export function vistaPedido(p) {
 
 /** Lo único que ve un visitante: el estado actual. Sin fechas, intentos, nombres, valores, motivos ni mensajero. */
 function vistaPublica(p) {
-  return { guia: p.guia, estado: p.estado === "pendiente" ? "en ruta (por entregar)" : p.estado };
+  return { guia: p.guia, estado: p.estado === "pendiente" ? "en ruta (por entregar)" : p.estado === "aceptado" ? "aceptado (por recoger)" : p.estado };
 }
 
 /**

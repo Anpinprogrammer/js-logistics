@@ -14,7 +14,7 @@ const bandera = z.enum(["true", "false"]).transform(v => v === "true");
    - Por páginas (`pagina` y `porPagina`): para las pantallas con paginador. Responde también `total` y `paginas`.
    - Por cursor (`cursor` → `siguiente`): para cargar todo de a pedazos (la app interna y la cola del mensajero). */
 export const listar = z.object({
-  estado: z.enum(["pendiente", "entregado", "devuelto"]).optional(),
+  estado: z.enum(["aceptado", "pendiente", "entregado", "devuelto"]).optional(),  // aceptado = por recoger; pendiente = en ruta
   mensajeroId: id.optional(),
   clienteId: id.optional(),
   desde: fecha.optional(),
