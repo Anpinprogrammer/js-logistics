@@ -107,7 +107,13 @@ export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un p
 export function Lista({ registros, cargando, vacio = "Todavía no has anotado pagos. Cuando un cliente te pague, anótalo arriba." }: { registros?: RegistroCajaPatinador[]; cargando: boolean; vacio?: string }) {
   if (cargando) return <div className="vacio" role="status">Cargando…</div>;
   if (!registros?.length) return <div className="vacio">{vacio}</div>;
-  return <div className="lista lista-patinador">{registros.map(r => (
+  return <div className="lista lista-patinador">{registros.map(r => r.tipo === "entrega" ? (
+    // Entrega a administración: se descontó de la caja del patinador.
+    <div className="fila fila-pago fila-entrega" key={r.id}>
+      <span className="info"><b className="min-w-0">{r.clienteNombre}</b><p>Descontado de la caja{r.concepto ? " · " + r.concepto : ""}{r.medio && r.medio !== "efectivo" ? " · " + (MEDIOS[r.medio as Medio] || r.medio) : ""} · {hora(Date.parse(r.fecha))}</p></span>
+      <span className="n fila-pago-valor">−{pesos(r.valor)}</span>
+    </div>
+  ) : (
     <div className="fila fila-pago" key={r.id}>
       <span className="info"><b className="min-w-0">{r.clienteNombre}</b><p>{r.concepto}{r.medio && r.medio !== "efectivo" ? " · " + (MEDIOS[r.medio as Medio] || r.medio) : ""} · {hora(Date.parse(r.fecha))}</p></span>
       <span className="n fila-pago-valor">{pesos(r.valor)}</span>

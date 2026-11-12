@@ -4,7 +4,7 @@ import { filaAObjeto, paginaEnParalelo } from "../helpers/sql.js";
 import { nuevoId } from "../helpers/ids.js";
 
 const CON_CLIENTE = `
-  SELECT r.id, r.mensajero_id, r.cliente_id, c.nombre AS cliente_nombre, r.concepto, r.valor, r.fecha
+  SELECT r.id, r.mensajero_id, r.cliente_id, c.nombre AS cliente_nombre, r.concepto, r.valor, r.fecha, 'pago' AS tipo
   FROM caja_patinador r JOIN clientes c ON c.id = r.cliente_id`;
 
 // "Hoy" es el día de Colombia, no el del servidor (que corre en UTC).
@@ -38,13 +38,23 @@ export async function resumen(mensajeroId, db = { query }) {
   return o;
 }
 
-/** Registros de un patinador, los más nuevos primero, por páginas (paginador de pantalla). */
+/** Movimientos de la caja de un patinador, los más nuevos primero, por páginas (paginador de pantalla). Mezcla los pagos que
+    recibió (`tipo: "pago"`) con las entregas de dinero que administración le recibió (`tipo: "entrega"`, de `recaudos`),
+    para que vea en su historial cuándo se le descontó plata de la caja. En las entregas `clienteNombre` es quién las recibió. */
+const MOVIMIENTOS = `
+  SELECT r.id, r.mensajero_id, r.cliente_id, c.nombre AS cliente_nombre, r.concepto, r.valor, r.fecha, 'pago' AS tipo, NULL::text AS medio
+  FROM caja_patinador r JOIN clientes c ON c.id = r.cliente_id WHERE r.mensajero_id = $1
+  UNION ALL
+  SELECT e.id, e.mensajero_id, NULL, CASE WHEN e.por_nombre <> '' THEN 'Entregado a ' || e.por_nombre ELSE 'Entregado a la oficina' END,
+         e.nota, e.valor, e.fecha, 'entrega', e.medio
+  FROM recaudos e WHERE e.mensajero_id = $1`;
+
 export async function listarPagina({ mensajeroId, pagina = 1, porPagina = 8 }) {
   const r = await paginaEnParalelo({
     pagina, porPagina,
-    contar: async () => (await query(`SELECT count(*)::int AS total FROM caja_patinador WHERE mensajero_id = $1`, [mensajeroId])).rows[0].total,
+    contar: async () => (await query(`SELECT count(*)::int AS total FROM (${MOVIMIENTOS}) m`, [mensajeroId])).rows[0].total,
     traer: async offset => (await query(
-      `${CON_CLIENTE} WHERE r.mensajero_id = $1 ORDER BY r.fecha DESC, r.id LIMIT $2 OFFSET $3`,
+      `SELECT * FROM (${MOVIMIENTOS}) m ORDER BY m.fecha DESC, m.id LIMIT $2 OFFSET $3`,
       [mensajeroId, porPagina, offset]
     )).rows
   });

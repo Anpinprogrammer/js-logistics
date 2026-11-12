@@ -199,7 +199,11 @@ test("recibir dinero de un patinador usa la misma entrega de los mensajeros y ba
   assert.equal(a.body.debe, 12000); // 32.000 recibidos − 20.000 entregados
   // Lo que ve el patinador en su caja baja en el acto, sin tocar sus pagos anotados.
   const m1 = (await patinador.get("/api/patinador/caja")).body;
-  assert.deepEqual([m1.resumen.total, m1.resumen.entregado, m1.resumen.enCaja, m1.total], [32000, 20000, 12000, 2]);
+  assert.deepEqual([m1.resumen.total, m1.resumen.entregado, m1.resumen.enCaja, m1.total], [32000, 20000, 12000, 3]); // total = 2 pagos + la entrega, que sale en su historial
+  const ent = m1.registros.find(x => x.tipo === "entrega");
+  assert.deepEqual([ent.valor, ent.concepto, m1.registros.filter(x => x.tipo === "pago").length], [20000, "Primera entrega", 2]);
+  assert.equal(m1.registros[0].tipo, "entrega"); // la más nueva primero
+  assert.equal((await oficina.get(`/api/patinador/caja?mensajeroId=${idPatinador}`)).body.registros.filter(x => x.tipo === "entrega").length, 1);
   const b = await asistente.post("/api/recaudos").send({ mensajeroId: idPatinador, valor: 15000, medio: "nequi" });
   assert.equal(b.body.debe, -3000); // entregó de más: queda a favor
   const t = (await oficina.get("/api/patinador/resumen")).body.patinadores.find(p => p.mensajeroId === idPatinador);
@@ -212,5 +216,6 @@ test("recibir dinero de un patinador usa la misma entrega de los mensajeros y ba
   // Corregir o quitar sigue siendo de administración y se refleja en el resumen.
   assert.equal((await oficina.delete(`/api/recaudos/${b.body.recaudo.id}`)).status, 200);
   assert.equal((await oficina.get("/api/patinador/resumen")).body.patinadores.find(p => p.mensajeroId === idPatinador).debe, 12000);
-  assert.equal((await patinador.get("/api/patinador/caja")).body.resumen.enCaja, 12000);
+  const m2 = (await patinador.get("/api/patinador/caja")).body;
+  assert.deepEqual([m2.resumen.enCaja, m2.registros.filter(x => x.tipo === "entrega").length], [12000, 1]); // la entrega quitada sale del historial
 });

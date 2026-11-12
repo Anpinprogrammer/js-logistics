@@ -8,7 +8,7 @@ import { DEMO } from "../demo";
 import { motivoError } from "../datos";
 import { Kpi, Paginador } from "../ui";
 import { FormPago, Lista, type Anotar } from "../pagos";
-import { pesos } from "../motor";
+import { pesos, S } from "../motor";
 import { registrosDemo, resumenDe } from "./demoCaja";
 import { usePorPagina } from "../../lib/pantalla";
 
@@ -17,7 +17,12 @@ const DEMO_PROPIO = "m-pat"; // la ficha de patinador@demo.co
 /* ---- modo demo: la caja vive en memoria, como el resto de la demo (demoCaja.ts) ---- */
 const cajaDemo = (pagina: number, porPagina: number, mensajeroId = DEMO_PROPIO): CajaPatinador => {
   const suyos = registrosDemo.filter(r => r.mensajeroId === mensajeroId);
-  const todos = [...suyos].reverse(), paginas = Math.max(1, Math.ceil(todos.length / porPagina)), p = Math.min(pagina, paginas);
+  // Las entregas a administración (S.recaudos) también salen en su historial, como en el servidor.
+  const entregas: RegistroCajaPatinador[] = Object.values(S.recaudos).filter(r => r.mensajeroId === mensajeroId).map(r => ({
+    id: r.id, mensajeroId, clienteId: "", clienteNombre: r.porNombre ? "Entregado a " + r.porNombre : "Entregado a la oficina", concepto: r.nota, valor: Number(r.valor) || 0,
+    fecha: new Date(r.fecha).toISOString(), medio: r.medio, tipo: "entrega"
+  }));
+  const todos = [...suyos, ...entregas].sort((a, b) => Date.parse(b.fecha) - Date.parse(a.fecha)), paginas = Math.max(1, Math.ceil(todos.length / porPagina)), p = Math.min(pagina, paginas);
   return { resumen: resumenDe(suyos, mensajeroId), registros: todos.slice((p - 1) * porPagina, p * porPagina), pagina: p, porPagina, total: todos.length, paginas };
 };
 const traerCaja = (pagina: number, porPagina: number, mensajeroId?: string) =>
@@ -54,7 +59,7 @@ function MiCaja({ irHistorial, ajeno }: { irHistorial: () => void; ajeno?: Ajeno
       <Kpi ico="caja" lbl="Recibido hoy" val={r ? pesos(r.totalHoy) : "…"} pie={<small>{r ? `${r.registrosHoy} ${r.registrosHoy === 1 ? "pago" : "pagos"}` : ""}</small>} />
     </div>
     <FormPago anotar={d => anotarYContar(d, ajeno)} invalidar={["patinador"]} deOtro={!!ajeno} />
-    <div className="cab-lista"><h2>Últimos pagos</h2>{q.data && q.data.total > 3 ? <button type="button" className="btn sec" onClick={irHistorial}>Ver todo</button> : null}</div>
+    <div className="cab-lista"><h2>Últimos movimientos</h2>{q.data && q.data.total > 3 ? <button type="button" className="btn sec" onClick={irHistorial}>Ver todo</button> : null}</div>
     <Lista registros={q.data?.registros.slice(0, 3)} cargando={q.isLoading} vacio={ajeno ? VACIO_AJENO : undefined} />
   </>;
 }

@@ -306,7 +306,8 @@ export interface PaginaSolicitudesFiltradas { data: Solicitud[]; pagination: { p
 export interface ListaSolicitudes { solicitudes: Solicitud[]; conteo: ConteoSolicitudes }
 
 /** Un pago que el patinador recibió de un cliente en su ruta (GET/POST /patinador/caja). */
-export interface RegistroCajaPatinador { id: string; mensajeroId: string; clienteId: string; clienteNombre: string; concepto: string; valor: number; fecha: string; /** Solo en Recepción del mensajero. */ medio?: Medio }
+export interface RegistroCajaPatinador { id: string; mensajeroId: string; clienteId: string; clienteNombre: string; concepto: string; valor: number; fecha: string; /** Solo en Recepción del mensajero. */ medio?: Medio;
+  /** "entrega" = dinero que administración le recibió y se descontó de su caja (solo en GET /patinador/caja; `clienteNombre` dice quién lo recibió). Sin `tipo` es un pago. */ tipo?: "pago" | "entrega" }
 /** Total acumulado de su caja y lo de hoy (día de Colombia), calculados por el servidor. */
 /** `total` es todo lo que recibió; `entregado` lo que ya le dio a la oficina (se descuenta solo cuando administración lo registra); `enCaja` lo que le queda en la mano. Solo los trae la caja del patinador (el recibido del mensajero no). */
 export interface ResumenCajaPatinador { total: number; registros: number; totalHoy: number; registrosHoy: number; entregado?: number; entregadoHoy?: number; enCaja?: number }
