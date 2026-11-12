@@ -55,7 +55,7 @@ export const IconoEnviar = () => svg(<><path d="M21 3 10.5 13.5" /><path d="M21 
 export const IconoCorreoMasivo = () => svg(<><rect x="3" y="4.5" width="18" height="14" rx="2" /><path d="M3.5 6 12 12.5 20.5 6" /><path d="M15.5 17.5l1.8 1.8 3.2-3.8" /></>);
 
 /* ---------- diálogo, avisos y confirmación (una sola ventana, como el prototipo) ---------- */
-interface Ventana { abrir: (contenido: ReactNode, variante?: "drawer" | "drawer-ancho" | "centrada" | "centrada-ancha" | "entrega" | "devolucion" | "solicitud") => void; cerrar: () => void; avisar: (msg: string) => void; confirmar: (titulo: string, msg: string, boton: string) => Promise<boolean>; ampliar: (src: string) => void }
+interface Ventana { abrir: (contenido: ReactNode, variante?: "drawer" | "drawer-ancho" | "centrada" | "centrada-ancha" | "entrega" | "devolucion" | "solicitud" | "cliente") => void; cerrar: () => void; avisar: (msg: string) => void; confirmar: (titulo: string, msg: string, boton: string) => Promise<boolean>; ampliar: (src: string) => void }
 const CtxV = createContext<Ventana | null>(null);
 export const useVentana = () => { const v = useContext(CtxV); if (!v) throw new Error("useVentana fuera de ProveedorVentana"); return v; };
 
@@ -66,7 +66,7 @@ export function ProveedorVentana({ children }: { children: ReactNode }) {
   const [visor, setVisor] = useState("");
 
   const cerrar = useCallback(() => { dlg.current?.close(); }, []);
-  const abrir = useCallback((c: ReactNode, variante?: "drawer" | "drawer-ancho" | "centrada" | "centrada-ancha" | "entrega" | "devolucion" | "solicitud") => {
+  const abrir = useCallback((c: ReactNode, variante?: "drawer" | "drawer-ancho" | "centrada" | "centrada-ancha" | "entrega" | "devolucion" | "solicitud" | "cliente") => {
     setContenido(c); setClave(k => k + 1);
     const d = dlg.current;
     if (d) {

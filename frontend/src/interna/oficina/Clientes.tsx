@@ -6,7 +6,7 @@ import {
   nombreCliente, servicio, gastoDe, cargoEnvio, cambiaLoContado, yaContado, mueveCaja, esPago, fechaCaja, fechaDia, diaMinCaja, fechaLarga,
   MOVS, MOVS_OFICINA, MEDIOS, type Medio, type TipoMov,
 } from "../motor";
-import { Cab, FiltroDia, IconoAgregarUsuario, IconoFiltro, IconoWhatsApp, Paginador, pl, useVentana } from "../ui";
+import { Cab, FiltroDia, Icono, IconoAgregarUsuario, IconoEditar, IconoFiltro, IconoInfo, IconoWhatsApp, Paginador, pl, useVentana } from "../ui";
 import { E, guardarLocal } from "../estado";
 import { actualizarPedido, borrarDe, guardarCliente, guardarMovimiento, unirClientes } from "../acciones";
 import { motivoError, useDatos } from "../datos";
@@ -135,7 +135,10 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
     {q.isError ? <div className="aviso alerta">No se pudo traer la lista de clientes: {motivoError(q.error)} <button className="btn chico" onClick={() => q.refetch()}>Intentar otra vez</button></div>
       : !pag ? <div className="vacio">Cargando clientes…</div>
       : filas.length ? <>
-        <div className="tabla-env" aria-busy={q.isFetching} style={q.isPlaceholderData ? { opacity: .6 } : undefined}><table><thead><tr><th>Cliente</th><th>Número</th><th>Cuenta</th>{dia && <th className="n">Ese día</th>}<th className="n">Saldo</th><th></th></tr></thead><tbody>
+        <div className="cli-lista" aria-busy={q.isFetching} style={q.isPlaceholderData ? { opacity: .6 } : undefined}>
+          {filas.map(c => <FilaClienteMovil key={c.id} c={c} dia={dia} abrir={() => v.abrir(<FichaCliente cid={c.id} direccion={c.direccionRecogida} />, "cliente")} />)}
+        </div>
+        <div className="tabla-env cli-tabla" aria-busy={q.isFetching} style={q.isPlaceholderData ? { opacity: .6 } : undefined}><table><thead><tr><th>Cliente</th><th>Número</th><th>Cuenta</th>{dia && <th className="n">Ese día</th>}<th className="n">Saldo</th><th></th></tr></thead><tbody>
           {filas.map(c => <tr key={c.id}><td><b>{c.nombre}</b>{Number(c.tarifa) ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>Domicilio {pesos(c.tarifa)}</span></> : null}</td><td>{c.telefono || ""}</td>
             <td>{c.saldo < 0 ? <span className="etq sin">Por cobrar</span> : c.saldo > 0 ? <span className="etq ent">Por pagar</span> : <span className="sub">Paz y salvo</span>}</td>
             {dia && <td className={"n " + ((c.delDia ?? 0) < 0 ? "neg" : "pos")}>{(c.delDia ?? 0) < 0 ? "Debe " : "A favor "}{pesos(Math.abs(c.delDia ?? 0))}</td>}
@@ -181,9 +184,11 @@ export function FormCliente({ id, alGuardar, nombre: nombre0 }: { id?: string; a
 }
 
 /** Cuenta de un cliente: saldo, WhatsApp, registrar pago o ajuste y sus movimientos (abrirCuenta del prototipo). */
-export function AbrirCuenta({ cid }: { cid: string }) {
+export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: boolean; volver?: () => void }) {
   useDatos();
   const v = useVentana(), c = S.clientes[cid];
+  // Dentro de la ficha móvil se vuelve a la pestaña "Ver cuenta"; suelta, a esta misma ventana.
+  const reabrir = volver ?? (() => v.abrir(<AbrirCuenta cid={cid} />));
   const s0 = c ? saldoCliente(cid) : 0;
   const tipos = (Object.keys(MOVS) as TipoMov[]).filter(k => yo.esAdmin || MOVS_OFICINA.includes(k));
   const [tipo, setTipo] = useState<TipoMov>(yo.esAdmin ? (s0 < 0 ? "pago_de_cliente" : "pago_a_cliente") : s0 > 0 ? "pago_a_cliente" : tipos[0]);
@@ -195,29 +200,29 @@ export function AbrirCuenta({ cid }: { cid: string }) {
     const valor = Number(val); if (!(valor > 0)) return v.avisar("Escribe un valor mayor a cero");
     const caja = mueveCaja({ tipo }); if (yo.esAdmin && caja && diaAntesDelArqueo(v, dia)) return;
     const fecha = !yo.esAdmin && esPago({ tipo }) ? Date.now() : caja ? fechaCaja(dia) : fechaDia(dia); // el pago que registra el asistente queda con la hora del momento
-    try { await guardarMovimiento(null, { clienteId: cid, tipo, valor, medio, nota: nota.trim(), fecha }); v.avisar("Movimiento registrado"); v.abrir(<AbrirCuenta cid={cid} />); }
+    try { await guardarMovimiento(null, { clienteId: cid, tipo, valor, medio, nota: nota.trim(), fecha }); v.avisar("Movimiento registrado"); reabrir(); }
     catch (e) { v.avisar("No se pudo guardar: " + motivoError(e)); }
   };
   const domi = async (g: string) => {
     const ped = S.pedidos[g]; if (!ped) return;
     if (ped.domiPagado) {
       if (cambiaLoContado(ped, { ...ped, domiPagado: false, domiPagoMedio: "" })) return avisoContado(v);
-      if (!await v.confirmar("Desmarcar el pago de " + g, "El pago del domicilio se quita de la caja y vuelve a sumarse al saldo del cliente.", "Desmarcar")) return v.abrir(<AbrirCuenta cid={cid} />);
+      if (!await v.confirmar("Desmarcar el pago de " + g, "El pago del domicilio se quita de la caja y vuelve a sumarse al saldo del cliente.", "Desmarcar")) return reabrir();
       try { await actualizarPedido(g, { domiPagado: false, domiPagoMedio: "" }); v.avisar("Guía " + g + " actualizada"); } catch (e) { v.avisar("No se pudo guardar: " + motivoError(e)); }
-      return v.abrir(<AbrirCuenta cid={cid} />);
+      return reabrir();
     }
-    v.abrir(<PagoDomicilio guia={g} despues={() => v.abrir(<AbrirCuenta cid={cid} />)} />);
+    v.abrir(<PagoDomicilio guia={g} despues={reabrir} />);
   };
   const quitarMov = async (mid: string) => {
     const m = S.movimientos[mid]; if (!m) return;
     if (mueveCaja(m) && yaContado(m.fecha)) return avisoContado(v);
-    if (!await v.confirmar("Quitar movimiento", `${MOVS[m.tipo]?.corto || "Movimiento"} · ${pesos(m.valor)}. Se quita de la cuenta del cliente${mueveCaja(m) ? " y de la caja" : ""}.`, "Quitar")) return v.abrir(<AbrirCuenta cid={cid} />);
+    if (!await v.confirmar("Quitar movimiento", `${MOVS[m.tipo]?.corto || "Movimiento"} · ${pesos(m.valor)}. Se quita de la cuenta del cliente${mueveCaja(m) ? " y de la caja" : ""}.`, "Quitar")) return reabrir();
     try { await borrarDe("movimientos", mid); v.avisar("Movimiento quitado"); } catch (e) { v.avisar("No se pudo quitar: " + motivoError(e)); }
-    v.abrir(<AbrirCuenta cid={cid} />);
+    reabrir();
   };
   return <>
-    <Cab sub={<span className="sub">{c.telefono || ""}{pendientes ? ` · ${pendientes} en ruta` : ""}</span>}><h2>{c.nombre}</h2></Cab>
-    <div className={"saldo-grande " + (s < 0 ? "neg" : s > 0 ? "pos" : "")}>{pesos(Math.abs(s))}</div>
+    {!enFicha && <><Cab sub={<span className="sub">{c.telefono || ""}{pendientes ? ` · ${pendientes} en ruta` : ""}</span>}><h2>{c.nombre}</h2></Cab>
+    <div className={"saldo-grande " + (s < 0 ? "neg" : s > 0 ? "pos" : "")}>{pesos(Math.abs(s))}</div></>}
     <p className="sub">{s > 0 ? "Cuenta por pagar: JS le debe este valor al cliente." : s < 0 ? "Cuenta por cobrar: el cliente le debe este valor a JS." : "Cuenta a paz y salvo."}</p>
     {s ? (telWhatsApp(c.telefono) ? <div className="acciones" style={{ margin: "0 0 6px" }}><a className="btn ok" id="cWa" href={linkSaldo(cid)} target="_blank" rel="noopener" onClick={marcarEnviado}>Enviar {s < 0 ? "cobro" : "saldo a favor"} por WhatsApp</a>
       <button className="btn sec" id="cWaCopiar" type="button" onClick={async () => { try { await navigator.clipboard.writeText(textoSaldo(cid)); v.avisar("Mensaje copiado. Pégalo en WhatsApp."); } catch { v.avisar("No se pudo copiar en este navegador"); } }}>Copiar mensaje</button></div>
@@ -228,13 +233,70 @@ export function AbrirCuenta({ cid }: { cid: string }) {
       <div className="campo"><label htmlFor="mVal">Valor</label><input id="mVal" type="number" inputMode="numeric" min="0" step="100" value={val} onChange={e => setVal(e.target.value)} /></div></div>
     <div className="linea2"><div className="campo"><label htmlFor="mMedio">Medio (para pagos)</label><select id="mMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{Object.entries(MEDIOS).map(([x, t]) => <option key={x} value={x}>{t}</option>)}</select></div>
       <div className="campo"><label htmlFor="mNota">Nota (opcional)</label><input id="mNota" placeholder="Ej: compra, transferencia Nequi" value={nota} onChange={e => setNota(e.target.value)} /></div></div>
-    <div className="acciones"><button className="btn ok" id="mReg" onClick={registrar}>Registrar</button><button className="btn sec" id="cEdit" onClick={() => v.abrir(<FormCliente id={cid} />, "centrada")}>Editar cliente</button></div>
+    <div className="acciones"><button className="btn ok" id="mReg" onClick={registrar}>Registrar</button><button className="btn sec" id="cEdit" onClick={() => v.abrir(<FormCliente id={cid} alGuardar={enFicha ? id => v.abrir(<FichaCliente cid={id} pestana="cuenta" />, "cliente") : undefined} />, "centrada")}>Editar cliente</button></div>
     <h2>Movimientos</h2>
     {rows.length ? <div className="tabla-env"><table><thead><tr><th>Fecha</th><th>Detalle</th><th className="n">Valor</th><th></th></tr></thead><tbody>
       {rows.map((r, i) => <tr key={(r.pid || r.mid || "") + i}><td>{hora(r.fecha)}</td><td>{r.det}</td><td className={"n " + (r.v < 0 ? "neg" : "pos")}>{pesos(r.v)}</td>
         <td>{r.mid ? (yo.esAdmin ? <button className="btn peligro chico" onClick={() => quitarMov(r.mid!)}>Quitar</button> : null) : r.pid && (r.v < 0 || r.dp) ? <button className="btn sec chico" onClick={() => domi(r.pid!)}>{r.dp ? "Desmarcar pago" : "Ya pagó domicilio"}</button> : null}</td></tr>)}
     </tbody></table></div> : <div className="vacio">Sin movimientos.</div>}
   </>;
+}
+
+/** Fila de la lista de clientes en el celular: nombre, domicilio, saldo con su estado y flecha. */
+function FilaClienteMovil({ c, dia, abrir }: { c: ClienteConSaldo; dia: string; abrir: () => void }) {
+  const estado = c.saldo < 0 ? "Por cobrar" : c.saldo > 0 ? "Por pagar" : "Paz y salvo";
+  const delDia = c.delDia ?? 0;
+  return <button type="button" className="cli-fila" onClick={abrir} aria-label={`${c.nombre}: ${estado} ${pesos(Math.abs(c.saldo))}. Ver detalle`}>
+    <span className="cli-fila-nombre"><b>{c.nombre}</b><small>{Number(c.tarifa) ? "Domicilio " + pesos(c.tarifa) : c.telefono || "Sin tarifa fija"}</small></span>
+    <span className="cli-fila-saldo"><b className={c.saldo < 0 ? "neg" : c.saldo > 0 ? "pos" : ""}>{pesos(Math.abs(c.saldo))}</b><small>{estado}</small>
+      {dia && <small className={delDia < 0 ? "neg" : "pos"}>Ese día: {delDia < 0 ? "debe " : "a favor "}{pesos(Math.abs(delDia))}</small>}</span>
+    <span className="cli-fila-flecha" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg></span>
+  </button>;
+}
+
+/** Ficha del cliente en el celular: hoja con dos pestañas, la información y la misma cuenta del botón "Ver cuenta". */
+export function FichaCliente({ cid, pestana = "info", direccion }: { cid: string; pestana?: "info" | "cuenta"; direccion?: string }) {
+  useDatos();
+  const v = useVentana(), c = S.clientes[cid];
+  const [tab, setTab] = useState(pestana);
+  const cuerpo = useRef<HTMLDivElement>(null);
+  if (!c) return null;
+  const s = saldoCliente(cid), estado = s < 0 ? "Por cobrar" : s > 0 ? "Por pagar" : "Paz y salvo";
+  const enRuta = Object.values(S.pedidos).filter(p => p.clienteId === cid && p.estado === "pendiente").length;
+  const wa = telWhatsApp(c.telefono);
+  const reabrir = (t: "info" | "cuenta") => v.abrir(<FichaCliente cid={cid} pestana={t} direccion={direccion} />, "cliente");
+  const cambiar = (t: "info" | "cuenta") => { setTab(t); if (cuerpo.current) cuerpo.current.scrollTop = 0; };
+  const teclas = (e: React.KeyboardEvent) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const t = tab === "info" ? "cuenta" : "info"; cambiar(t); document.getElementById("cli-tab-" + t)?.focus(); } };
+  return <div className="cli-ficha">
+    <header className="cli-ficha-cab">
+      <div className="cli-ficha-titulo">
+        <div><h2>{c.nombre} <span className={"etq " + (s < 0 ? "sin" : s > 0 ? "ent" : "")}>{estado}</span></h2>
+          <p>Saldo actual: <b className={s < 0 ? "neg" : s > 0 ? "pos" : ""}>{pesos(Math.abs(s))}</b></p></div>
+        <button className="cerrar" type="button" data-cerrar aria-label="Cerrar">×</button>
+      </div>
+      <div className="seg cli-ficha-tabs" role="tablist" aria-label="Ficha del cliente" onKeyDown={teclas}>
+        <button type="button" role="tab" id="cli-tab-info" aria-controls="cli-panel" aria-selected={tab === "info"} tabIndex={tab === "info" ? 0 : -1} onClick={() => cambiar("info")}><IconoInfo /><span>Información</span></button>
+        <button type="button" role="tab" id="cli-tab-cuenta" aria-controls="cli-panel" aria-selected={tab === "cuenta"} tabIndex={tab === "cuenta" ? 0 : -1} onClick={() => cambiar("cuenta")}><Icono n="cuenta" /><span>Ver cuenta</span></button>
+      </div>
+    </header>
+    <div className="cli-ficha-cuerpo" ref={cuerpo} id="cli-panel" role="tabpanel" aria-labelledby={"cli-tab-" + tab}>
+      {tab === "info" ? <div className="cli-info">
+        <dl>
+          <div><dt>Teléfono / WhatsApp</dt><dd>{c.telefono ? <a href={"tel:" + c.telefono.replace(/[^\d+]/g, "")}>{c.telefono}</a> : "Sin número"}</dd></div>
+          {direccion ? <div><dt>Dirección de recogida</dt><dd>{direccion}</dd></div> : null}
+          <div><dt>Valor del domicilio</dt><dd>{Number(c.tarifa) ? pesos(c.tarifa) : "Sin tarifa fija"}</dd></div>
+          <div><dt>Pedidos en ruta</dt><dd>{enRuta}</dd></div>
+          <div><dt>Saldo</dt><dd className={s < 0 ? "neg" : s > 0 ? "pos" : ""}>{pesos(Math.abs(s))}</dd></div>
+        </dl>
+        <p className="sub">{s > 0 ? "Cuenta por pagar: JS le debe este valor al cliente." : s < 0 ? "Cuenta por cobrar: el cliente le debe este valor a JS." : "Cuenta a paz y salvo."}</p>
+        <div className="cli-info-acciones">
+          {wa ? <a className="btn ok" href={"https://wa.me/" + wa} target="_blank" rel="noopener"><IconoWhatsApp /><span>WhatsApp</span></a> : <button type="button" className="btn ok" disabled><IconoWhatsApp /><span>WhatsApp</span></button>}
+          <button type="button" className="btn sec" onClick={() => v.abrir(<FormCliente id={cid} alGuardar={id => (id === cid ? reabrir("info") : v.abrir(<FichaCliente cid={id} />, "cliente"))} />, "centrada")}><IconoEditar /><span>Editar ficha</span></button>
+        </div>
+      </div>
+        : <AbrirCuenta cid={cid} enFicha volver={() => reabrir("cuenta")} />}
+    </div>
+  </div>;
 }
 
 /** Registrar que el cliente pagó el domicilio de una guía: cómo y cuánto; entra a la caja. */

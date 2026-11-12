@@ -1204,3 +1204,53 @@
   .jsl .rango-pop{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));top:auto;width:auto;max-width:none;margin:0;z-index:50;max-height:85dvh;overflow-y:auto}
   .jsl .rango-pop .fecha-dia{width:100%;max-width:44px;height:36px}
 }
+
+/* ---------- Clientes en el celular: lista sin scroll lateral y ficha con dos pestañas ---------- */
+.jsl .cli-lista{display:none}
+@media (max-width:767px){
+  .jsl .cli-tabla{display:none}
+  .jsl .cli-lista{display:flex;flex-direction:column;gap:8px;min-width:0;margin-bottom:12px}
+  .jsl .cli-fila{display:flex;align-items:center;gap:12px;width:100%;min-width:0;padding:13px 12px 13px 14px;border:1px solid var(--linea);border-radius:16px;background:var(--papel);color:var(--tinta);box-shadow:var(--sombra);font:inherit;text-align:left;cursor:pointer;transition:transform .08s ease,border-color .15s}
+  .jsl .cli-fila:active{transform:scale(.99)}
+  .jsl .cli-fila:focus-visible{outline:2px solid var(--marca2);outline-offset:2px}
+  .jsl .cli-fila-nombre{display:flex;flex-direction:column;flex:1;min-width:0}
+  .jsl .cli-fila-nombre b{overflow:hidden;font-size:.9rem;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
+  .jsl .cli-fila-nombre small{margin-top:2px;overflow:hidden;color:var(--suave);font-size:.75rem;text-overflow:ellipsis;white-space:nowrap}
+  .jsl .cli-fila-saldo{display:flex;flex-direction:column;align-items:flex-end;flex:none;text-align:right}
+  .jsl .cli-fila-saldo b{font-size:.9rem;font-weight:800;white-space:nowrap}
+  .jsl .cli-fila-saldo small{margin-top:2px;color:var(--suave);font-size:.69rem;font-weight:600;white-space:nowrap}
+  .jsl .cli-fila-saldo small.neg,.jsl .cli-fila-saldo small.pos{font-weight:600}
+  .jsl .cli-fila-saldo small.neg{color:var(--rojo)}
+  .jsl .cli-fila-saldo small.pos{color:var(--verde)}
+  .jsl .cli-fila-flecha{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:50%;background:var(--hueco);color:var(--suave)}
+  .jsl .cli-fila-flecha svg{width:16px;height:16px}
+}
+.jsl dialog[data-variante="cliente"]{position:fixed;inset:auto 0 0;margin:0;width:100%;max-width:100%;max-height:92dvh;border-radius:24px 24px 0 0;overflow:hidden}
+.jsl dialog[data-variante="cliente"] .dlg{padding:0;max-height:92dvh;overflow:hidden}
+.jsl dialog[data-variante="cliente"] .dlg::before{display:none}
+@media (min-width:768px){.jsl dialog[data-variante="cliente"]{inset:0;margin:auto;width:min(600px,calc(100vw - 32px));max-width:600px;max-height:88dvh;border-radius:22px}.jsl dialog[data-variante="cliente"] .dlg,.jsl .cli-ficha{max-height:88dvh}}
+.jsl .cli-ficha{display:flex;flex-direction:column;max-height:92dvh;min-height:0;background:var(--papel)}
+.jsl .dlg .cli-ficha-cab{display:block;flex:none;margin:0;padding:16px 20px 12px;border-bottom:1px solid var(--linea)}
+.jsl .cli-ficha-titulo{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+.jsl .cli-ficha-titulo > div{min-width:0}
+.jsl .dlg .cli-ficha-titulo h2{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0;font-size:1.05rem;font-weight:800;overflow-wrap:anywhere}
+.jsl .cli-ficha-titulo h2 .etq{font-size:.7rem;font-weight:700}
+.jsl .cli-ficha-titulo h2 .etq:not(.sin):not(.ent){background:var(--hueco);color:var(--suave)}
+.jsl .cli-ficha-titulo p{margin:4px 0 0;color:var(--suave);font-size:.8rem}
+.jsl .cli-ficha-titulo .cerrar{display:grid;place-items:center;flex:none;width:34px;height:34px}
+.jsl .cli-ficha-tabs{display:grid;grid-template-columns:1fr 1fr;width:100%;margin-top:14px;border-radius:14px}
+.jsl .cli-ficha-tabs button{display:flex;align-items:center;justify-content:center;gap:6px;min-width:0;min-height:40px;border-radius:11px;font-size:.8rem;font-weight:700}
+.jsl .cli-ficha-tabs button svg{width:16px;height:16px;flex:none}
+.jsl .cli-ficha-tabs button:focus-visible{outline:2px solid var(--marca2);outline-offset:1px}
+.jsl .cli-ficha-cuerpo{min-height:0;padding:16px 20px calc(22px + env(safe-area-inset-bottom,0px));overflow-y:auto;overscroll-behavior:contain}
+.jsl .cli-ficha-cuerpo > h2:first-child,.jsl .cli-ficha-cuerpo h2{font-size:1rem}
+.jsl .cli-info{display:grid;gap:12px;min-width:0}
+.jsl .cli-info dl{display:grid;gap:10px;margin:0;padding:14px;border:1px solid var(--linea);border-radius:14px;background:var(--hueco)}
+.jsl .cli-info dl div{display:flex;justify-content:space-between;gap:16px;min-width:0;font-size:.82rem}
+.jsl .cli-info dt{flex:none;color:var(--suave);font-weight:600}
+.jsl .cli-info dd{min-width:0;margin:0;font-weight:700;text-align:right;overflow-wrap:anywhere}
+.jsl .cli-info dd a{color:var(--marca2);text-decoration:underline}
+.jsl .cli-info .sub{margin:0;font-size:.8rem}
+.jsl .cli-info-acciones{display:grid;grid-template-columns:1fr 1fr;gap:9px;min-width:0}
+.jsl .cli-info-acciones .btn{justify-content:center;gap:6px;min-width:0;min-height:44px;font-size:.8rem}
+.jsl .cli-info-acciones .btn svg{width:17px;height:17px;flex:none}
