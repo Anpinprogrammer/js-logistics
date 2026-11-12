@@ -6,7 +6,8 @@ import {
   nombreCliente, servicio, gastoDe, cargoEnvio, cambiaLoContado, yaContado, mueveCaja, esPago, fechaCaja, fechaDia, diaMinCaja, fechaLarga,
   MOVS, MOVS_OFICINA, MEDIOS, type Medio, type TipoMov,
 } from "../motor";
-import { Cab, FiltroDia, Icono, IconoAgregarUsuario, IconoEditar, IconoFiltro, IconoInfo, IconoWhatsApp, Paginador, pl, useVentana } from "../ui";
+import { Cab, FiltroDia, Icono, IconoAgregarUsuario, IconoEditar, IconoFiltro, IconoInfo, Paginador, pl, useVentana } from "../ui";
+import { WhatsAppIcon } from "../../components/icons/WhatsAppIcon";
 import { E, guardarLocal } from "../estado";
 import { actualizarPedido, borrarDe, guardarCliente, guardarMovimiento, unirClientes } from "../acciones";
 import { motivoError, useDatos } from "../datos";
@@ -101,7 +102,7 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
         <button type="button" className="tp-movil-abrir" onClick={abrirFiltros} aria-haspopup="dialog" aria-label={`Filtros${filtrosActivos ? `, ${filtrosActivos} activos` : ""}`}><IconoFiltro /><span>Filtros</span>{filtrosActivos > 0 && <b>{filtrosActivos}</b>}</button>
       </div>
       <div className="cli-movil-acciones">
-        <button type="button" className="btn ok" onClick={enviarSaldos}><IconoWhatsApp /><span>Enviar saldos</span></button>
+        <button type="button" className="btn ok" onClick={enviarSaldos}><WhatsAppIcon /><span>Enviar saldos</span></button>
         <button type="button" className="btn" onClick={registrar}><IconoAgregarUsuario /><span>Registrar cliente</span></button>
       </div>
     </div>
@@ -117,7 +118,7 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
     </div>}
     <div className="controles tp-escritorio">
       <div className="barra-acciones">
-        <button className="btn ok" id="waMasivo" onClick={enviarSaldos}><IconoWhatsApp />Enviar saldos por WhatsApp</button>
+        <button className="btn ok" id="waMasivo" onClick={enviarSaldos}><WhatsAppIcon />Enviar saldos por WhatsApp</button>
         <button className="btn" id="nuevoCli" onClick={registrar}>Registrar cliente</button>
       </div>
       <div className="toolbar">
@@ -224,7 +225,7 @@ export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: b
     {!enFicha && <><Cab sub={<span className="sub">{c.telefono || ""}{pendientes ? ` · ${pendientes} en ruta` : ""}</span>}><h2>{c.nombre}</h2></Cab>
     <div className={"saldo-grande " + (s < 0 ? "neg" : s > 0 ? "pos" : "")}>{pesos(Math.abs(s))}</div></>}
     <p className="sub">{s > 0 ? "Cuenta por pagar: JS le debe este valor al cliente." : s < 0 ? "Cuenta por cobrar: el cliente le debe este valor a JS." : "Cuenta a paz y salvo."}</p>
-    {s ? (telWhatsApp(c.telefono) ? <div className="acciones" style={{ margin: "0 0 6px" }}><a className="btn ok" id="cWa" href={linkSaldo(cid)} target="_blank" rel="noopener" onClick={marcarEnviado}>Enviar {s < 0 ? "cobro" : "saldo a favor"} por WhatsApp</a>
+    {s ? (telWhatsApp(c.telefono) ? <div className="acciones" style={{ margin: "0 0 6px" }}><a className="btn ok" id="cWa" href={linkSaldo(cid)} target="_blank" rel="noopener" onClick={marcarEnviado}><WhatsAppIcon />Enviar {s < 0 ? "cobro" : "saldo a favor"} por WhatsApp</a>
       <button className="btn sec" id="cWaCopiar" type="button" onClick={async () => { try { await navigator.clipboard.writeText(textoSaldo(cid)); v.avisar("Mensaje copiado. Pégalo en WhatsApp."); } catch { v.avisar("No se pudo copiar en este navegador"); } }}>Copiar mensaje</button></div>
       : <div className="aviso">Agrega el celular del cliente para enviarle el saldo por WhatsApp.</div>) : null}
     <h2>{yo.esAdmin ? "Registrar pago o ajuste" : "Registrar pago, compra o ganancia"}</h2>
@@ -290,7 +291,7 @@ export function FichaCliente({ cid, pestana = "info", direccion }: { cid: string
         </dl>
         <p className="sub">{s > 0 ? "Cuenta por pagar: JS le debe este valor al cliente." : s < 0 ? "Cuenta por cobrar: el cliente le debe este valor a JS." : "Cuenta a paz y salvo."}</p>
         <div className="cli-info-acciones">
-          {wa ? <a className="btn ok" href={"https://wa.me/" + wa} target="_blank" rel="noopener"><IconoWhatsApp /><span>WhatsApp</span></a> : <button type="button" className="btn ok" disabled><IconoWhatsApp /><span>WhatsApp</span></button>}
+          {wa ? <a className="btn ok" href={"https://wa.me/" + wa} target="_blank" rel="noopener"><WhatsAppIcon /><span>WhatsApp</span></a> : <button type="button" className="btn ok" disabled><WhatsAppIcon /><span>WhatsApp</span></button>}
           <button type="button" className="btn sec" onClick={() => v.abrir(<FormCliente id={cid} alGuardar={id => (id === cid ? reabrir("info") : v.abrir(<FichaCliente cid={id} />, "cliente"))} />, "centrada")}><IconoEditar /><span>Editar ficha</span></button>
         </div>
       </div>
@@ -333,7 +334,7 @@ function EnvioMasivo({ tipo0 }: { tipo0: "cobrar" | "pagar" }) {
     <Cab sub={<span className="sub">{conTel.length - pend.length} de {conTel.length} enviados hoy</span>}><h2>Enviar saldos por WhatsApp</h2></Cab>
     <div className="filtros">{([["cobrar", "Clientes que deben"], ["pagar", "Saldos a favor"]] as const).map(([k, t]) => <button key={k} aria-pressed={tipo === k} onClick={() => setTipo(k)}>{t}</button>)}</div>
     <p className="sub">Toca “Enviar al siguiente”: se abre el chat con el mensaje listo; envíalo en WhatsApp y vuelve aquí para el próximo.</p>
-    {sig ? <a className="btn ok envio-siguiente" id="waSig" href={linkSaldo(sig.id)} target="_blank" rel="noopener" onClick={() => tras(sig.id)}>Enviar al siguiente: {sig.nombre} ({pesos(Math.abs(sig.s))})</a>
+    {sig ? <a className="btn ok envio-siguiente" id="waSig" href={linkSaldo(sig.id)} target="_blank" rel="noopener" onClick={() => tras(sig.id)}><WhatsAppIcon />Enviar al siguiente: {sig.nombre} ({pesos(Math.abs(sig.s))})</a>
       : <div className="vacio">{conTel.length ? "¡Listo! Ya se envió a todos." : "No hay clientes en esta lista."}</div>}
     {conTel.length ? <div className="envio-tabla"><table className="tabla-envio"><thead><tr><th className="col-cliente">Cliente</th><th className="col-saldo">Saldo</th><th className="col-accion">Acción</th></tr></thead><tbody>
       {conTel.map(c => <tr key={c.id}><td className="col-cliente"><b className="envio-nombre">{c.nombre}</b></td><td className="col-saldo">{pesos(Math.abs(c.s))}</td><td className="col-accion">{env.has(c.id) ? <><span className="etq ent">✓ Enviado</span> </> : null}<a className="btn enviar-fila" href={linkSaldo(c.id)} target="_blank" rel="noopener" onClick={() => tras(c.id)}>{env.has(c.id) ? "Reenviar" : "Enviar"}</a></td></tr>)}

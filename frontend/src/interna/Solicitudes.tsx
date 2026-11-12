@@ -8,7 +8,8 @@ import type { Solicitud, ListaSolicitudes, ConteoSolicitudes, GrupoSolicitud, Pa
 import { mensajeDe } from "../api/cliente";
 import { DEMO } from "./demo";
 import { S, hora, pesos, linkWhatsApp, telWhatsApp } from "./motor";
-import { Cab, IconoWhatsApp, useVentana } from "./ui";
+import { Cab, useVentana } from "./ui";
+import { WhatsAppIcon } from "../components/icons/WhatsAppIcon";
 
 /* ---- Modo demo: las solicitudes viven en memoria ---- */
 const ahora = Date.now();
@@ -201,7 +202,7 @@ export function TarjetaSolicitud({ s, enDetalle = false, alCompletar }: { s: Sol
         <p className="suave">Envíale el valor al cliente y, cuando responda que sí, márcalo.</p>
         <div className="acciones">
           {hayTel
-            ? <a className="btn ok" href={wa} target="_blank" rel="noopener noreferrer"><IconoWhatsApp />Enviar valor por WhatsApp</a>
+            ? <a className="btn ok" href={wa} target="_blank" rel="noopener noreferrer"><WhatsAppIcon />Enviar valor por WhatsApp</a>
             : <span className="aviso alerta">El teléfono no sirve para WhatsApp: llámalo.</span>}
           <button className="btn" disabled={ocupado} onClick={confirmar}>El cliente está de acuerdo</button>
           {!rechazando && <button className="btn sec" disabled={ocupado} onClick={rechazar}>Rechazar</button>}

@@ -5,7 +5,8 @@ import {
   S, yo, hoy, hora, pesos, diaDe, moverDia, fechaLarga, cerrado, servicio, totales, sueldosDia, saldoCliente, nombreCliente, listaOrdenada, sinTildes, tipoDe, esRepartidor, vinculosDe,
   SUBMAS, TIPOS, ROLES, telWhatsApp, type Persona, type TipoPersonal, type UsuarioS,
 } from "../motor";
-import { Cab, IconoCargando, IconoCorreo, IconoCorreoMasivo, IconoEditar, IconoEnviar, IconoLiberar, IconoLlave, IconoQuitarUsuario, IconoWhatsApp, Paginador, useVentana } from "../ui";
+import { Cab, IconoCargando, IconoCorreo, IconoCorreoMasivo, IconoEditar, IconoEnviar, IconoLiberar, IconoLlave, IconoQuitarUsuario, Paginador, useVentana } from "../ui";
+import { WhatsAppIcon } from "../../components/icons/WhatsAppIcon";
 import { E, guardarLocal } from "../estado";
 import { cambiarAcceso, cambiarClaveDe, crearAcceso, guardarPersona, quitarAcceso, quitarPersona, type AccesoWhatsApp } from "../acciones";
 import { aPersona, aUsuario, motivoError, useDatos } from "../datos";
@@ -500,13 +501,13 @@ function ModalWhatsApp({ datos, alCerrar }: { datos: { user: AccesoWhatsApp; cor
   return <div className="modal-fondo wa-fondo" onClick={e => { if (e.target === e.currentTarget) alCerrar(); }}>
     <div className="modal-caja wa-caja" role="dialog" aria-modal="true" aria-label="Enviar activación por WhatsApp">
       <button type="button" className="modal-cerrar" aria-label="Cerrar" onClick={alCerrar}>×</button>
-      <div className="wa-icono"><IconoWhatsApp /></div>
+      <div className="wa-icono"><WhatsAppIcon /></div>
       <h2>¡Acceso creado con éxito!</h2>
       <p className="wa-texto">{datos.correo?.enviado === false
         ? <>No se pudo enviar el correo a <b>{u.email}</b>. Puedes enviar el enlace por WhatsApp o copiarlo.</>
         : <>Se envió el correo de invitación a <b>{u.email}</b>.</>} ¿Deseas enviar también el enlace directo de activación por WhatsApp a <b>{u.nombre}</b>{u.telefono ? <> (<b>{u.telefono}</b>)</> : null}?</p>
       {!valido ? <div className="aviso alerta wa-aviso">No hay un número de celular válido registrado. Copia el enlace y envíalo por el medio que prefieras.</div> : null}
-      <button type="button" className="btn wa-enviar" disabled={!valido} onClick={enviar}><IconoWhatsApp /> Enviar activación por WhatsApp</button>
+      <button type="button" className="btn wa-enviar" disabled={!valido} onClick={enviar}><WhatsAppIcon /> Enviar activación por WhatsApp</button>
       <button type="button" className="btn wa-copiar" onClick={copiar}>Copiar enlace de activación</button>
       <button type="button" className="btn wa-omitir" onClick={alCerrar}>Solo enviar por correo</button>
     </div>

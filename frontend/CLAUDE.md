@@ -48,6 +48,7 @@ Con sesión, la app es **igual al prototipo** (`app/` del sistema viejo): mismo 
 - Accesibilidad: todo campo con su `label`, botones de solo ícono con `aria-label`, diálogos con la ventana de `interna/ui.tsx` y foco visible. `useVentana().abrir(contenido, variante?)` acepta `"drawer"` (lateral izquierdo a pantalla completa), `"drawer-ancho"` (drawer de hasta 540 px para “Enviar saldos por WhatsApp”), `"centrada"` (modal de 448 px al centro también en móvil) o `"centrada-ancha"` (512 px, para los formularios de Sueldos); se aplica con `data-variante` en el `<dialog>` y reglas en `ajustes.css`. Sin variante se mantiene la ventana de siempre. El calendario de una sola fecha es `SelectorFecha` (`interna/Calendario.tsx`), reutilizable con `valor` en `YYYY-MM-DD` y `alCambiar`.
 
 Los formularios de Cuentas y Sueldos llevan la clase `form-modal` (etiquetas pequeñas y botón primario a todo el ancho); con `form-doble` los pares de campos van en dos columnas desde 600 px.
+- **Botones y enlaces de WhatsApp** llevan el logotipo oficial `<WhatsAppIcon />` (`src/components/icons/WhatsAppIcon.tsx`, relleno con `currentColor`); el tamaño lo da el CSS del botón (`.jsl .btn>svg`). No dibujes otro ícono de chat o teléfono para WhatsApp.
 - Textos en español de Colombia, de tú, cortos. Dinero con `pesos()` y fechas con `fechaHora()` / `hora()`, siempre en hora de Colombia. Para convertir lo que escribe el usuario a pesos, usa `aPesos("25.000")`.
 
 **TypeScript**
