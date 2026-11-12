@@ -4,6 +4,13 @@ Este archivo es la **memoria compartida** entre sesiones y agentes. Léelo despu
 
 Los repositorios hermanos tienen el suyo: `jslogistics-cliente-frontend/docs/ESTADO.md`.
 
+## Lista y ficha móvil de Clientes — 2026-11-12
+
+- Bajo 768 px la tabla de Clientes se cambia por filas (`.cli-fila`): nombre y domicilio, saldo con color (rojo por cobrar, verde por pagar, neutro en paz y salvo) con su estado debajo, y flecha. Con día elegido, la fila suma "Ese día: …". Desde 768 px la tabla con "Ver cuenta" no cambia.
+- Tocar una fila abre `FichaCliente` en la ventana compartida con la variante `cliente` (hoja inferior, cabecera fija y cuerpo con scroll). Tiene dos pestañas: Información (teléfono, dirección de recogida si llega, domicilio, pedidos en ruta, saldo, WhatsApp y Editar ficha) y Ver cuenta, que es el mismo `AbrirCuenta` de escritorio con `enFicha` (sin su cabecera ni el saldo grande) y `volver`, para que registrar, quitar o marcar un domicilio vuelva a la ficha en "Ver cuenta" y no a la ventana suelta.
+- El cliente no tiene correo en el modelo, así que la ficha no lo muestra. Si se agrega, va primero en el backend.
+- **Trampa:** `.dlg header` del prototipo es flex y aplastaba el título de la ficha; las reglas de `.cli-ficha-cab` van con `.dlg` delante para ganarle.
+
 ## Filtros móviles de Clientes — 2026-11-12
 
 - Bajo 768 px Clientes usa el mismo patrón de Pedidos y Solicitudes: buscador con X y botón Filtros con contador (+1 si la cuenta no es "Todos", +1 si hay día). La hoja (`tp-hoja`) prepara estado de cuenta (Todos, Por cobrar, Por pagar) y día (`FiltroDia compacto`), y los aplica o limpia juntos; cierra con Escape, al tocar fuera o al pasar a escritorio.
