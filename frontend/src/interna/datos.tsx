@@ -69,8 +69,16 @@ export function necesarias(modo: string, tab: string): Coleccion[] {
 async function todosLosPedidos(sinMini: boolean) {
   const out: T.Pedido[] = [];
   let cursor: number | undefined;
-  for (let i = 0; i < 200; i++) {
-    const r = await api.pedidos.listar({ limite: 1000, cursor, ...(sinMini ? { sinMini: true } : {}) });
+  // Si el servidor todavía es de la versión anterior (tope de 500 y sin `sinMini`), responde 400: se sigue con lo de
+  // antes, para que la app no se caiga cuando la página se publica antes que el backend.
+  let viejo = false;
+  for (let i = 0; i < 400; i++) {
+    const pedir = () => api.pedidos.listar(viejo ? { limite: 500, cursor } : { limite: 1000, cursor, ...(sinMini ? { sinMini: true } : {}) });
+    const r = await pedir().catch(e => {
+      if (viejo || !(e instanceof FalloApi) || e.status !== 400) throw e;
+      viejo = true;
+      return pedir();
+    });
     out.push(...r.pedidos);
     if (!r.siguiente) break;
     cursor = r.siguiente;
