@@ -1,5 +1,13 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Recepción del mensajero: Nuevo pedido y Recibir dinero — 2026-11-12
+
+- La pestaña **Nuevo** del mensajero ahora es **Recepción** (`E.tabM = "recepcion"`, ícono de bandeja) con dos sub-pestañas en `E.subRecM` (`pedido` | `dinero`), recordadas en la URL por `navegacion.ts`. Una pestaña guardada como `nuevo` se abre en Recepción. *Nuevo pedido* es exactamente lo de antes (foto y galería).
+- *Recibir dinero* usa el mismo formulario y lista del patinador, que se movieron a `interna/pagos.tsx` (`FormPago`, `Lista`). Cada pago es un `pago_de_cliente` normal (efectivo, hora del servidor) con **`movimientos.mensajero_id`**: abona a la cuenta del cliente igual que un pago de oficina (`POST /movimientos/recibidos`).
+- **Cuadre:** `mueveCaja(m)` es falso si `m.mensajeroId` (backend `calculos.js` y `motor.ts`): ese pago no entra al libro de caja ni al arqueo. Entra cuando el mensajero lo entrega en Caja → Mensajeros (recaudo de siempre). Mientras tanto `periodoMensajero` lo suma a `debe` (`cobros`, `cobrosCli`), así sale en "Todavía en manos de mensajeros", en el cierre del día y en la liquidación (`liquidaciones.cobros`; corregirlo después de liquidar pasa al ajuste como el resto). `cajaOficina` los ignora. Quitar uno lo borra aunque haya arqueo (nunca estuvo en la caja).
+- `equivalencia.test.js` quita `cobros`/`cobrosCli` al comparar: la app vieja no tiene estos pagos. El mensajero ahora lee `GET /movimientos`, pero el servidor solo le da los que él recibió.
+- Requiere `npm run db:migrar` (columnas `movimientos.mensajero_id` y `liquidaciones.cobros`). El patinador sigue con su caja (`caja_patinador`), aparte.
+
 ## Sub-pestaña Patinadores y cierre del día — 2026-11-12
 
 - Caja tiene una sub-pestaña propia **Patinadores** (entre Mensajeros y Liquidaciones recientes; `E.tabCaja = "patinadores"`, también en `navegacion.ts` y `js_caja`): tarjetas por patinador con "Recibir dinero" y la tabla "Dinero recibido de patinadores" del día. La tabla de Mensajeros ya no lista las entregas de los patinadores: son las mismas entregas (`recaudos`), repartidas por tipo de ficha (función `dineroRecibido` de `Caja.tsx`).

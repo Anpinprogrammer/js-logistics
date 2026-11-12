@@ -46,7 +46,8 @@ test("los cálculos del servidor dan exactamente lo mismo que app/js/app.js", { 
       saldoCliente: [`Object.keys(S.clientes).map(saldoCliente)`, cids.map(srv.saldoCliente)],
       filasCuenta: [`Object.keys(S.clientes).map(filasCuenta)`, cids.map(srv.filasCuenta)],
       periodoMensajero: [`Object.keys(S.mensajeros).map(m=>{const p=periodoMensajero(m);return {...p,ps:p.ps.map(x=>x.guia),recs:p.recs.map(x=>x.id),bases:p.bases.map(x=>x.id)}})`,
-        mids.map(m => { const p = srv.periodoMensajero(m); return { ...p, ps: p.ps.map(x => x.guia), recs: p.recs.map(x => x.id), bases: p.bases.map(x => x.id) }; })],
+        // cobros y cobrosCli (pagos de clientes que recibió el mensajero) no existen en la app vieja: se comparan aparte en dinero.test.js.
+        mids.map(m => { const { cobros, cobrosCli, ...p } = srv.periodoMensajero(m); return { ...p, ps: p.ps.map(x => x.guia), recs: p.recs.map(x => x.id), bases: p.bases.map(x => x.id) }; })],
       libroCaja: [`libroCaja()`, srv.libroCaja()],
       resumenCaja: [`(({L,...x})=>x)(resumenCaja())`, (({ L, ...x }) => x)(srv.resumenCaja())],
       cajaOficina: [`["a1","a2","ad"].map(cajaOficina)`, ["a1", "a2", "ad"].map(srv.cajaOficina)],

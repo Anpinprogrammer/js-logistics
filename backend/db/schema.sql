@@ -184,6 +184,10 @@ CREATE TABLE IF NOT EXISTS movimientos (           -- cuenta de cada cliente
 );
 CREATE INDEX IF NOT EXISTS movimientos_cliente_idx ON movimientos (cliente_id, fecha DESC);
 CREATE INDEX IF NOT EXISTS movimientos_fecha_idx   ON movimientos (fecha DESC);
+-- Pago que un mensajero recibió de un cliente en la calle (Recepción → Recibir dinero). Abona a la cuenta del cliente
+-- como cualquier pago, pero no entra a la caja hasta que el mensajero lo entrega: mientras tanto suma a lo que debe.
+ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS mensajero_id TEXT REFERENCES mensajeros(id) ON DELETE RESTRICT;
+CREATE INDEX IF NOT EXISTS movimientos_mensajero_idx ON movimientos (mensajero_id, fecha DESC) WHERE mensajero_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS recaudos (              -- dinero que entrega un mensajero
   id           TEXT PRIMARY KEY,
@@ -225,6 +229,8 @@ CREATE TABLE IF NOT EXISTS liquidaciones (         -- cierre de período de un m
 );
 -- Bases creadas con versiones anteriores de este archivo (ver "Actualizar la base" en README.md):
 ALTER TABLE liquidaciones ADD COLUMN IF NOT EXISTS ajuste BIGINT NOT NULL DEFAULT 0;
+-- Pagos de clientes que recibió el mensajero en ese período (movimientos con mensajero_id).
+ALTER TABLE liquidaciones ADD COLUMN IF NOT EXISTS cobros BIGINT NOT NULL DEFAULT 0;
 -- guias pasó a aceptar NULL: en la app, una liquidación sin lista de guías es de antes de que existiera la lista
 -- y sus entregas se cuentan por hora (periodoMensajero). Una lista vacía con entregas solo pudo salir de una
 -- importación anterior que no distinguía los dos casos.

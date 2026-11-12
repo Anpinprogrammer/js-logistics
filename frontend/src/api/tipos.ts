@@ -142,6 +142,8 @@ export interface Movimiento {
   porNombre: string;
   porUid?: string | null;
   medioAntes?: string | null;
+  /** Pago que recibió un mensajero en la calle (Recepción): no entra a la caja hasta que él lo entrega. */
+  mensajeroId?: string | null;
 }
 
 /** Una página de la pestaña Movimientos de Cuentas (6 en celular, 15 en computador). */
@@ -195,6 +197,8 @@ export interface Liquidacion {
   entregas: number; efectivo: number; transfJs: number; transfCli: number; gastos: number; base: number;
   recibido: number; anterior: number; ajuste: number; debe: number; sueldo: number; nota?: string;
   recibidoAntes?: number; entregaFinal?: number; adelanto?: number; enRuta?: number; dia?: string;
+  /** Pagos de clientes que recibió el mensajero en ese período. */
+  cobros?: number;
 }
 
 /** Pago por día de patinadores y oficina, y el "sueldo previo" de una semana (id `persona_previo_semana`). */

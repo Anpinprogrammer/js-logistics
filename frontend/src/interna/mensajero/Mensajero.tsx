@@ -1,5 +1,6 @@
 /* App del mensajero, igual al prototipo (pintarMensajero, inicioMensajeroHtml, miSueldoHtml y los diálogos de entrega). */
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useUsuario } from "../../auth/Sesion";
 import { E, guardarLocal } from "../estado";
 import {
@@ -7,7 +8,11 @@ import {
   MEDIOS, MOTIVOS, metodoTxt, moverDia, pct, nivelEfectividad, CONSEJOS_MOTIVO, semanaDe, tipoDe, sueldoPersonaSemana, entregasPorDia, COLOR_ESTADO,
   moverSemana, diaSueldo, servicio, DIAS_SEM, fechaLarga, pendienteAnterior, DESC_SUELDO,
 } from "../motor";
-import { Columnas, Dona, EtqEstado, FiltroDia, Icono, IconoCamara, Kpi, Mini, TablaEntregas, pl, useVentana } from "../ui";
+import { Columnas, Dona, EtqEstado, FiltroDia, Icono, IconoCamara, Kpi, Mini, Paginador, TablaEntregas, pl, useVentana } from "../ui";
+import { FormPago, Lista, type Anotar } from "../pagos";
+import { recibidosDe, recibirDeCliente } from "../acciones";
+import { motivoError } from "../datos";
+import { usePorPagina } from "../../lib/pantalla";
 import { abrirEntregaEn, VerEntregado } from "./Entrega";
 import { DlgNuevaGuia } from "./NuevaGuia";
 import { DlgRecoger } from "./Recoger";
@@ -60,12 +65,12 @@ export default function Mensajero({ pintar }: { pintar: () => void }) {
         <select id="selMens" value="" onChange={e => elegir(e.target.value)}><option value="">Elige tu nombre…</option>{mens.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div></>;
   } else if (E.tabM === "inicio") {
     h = <InicioMensajero mid={E.miMensajero} enlace={enlaceCambiar} irM={irM} btnFoto={btnFoto} btnGaleria={btnGaleria} />;
-  } else if (E.tabM === "nuevo") {
+  } else if (E.tabM === "recepcion") {
     const m = S.mensajeros[E.miMensajero];
-    h = <><h1>Salida de pedidos</h1><p className="sub">{m.nombre}{enlaceCambiar}</p>
+    h = <Recepcion pintar={pintar} nombre={<>{m.nombre}{enlaceCambiar}</>} nuevoPedido={<>
       <button className="camara" id="btnFoto" onClick={btnFoto}><IconoCamara />Tomar foto del pedido<small>Se le asigna número de guía y pasa a “Por entregar”</small></button>
       <button className="btn sec" id="btnGaleria" style={{ width: "100%", marginTop: 10 }} onClick={btnGaleria}>Subir fotos de la galería (puedes elegir varias)</button>
-      {E.ultimaGuia && <div className="recien"><div><div className="guia">{E.ultimaGuia}</div><span>Guardado en por entregar. Escribe {E.ultimaGuia.includes(" a ") ? "cada número en su paquete" : "este número en el paquete"}.</span></div></div>}</>;
+      {E.ultimaGuia && <div className="recien"><div><div className="guia">{E.ultimaGuia}</div><span>Guardado en por entregar. Escribe {E.ultimaGuia.includes(" a ") ? "cada número en su paquete" : "este número en el paquete"}.</span></div></div>}</>} />;
   } else if (E.tabM === "pend") {
     h = <PedidosMensajero pintar={pintar} />;
   } else if (E.tabM === "sueldo") {
@@ -90,6 +95,7 @@ export default function Mensajero({ pintar }: { pintar: () => void }) {
         <div className="cifra"><span>Efectivo cobrado</span><b>{pesos(t.efectivo)}</b></div>
         {pm.base ? <div className="cifra"><span>Base para vueltos</span><b>{pesos(pm.base)}</b></div> : null}
         {pm.gastos ? <div className="cifra"><span>Fletes / gastos que pagaste</span><b>− {pesos(pm.gastos)}</b></div> : null}
+        {pm.cobros ? <div className="cifra"><span>Pagos de clientes que recibiste</span><b>{pesos(pm.cobros)}</b></div> : null}
         <div className="cifra"><span>Ya entregaste</span><b>{pesos(pm.recibido)}</b></div>
         {pm.anterior ? <div className="cifra"><span>Pendiente de la liquidación anterior</span><b>{pesos(pm.anterior)}</b></div> : null}
         {pm.ajuste ? <div className="cifra"><span>Correcciones a liquidaciones cerradas</span><b>{ajusteTxt(pm.ajuste)}</b></div> : null}
@@ -102,6 +108,48 @@ export default function Mensajero({ pintar }: { pintar: () => void }) {
       <h2>Entregas del período</h2><TablaEntregas ps={pm.ps} conCliente={false} /></>;
   }
   return <>{entradas}{h}</>;
+}
+
+/* ---- Recepción: lo que le llega al mensajero. Nuevo pedido (la foto al salir, lo que antes era la pestaña Nuevo) y
+   Recibir dinero (lo que le paga un cliente en la calle: abona a su cuenta y suma a lo que el mensajero debe entregar). ---- */
+const SUBS_REC: [k: "pedido" | "dinero", t: string][] = [["pedido", "Nuevo pedido"], ["dinero", "Recibir dinero"]];
+
+function Recepcion({ pintar, nombre, nuevoPedido }: { pintar: () => void; nombre: React.ReactNode; nuevoPedido: React.ReactNode }) {
+  const barra = useRef<HTMLDivElement>(null), sub = E.subRecM;
+  const ir = (k: typeof sub) => { E.subRecM = k; pintar(); };
+  const alTeclear = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    ir(sub === "pedido" ? "dinero" : "pedido"); setTimeout(() => barra.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus(), 0);
+  };
+  return <>
+    <h1>Recepción</h1><p className="sub">{nombre}</p>
+    <div className="seg subtabs subtabs-mens subtabs-rec" role="tablist" aria-label="Recepción" ref={barra}>
+      {SUBS_REC.map(([k, t]) => <button key={k} id={"subRecM-" + k} type="button" role="tab" aria-selected={sub === k} aria-controls="panelRecM" tabIndex={sub === k ? 0 : -1}
+        onClick={() => ir(k)} onKeyDown={alTeclear}>{t}</button>)}
+    </div>
+    <div id="panelRecM" role="tabpanel" aria-labelledby={"subRecM-" + sub}>
+      {sub === "pedido" ? nuevoPedido : <RecibirDinero mid={E.miMensajero} />}
+    </div>
+  </>;
+}
+
+function RecibirDinero({ mid }: { mid: string }) {
+  const porPagina = usePorPagina(), [pagina, setPagina] = useState(1);
+  const q = useQuery({ queryKey: ["recibidos", mid, pagina, porPagina], queryFn: () => recibidosDe(mid, pagina, porPagina), placeholderData: prev => prev });
+  const r = q.data?.resumen, pm = periodoMensajero(mid);
+  const anotar: Anotar = d => recibirDeCliente({ ...d, mensajeroId: mid });
+  return <>
+    <p className="sub">Anota cada pago que te hace un cliente en la calle. Se abona a su cuenta y queda en lo que debes entregar en la oficina.</p>
+    {q.isError && <div className="aviso alerta">No se pudo traer lo que has recibido: {motivoError(q.error)}</div>}
+    <div className="kpis kpis-patinador">
+      <Kpi ico="plata" lbl="Te falta entregar" val={pesos(pm.debe)} pie={<small>{pm.cobros ? `${pesos(pm.cobros)} de pagos de clientes` : "En tu período abierto"}</small>} />
+      <Kpi ico="caja" lbl="Recibido hoy" val={r ? pesos(r.totalHoy) : "…"} pie={<small>{r ? `${r.registrosHoy} ${r.registrosHoy === 1 ? "pago" : "pagos"}` : ""}</small>} />
+    </div>
+    <FormPago anotar={anotar} invalidar={["recibidos"]} titulo="Recibir dinero" boton="Registrar pago" />
+    <h2>Lo que has recibido</h2>
+    <Lista registros={q.data?.registros} cargando={q.isLoading} vacio="Todavía no has recibido pagos de clientes. Cuando te paguen, anótalo arriba." />
+    {q.data && q.data.paginas > 1 && <Paginador pagina={q.data.pagina} paginas={q.data.paginas} total={q.data.total} porPagina={q.data.porPagina} cargando={q.isFetching} ir={p => setPagina(p)} />}
+  </>;
 }
 
 /* ---- Pedidos del mensajero: Todos, Por entregar (en ruta) y Por recoger (guías de solicitudes sin foto) ---- */
@@ -119,8 +167,8 @@ function PedidosMensajero({ pintar }: { pintar: () => void }) {
   };
   const vacio = E.diaPedM ? (sub === "recoger" ? "No tienes pedidos por recoger de ese día." : "No tienes pedidos pendientes de ese día.")
     : sub === "recoger" ? "No tienes pedidos por recoger. Cuando la oficina te asigne una solicitud, aparece aquí."
-    : sub === "entregar" ? "No tienes pedidos por entregar. Toma la foto en “Nuevo pedido” al salir."
-    : "No tienes pedidos pendientes. Toma la foto en “Nuevo pedido” al salir.";
+    : sub === "entregar" ? "No tienes pedidos por entregar. Toma la foto en Recepción → “Nuevo pedido” al salir."
+    : "No tienes pedidos pendientes. Toma la foto en Recepción → “Nuevo pedido” al salir.";
   const sub_ = (p: Pedido) => p.estado === "aceptado"
     ? (p.solicitud?.direccionRecogida ? "Recoger en " + p.solicitud.direccionRecogida : "Asignado " + hora(p.creado))
     : (p.solicitud?.direccionEntrega ? "Entregar en " + p.solicitud.direccionEntrega + " · " : "") + "salió " + hora(p.creado);

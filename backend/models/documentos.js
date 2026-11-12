@@ -258,7 +258,7 @@ export const Usuarios = crearModelo({
 export const Movimientos = crearModelo({
   col: "movimientos", pk: "id",
   campos: { id: "texto", clienteId: "ref", tipo: "texto", valor: "num", medio: "ref", nota: "texto", fecha: "ms!", porUid: "ref", porNombre: "texto",
-    medioAntes: "ref", medioCambio: "ms", reversoDe: "ref" }
+    medioAntes: "ref", medioCambio: "ms", reversoDe: "ref", mensajeroId: "ref" }
 });
 
 export const Recaudos = crearModelo({
@@ -271,7 +271,7 @@ export const Liquidaciones = crearModelo({
   col: "liquidaciones", pk: "id",
   campos: {
     id: "texto", mensajeroId: "ref", desde: "ms", fecha: "ms!", dia: "dia", entregas: "int", guias: "arr", efectivo: "num", base: "num", gastos: "num",
-    anterior: "num", recibidoAntes: "num", entregaFinal: "num", recibido: "num", debe: "num", adelanto: "num", ajuste: "num",
+    anterior: "num", recibidoAntes: "num", entregaFinal: "num", recibido: "num", debe: "num", adelanto: "num", ajuste: "num", cobros: "num",
     transfJs: "num", transfCli: "num", sueldo: "num", enRuta: "int"
   },
   alGuardar: d => { if (!esDiaTxt(d.dia)) d.dia = diaDe(d.fecha ?? ahora()); return d; }

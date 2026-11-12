@@ -39,13 +39,13 @@ export interface Pedido {
 }
 export interface Cliente { id: string; nombre: string; telefono: string; tarifa: number }
 export interface Persona { id: string; nombre: string; telefono: string; tipo: TipoPersonal; tarifa: number }
-export interface Movimiento { id: string; clienteId: string; tipo: TipoMov; valor: number; medio: Medio | ""; nota: string; fecha: number; porUid: string; porNombre: string; medioAntes?: string }
+export interface Movimiento { id: string; clienteId: string; tipo: TipoMov; valor: number; medio: Medio | ""; nota: string; fecha: number; porUid: string; porNombre: string; medioAntes?: string; mensajeroId?: string }
 export interface Recaudo { id: string; mensajeroId: string; valor: number; medio: Medio; nota: string; fecha: number; porUid: string; porNombre: string; medioAntes?: string }
 export interface Liquidacion {
   id: string; mensajeroId: string; fecha: number; desde: number; guias?: string[];
   entregas: number; efectivo: number; transfJs: number; transfCli: number; gastos: number; base: number;
   recibido: number; anterior: number; ajuste: number; debe: number; sueldo: number; nota?: string;
-  recibidoAntes?: number; entregaFinal?: number; adelanto?: number; enRuta?: number; dia?: string;
+  recibidoAntes?: number; entregaFinal?: number; adelanto?: number; enRuta?: number; dia?: string; cobros?: number;
 }
 export interface Jornada { id: string; personaId: string; dia: string; valor: number }
 export interface CajaMov {
@@ -187,7 +187,11 @@ export function entregasPorDia(ps: Pedido[], n: number) {
 /* ---------- clientes ---------- */
 export const signoMov = (m: Movimiento) => (MOVS[m.tipo]?.s || -1) * (Number(m.valor) || 0);
 export const esPago = (m: { tipo: string }) => !!MOVS[m.tipo as TipoMov]?.pago;
-export const mueveCaja = (m: { tipo: string }) => esPago(m) || !!MOVS[m.tipo as TipoMov]?.caja;
+/** Un pago que recibió un mensajero en la calle (mensajeroId) abona al cliente pero no mueve la caja: entra cuando él lo
+    entrega (recaudo) y mientras tanto suma a lo que debe (periodoMensajero). Igual que helpers/calculos.js del backend. */
+export const mueveCaja = (m: { tipo: string; mensajeroId?: string }) => !m.mensajeroId && (esPago(m) || !!MOVS[m.tipo as TipoMov]?.caja);
+/** Pagos de clientes que recibió el mensajero `mid` (+ lo que le dieron, − si se le devolvió al cliente). */
+export const esCobroMensajero = (m: Movimiento, mid: string) => !!m.mensajeroId && m.mensajeroId === mid && esPago(m);
 /* Pedidos y movimientos agrupados por cliente, armados una vez por pintada. Antes cada saldo recorría todas las guías:
    el Panel, la Caja y Cuentas suman el saldo de todos los clientes y eso era clientes × guías en cada pintada.
    El grupo dura hasta el final de la tarea actual (queueMicrotask) o hasta que cambie S.pedidos o S.movimientos,
@@ -325,7 +329,9 @@ export function periodoMensajero(mid: string) {
   const enLiq = new Set(liqs.flatMap(l => l.guias || [])), sinGuias = Math.max(0, ...liqs.filter(l => !Array.isArray(l.guias)).map(l => l.fecha));
   const ps = Object.values(S.pedidos).filter(p => cerrado(p) && p.mensajeroId === mid && !enLiq.has(p.guia) && (p.entregado || 0) > sinGuias).sort((a, b) => (a.entregado || 0) - (b.entregado || 0));
   const todosRecs = Object.values(S.recaudos).filter(r => r.mensajeroId === mid), todasBases = Object.values(S.cajamovs).filter(c => c.cat === "base" && c.personaId === mid);
+  const todosCobros = Object.values(S.movimientos).filter(m => esCobroMensajero(m, mid)).map(m => ({ ...m, valor: signoMov(m) }));
   const recs = todosRecs.filter(r => r.fecha > desde).sort((a, b) => a.fecha - b.fecha);
+  const cobrosCli = todosCobros.filter(m => m.fecha > desde).sort((a, b) => a.fecha - b.fecha);
   const bases = todasBases.filter(c => c.fecha > desde).sort((a, b) => a.fecha - b.fecha);
   const enVentana = (xs: { fecha: number; valor: number }[], l: Liquidacion) => xs.filter(x => x.fecha > (Number(l.desde) || 0) && x.fecha <= l.fecha).reduce((a, x) => a + (Number(x.valor) || 0), 0);
   let ajuste = 0;
@@ -333,11 +339,13 @@ export function periodoMensajero(mid: string) {
     if (!Array.isArray(l.guias)) continue;
     const lp = l.guias.map(g => S.pedidos[g]).filter(p => p && cerrado(p));
     ajuste += (totales(lp).efectivo - (Number(l.efectivo) || 0)) - (lp.reduce((a, p) => a + gastoDe(p), 0) - (Number(l.gastos) || 0))
-      + (enVentana(todasBases, l) - (Number(l.base) || 0)) - (enVentana(todosRecs, l) - (Number(l.recibido) || 0)) - (Number(l.ajuste) || 0);
+      + (enVentana(todasBases, l) - (Number(l.base) || 0)) - (enVentana(todosRecs, l) - (Number(l.recibido) || 0)) - (Number(l.ajuste) || 0)
+      + (enVentana(todosCobros, l) - (Number(l.cobros) || 0));
   }
   ajuste = Math.round(ajuste);
   const efectivo = totales(ps).efectivo, recibido = recs.reduce((a, r) => a + (Number(r.valor) || 0), 0), base = bases.reduce((a, c) => a + (Number(c.valor) || 0), 0), gastos = ps.reduce((a, p) => a + gastoDe(p), 0);
-  return { ul, desde, anterior, ajuste, ps, recs, bases, base, gastos, efectivo, recibido, debe: anterior + ajuste + efectivo + base - gastos - recibido };
+  const cobros = cobrosCli.reduce((a, m) => a + m.valor, 0);
+  return { ul, desde, anterior, ajuste, ps, recs, bases, base, gastos, efectivo, recibido, cobros, cobrosCli, debe: anterior + ajuste + efectivo + base + cobros - gastos - recibido };
 }
 export const yaLiquidado = (mid: string, fecha: number) => { const ul = liquidacionesDe(mid)[0]; return !!ul && fecha <= ul.fecha; };
 export const recibidoDia = (mid: string, dia: string) => Object.values(S.recaudos).filter(r => r.mensajeroId === mid && diaDe(r.fecha) === dia).reduce((a, r) => a + (Number(r.valor) || 0), 0);
@@ -373,7 +381,7 @@ export function cajaOficina(auid: string) {
     else if (c.cat === "interna" && !c.inicial && c.porUid === auid) add(c.fecha, (c.tipo === "entra" ? "Entrada de " : "Salida a ") + (S.cuentas[c.cuentaId || ""]?.nombre || "cuenta interna"), (c.tipo === "entra" ? 1 : -1) * (Number(c.valor) || 0), c.medio);
   }
   for (const r of Object.values(S.recaudos)) if (r.porUid === auid) add(r.fecha, "Entrega de " + nomM(r.mensajeroId) + antesTxt(r), Number(r.valor) || 0, r.medio);
-  for (const m of Object.values(S.movimientos)) if (m.porUid === auid && ["pago_de_cliente", "pago_a_cliente", "compra_cliente"].includes(m.tipo))
+  for (const m of Object.values(S.movimientos)) if (m.porUid === auid && !m.mensajeroId && ["pago_de_cliente", "pago_a_cliente", "compra_cliente"].includes(m.tipo))
     add(m.fecha, (m.tipo === "pago_de_cliente" ? "Pago de " : m.tipo === "pago_a_cliente" ? "Pago a " : "Compra para ") + nombreCliente(m.clienteId) + antesTxt(m), (m.tipo === "pago_de_cliente" ? 1 : -1) * (Number(m.valor) || 0), m.medio);
   for (const p of Object.values(S.pedidos)) if (p.domiPagado && p.domiPagoUid === auid && p.domiPagoMedio) add(p.domiPagoFecha, "Pago de domicilio · " + p.guia, pagoDomi(p), p.domiPagoMedio);
   L.sort((a, b) => a.fecha - b.fecha);

@@ -2,6 +2,8 @@
    Las reglas están en servicios/movimientos.js. */
 import * as S from "../servicios/movimientos.js";
 import { leerDe } from "../servicios/datos.js";
+import * as Movimiento from "../models/movimiento.model.js";
+import { invalido, prohibido } from "../helpers/errores.js";
 import { responder, diaDeFecha } from "./accion.js";
 
 const conDia = b => ({ ...b, dia: b.dia ?? diaDeFecha(b.fecha) });
@@ -20,3 +22,22 @@ export const eliminar = responder((ctx, req) => S.eliminar(ctx, req.valido.param
 export const reversar = responder((ctx, req) => S.reversarPagos(ctx, req.valido.body));
 export const pagina = responder((ctx, req) => S.paginaOficina(ctx, req.valido.query));
 export const ganancias = responder((ctx, req) => S.gananciasPorCliente(ctx, req.valido.query));
+
+/** POST /movimientos/recibidos: 201 { movimiento, clienteNombre, saldoCliente, debe }. */
+export const recibir = responder((ctx, req) => S.recibirDeMensajero(ctx, req.valido.body), { status: 201 });
+
+/** GET /movimientos/recibidos: { resumen, registros, pagina, porPagina, total, paginas }, igual a la caja del patinador.
+    El mensajero ve lo suyo (lo que mande la petición no cuenta); la oficina dice de cuál mensajero. */
+export async function recibidos(req, res) {
+  const u = req.usuario, { mensajeroId: pedido, pagina, porPagina } = req.valido.query;
+  let mensajeroId;
+  if (u.rol === "admin" || u.rol === "asistente") {
+    mensajeroId = pedido || u.mensajeroId;
+    if (!mensajeroId) throw invalido("Elige el mensajero", { mensajeroId: "Elige el mensajero" });
+  } else {
+    if (!u.mensajeroId) throw prohibido("Tu cuenta no está vinculada con tu nombre en Personal. Pídele a administración que la vincule.");
+    mensajeroId = u.mensajeroId;
+  }
+  const [resumen, lista] = await Promise.all([Movimiento.resumenRecibidos(mensajeroId), Movimiento.recibidosPagina({ mensajeroId, pagina, porPagina })]);
+  res.json({ resumen, ...lista });
+}

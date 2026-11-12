@@ -8,7 +8,7 @@ Con sesión, la app muestra **lo mismo que el prototipo** (`app/` del sistema vi
 
 | Rol | Pantallas |
 |---|---|
-| Mensajero (celular) | **Inicio** (KPIs, recomendaciones, efectividad, entregas por día, motivos, tus números), **Nuevo**, **Por entregar** (entregar con foto y firma, no entregado), **Mi caja**, **Mi sueldo**, **Entregados**. |
+| Mensajero (celular) | **Inicio** (KPIs, recomendaciones, efectividad, entregas por día, motivos, tus números), **Recepción** (Nuevo pedido con la foto; Recibir dinero de un cliente en la calle, que abona a su cuenta y suma a lo que el mensajero entrega), **Por entregar** (entregar con foto y firma, no entregado), **Mi caja**, **Mi sueldo**, **Entregados**. |
 | Asistente | **Inicio** (panel de control), **Pedidos**, **Clientes** (saldos, WhatsApp, paginados de 8 en celular y 20 en computador), **Caja** (recibir dinero de mensajeros, su caja de oficina), **Cuentas** (pagos, compras y ganancias de clientes). |
 | Administración | Todo lo anterior, más cierre del día, caja general y arqueos, liquidaciones, **Sueldos** y **Más** (Resultados, Personal y accesos, Historial, Papelera y Respaldo). En el escritorio, Resultados, Personal, Historial, Papelera y Respaldo son accesos directos del menú lateral; en el celular siguen dentro de **Más**. Puede pasar a modo Mensajero. |
 

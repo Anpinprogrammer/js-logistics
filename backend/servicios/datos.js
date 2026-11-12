@@ -17,7 +17,7 @@ export function lecturasDe(a) {
   if (a.esAsistente) {
     Object.assign(L, { pedidos: null, clientes: null, mensajeros: null, movimientos: null, cuentas: null, recaudos: null, liquidaciones: null });
     L.cajamovs = [{ cat: "interna" }, { cat: "base" }, { personaUid: a.uid }];
-  } else if (mid) Object.assign(L, { pedidos: { mensajeroId: mid }, mensajeros: { id: mid } });
+  } else if (mid) Object.assign(L, { pedidos: { mensajeroId: mid }, mensajeros: { id: mid }, movimientos: { mensajeroId: mid } }); // movimientos: los pagos que él recibió (Mi caja)
   if (mid) {
     L.jornadas = { personaId: mid };
     if (!a.esAsistente) Object.assign(L, { recaudos: { mensajeroId: mid }, liquidaciones: { mensajeroId: mid } });
