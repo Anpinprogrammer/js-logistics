@@ -39,7 +39,6 @@ const TRAZOS: Record<string, ReactNode> = {
 };
 export const Icono = ({ n }: { n: string }) => svg(TRAZOS[n] ?? TRAZOS.mas);
 export const IconoCamara = ({ chico }: { chico?: boolean }) => svg(camara, chico ? { width: 22, height: 22 } : undefined);
-export const IconoWhatsApp = () => svg(<><path d="M20.5 11.6a8.5 8.5 0 0 1-12.6 7.5L3.5 20.5l1.4-4.3a8.5 8.5 0 1 1 15.6-4.6z" /><path d="M9.4 8.2c.2-.4.4-.4.6-.4h.5c.2 0 .4.05.5.35l.65 1.55c.08.2.05.4-.06.52l-.4.48c-.1.12-.2.24-.1.44.4.75 1 1.4 1.75 1.8.2.1.33 0 .44-.1l.5-.55c.12-.14.3-.2.5-.12l1.55.72c.2.1.3.2.3.4v.5c0 .4-.4.9-1 1-1.4.3-4.05-1.2-4.9-3.3-.2-.5-.3-1-.3-1.4 0-.35.14-.68.32-.9z" /></>);
 export const IconoCalendario = () => svg(<><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" /><path d="M8 3v4M16 3v4M3.5 10h17" /></>);
 export const IconoFiltro = () => svg(<path d="M3 5h18l-7 8.5V20l-4-2v-4.5L3 5z" />);
 export const IconoInfo = () => svg(<><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 7.5v.01" /></>);
