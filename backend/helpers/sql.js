@@ -26,3 +26,16 @@ export function armarSet(datos, permitidos, desde = 1) {
   if (!cols.length) return null;
   return { sql: cols.join(", "), valores };
 }
+
+/**
+ * Cuenta y trae una página al mismo tiempo, en vez de una consulta después de la otra.
+ * `contar()` devuelve el total y `traer(offset)` las filas. Si la página pedida ya no existe
+ * (se borraron filas o cambió el filtro), se vuelve a pedir la última, como antes.
+ */
+export async function paginaEnParalelo({ contar, traer, pagina = 1, porPagina }) {
+  const pedida = Math.max(1, Number(pagina) || 1);
+  const [total, filas] = await Promise.all([contar(), traer((pedida - 1) * porPagina)]);
+  const paginas = Math.max(1, Math.ceil(total / porPagina));
+  const actual = Math.min(pedida, paginas);
+  return { total, paginas, pagina: actual, filas: actual === pedida ? filas : await traer((actual - 1) * porPagina) };
+}

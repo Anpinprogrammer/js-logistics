@@ -1,7 +1,7 @@
 /* Marco de la app interna, igual al prototipo: menú lateral en computador, barra arriba y pestañas abajo en el celular. */
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSesion, useUsuario } from "../auth/Sesion";
-import { ProveedorDatos, useDatos } from "./datos";
+import { necesarias, ProveedorDatos, useColecciones, useDatos } from "./datos";
 import { ProveedorVentana, Icono, IconoSalir, useVentana } from "./ui";
 import { E, estadoInicialPedidos, guardarLocal } from "./estado";
 import { useTema } from "./tema";
@@ -10,6 +10,10 @@ import { S, fechaLarga, hoy, horaActual, type Pedido } from "./motor";
 import { pendientesMios, porRecogerMios, devolucionesPorDefinirMios } from "./mensajero/pendientes";
 import { useEscritorio } from "../lib/pantalla";
 import { perezoso } from "../lib/perezoso";
+import { CLAVE_NAV_ADMIN, usePersistedTab } from "../hooks/usePersistedTab";
+import { navegacionActual, restaurarNavegacion } from "./navegacion";
+import { precargarPestana } from "./oficina/pestanas";
+import { precargarAvisos } from "../lib/alertasAdmin";
 import "./estilos.css";
 import "./ajustes.css";
 
@@ -38,6 +42,8 @@ const IconoExpandir = () => <svg {...iconoTema}><path d="M13 17l5-5-5-5M6 17l5-5
 
 export default function AppInterna() {
   const usuario = useUsuario();
+  // Al entrar (o al recargar con F5) se vuelve a la pestaña en la que estaba, si le corresponde a esta cuenta.
+  useState(() => restaurarNavegacion(usuario.id, usuario.rol));
   const { tema, oscuro, cambiar } = useTema();
   const [menuColapsado, setMenuColapsado] = useState(false);
   return (
@@ -51,7 +57,7 @@ export default function AppInterna() {
 
 function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boolean; cambiarTema: () => void; colapsado: boolean; alternarMenu: () => void }) {
   const { usuario, salir } = useSesion();
-  const { version, tocar, error, cargado } = useDatos();
+  const { version, tocar, error } = useDatos();
   const ventana = useVentana();
   const escritorio = useEscritorio();
   const [perfilAbierto, setPerfilAbierto] = useState(false);
@@ -80,19 +86,25 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     actual = escritorio && esAdmin && E.tabA === "mas" ? E.subMas : E.tabA;
     elegir = k => { if (ADMIN_ESCRITORIO.some(([x]) => x === k)) { E.tabA = "mas"; E.subMas = k; } else E.tabA = k; };
   }
+  // Apuntar o tocar un botón del menú ya empieza a bajar esa pestaña (solo en la oficina; el mensajero va en un solo archivo).
+  const intencion = (k: string) => { if (!enMensajero) precargarPestana(k); };
   const ir = (k: string) => {
     if (k === "pedidos" && !enMensajero) Object.assign(E, { filtroA: estadoInicialPedidos(), buscarA: "", mensPedA: "", diaPedA: "", paginaA: 1 });
     elegir(k); pintar(); scrollTo(0, 0);
   };
   const boton = ([k, t, n]: ItemNav) => (
-    <button key={k} aria-current={actual === k ? "page" : undefined} aria-label={t} title={t} onClick={() => ir(k)}><Icono n={k} /><span className="t">{t}</span>{n ? <span className="num">{n}</span> : null}</button>
+    <button key={k} aria-current={actual === k ? "page" : undefined} aria-label={t} title={t} onClick={() => ir(k)} onPointerEnter={() => intencion(k)} onFocus={() => intencion(k)} onTouchStart={() => intencion(k)}><Icono n={k} /><span className="t">{t}</span>{n ? <span className="num">{n}</span> : null}</button>
   );
+  // Solo se piden al servidor las colecciones que usa la vista abierta (las demás, al abrirla).
+  const listo = useColecciones(necesarias(E.rol, enMensajero ? E.tabM : E.tabA));
+  // La pestaña y sub-pestaña quedan en la URL y en sessionStorage para la próxima recarga.
+  usePersistedTab(CLAVE_NAV_ADMIN, usuario?.id || "", navegacionActual());
   const cabe = items.length <= 5, vis = cabe ? items : items.slice(0, 4), resto = cabe ? [] : items.slice(4);
   const enResto = resto.find(([k]) => k === actual), nResto = resto.reduce((a, [, , n]) => a + (n || 0), 0);
   const abrirMenu = () => ventana.abrir(<>
     <header><h2>Menú</h2><button className="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     <div className="menu-grid">
-      {items.map(([k, t, n]) => <button key={k} aria-current={actual === k ? "page" : undefined} onClick={() => { ventana.cerrar(); ir(k); }}><Icono n={k} /><span>{t}{n ? <> <span className="etq sin">{n}</span></> : null}</span></button>)}
+      {items.map(([k, t, n]) => <button key={k} aria-current={actual === k ? "page" : undefined} onTouchStart={() => intencion(k)} onFocus={() => intencion(k)} onClick={() => { ventana.cerrar(); ir(k); }}><Icono n={k} /><span>{t}{n ? <> <span className="etq sin">{n}</span></> : null}</span></button>)}
       <button type="button" onClick={() => { cambiarTema(); ventana.cerrar(); }}>
         {oscuro ? <IconoSol /> : <IconoLuna />}
         <span>{oscuro ? "Modo claro" : "Modo oscuro"}</span>
@@ -120,6 +132,12 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
   useEffect(() => { document.title = "JS Logistics"; }, []);
   // Mientras llegan los datos, se baja la pantalla del modo actual: así no se espera una cosa después de la otra.
   useEffect(() => { (enMensajero ? Mensajero : Oficina).precargar().catch(() => { /* se reintenta al pintarla */ }); }, [enMensajero]);
+  // Cuando el navegador queda libre se baja la librería de avisos, para que el primer aviso no espere (sobre todo sin señal).
+  useEffect(() => {
+    if ("requestIdleCallback" in window) { const id = requestIdleCallback(precargarAvisos, { timeout: 5000 }); return () => cancelIdleCallback(id); }
+    const id = setTimeout(precargarAvisos, 3000);
+    return () => clearTimeout(id);
+  }, []);
   void version;
 
   return <>
@@ -167,7 +185,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     </header>
     <main id="vista" className={!enMensajero && E.tabA === "pedidos" ? "vista-pedidos-oficina" : !enMensajero && E.tabA === "solicitudes" ? "vista-solicitudes-oficina" : !enMensajero && E.tabA === "clientes" ? "vista-clientes-oficina" : undefined}>
       {error && <div className="aviso alerta">No se pudieron traer los datos: {error} Se vuelve a intentar solo en unos segundos.</div>}
-      {!cargado && !error ? cargando : <Suspense fallback={cargando}>{enMensajero ? <Mensajero pintar={pintar} /> : <Oficina pintar={pintar} />}</Suspense>}
+      {!listo && !error ? cargando : <Suspense fallback={cargando}>{enMensajero ? <Mensajero pintar={pintar} /> : <Oficina pintar={pintar} />}</Suspense>}
     </main>
     <nav className="pestanas" id="pestanas" aria-label="Secciones">
       {vis.map(boton)}

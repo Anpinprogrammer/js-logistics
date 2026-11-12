@@ -14,9 +14,8 @@ import { DEMO } from "../demo";
 import { caja as apiCaja, movimientos as apiMovimientos } from "../../api/servicios";
 import { usePorPaginaCuentas, usePorPaginaInternos } from "../../lib/pantalla";
 import type { GananciaCliente, PaginaCajaMovimientos, PaginaGanancias, PaginaMovimientos } from "../../api/tipos";
-import { avisoContado } from "./Pedidos";
-import { diaAntesDelArqueo, FormCliente } from "./Clientes";
-import { CambiarMedio } from "./Caja";
+import { avisoContado, diaAntesDelArqueo } from "./comun";
+import { CambiarMedio, FormCliente } from "./modales";
 
 type Ventana = ReturnType<typeof useVentana>;
 type FiltrosCuentas = { tipo: string; buscar: string; desde: string; hasta: string };
@@ -74,7 +73,8 @@ const reversarPago = (m: Movimiento) => yaContado(m.fecha) ? guardarMovimiento(n
 export default function Cuentas({ pintar }: { pintar: () => void }) {
   const v = useVentana();
   const cs = listaOrdenada(S.cuentas, "nombre");
-  const R = resumenCaja();
+  // El resumen de la caja recorre todo: solo se calcula en la sub-pestaña Cuentas, que es la que lo muestra.
+  const R = E.tabCuentas === "cuentas" ? resumenCaja() : null;
   const [creando, setCreando] = useState(false);
   const poner = (cambio: Partial<typeof E>) => { Object.assign(E, cambio); pintar(); };
   const semilla = async () => {
@@ -164,6 +164,7 @@ export default function Cuentas({ pintar }: { pintar: () => void }) {
     </div>
 
     <div role="tabpanel" id="panelCue-cuentas" aria-labelledby="tabCue-cuentas" hidden={E.tabCuentas !== "cuentas"}>
+      {E.tabCuentas === "cuentas" && R && <>
       <div className="cifras cifras-cuentas">
         <div className="cifra fuerte"><span>Total en caja</span><b>{pesos(R.total)}</b><span>{Object.entries(R.porMedio).filter(([, x]) => Math.round(x)).map(([m, x]) => `${MEDIOS_CAJA[m] || m}: ${pesos(x)}`).join(" · ") || "Sin movimientos"}</span></div>
         {(["efectivo", "nequi", "bancolombia"] as const).map(k => <div className="cifra" key={k}><span>{MEDIOS_CAJA[k] || k}</span><b>{pesos(R.porMedio[k] || 0)}</b></div>)}
@@ -198,9 +199,11 @@ export default function Cuentas({ pintar }: { pintar: () => void }) {
           </tbody></table></div>
           <Paginador pagina={pagInt.pagina} paginas={pagInt.paginas} total={pagInt.total} porPagina={pagInt.porPagina} ir={irInt} cargando={qInt.isPlaceholderData} />
         </> : <div className="vacio">Sin movimientos con esos filtros.</div>}
+      </>}
     </div>
 
     <div role="tabpanel" id="panelCue-movimientos" aria-labelledby="tabCue-movimientos" hidden={E.tabCuentas !== "movimientos"}>
+      {E.tabCuentas === "movimientos" && <>
       <div className="toolbar-cuentas">
         <div className="campo"><input id="buscarCue" type="search" placeholder="Buscar cliente o detalle…" value={buscar} aria-label="Buscar por cliente o detalle"
           onChange={e => alBuscar(e.target.value)} /></div>
@@ -232,9 +235,11 @@ export default function Cuentas({ pintar }: { pintar: () => void }) {
           </tbody></table></div>
           <Paginador pagina={pag.pagina} paginas={pag.paginas} total={pag.total} porPagina={pag.porPagina} ir={irMovs} cargando={qMovs.isPlaceholderData} />
         </> : <div className="vacio">No hay movimientos con esos filtros.</div>}
+      </>}
     </div>
 
     <div role="tabpanel" id="panelCue-ganancias" aria-labelledby="tabCue-ganancias" hidden={E.tabCuentas !== "ganancias"}>
+      {E.tabCuentas === "ganancias" && <>
       <div className="cab-ganancias">
         <div><h2>Ganancias por cliente</h2><p className="sub">Ganancia ocasional cargada a cada cliente, con el rango de fechas de Movimientos.</p></div>
         <div className="campo"><input id="buscarGan" type="search" placeholder="Buscar cliente…" value={buscarGan} aria-label="Buscar cliente"
@@ -252,6 +257,7 @@ export default function Cuentas({ pintar }: { pintar: () => void }) {
           </tbody></table></div>
           <Paginador pagina={pagGan.pagina} paginas={pagGan.paginas} total={pagGan.total} porPagina={pagGan.porPagina} ir={irGan} cargando={qGan.isPlaceholderData} />
         </> : <div className="vacio">No hay ganancias con ese rango de fechas.</div>}
+      </>}
     </div>
   </>;
 }

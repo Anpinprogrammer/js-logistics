@@ -29,12 +29,15 @@ export const listar = z.object({
   cambioPendiente: bandera.optional(),                                  // prenda de cambio que el cliente no ha recibido
   sinServicio: bandera.optional(),                                      // entregado, con remitente y sin valor de servicio
   dia: z.string().refine(esDia, "Usa un día con el formato AAAA-MM-DD").optional(), // salió o se cerró ese día (hora de Colombia)
-  limite: z.coerce.number().int().min(1).max(500).default(100),
+  // Hasta 1000 por pedazo: la carga completa de la app interna hace menos viajes.
+  limite: z.coerce.number().int().min(1).max(1000).default(100),
   cursor: z.coerce.number().int().positive().optional(),
   pagina: z.coerce.number().int().min(1).max(100_000).optional(),
   porPagina: z.coerce.number().int().min(1).max(100).default(20),
   // Con `sinTotal` el paginador no consulta el total: la respuesta trae `hayMas`.
-  sinTotal: bandera.optional()
+  sinTotal: bandera.optional(),
+  // Con `sinMini` no se firman las URL de las miniaturas (la carga completa de la oficina no las pinta).
+  sinMini: bandera.optional()
 }).refine(d => !(d.pagina && d.cursor), { message: "Usa pagina o cursor, no los dos", path: ["cursor"] });
 
 // El mensajero solo manda el body vacío: la guía queda a su nombre y en cero.

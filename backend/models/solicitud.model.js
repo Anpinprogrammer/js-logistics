@@ -1,6 +1,6 @@
 /* Solicitudes de envío que llegan del formulario público de la landing. */
 import { query } from "../config/db.js";
-import { filaAObjeto, armarSet } from "../helpers/sql.js";
+import { filaAObjeto, armarSet, paginaEnParalelo } from "../helpers/sql.js";
 import { nuevoId } from "../helpers/ids.js";
 
 // NUMERIC llega como texto desde pg: el peso se devuelve como número (o null).
@@ -93,11 +93,12 @@ export async function listarPagina({ grupo, pagina = 1, porPagina = 20 } = {}) {
   const valores = [];
   if (estados) valores.push(estados);
   const donde = estados ? "WHERE s.estado = ANY($1)" : "";
-  const { rows: [{ n }] } = await query(`SELECT count(*)::int AS n FROM solicitudes s ${donde}`, valores);
-  const { rows } = await query(
-    `${CON_NOMBRES} ${donde} ORDER BY s.creado DESC LIMIT $${valores.length + 1} OFFSET $${valores.length + 2}`,
-    [...valores, porPagina, (pagina - 1) * porPagina]
-  );
+  // Conteo y página en paralelo. Como antes, si la página no existe responde vacía (no salta a la última).
+  const [{ rows: [{ n }] }, { rows }] = await Promise.all([
+    query(`SELECT count(*)::int AS n FROM solicitudes s ${donde}`, valores),
+    query(`${CON_NOMBRES} ${donde} ORDER BY s.creado DESC LIMIT $${valores.length + 1} OFFSET $${valores.length + 2}`,
+      [...valores, porPagina, (pagina - 1) * porPagina])
+  ]);
   return { solicitudes: rows.map(aObjeto), total: n, paginas: Math.max(1, Math.ceil(n / porPagina)) };
 }
 
@@ -138,23 +139,28 @@ function condicionesPantalla({ search = "", source = "todos", date = "", status 
 export async function listarFiltradas({ page = 1, limit = 15, status = "todas", search = "", source = "todos", date = "" } = {}) {
   const filtros = { status, search, source, date };
   const base = condicionesPantalla(filtros);
-  const { rows: estados } = await query(`SELECT s.estado, count(*)::int AS n FROM solicitudes s ${base.sql} GROUP BY s.estado`, base.valores);
-  const por = Object.fromEntries(estados.map(f => [f.estado, f.n]));
-  const suma = estados => estados.reduce((total, estado) => total + (por[estado] || 0), 0);
-  const counts = {
-    todas: suma(["pendiente", "cotizada", "confirmada", "asignada", "rechazada"]),
-    pendientes: suma(GRUPOS.pendientes), por_confirmar: suma(GRUPOS["por-confirmar"]),
-    aceptadas: suma(GRUPOS.aceptadas), rechazadas: suma(GRUPOS.rechazadas)
-  };
-  const totalItems = counts[status === "por_confirmar" ? "por_confirmar" : status];
-  const totalPages = Math.max(1, Math.ceil(totalItems / limit));
-  const actual = Math.min(page, totalPages);
   const lista = condicionesPantalla({ ...filtros, status: status === "por_confirmar" ? "por-confirmar" : status }, true);
-  const { rows } = await query(
-    `${CON_NOMBRES} ${lista.sql} ORDER BY s.creado DESC, s.id DESC LIMIT $${lista.valores.length + 1} OFFSET $${lista.valores.length + 2}`,
-    [...lista.valores, limit, (actual - 1) * limit]
-  );
-  return { data: rows.map(aObjeto), pagination: { page: actual, limit, totalItems, totalPages }, counts };
+  let counts = null;
+  // Los conteos por estado (en la base, con GROUP BY) y la página van en paralelo.
+  const r = await paginaEnParalelo({
+    pagina: page, porPagina: limit,
+    contar: async () => {
+      const { rows: estados } = await query(`SELECT s.estado, count(*)::int AS n FROM solicitudes s ${base.sql} GROUP BY s.estado`, base.valores);
+      const por = Object.fromEntries(estados.map(f => [f.estado, f.n]));
+      const suma = estados => estados.reduce((total, estado) => total + (por[estado] || 0), 0);
+      counts = {
+        todas: suma(["pendiente", "cotizada", "confirmada", "asignada", "rechazada"]),
+        pendientes: suma(GRUPOS.pendientes), por_confirmar: suma(GRUPOS["por-confirmar"]),
+        aceptadas: suma(GRUPOS.aceptadas), rechazadas: suma(GRUPOS.rechazadas)
+      };
+      return counts[status === "por_confirmar" ? "por_confirmar" : status];
+    },
+    traer: async offset => (await query(
+      `${CON_NOMBRES} ${lista.sql} ORDER BY s.creado DESC, s.id DESC LIMIT $${lista.valores.length + 1} OFFSET $${lista.valores.length + 2}`,
+      [...lista.valores, limit, offset]
+    )).rows
+  });
+  return { data: r.filas.map(aObjeto), pagination: { page: r.pagina, limit, totalItems: r.total, totalPages: r.paginas }, counts };
 }
 
 /** Cuántas hay en cada estado abierto (para la campanita). */

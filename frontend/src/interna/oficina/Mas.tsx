@@ -14,7 +14,7 @@ import { DEMO } from "../demo";
 import { useEscritorio, usePorPaginaAccesos, usePorPaginaHistorial, usePorPaginaPersonal } from "../../lib/pantalla";
 import * as api from "../../api/servicios";
 import type { Cambio, EnPapelera, PaginaHistorial, PaginaPersonal, Rol } from "../../api/tipos";
-import { FormCliente } from "./Clientes";
+import { FormCliente } from "./modales";
 
 export default function Mas({ pintar }: { pintar: () => void }) {
   // En el escritorio cada sub-pestaña es un acceso directo del menú lateral; en el celular siguen aquí.

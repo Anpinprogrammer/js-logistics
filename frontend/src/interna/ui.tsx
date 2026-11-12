@@ -1,5 +1,5 @@
 /* Piezas comunes de la app interna, con el mismo HTML y las mismas clases del prototipo (app/js/app.js). */
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, Suspense, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useDatos } from "./datos";
 import { pedidos as apiPedidos } from "../api/servicios";
 import { DEMO } from "./demo";
@@ -95,7 +95,7 @@ export function ProveedorVentana({ children }: { children: ReactNode }) {
     <CtxV.Provider value={{ abrir, cerrar, avisar, confirmar, ampliar: setVisor }}>
       {children}
       <dialog id="dlg" ref={dlg} onClick={e => { if (e.target === dlg.current) cerrar(); else alClic(e); }}>
-        <div className="dlg" id="dlgCont" ref={cont} key={clave}>{contenido}</div>
+        <div className="dlg" id="dlgCont" ref={cont} key={clave}><Suspense fallback={<div className="vacio" role="status">Cargando…</div>}>{contenido}</Suspense></div>
         {visor && <Visor src={visor} cerrar={() => setVisor("")} />}
       </dialog>
       {visor && !dlg.current?.open && <Visor src={visor} cerrar={() => setVisor("")} />}

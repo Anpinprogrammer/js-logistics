@@ -5,6 +5,7 @@ import { auth } from "../api/servicios";
 import { cuandoSePierdaLaSesion } from "../api/cliente";
 import type { Rol, Usuario } from "../api/tipos";
 import { DEMO, USUARIOS_DEMO } from "../interna/cuentasDemo";
+import { CLAVE_NAV_ADMIN, limpiarNavegacion } from "../hooks/usePersistedTab";
 
 /* Modo demo: sin backend. Solo se recuerda cuál cuenta de prueba se eligió (no hay token). */
 const CLAVE_DEMO = "jsl_demo_cuenta";
@@ -53,6 +54,7 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   const salir = useCallback(async () => {
     await sesion.salir().catch(() => {});
     qc.clear();
+    limpiarNavegacion(CLAVE_NAV_ADMIN); // la próxima vez entra al Inicio
     setUsuario(null);
   }, [qc]);
 

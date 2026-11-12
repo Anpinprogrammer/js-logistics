@@ -8,7 +8,7 @@ import { Cab, useVentana } from "../ui";
 import { E } from "../estado";
 import { devolverAdelanto, guardarPersona, ponerJornada, quitarAdelanto } from "../acciones";
 import { motivoError } from "../datos";
-import { MovCaja } from "./Caja";
+import { MovCaja } from "./modales";
 
 type Ventana = ReturnType<typeof useVentana>;
 const MEDIOS_K = Object.keys(MEDIOS) as Medio[];

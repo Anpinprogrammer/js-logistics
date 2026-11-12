@@ -1,10 +1,18 @@
 /* Pedidos (guías), sus intentos fallidos y el consecutivo. */
 import { query, transaccion } from "../config/db.js";
-import { filaAObjeto, armarSet } from "../helpers/sql.js";
+import { filaAObjeto, armarSet, paginaEnParalelo } from "../helpers/sql.js";
 import { formatoGuia } from "../helpers/ids.js";
 
-const CON_INTENTOS = `
-  SELECT p.*, c.nombre AS cliente_nombre, m.nombre AS mensajero_nombre,
+/* Columnas de las listas: lo que pintan las filas y lo que usan los cálculos de la app. Quedan fuera las de control
+   interno (quién creó, quién entregó o confirmó el cambio, si se borraron fotos y la hora del último cambio), que
+   solo se necesitan al abrir una guía (buscarPorGuia, con todas las columnas). */
+const COLUMNAS_LISTA = `p.guia, p.n, p.estado, p.creado, p.mensajero_id, p.cliente_id, p.valor_servicio, p.a_cobrar, p.entregado,
+  p.destinatario, p.valor_cobrado, p.metodo, p.cuenta_js, p.dif_cobro, p.dif_revisada, p.motivo_dev, p.nota_dev, p.cobrar_dev,
+  p.cambio, p.cambio_recibido, p.gasto, p.gasto_nota, p.domi_pagado, p.domi_pago_medio, p.domi_pago_valor, p.domi_pago_fecha,
+  p.domi_pago_uid, p.destino_dev, p.reintento_de, p.reintento_pedido`;
+
+const conIntentos = columnas => `
+  SELECT ${columnas}, c.nombre AS cliente_nombre, m.nombre AS mensajero_nombre,
     COALESCE((SELECT json_agg(json_build_object('fecha', i.fecha, 'motivo', i.motivo, 'nota', i.nota) ORDER BY i.fecha)
               FROM pedido_intentos i WHERE i.guia = p.guia), '[]'::json) AS intentos,
     (SELECT a.ruta FROM pedido_archivos a WHERE a.guia = p.guia AND a.tipo = 'mini' ORDER BY a.creado DESC LIMIT 1) AS mini_ruta,
@@ -19,6 +27,8 @@ const CON_INTENTOS = `
   FROM pedidos p
   LEFT JOIN clientes c ON c.id = p.cliente_id
   LEFT JOIN mensajeros m ON m.id = p.mensajero_id`;
+const CON_INTENTOS = conIntentos("p.*");
+const LISTA = conIntentos(COLUMNAS_LISTA);
 
 /** Inicio y fin (exclusivo) de un día de Colombia, que siempre es UTC−5. */
 const limitesDia = dia => { const ini = new Date(dia + "T00:00:00-05:00"); return [ini, new Date(ini.getTime() + 864e5)]; };
@@ -65,7 +75,7 @@ export async function listar({ limite = 100, cursor, ...filtros } = {}) {
   const { cond, valores } = filtrosSql(filtros);
   if (cursor) { valores.push(cursor); cond.push(`p.n < $${valores.length}`); } // el `n` más bajo de la página anterior
   valores.push(limite);
-  const { rows } = await query(`${CON_INTENTOS} ${donde(cond)} ORDER BY p.n DESC LIMIT $${valores.length}`, valores);
+  const { rows } = await query(`${LISTA} ${donde(cond)} ORDER BY p.n DESC LIMIT $${valores.length}`, valores);
   return rows.map(filaAObjeto);
 }
 
@@ -77,29 +87,23 @@ export async function listar({ limite = 100, cursor, ...filtros } = {}) {
  */
 export async function listarPagina({ pagina = 1, porPagina = 20, sinTotal = false, ...filtros } = {}) {
   const { cond, valores } = filtrosSql(filtros);
-  let actual = pagina, total, paginas;
-  if (!sinTotal) {
-    const { rows: [c] } = await query(
-      `SELECT count(*)::int AS total FROM pedidos p
-       LEFT JOIN clientes c ON c.id = p.cliente_id LEFT JOIN mensajeros m ON m.id = p.mensajero_id ${donde(cond)}`,
-      valores
-    );
-    total = c.total;
-    paginas = Math.max(1, Math.ceil(total / porPagina));
-    actual = Math.min(pagina, paginas);
+  const traer = async (offset, limite = porPagina) => (await query(
+    `${LISTA} ${donde(cond)} ORDER BY p.n DESC LIMIT $${valores.length + 1} OFFSET $${valores.length + 2}`,
+    [...valores, limite, offset]
+  )).rows;
+  if (sinTotal) {
+    const rows = await traer((pagina - 1) * porPagina, porPagina + 1);
+    const hayMas = rows.length > porPagina;
+    return { pedidos: (hayMas ? rows.slice(0, porPagina) : rows).map(filaAObjeto), pagina, porPagina, hayMas };
   }
-  const limite = sinTotal ? porPagina + 1 : porPagina;
-  const { rows } = await query(
-    `${CON_INTENTOS} ${donde(cond)} ORDER BY p.n DESC LIMIT $${valores.length + 1} OFFSET $${valores.length + 2}`,
-    [...valores, limite, (actual - 1) * porPagina]
-  );
-  const hayMas = sinTotal ? rows.length > porPagina : undefined;
-  return {
-    pedidos: (hayMas ? rows.slice(0, porPagina) : rows).map(filaAObjeto),
-    pagina: actual,
-    porPagina,
-    ...(sinTotal ? { hayMas } : { total, paginas })
-  };
+  // El conteo y la página van en paralelo (antes, uno después del otro).
+  const contar = async () => (await query(
+    `SELECT count(*)::int AS total FROM pedidos p
+     LEFT JOIN clientes c ON c.id = p.cliente_id LEFT JOIN mensajeros m ON m.id = p.mensajero_id ${donde(cond)}`,
+    valores
+  )).rows[0].total;
+  const r = await paginaEnParalelo({ contar, traer, pagina, porPagina });
+  return { pedidos: r.filas.map(filaAObjeto), pagina: r.pagina, porPagina, total: r.total, paginas: r.paginas };
 }
 
 export async function buscarPorGuia(guia, db = { query }) {

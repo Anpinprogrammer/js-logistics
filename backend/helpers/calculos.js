@@ -65,18 +65,39 @@ export const lineasCajaPedido = p => [
 export function crearCalculos(S, { corteRemoto = 0 } = {}) {
   const V = col => Object.values(S[col] || {});
 
+  /* Saldo de cada cliente en una sola pasada por pedidos y movimientos (antes se recorrían todos por cada cliente:
+     la lista de Clientes era cuadrática). S no se modifica después de crear los cálculos (cada petición arma los suyos). */
+  let saldos = null;
   function saldoCliente(cid) {
-    let s = 0;
-    for (const p of V("pedidos")) if (p.clienteId === cid) s += saldoPedido(p);
-    for (const m of V("movimientos")) if (m.clienteId === cid) s += signoMov(m);
-    return s;
+    if (!cid) { // sin id se conserva el recorrido de siempre (suma lo que tenga ese mismo valor vacío)
+      let s = 0;
+      for (const p of V("pedidos")) if (p.clienteId === cid) s += saldoPedido(p);
+      for (const m of V("movimientos")) if (m.clienteId === cid) s += signoMov(m);
+      return s;
+    }
+    if (!saldos) {
+      saldos = new Map();
+      for (const p of V("pedidos")) if (p.clienteId) saldos.set(p.clienteId, (saldos.get(p.clienteId) || 0) + saldoPedido(p));
+      for (const m of V("movimientos")) if (m.clienteId) saldos.set(m.clienteId, (saldos.get(m.clienteId) || 0) + signoMov(m));
+    }
+    return saldos.get(cid) || 0;
   }
   const nombreCliente = id => S.clientes[id]?.nombre || (id && V("pedidos").find(p => p.clienteId === id && p.clienteNombre)?.clienteNombre) || "";
   const listaOrdenada = (obj, campo, desc) => Object.values(obj).sort((a, b) => (desc ? (b[campo] || 0) - (a[campo] || 0) : String(a[campo] || "").localeCompare(String(b[campo] || ""), "es")));
 
+  // Pedidos y movimientos agrupados por cliente, en el mismo orden de S (para no recorrerlos todos por cada cliente).
+  let grupos = null;
+  const deCliente = (col, cid) => {
+    if (!cid) return V(col).filter(x => x.clienteId === cid);
+    if (!grupos) {
+      grupos = { pedidos: new Map(), movimientos: new Map() };
+      for (const k of ["pedidos", "movimientos"]) for (const x of V(k)) if (x.clienteId) { const g = grupos[k].get(x.clienteId); if (g) g.push(x); else grupos[k].set(x.clienteId, [x]); }
+    }
+    return grupos[col].get(cid) || [];
+  };
   function filasCuenta(cid) {
-    const ps = V("pedidos").filter(p => p.clienteId === cid && cerrado(p)).map(p => ({ fecha: p.entregado, det: `${p.guia} · ${p.destinatario || ""} · ${metodoTxt(p)} · cobró ${pesos(p.valorCobrado)} · ${textoDomi(p)}`, v: saldoPedido(p), pid: p.guia, dp: !!p.domiPagado, nom: p.destinatario || (p.estado === "devuelto" ? "Devolucion" : "") }));
-    const ms = V("movimientos").filter(m => m.clienteId === cid).map(m => ({ fecha: m.fecha, det: (MOVS[m.tipo]?.corto || "Movimiento") + (m.nota ? " · " + m.nota : ""), v: signoMov(m), mid: m.id, nom: (MOVS[m.tipo]?.corto || "Movimiento") + (m.nota ? " " + m.nota : "") }));
+    const ps = deCliente("pedidos", cid).filter(p => cerrado(p)).map(p => ({ fecha: p.entregado, det: `${p.guia} · ${p.destinatario || ""} · ${metodoTxt(p)} · cobró ${pesos(p.valorCobrado)} · ${textoDomi(p)}`, v: saldoPedido(p), pid: p.guia, dp: !!p.domiPagado, nom: p.destinatario || (p.estado === "devuelto" ? "Devolucion" : "") }));
+    const ms = deCliente("movimientos", cid).map(m => ({ fecha: m.fecha, det: (MOVS[m.tipo]?.corto || "Movimiento") + (m.nota ? " · " + m.nota : ""), v: signoMov(m), mid: m.id, nom: (MOVS[m.tipo]?.corto || "Movimiento") + (m.nota ? " " + m.nota : "") }));
     return [...ps, ...ms].sort((a, b) => b.fecha - a.fecha);
   }
 

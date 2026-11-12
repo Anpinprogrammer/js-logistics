@@ -188,20 +188,32 @@ export function entregasPorDia(ps: Pedido[], n: number) {
 export const signoMov = (m: Movimiento) => (MOVS[m.tipo]?.s || -1) * (Number(m.valor) || 0);
 export const esPago = (m: { tipo: string }) => !!MOVS[m.tipo as TipoMov]?.pago;
 export const mueveCaja = (m: { tipo: string }) => esPago(m) || !!MOVS[m.tipo as TipoMov]?.caja;
+/* Pedidos y movimientos agrupados por cliente, armados una vez por pintada. Antes cada saldo recorría todas las guías:
+   el Panel, la Caja y Cuentas suman el saldo de todos los clientes y eso era clientes × guías en cada pintada.
+   El grupo dura hasta el final de la tarea actual (queueMicrotask) o hasta que cambie S.pedidos o S.movimientos,
+   así que un cambio guardado después siempre se ve. El orden dentro de cada grupo es el de S, igual que antes. */
+let grupos: { pedidos: typeof S.pedidos; movimientos: typeof S.movimientos; ps: Map<string, Pedido[]>; ms: Map<string, Movimiento[]>; saldos: Map<string, number> } | null = null;
+function porCliente() {
+  if (grupos && grupos.pedidos === S.pedidos && grupos.movimientos === S.movimientos) return grupos;
+  const ps = new Map<string, Pedido[]>(), ms = new Map<string, Movimiento[]>(), saldos = new Map<string, number>();
+  for (const p of Object.values(S.pedidos)) { const g = ps.get(p.clienteId); if (g) g.push(p); else ps.set(p.clienteId, [p]); saldos.set(p.clienteId, (saldos.get(p.clienteId) || 0) + saldoPedido(p)); }
+  for (const m of Object.values(S.movimientos)) { const g = ms.get(m.clienteId); if (g) g.push(m); else ms.set(m.clienteId, [m]); saldos.set(m.clienteId, (saldos.get(m.clienteId) || 0) + signoMov(m)); }
+  const g = grupos = { pedidos: S.pedidos, movimientos: S.movimientos, ps, ms, saldos };
+  queueMicrotask(() => { if (grupos === g) grupos = null; });
+  return g;
+}
 export function saldoCliente(cid: string) {
-  let s = 0;
-  for (const p of Object.values(S.pedidos)) if (p.clienteId === cid) s += saldoPedido(p);
-  for (const m of Object.values(S.movimientos)) if (m.clienteId === cid) s += signoMov(m);
-  return s;
+  return porCliente().saldos.get(cid) || 0;
 }
 export const nombreCliente = (id: string) => S.clientes[id]?.nombre || (id && Object.values(S.pedidos).find(p => p.clienteId === id && p.clienteNombre)?.clienteNombre) || "";
 export interface FilaCuenta { fecha: number; det: string; v: number; pid?: string; dp?: boolean; mid?: string; nom: string }
 export function filasCuenta(cid: string): FilaCuenta[] {
-  const ps = Object.values(S.pedidos).filter(p => p.clienteId === cid && cerrado(p)).map(p => ({
+  const g = porCliente();
+  const ps = (g.ps.get(cid) || []).filter(p => cerrado(p)).map(p => ({
     fecha: p.entregado || 0, det: `${p.guia} · ${p.destinatario || ""} · ${metodoTxt(p)} · cobró ${pesos(p.valorCobrado)} · ${textoDomi(p)}`,
     v: saldoPedido(p), pid: p.guia, dp: !!p.domiPagado, nom: p.destinatario || (p.estado === "devuelto" ? "Devolucion" : ""),
   }));
-  const ms = Object.values(S.movimientos).filter(m => m.clienteId === cid).map(m => ({
+  const ms = (g.ms.get(cid) || []).map(m => ({
     fecha: m.fecha, det: (MOVS[m.tipo]?.corto || "Movimiento") + (m.nota ? " · " + m.nota : ""), v: signoMov(m), mid: m.id,
     nom: (MOVS[m.tipo]?.corto || "Movimiento") + (m.nota ? " " + m.nota : ""),
   }));

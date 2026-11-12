@@ -5,8 +5,7 @@ import {
 } from "../motor";
 import { Columnas, Dona, EtqDash, Kpi, pl, useVentana } from "../ui";
 import { E } from "../estado";
-import { AbrirPedido } from "./Pedidos";
-import { AbrirCuenta } from "./Clientes";
+import { AbrirCuenta, AbrirPedido } from "./modales";
 
 const COL_MEDIO: Record<string, string> = { efectivo: "var(--verde)", nequi: "#8E44AD", bancolombia: "#E0A100", cuentas: "var(--marca2)" };
 
