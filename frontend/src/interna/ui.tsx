@@ -46,6 +46,7 @@ export const IconoInfo = () => svg(<><circle cx="12" cy="12" r="9" /><path d="M1
 export const IconoSalir = () => svg(<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" />);
 export const IconoLlave = () => svg(<><circle cx="7.5" cy="15.5" r="4.5" /><path d="M10.8 12.2 21 2M16.5 6.5l3 3M19.5 3.5l1.5 1.5" /></>);
 export const IconoQuitarUsuario = () => svg(<><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.5 3.3-5.5 6.5-5.5 1.2 0 2.3.3 3.3.8" /><path d="M16 15.5l5 5M21 15.5l-5 5" /></>);
+export const IconoAgregarUsuario = () => svg(<><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.5 3.3-5.5 6.5-5.5 1.2 0 2.3.3 3.3.8" /><path d="M18 14v7M14.5 17.5h7" /></>);
 export const IconoLiberar = () => svg(<><rect x="4" y="11" width="14" height="10" rx="2" /><path d="M8 11V7.5a4 4 0 0 1 7.6-1.7" /><path d="M11 15.5v2" /></>);
 export const IconoEditar = () => svg(<><path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17v3z" /><path d="M13.5 6.5l3 3" /></>);
 export const IconoCorreo = () => svg(<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3.5 6.5 12 13l8.5-6.5" /></>);

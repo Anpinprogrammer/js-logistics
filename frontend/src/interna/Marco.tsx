@@ -165,7 +165,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
         </div>
       </div>
     </header>
-    <main id="vista" className={!enMensajero && E.tabA === "pedidos" ? "vista-pedidos-oficina" : !enMensajero && E.tabA === "solicitudes" ? "vista-solicitudes-oficina" : undefined}>
+    <main id="vista" className={!enMensajero && E.tabA === "pedidos" ? "vista-pedidos-oficina" : !enMensajero && E.tabA === "solicitudes" ? "vista-solicitudes-oficina" : !enMensajero && E.tabA === "clientes" ? "vista-clientes-oficina" : undefined}>
       {error && <div className="aviso alerta">No se pudieron traer los datos: {error} Se vuelve a intentar solo en unos segundos.</div>}
       {!cargado && !error ? cargando : <Suspense fallback={cargando}>{enMensajero ? <Mensajero pintar={pintar} /> : <Oficina pintar={pintar} />}</Suspense>}
     </main>
