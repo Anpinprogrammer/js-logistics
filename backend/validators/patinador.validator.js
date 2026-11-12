@@ -2,8 +2,10 @@
 import { z } from "zod";
 import { id, pesos } from "./comunes.js";
 
-/** Un pago recibido. El patinador y la hora los pone el servidor, por eso no se aceptan campos de más. */
+/** Un pago recibido. La hora la pone el servidor y no se aceptan campos de más. `mensajeroId` solo lo manda
+    administración (en qué caja anota); el patinador anota siempre en la suya y si lo manda se rechaza. */
 export const registro = z.object({
+  mensajeroId: id.optional(),
   clienteId: id,
   concepto: z.string().trim().min(1, "Escribe el concepto").max(80, "El concepto es muy largo (máximo 80 letras)"),
   valor: pesos.refine(v => v > 0, "Escribe un valor mayor a cero")

@@ -43,7 +43,7 @@
 .jsl .perfil-info small{color:var(--suave);font-size:.72rem}
 .jsl .perfil-modos{padding:12px 0 8px}
 .jsl .perfil-modos>span{display:block;margin:0 7px 7px;color:var(--suave);font-size:.66rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
-.jsl .perfil-modos>div{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border:1px solid var(--linea);border-radius:11px;background:var(--hueco)}
+.jsl .perfil-modos>div{display:grid;grid-auto-flow:column;grid-auto-columns:auto;gap:4px;padding:4px;border:1px solid var(--linea);border-radius:11px;background:var(--hueco)}
 .jsl .perfil-modos button{min-width:0;min-height:36px;padding:6px 5px;border:0;border-radius:8px;background:none;color:var(--suave);font-size:.72rem;font-weight:700;cursor:pointer}
 .jsl .perfil-modos button[aria-pressed="true"]{background:var(--papel);color:var(--tinta);box-shadow:0 1px 5px rgba(2,6,23,.12)}
 .jsl .perfil-opcion{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding:9px 10px;border:0;border-radius:10px;background:none;color:var(--tinta);font:inherit;font-size:.78rem;font-weight:600;text-align:left;cursor:pointer}
@@ -1320,3 +1320,5 @@
 .jsl .form-pago .medios-pago button{flex:1 1 auto;min-width:0;min-height:44px;padding-inline:6px;white-space:nowrap}
 .jsl .form-pago .medios-pago+small{display:block;margin-top:6px}
 @media (max-width:419px){.jsl .form-pago .medios-pago button{font-size:.8rem;padding-inline:4px}}
+/* Tres modos (Mensajero, Patinador, Administración): cada botón toma el ancho de su texto para que quepan a 320 px */
+.jsl .perfil-modos button{padding:6px 4px;white-space:nowrap;font-size:.7rem}

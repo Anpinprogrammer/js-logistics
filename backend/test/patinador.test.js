@@ -120,17 +120,42 @@ test("el patinador no entra a lo de la oficina ni a lo del mensajero", async () 
   assert.equal((await patinador.post("/api/pedidos").send({ valorServicio: 1000 })).status, 403);
 });
 
-test("solo el patinador anota; la oficina consulta la caja de un patinador; el mensajero no la ve", async () => {
+test("anotan el patinador y administración; la oficina consulta la caja de un patinador; el mensajero no la ve", async () => {
   assert.equal((await request(app).get("/api/patinador/caja")).status, 401);
   assert.equal((await mensajero.get("/api/patinador/caja")).status, 403);
   assert.equal((await mensajero.post("/api/patinador/caja").send({ clienteId: idCliente, concepto: "x", valor: 1000 })).status, 403);
-  assert.equal((await oficina.post("/api/patinador/caja").send({ clienteId: idCliente, concepto: "x", valor: 1000 })).status, 403);
+  // El asistente solo consulta; administración tiene que decir en cuál caja anota.
+  assert.equal((await asistente.post("/api/patinador/caja").send({ mensajeroId: idPatinador, clienteId: idCliente, concepto: "x", valor: 1000 })).status, 403);
+  assert.equal((await oficina.post("/api/patinador/caja").send({ clienteId: idCliente, concepto: "x", valor: 1000 })).status, 400);
   assert.equal((await asistente.get("/api/patinador/caja")).status, 400);
   const r = await asistente.get(`/api/patinador/caja?mensajeroId=${idPatinador}&porPagina=1`);
   assert.equal(r.status, 200);
   assert.equal(r.body.resumen.total, 32000);
   assert.equal(r.body.registros.length, 1);
   assert.equal(r.body.paginas, 2);
+});
+
+test("administración anota en la caja del patinador que elige, como si fuera él", async () => {
+  // Solo en la caja de un patinador que exista.
+  assert.equal((await oficina.post("/api/patinador/caja").send({ mensajeroId: idMensajero, clienteId: idCliente, concepto: "x", valor: 1000 })).status, 400);
+  assert.equal((await oficina.post("/api/patinador/caja").send({ mensajeroId: "no-existe", clienteId: idCliente, concepto: "x", valor: 1000 })).status, 404);
+
+  const r = await oficina.post("/api/patinador/caja").send({ mensajeroId: idOtroPatinador, clienteId: idCliente, concepto: "Pago anotado en la oficina", valor: 5000 });
+  assert.equal(r.status, 201);
+  assert.equal(r.body.registro.mensajeroId, idOtroPatinador);
+  assert.deepEqual([r.body.resumen.total, r.body.resumen.registros], [5000, 1]);
+  // Queda en la caja de ese patinador (no en la del otro) y en su resumen de la oficina.
+  assert.equal((await oficina.get(`/api/patinador/caja?mensajeroId=${idOtroPatinador}`)).body.resumen.total, 5000);
+  assert.equal((await patinador.get("/api/patinador/caja")).body.resumen.total, 32000);
+  assert.equal((await oficina.get("/api/patinador/resumen")).body.patinadores.find(p => p.mensajeroId === idOtroPatinador).debe, 5000);
+  // El abono del cliente dice qué patinador recibió la plata, y el historial que lo anotó administración.
+  const movs = (await oficina.get(`/api/clientes/${idCliente}/movimientos`)).body.movimientos;
+  assert.ok(movs.some(m => m.tipo === "abono" && m.valor === 5000 && /Otro Patín/.test(m.nota)));
+  const { rows } = await pool.query(`SELECT accion FROM historial WHERE tabla = 'caja_patinador' AND registro = $1`, [r.body.registro.id]);
+  assert.match(rows[0].accion, /caja de Otro Patín/);
+  // Se deshace para no mover las cifras de las pruebas siguientes.
+  await pool.query(`DELETE FROM caja_patinador WHERE id = $1`, [r.body.registro.id]);
+  await pool.query(`DELETE FROM movimientos WHERE tipo = 'abono' AND valor = 5000`);
 });
 
 test("un patinador sin ficha vinculada no tiene caja", async () => {

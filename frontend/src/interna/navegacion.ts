@@ -10,6 +10,7 @@ import { SUBMAS } from "./motor";
 const TABS_ADMIN = ["inicio", "pedidos", "solicitudes", "clientes", "caja", "cuentas", "sueldos", "mas"];
 const TABS_ASISTENTE = ["inicio", "pedidos", "solicitudes", "clientes", "caja", "cuentas"];
 const TABS_MENSAJERO = ["inicio", "recepcion", "pend", "caja", "sueldo", "entregados"];
+const TABS_PATINADOR = ["caja", "historial"];
 const FILTROS_PEDIDOS = ["todos", "sin", "rec", "pend", "ent", "dev", "dif", "cambio", "serv"];
 
 type Sub = { leer: () => string; poner: (v: string) => void; validos: readonly string[] };
@@ -27,8 +28,8 @@ const SUB_MENSAJERO: Record<string, Sub> = {
   pend: { leer: () => E.subPedM, poner: v => { E.subPedM = v as typeof E.subPedM; }, validos: ["todos", "entregar", "recoger"] },
 };
 
-/** Modos en los que puede estar cada rol: el asistente solo en oficina; el mensajero solo en su modo. */
-const modosDe = (rol: Rol) => (rol === "admin" ? ["admin", "mensajero"] : rol === "asistente" ? ["admin"] : ["mensajero"]);
+/** Modos en los que puede estar cada rol: el admin en los tres; el asistente solo en oficina; el mensajero solo en su modo. */
+const modosDe = (rol: Rol) => (rol === "admin" ? ["admin", "mensajero", "patinador"] : rol === "asistente" ? ["admin"] : ["mensajero"]);
 
 /**
  * Pone en `E` la pestaña guardada si existe y le corresponde a esta cuenta. Lo que no cuadra (otra cuenta, una
@@ -36,13 +37,14 @@ const modosDe = (rol: Rol) => (rol === "admin" ? ["admin", "mensajero"] : rol ==
  * Se llama una vez, al entrar a la app interna.
  */
 export function restaurarNavegacion(uid: string, rol: Rol) {
-  E.tabA = "inicio"; E.tabM = "inicio"; // nada de la sesión anterior en esta misma pestaña del navegador
+  E.tabA = "inicio"; E.tabM = "inicio"; E.tabP = "caja"; // nada de la sesión anterior en esta misma pestaña del navegador
   const nav = leerNavegacion(CLAVE_NAV_ADMIN, uid);
   if (!nav) return;
   if (nav.tab === "nuevo") nav.tab = "recepcion"; // la pestaña Nuevo del mensajero ahora es Recepción → Nuevo pedido
   const modos = modosDe(rol);
   const modo = nav.modo && modos.includes(nav.modo) ? nav.modo : modos.includes(E.rol) ? E.rol : modos[0];
   E.rol = modo as typeof E.rol;
+  if (modo === "patinador") { if (TABS_PATINADOR.includes(nav.tab)) E.tabP = nav.tab as typeof E.tabP; return; }
   const mensajero = modo === "mensajero";
   const tabs = mensajero ? TABS_MENSAJERO : rol === "admin" ? TABS_ADMIN : TABS_ASISTENTE;
   if (!tabs.includes(nav.tab)) return; // pestaña que no existe para este rol: se queda en Inicio
@@ -55,6 +57,7 @@ export function restaurarNavegacion(uid: string, rol: Rol) {
 
 /** Lo que se ve ahora, para guardarlo. */
 export function navegacionActual(): Navegacion {
+  if (E.rol === "patinador") return { modo: E.rol, tab: E.tabP };
   const mensajero = E.rol === "mensajero", tab = mensajero ? E.tabM : E.tabA;
   const sub = (mensajero ? SUB_MENSAJERO : SUB_OFICINA)[tab];
   return { modo: E.rol, tab, subtab: sub?.leer() || undefined };

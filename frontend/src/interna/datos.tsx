@@ -61,6 +61,7 @@ const DE_PESTANA: Record<string, Coleccion[]> = {
 /** Colecciones que necesita la vista. El modo mensajero y las pestañas que muestran el resumen de la caja o los sueldos
     (Inicio, Caja, Cuentas, Sueldos, Más) piden todas: esos cálculos cruzan pedidos, movimientos, caja, jornadas y usuarios. */
 export function necesarias(modo: string, tab: string): Coleccion[] {
+  if (modo === "patinador") return ["mensajeros"]; // solo para elegir el patinador: su caja la trae su propia consulta
   return modo === "mensajero" ? TODAS : DE_PESTANA[tab] ?? TODAS;
 }
 

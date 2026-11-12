@@ -136,12 +136,13 @@ export const mensajeros = {
 };
 
 export const patinador = {
-  /** Su caja: el total y los registros de la página (8 en celular, 20 en computador). */
-  caja: (pagina: number, porPagina: number) => datos<CajaPatinador>(api.get("/patinador/caja", { params: { pagina, porPagina } })),
+  /** Su caja: el total y los registros de la página. La oficina dice de cuál patinador (`mensajeroId`). */
+  caja: (pagina: number, porPagina: number, mensajeroId?: string) =>
+    datos<CajaPatinador>(api.get("/patinador/caja", { params: { pagina, porPagina, ...(mensajeroId ? { mensajeroId } : {}) } })),
   /** Oficina: cuánto recibió cada patinador, cuánto ya entregó y cuánto debe. */
   resumen: () => datos<{ patinadores: ResumenPatinador[] }>(api.get("/patinador/resumen")).then(d => d.patinadores),
-  /** Anota un pago. La hora y el patinador los pone el servidor. */
-  registrar: (d: { clienteId: string; concepto: string; valor: number }) =>
+  /** Anota un pago. La hora la pone el servidor; el patinador anota en su caja y administración manda en cuál (`mensajeroId`). */
+  registrar: (d: { mensajeroId?: string; clienteId: string; concepto: string; valor: number }) =>
     datos<{ registro: RegistroCajaPatinador; resumen: ResumenCajaPatinador }>(api.post("/patinador/caja", d))
 };
 
