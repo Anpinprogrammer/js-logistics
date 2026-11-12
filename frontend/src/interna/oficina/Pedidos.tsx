@@ -13,6 +13,7 @@ import { DEMO } from "../demo";
 import { usePorPagina } from "../../lib/pantalla";
 import { pedidos as apiPedidos, type FiltrosPedidos } from "../../api/servicios";
 import { abrirEntregaEn, DlgDevolucion } from "../mensajero/Entrega";
+import { BloqueDevolucion } from "../mensajero/Reintento";
 import { DlgRecoger } from "../mensajero/Recoger";
 import { FormCliente } from "./Clientes";
 import type { CambiosPedido } from "../../api/servicios";
@@ -232,12 +233,13 @@ export function AbrirPedido({ guia, cliElegido }: { guia: string; cliElegido?: s
         {p.domiPagado && <><dt>Pago de domicilio</dt><dd>{pesos(pagoDomi(p))}{p.domiPagoMedio ? " · " + MEDIOS[p.domiPagoMedio] + " · " + hora(p.domiPagoFecha) : " · sin registrar en caja"}</dd></>}
         <dt>Efecto en saldo</dt><dd className={s < 0 ? "neg" : "pos"}>{pesos(s)}</dd></>}
     </dl>
+    <BloqueDevolucion guia={guia} abrirGuia={g => v.abrir(<AbrirPedido guia={g} />, "drawer")} volver={() => v.abrir(<AbrirPedido guia={guia} />, "drawer")} />
     <FotosGuia p={p} id="pFotos" conPrevias />
     </div>
     <div className="acciones pedido-drawer-pie">
       {p.estado === "aceptado" ? <button className="btn chico" id="pRecoger" onClick={() => v.abrir(<DlgRecoger guia={guia} />, "centrada")}>Recoger (foto del paquete)</button> : <>
       {!cerrado(p) && tipoDe(S.mensajeros[p.mensajeroId]) === "oficina" && <button className="btn ok chico" id="pEntregar" onClick={() => abrirEntregaEn(v, guia)}>Marcar entregado</button>}
-      {cerrado(p) ? (yo.esAdmin && <button className="btn sec chico" id="pReabrir" onClick={reabrirG}>Devolver a por entregar</button>)
+      {cerrado(p) ? (yo.esAdmin && !p.reintentos?.length && <button className="btn sec chico" id="pReabrir" onClick={reabrirG}>Devolver a por entregar</button>)
         : <button className="btn sec chico" id="pNoEnt" onClick={() => v.abrir(<DlgDevolucion guia={guia} />)}>Registrar que no se pudo entregar</button>}</>}
       {Number(p.difCobro) && !p.difRevisada ? <button className="btn sec chico" id="pDifOk" onClick={() => conCambio(() => actualizarPedido(guia, { difRevisada: true }), "Diferencia revisada", false)}>Marcar diferencia como revisada</button> : null}
       {cambioPendiente(p) && <button className="btn sec chico" id="pCambioOk" onClick={cambioOk}>Cambio entregado al cliente</button>}

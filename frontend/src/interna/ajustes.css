@@ -856,3 +856,14 @@
 .jsl .subtabs-mens .num.amb{background:var(--ambar,#f59e0b);color:#1c1917}
 .jsl .subtabs-mens button[aria-selected="true"] .num{background:rgba(255,255,255,.25);color:#fff}
 @media (min-width:600px){.jsl .subtabs-mens{display:inline-flex;width:auto}.jsl .subtabs-mens button{flex:none}}
+
+/* Devoluciones y reintentos: la cadena de guías de una misma entrega y las opciones de "dónde quedó el paquete". */
+.jsl .devolucion{margin-top:14px}
+.jsl .cadena{margin:12px 0}
+.jsl .cadena ol{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.jsl .cadena li{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--linea);border-radius:10px}
+.jsl .cadena li.actual{background:color-mix(in srgb,var(--marca2) 8%,var(--papel));border-color:color-mix(in srgb,var(--marca2) 45%,transparent)}
+.jsl .guia.enlace{background:none;border:0;padding:0;font:inherit;color:var(--marca2);text-decoration:underline;cursor:pointer;min-height:32px}
+.jsl .destinos{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.jsl .destinos .btn{width:100%;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.jsl .destinos .btn small{font-weight:400;opacity:.85}

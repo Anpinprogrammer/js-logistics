@@ -86,6 +86,12 @@ export const pedidos = {
   cambioRecibido: (guia: string) => datos<{ pedido: Pedido }>(api.post(`/pedidos/${guia}/cambio-recibido`)).then(r => r.pedido),
   /** Devuelve una guía entregada o devuelta a "por entregar" (solo administración). Las pruebas quedan como "previas". */
   reabrir: (guia: string) => datos<{ pedido: Pedido }>(api.post(`/pedidos/${guia}/reabrir`)).then(r => r.pedido),
+  /** Dónde quedó el paquete de un devuelto: con el cliente o en la oficina. */
+  destinoDevolucion: (guia: string, destino: "cliente" | "oficina") =>
+    datos<{ pedido: Pedido }>(api.post(`/pedidos/${guia}/destino-devolucion`, { destino })).then(r => r.pedido),
+  /** Crea la guía del reintento de un devuelto. El mensajero no manda nada (es suyo); la oficina elige quién lo hace. */
+  reintentar: (guia: string, mensajeroId?: string) =>
+    datos<{ pedido: Pedido; reintento: Pedido }>(api.post(`/pedidos/${guia}/reintento`, mensajeroId ? { mensajeroId } : {})),
   archivos: (guia: string) => datos<{ archivos: Archivo[] }>(api.get(`/pedidos/${guia}/archivos`)).then(d => d.archivos),
   /** La imagen va como cuerpo binario (ya comprimida en el celular), una por petición. */
   subirArchivo: (guia: string, tipo: Exclude<TipoArchivo, "previa">, imagen: Blob) =>

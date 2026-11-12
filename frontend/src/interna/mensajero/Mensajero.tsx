@@ -11,7 +11,8 @@ import { Columnas, Dona, EtqEstado, FiltroDia, Icono, IconoCamara, Kpi, Mini, Ta
 import { abrirEntregaEn, VerEntregado } from "./Entrega";
 import { DlgNuevaGuia } from "./NuevaGuia";
 import { DlgRecoger } from "./Recoger";
-import { pendientesMios, porRecogerMios } from "./pendientes";
+import { pendientesMios, porRecogerMios, devolucionesPorDefinirMios } from "./pendientes";
+import { DlgDestinoDev } from "./Reintento";
 import type { Pedido } from "../motor";
 
 /** Sub-pestañas de Pedidos del mensajero. */
@@ -106,7 +107,7 @@ export default function Mensajero({ pintar }: { pintar: () => void }) {
 /* ---- Pedidos del mensajero: Todos, Por entregar (en ruta) y Por recoger (guías de solicitudes sin foto) ---- */
 function PedidosMensajero({ pintar }: { pintar: () => void }) {
   const ventana = useVentana(), barra = useRef<HTMLDivElement>(null);
-  const entregar = pendientesMios().filter(p => delDia(p, E.diaPedM)), recoger = porRecogerMios().filter(p => delDia(p, E.diaPedM));
+  const entregar = pendientesMios().filter(p => delDia(p, E.diaPedM)), recoger = porRecogerMios().filter(p => delDia(p, E.diaPedM)), porDefinir = devolucionesPorDefinirMios();
   const sub = E.subPedM, cuantos = { todos: entregar.length + recoger.length, entregar: entregar.length, recoger: recoger.length };
   // En "Todos" primero lo que hay que recoger: sin la foto no se puede entregar.
   const ps = sub === "entregar" ? entregar : sub === "recoger" ? recoger : [...recoger, ...entregar];
@@ -126,6 +127,13 @@ function PedidosMensajero({ pintar }: { pintar: () => void }) {
   return <>
     <h1>Pedidos</h1>
     <p className="sub">{entregar.length} en ruta · {recoger.length} por recoger{E.diaPedM ? " de ese día" : ""}</p>
+    {porDefinir.length > 0 && <section className="aviso alerta" aria-label="Devoluciones por confirmar">
+      <b>{porDefinir.length === 1 ? "Tienes 1 devolución por confirmar" : "Tienes " + porDefinir.length + " devoluciones por confirmar"}</b>
+      <span className="sub"> Cuéntanos dónde quedó el paquete: con el cliente, en la oficina o si harás el reintento.</span>
+      <div className="lista">{porDefinir.map(p => <button className="fila" key={p.guia} onClick={() => ventana.abrir(<DlgDestinoDev guia={p.guia} />, "centrada")}><Mini p={p} />
+        <span className="info"><span className="guia">{p.guia}</span> <span className="etq dev">Devuelto</span><p>{nombreCliente(p.clienteId) || p.clienteNombre || "Remitente sin asignar"} · {MOTIVOS[p.motivoDev as keyof typeof MOTIVOS] || "Devuelto"} · {hora(p.entregado)}</p></span>
+        <span className="btn chico">¿Dónde quedó?</span></button>)}</div>
+    </section>}
     <div className="seg subtabs subtabs-mens" role="tablist" aria-label="Pedidos del mensajero" ref={barra}>
       {SUBS_PED.map(([k, t]) => <button key={k} id={"subPedM-" + k} type="button" role="tab" aria-selected={sub === k} aria-controls="panelPedM" tabIndex={sub === k ? 0 : -1}
         onClick={() => ir(k)} onKeyDown={alTeclear}>{t} <span className={"num" + (k === "recoger" && cuantos.recoger ? " amb" : "")}>{cuantos[k]}</span></button>)}

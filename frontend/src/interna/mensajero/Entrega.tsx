@@ -7,9 +7,19 @@ import { motivoError, useDatos } from "../datos";
 import { comprimir } from "../../lib/imagen";
 import { pedidos as apiPedidos } from "../../api/servicios";
 import { DEMO } from "../demo";
+import { BloqueDevolucion } from "./Reintento";
+import { DlgRecoger } from "./Recoger";
 
 type Ventana = ReturnType<typeof useVentana>;
 export const abrirEntregaEn = (v: Ventana, guia: string) => v.abrir(<DlgEntrega guia={guia} />);
+/** Abre una guía del mensajero según su estado: por recoger, por entregar o cerrada (la cadena de un reintento salta entre ellas). */
+export function abrirGuiaMensajero(v: Ventana, guia: string) {
+  const p = S.pedidos[guia];
+  if (!p) return v.avisar("Esa guía no está en tu lista");
+  if (p.estado === "pendiente") return abrirEntregaEn(v, guia);
+  if (p.estado === "aceptado") return v.abrir(<DlgRecoger guia={guia} />, "centrada");
+  v.abrir(<VerEntregado guia={guia} />);
+}
 
 /** Foto elegida con la cámara o la galería, ya comprimida, con su vista previa. */
 function useFoto() {
@@ -130,6 +140,7 @@ export function DlgDevolucion({ guia }: { guia: string }) {
 /** Pedido entregado o devuelto visto por el mensajero: solo información y pruebas, sin acciones. */
 export function VerEntregado({ guia }: { guia: string }) {
   useDatos();
+  const v = useVentana();
   const p = S.pedidos[guia]; if (!p) return null;
   return <>
     <Cab sub={<EtqEstado p={p} />}><h2 className="guia">{guia}</h2></Cab>
@@ -141,6 +152,7 @@ export function VerEntregado({ guia }: { guia: string }) {
       {p.estado === "devuelto" && <><dt>Devuelto</dt><dd>{hora(p.entregado)}</dd><dt>Motivo</dt><dd>{MOTIVOS[p.motivoDev as Motivo] || ""}{p.notaDev ? " · " + p.notaDev : ""}</dd></>}
       {gastoDe(p) ? <><dt>Flete / gasto que pagaste</dt><dd>{pesos(gastoDe(p))}{p.gastoNota ? " · " + p.gastoNota : ""}</dd></> : null}
     </dl>
+    <BloqueDevolucion guia={guia} abrirGuia={g => abrirGuiaMensajero(v, g)} volver={() => v.abrir(<VerEntregado guia={guia} />)} />
     <p className="sub">Si algo quedó mal, avísale a la oficina para que lo corrija.</p>
     <h2>Pruebas</h2><FotosGuia p={p} id="meFotos" firma="Firma de quien recibió" />
   </>;

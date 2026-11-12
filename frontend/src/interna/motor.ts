@@ -26,6 +26,10 @@ export interface Pedido {
   destinatario: string; valorCobrado: number; metodo: Metodo | "devuelto" | "";
   cuentaJs: "" | "nequi" | "bancolombia"; difCobro: number; difRevisada: boolean;
   motivoDev: Motivo | ""; notaDev: string; cobrarDev: boolean;
+  /** Devuelto: dónde quedó el paquete ("por_definir" hasta que el mensajero lo diga; "" = devuelto de antes del cambio). */
+  destinoDev?: "" | "por_definir" | "cliente" | "oficina" | "reintento";
+  /** Enlaces entre guías: la que esta reintenta, las que la reintentan y cuándo el cliente pidió el reintento. */
+  reintentoDe?: string; reintentos?: { guia: string; estado: "aceptado" | "pendiente" | "entregado" | "devuelto" }[]; reintentoPedido?: number | null;
   cambio: boolean; cambioRecibido: number | null;
   gasto: number; gastoNota: string;
   domiPagado: boolean; domiPagoMedio: Medio | ""; domiPagoValor: number | null; domiPagoFecha: number; domiPagoUid: string;
@@ -99,6 +103,16 @@ export const METODOS: Record<Metodo, { t: string; d: string }> = {
 export const MOTIVOS: Record<Motivo, string> = {
   no_contesta: "No contestan", direccion: "Dirección errada", rechazo: "Lo rechazaron", reprogramar: "Reprogramar (sigue en ruta)", otro: "Otro motivo",
 };
+/** Devolución: dónde quedó el paquete. */
+export const DESTINOS_DEV = { cliente: "Con el cliente", oficina: "En la oficina de JS", reintento: "En reintento" } as const;
+/** Todas las guías de una misma entrega, de la primera a la última: la original y sus reintentos (en orden). */
+export function cadenaGuias(guia: string): string[] {
+  let g = guia; const vistos = new Set<string>();
+  while (S.pedidos[g]?.reintentoDe && !vistos.has(g)) { vistos.add(g); g = S.pedidos[g].reintentoDe!; }
+  const cadena = [g];
+  for (let p = S.pedidos[g]; p?.reintentos?.length;) { const sig = p.reintentos[p.reintentos.length - 1].guia; if (cadena.includes(sig)) break; cadena.push(sig); p = S.pedidos[sig]; }
+  return cadena;
+}
 export const CUENTAS_JS = { nequi: "Nequi", bancolombia: "Bancolombia" } as const;
 export const MEDIOS: Record<Medio, string> = { efectivo: "Efectivo", nequi: "Nequi", bancolombia: "Bancolombia" };
 export const MEDIOS_CAJA: Record<string, string> = { ...MEDIOS, cuentas: "Cuentas JS (transferencias)" };

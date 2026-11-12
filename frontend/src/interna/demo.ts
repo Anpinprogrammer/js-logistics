@@ -72,6 +72,9 @@ export function datosDemo(u: Usuario): Almacen {
       cobrarDev: false, cambio: false, cambioRecibido: null, gasto: 0, gastoNota: "", domiPagado: false, domiPagoMedio: "", domiPagoValor: null, domiPagoFecha: 0, domiPagoUid: "", intentos: [], mini: "",
       solicitud: { direccionRecogida: rec, direccionEntrega: ent, destinatarioNombre: dest, destinatarioTelefono: "311 000 00" + (10 + i), paquetes: 1 } };
   });
+  // Devueltos recientes del primer mensajero: uno por confirmar y uno que ya está en la oficina (esperando reintento).
+  Object.values(S.pedidos).filter(p => p.estado === "devuelto" && p.mensajeroId === "m1").sort((a, b) => (b.entregado || 0) - (a.entregado || 0)).slice(0, 2)
+    .forEach((p, i) => { p.destinoDev = i === 0 ? "por_definir" : "oficina"; });
   // Movimientos de clientes: pagos que hicieron y pagos que les hizo JS
   let m = 1; const nuevo = (pre: string) => pre + (m++);
   for (let d = 30; d >= 0; d -= 1) {

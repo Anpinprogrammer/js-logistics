@@ -96,7 +96,7 @@ export async function entregar(guia: string, d: Entrega, foto: Blob | null, firm
 export async function noEntregado(guia: string, motivo: Motivo, nota: string, foto: Blob | null) {
   if (DEMO) {
     const p = S.pedidos[guia], intentos = [...p.intentos, { fecha: Date.now(), motivo, nota }];
-    return demoPedido(guia, motivo === "reprogramar" ? { intentos } : { estado: "devuelto", entregado: Date.now(), motivoDev: motivo, notaDev: nota, valorCobrado: 0, metodo: "devuelto", cobrarDev: true, intentos });
+    return demoPedido(guia, motivo === "reprogramar" ? { intentos } : { estado: "devuelto", entregado: Date.now(), motivoDev: motivo, notaDev: nota, valorCobrado: 0, metodo: "devuelto", cobrarDev: true, destinoDev: "por_definir", intentos });
   }
   if (foto && motivo !== "reprogramar") await api.pedidos.subirArchivo(guia, "entrega", foto);
   ponerPedido(await api.pedidos.noEntregado(guia, { motivo, nota }));
@@ -112,8 +112,31 @@ export async function cambioEntregado(guia: string) {
   ponerPedido(await api.pedidos.cambioRecibido(guia));
 }
 export async function reabrir(guia: string) {
-  if (DEMO) return demoPedido(guia, { estado: "pendiente", entregado: null, destinatario: "", valorCobrado: 0, metodo: "", cuentaJs: "", difCobro: 0, difRevisada: false, motivoDev: "", notaDev: "", cobrarDev: false });
+  if (DEMO) return demoPedido(guia, { estado: "pendiente", entregado: null, destinatario: "", valorCobrado: 0, metodo: "", cuentaJs: "", difCobro: 0, difRevisada: false, motivoDev: "", notaDev: "", cobrarDev: false, destinoDev: "", reintentoPedido: null });
   ponerPedido(await api.pedidos.reabrir(guia));
+}
+/** Devuelto: dónde quedó el paquete (con el cliente o en la oficina). */
+export async function destinoDevolucion(guia: string, destino: "cliente" | "oficina") {
+  if (DEMO) return demoPedido(guia, { destinoDev: destino });
+  ponerPedido(await api.pedidos.destinoDevolucion(guia, destino));
+}
+/** Reintento de un devuelto: guía nueva enlazada. El mensajero lo hace él mismo (sin `mensajeroId`); la oficina elige quién. Devuelve la guía nueva. */
+export async function reintentar(guia: string, mensajeroId?: string) {
+  const o = S.pedidos[guia];
+  if (DEMO) {
+    const n = Math.max(0, ...Object.values(S.pedidos).map(p => p.n)) + 1, nueva = "JS-" + String(n).padStart(5, "0"), mid = mensajeroId || o.mensajeroId;
+    const estado = !mensajeroId || o.destinoDev === "oficina" ? "pendiente" : "aceptado";
+    tocar(s => {
+      s.pedidos[nueva] = { ...o, guia: nueva, n, estado, creado: Date.now(), entregado: null, mensajeroId: mid, destinatario: "", valorCobrado: 0, metodo: "", cuentaJs: "", difCobro: 0, difRevisada: false,
+        motivoDev: "", notaDev: "", cobrarDev: false, destinoDev: "", reintentoDe: guia, reintentos: [], reintentoPedido: null, cambio: false, cambioRecibido: null, gasto: 0, gastoNota: "",
+        domiPagado: false, domiPagoMedio: "", domiPagoValor: null, domiPagoFecha: 0, domiPagoUid: "", intentos: [], mini: "", solicitud: null };
+      s.pedidos[guia] = { ...s.pedidos[guia], destinoDev: mensajeroId ? o.destinoDev : "reintento", reintentoPedido: null, reintentos: [{ guia: nueva, estado }] };
+    });
+    return nueva;
+  }
+  const r = await api.pedidos.reintentar(guia, mensajeroId);
+  ponerPedido(r.pedido); ponerPedido(r.reintento);
+  return r.reintento.guia;
 }
 export async function eliminarPedido(guia: string) {
   if (!DEMO) await api.pedidos.eliminar(guia);
