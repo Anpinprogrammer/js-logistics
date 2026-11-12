@@ -10,6 +10,8 @@ const Recuperar = lazy(() => import("./pages/Recuperar"));
 const Restablecer = lazy(() => import("./pages/Restablecer"));
 const cargarMarco = () => import("./interna/Marco");
 const AppInterna = lazy(cargarMarco);
+// El patinador solo tiene su caja: no baja la app de la oficina ni la de los mensajeros.
+const AppPatinador = lazy(() => import("./interna/patinador/Patinador"));
 
 const cargandoVista = <div className="grid min-h-dvh place-items-center text-sm text-slate-500" role="status">Cargando…</div>;
 
@@ -20,8 +22,8 @@ export default function App() {
   // Descarga el marco en paralelo con la sesión. El skeleton se muestra únicamente
   // cuando la navegación real ya está montada, nunca a pantalla completa antes de ella.
   useEffect(() => {
-    if (pathname === "/") void cargarMarco().catch(() => { /* lazy reintenta al entrar */ });
-  }, [pathname]);
+    if (pathname === "/" && usuario?.rol !== "patinador") void cargarMarco().catch(() => { /* lazy reintenta al entrar */ });
+  }, [pathname, usuario?.rol]);
 
   // Los enlaces del correo abren su pantalla aunque haya una sesión abierta en el mismo navegador.
   const publica =
@@ -31,5 +33,5 @@ export default function App() {
   if (publica) return <Suspense fallback={cargandoVista}>{publica}</Suspense>;
 
   if (buscandoSesion) return cargandoVista;
-  return <Suspense fallback={cargandoVista}>{usuario ? <AppInterna /> : <Ingreso />}</Suspense>;
+  return <Suspense fallback={cargandoVista}>{usuario ? (usuario.rol === "patinador" ? <AppPatinador /> : <AppInterna />) : <Ingreso />}</Suspense>;
 }

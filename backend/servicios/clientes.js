@@ -152,6 +152,7 @@ export async function unir(ctx, k, { otros }) {
       np += (await t.c.query(`UPDATE pedidos SET cliente_id = $1, actualizado = now() WHERE cliente_id = $2`, [k, o])).rowCount;
       nm += (await t.c.query(`UPDATE movimientos SET cliente_id = $1 WHERE cliente_id = $2`, [k, o])).rowCount;
       await t.c.query(`UPDATE usuarios SET cliente_id = $1, actualizado = now() WHERE cliente_id = $2`, [k, o]);
+      await t.c.query(`UPDATE caja_patinador SET cliente_id = $1 WHERE cliente_id = $2`, [k, o]); // si no, el borrado de abajo falla
       const falta = {};
       if (!Number(kc.tarifa) && Number(oc.tarifa)) falta.tarifa = kc.tarifa = Number(oc.tarifa);
       if (!kc.telefono && oc.telefono) falta.telefono = kc.telefono = oc.telefono;

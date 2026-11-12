@@ -19,6 +19,7 @@ import chatbot from "./chatbot.routes.js";
 import datos from "./datos.routes.js";
 import solicitudesPublico from "./solicitudes-publico.routes.js";
 import solicitudes from "./solicitudes.routes.js";
+import patinador from "./patinador.routes.js";
 
 const r = Router();
 
@@ -46,6 +47,7 @@ r.use("/jornadas", jornadas);
 r.use("/sueldos", sueldos);
 r.use("/chatbot", chatbot);
 r.use("/solicitudes", solicitudes);
+r.use("/patinador", patinador);
 r.use(datos); // historial, papelera, respaldo, sincronizar y eventos
 
 export default r;

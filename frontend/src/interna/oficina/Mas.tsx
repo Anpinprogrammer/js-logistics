@@ -142,7 +142,7 @@ function Personal() {
     try { await quitarPersona(id); if (E.miMensajero === id) { E.miMensajero = ""; guardarLocal("js_mensajero", ""); } v.avisar("Persona quitada"); } catch (e) { v.avisar("No se pudo quitar: " + motivoError(e)); }
   };
   return <>
-    <h1>Personal</h1><p className="sub">Mensajeros y el dueño entregan pedidos desde la app. Patinadores y la empresa (JS) solo aparecen en Sueldos. Cuando un mensajero elige su nombre por primera vez, queda vinculado a su cuenta; “Liberar” le permite elegir de nuevo (por ejemplo, si cambió de celular o de cuenta).</p>
+    <h1>Personal</h1><p className="sub">Mensajeros y el dueño entregan pedidos desde la app. Patinadores y la empresa (JS) aparecen en Sueldos; un patinador con acceso a la app anota desde el celular el dinero que le pagan en su ruta. Cuando un mensajero elige su nombre por primera vez, queda vinculado a su cuenta; “Liberar” le permite elegir de nuevo (por ejemplo, si cambió de celular o de cuenta).</p>
     <div className="cab-personal">
       <div className="seg subtabs" role="tablist" aria-label="Secciones de Personal">
         <button type="button" role="tab" id="tabPer-personal" aria-selected={tab === "personal"} aria-controls="panelPer-personal" onClick={() => setTab("personal")}>Personal JS</button>
@@ -216,7 +216,7 @@ function ModalPersonal({ alCerrar, persona, nombreInicial, tipoInicial, alGuarda
     }
     catch (er) { setGuardando(false); v.avisar("No se pudo guardar: " + motivoError(er)); }
   };
-  return <Modal titulo={persona ? "Editar personal" : "Agregar personal"} sub={persona ? "Cambia el nombre, el teléfono, el tipo o el pago por día. Los cambios se aplican de inmediato." : "Los mensajeros y el dueño entregan pedidos desde la app; patinadores y la empresa (JS) solo aparecen en Sueldos."} alCerrar={alCerrar} compacto>
+  return <Modal titulo={persona ? "Editar personal" : "Agregar personal"} sub={persona ? "Cambia el nombre, el teléfono, el tipo o el pago por día. Los cambios se aplican de inmediato." : "Los mensajeros y el dueño entregan pedidos desde la app; patinadores y la empresa (JS) aparecen en Sueldos (el patinador con acceso anota su caja desde la app)."} alCerrar={alCerrar} compacto>
     <form onSubmit={guardar}>
       <div className="form-col">
         <div className="campo"><label htmlFor="mNom">Nombre</label><input id="mNom" autoFocus value={f.nombre} onChange={e => setF({ ...f, nombre: e.target.value })} /></div>
@@ -230,10 +230,11 @@ function ModalPersonal({ alCerrar, persona, nombreInicial, tipoInicial, alGuarda
 }
 
 const ROLES_EQUIPO = Object.entries(ROLES).filter(([k]) => k !== "cliente");
-const ROLES_AYUDA = "Mensajero: solo sus pedidos, su caja y su sueldo. Asistente: trabaja en Oficina (pedidos, clientes, saldos y recibos); no ve caja, sueldos ni personal. Cliente: solo ve sus pedidos, sus pruebas de entrega y su saldo, sin editar nada. Administración: todo.";
+const ROLES_AYUDA = "Mensajero: solo sus pedidos, su caja y su sueldo. Asistente: trabaja en Oficina (pedidos, clientes, saldos y recibos); no ve caja, sueldos ni personal. Patinador: solo anota el dinero que le pagan los clientes en su ruta y ve su caja. Cliente: solo ve sus pedidos, sus pruebas de entrega y su saldo, sin editar nada. Administración: todo.";
 const ROLES_CALLOUT = <div className="modal-ayuda">
   <p><b>Mensajero:</b> solo sus pedidos, su caja y su sueldo.</p>
   <p><b>Asistente:</b> trabaja en Oficina (pedidos, clientes, saldos y recibos); no ve caja, sueldos ni personal.</p>
+  <p><b>Patinador:</b> solo anota el dinero que le pagan los clientes en su ruta y ve su caja.</p>
   <p><b>Cliente:</b> solo ve sus pedidos, sus pruebas de entrega y su saldo, sin editar nada.</p>
   <p><b>Administración:</b> todo.</p>
 </div>;
@@ -331,6 +332,7 @@ function Accesos({ modalAbierto, alCerrar }: { modalAbierto: boolean; alCerrar: 
         <select className="lista-filtro" aria-label="Filtrar por rol" value={rol} onChange={e => alRol(e.target.value as "" | Rol)}>
           <option value="">Todos los roles</option>
           <option value="mensajero">Mensajero</option>
+          <option value="patinador">Patinador</option>
           <option value="asistente">Asistente</option>
           <option value="cliente">Cliente</option>
           <option value="admin">Administración</option>
@@ -418,7 +420,7 @@ function ModalAcceso({ alCerrar }: { alCerrar: () => void }) {
   const usuarios = Object.values(S.usuarios);
   const entidades = cliente
     ? cs.map(c => ({ id: c.id, nombre: c.nombre, telefono: c.telefono || "", email: usuarios.find(u => u.clienteId === c.id)?.email || "" }))
-    : personal.map(m => ({ id: m.id, nombre: m.nombre, telefono: m.telefono || "", email: usuarios.find(u => u.mensajeroId === m.id)?.email || "" }));
+    : personal.filter(m => f.rol !== "patinador" || tipoDe(m) === "patinador").map(m => ({ id: m.id, nombre: m.nombre, telefono: m.telefono || "", email: usuarios.find(u => u.mensajeroId === m.id)?.email || "" }));
   const linkedId = cliente ? f.cli : f.men;
   const linked = entidades.find(e => e.id === linkedId) || null;
   const q = sinTildes(busEnt.trim());
@@ -454,7 +456,7 @@ function ModalAcceso({ alCerrar }: { alCerrar: () => void }) {
     <form onSubmit={guardar} noValidate>
       <div className="aviso acceso-nota"><b>Invitación automática.</b> La cuenta queda pendiente de activación: se enviará un correo con un enlace para que la persona cree su contraseña. No escribas una contraseña aquí.</div>
       <div className="form-col">
-        <div className="campo"><label htmlFor="acRol">Rol de acceso</label><select id="acRol" value={f.rol} onChange={e => cambiarRol(e.target.value as Rol)}>{(["mensajero", "asistente", "cliente", "admin"] as Rol[]).map(k => <option key={k} value={k}>{ROLES[k]}</option>)}</select></div>
+        <div className="campo"><label htmlFor="acRol">Rol de acceso</label><select id="acRol" value={f.rol} onChange={e => cambiarRol(e.target.value as Rol)}>{(["mensajero", "patinador", "asistente", "cliente", "admin"] as Rol[]).map(k => <option key={k} value={k}>{ROLES[k]}</option>)}</select></div>
         <div className="campo">
           <label htmlFor="acEnt">{cliente ? "Vincular con cliente" : "Vincular con Personal JS"}</label>
           <div className="combo-cliente" ref={comboRef}>
@@ -483,7 +485,7 @@ function ModalAcceso({ alCerrar }: { alCerrar: () => void }) {
       <div className="modal-acciones acceso-pie"><button type="submit" className="btn acceso-crear" disabled={!linkedId || !f.email.trim() || guardando}>Crear acceso y enviar invitación</button><button type="button" className="btn sec" onClick={alCerrar}>Cancelar</button></div>
     </form>
   </Modal>
-  {creandoPersonal ? <ModalPersonal nombreInicial={busEnt.trim()} tipoInicial={f.rol === "mensajero" ? "mensajero" : f.rol === "asistente" ? "oficina" : "dueno"} alCerrar={() => setCreandoPersonal(false)} alGuardar={mid => { const m = S.mensajeros[mid]; if (m) seleccionar({ id: mid, nombre: m.nombre, email: "" }); setCreandoPersonal(false); }} /> : null}
+  {creandoPersonal ? <ModalPersonal nombreInicial={busEnt.trim()} tipoInicial={f.rol === "mensajero" ? "mensajero" : f.rol === "patinador" ? "patinador" : f.rol === "asistente" ? "oficina" : "dueno"} alCerrar={() => setCreandoPersonal(false)} alGuardar={mid => { const m = S.mensajeros[mid]; if (m) seleccionar({ id: mid, nombre: m.nombre, email: "" }); setCreandoPersonal(false); }} /> : null}
   {creado ? <ModalWhatsApp datos={creado} alCerrar={alCerrar} /> : null}
   </>;
 }

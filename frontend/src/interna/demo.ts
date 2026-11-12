@@ -131,5 +131,6 @@ export function datosDemo(u: Usuario): Almacen {
     remitentesDemo = Object.values(S.clientes).map(c => ({ id: c.id, nombre: c.nombre, tarifa: c.tarifa }));
     S.clientes = {}; S.movimientos = {}; S.cuentas = {}; S.usuarios = { [u.id]: S.usuarios[u.id] };
   } else if (u.rol === "asistente") S.usuarios = { [u.id]: S.usuarios[u.id] };
+  else if (u.rol === "patinador") remitentesDemo = Object.values(S.clientes).map(c => ({ id: c.id, nombre: c.nombre, tarifa: c.tarifa })); // GET /clientes/buscar: solo nombre e id
   return S;
 }

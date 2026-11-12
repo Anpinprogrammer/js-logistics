@@ -7,4 +7,5 @@ export const USUARIOS_DEMO: Usuario[] = [
   { id: "u-admin", email: "admin@demo.co", nombre: "Laura Gómez", rol: "admin", clienteId: null, mensajeroId: "m-dueno" },
   { id: "u-asis", email: "asistente@demo.co", nombre: "Camila Ríos", rol: "asistente", clienteId: null, mensajeroId: null },
   { id: "u-mens", email: "mensajero@demo.co", nombre: "Andrés Mora", rol: "mensajero", clienteId: null, mensajeroId: "m1" },
+  { id: "u-pat", email: "patinador@demo.co", nombre: "Tomás Vélez", rol: "patinador", clienteId: null, mensajeroId: "m-pat" },
 ];

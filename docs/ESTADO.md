@@ -1,5 +1,14 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Rol patinador y su caja — 2026-11-12
+
+- Rol nuevo `patinador` (`usuarios.rol`, vinculado por `mensajero_id` a una ficha de Personal de tipo `patinador`; se crea desde Personal → Acceso como los demás). Anota el dinero que le pagan los clientes en su ruta (cliente, concepto, valor) en la tabla `caja_patinador`; el total y "hoy" (día de Colombia) los calcula el servidor. Endpoints `GET/POST /patinador/caja`; el patinador solo ve y anota en su propia caja, la oficina consulta con `mensajeroId`.
+- Requiere `npm run db:migrar` (cambia el CHECK de `usuarios.rol` y crea la tabla). `ROLES` de `helpers/negocio.js` agrega `patinador` aparte de `constantes.js` (copia fiel de la app vieja, que no lo tiene).
+- El frontend lo manda a `interna/patinador/Patinador.tsx` (no monta `ProveedorDatos`, ni SSE, ni la oficina): pestañas Mi caja (total, hoy, formulario, últimos pagos) e Historial paginado. Demo: `patinador@demo.co`.
+- Seguridad: las lecturas de `/pedidos` no declaraban rol y confiaban en el filtro del controlador; ahora llevan `permitir(EQUIPO, "cliente")`. Una ruta nueva sin `permitir(...)` expone todo a un rol nuevo.
+- Pendiente: la oficina todavía no ve la caja del patinador en pantalla (el endpoint ya existe) ni la cuadra/liquida; sin cola offline.
+- `test/solicitudes.test.js` ("la consulta administrativa filtra en la base…") ya fallaba antes de este cambio.
+
 ## Formato estructurado de JSBot — 2026-11-12
 
 - El prompt compartido de `servicios/chatbot.js` pide saltos reales, secciones, viñetas y negritas para guías/montos; se retiró la instrucción contradictoria de texto plano. El ejemplo está marcado como ficticio y no amplía datos, herramientas ni permisos del visitante. No inventar saldos: no existe herramienta financiera del bot.

@@ -23,7 +23,7 @@ export async function reiniciarBase() {
   const sql = await readFile(new URL("../db/schema.sql", import.meta.url), "utf8");
   await pool.query(sql);
   await pool.query(`TRUNCATE historial, papelera, pedido_intentos, pedido_archivos, pedidos, movimientos, recaudos,
-    liquidaciones, cajamovs, jornadas, enlaces, solicitudes, usuarios, clientes, mensajeros, cuentas, ajustes RESTART IDENTITY CASCADE`);
+    liquidaciones, cajamovs, jornadas, enlaces, solicitudes, caja_patinador, usuarios, clientes, mensajeros, cuentas, ajustes RESTART IDENTITY CASCADE`);
   await pool.query(`UPDATE contadores SET n = 0`);
 }
 
