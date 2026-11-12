@@ -187,11 +187,13 @@ export function entregasPorDia(ps: Pedido[], n: number) {
 /* ---------- clientes ---------- */
 export const signoMov = (m: Movimiento) => (MOVS[m.tipo]?.s || -1) * (Number(m.valor) || 0);
 export const esPago = (m: { tipo: string }) => !!MOVS[m.tipo as TipoMov]?.pago;
-/** Un pago que recibió un mensajero en la calle (mensajeroId) abona al cliente pero no mueve la caja: entra cuando él lo
-    entrega (recaudo) y mientras tanto suma a lo que debe (periodoMensajero). Igual que helpers/calculos.js del backend. */
-export const mueveCaja = (m: { tipo: string; mensajeroId?: string }) => !m.mensajeroId && (esPago(m) || !!MOVS[m.tipo as TipoMov]?.caja);
-/** Pagos de clientes que recibió el mensajero `mid` (+ lo que le dieron, − si se le devolvió al cliente). */
-export const esCobroMensajero = (m: Movimiento, mid: string) => !!m.mensajeroId && m.mensajeroId === mid && esPago(m);
+/** Pago que recibió un mensajero en la calle en efectivo: abona al cliente pero no mueve la caja hasta que él lo entrega
+    (recaudo) y mientras tanto suma a lo que debe (periodoMensajero). Por Nequi o Bancolombia ya está en la cuenta de JS:
+    mueve la caja como cualquier pago. Igual que helpers/calculos.js del backend. */
+export const enManoDeMensajero = (m: { mensajeroId?: string; medio?: string }) => !!m.mensajeroId && (m.medio || "efectivo") === "efectivo";
+export const mueveCaja = (m: { tipo: string; mensajeroId?: string; medio?: string }) => !enManoDeMensajero(m) && (esPago(m) || !!MOVS[m.tipo as TipoMov]?.caja);
+/** Pagos en efectivo de clientes que tiene el mensajero `mid` (+ lo que le dieron, − si se le devolvió al cliente). */
+export const esCobroMensajero = (m: Movimiento, mid: string) => enManoDeMensajero(m) && m.mensajeroId === mid && esPago(m);
 /* Pedidos y movimientos agrupados por cliente, armados una vez por pintada. Antes cada saldo recorría todas las guías:
    el Panel, la Caja y Cuentas suman el saldo de todos los clientes y eso era clientes × guías en cada pintada.
    El grupo dura hasta el final de la tarea actual (queueMicrotask) o hasta que cambie S.pedidos o S.movimientos,
