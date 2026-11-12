@@ -43,3 +43,8 @@ export async function registrar(req, res) {
   });
   res.status(201).json(r);
 }
+
+/** GET /patinador/resumen (oficina): cuánto recibió cada patinador, cuánto ya entregó y cuánto debe. */
+export async function resumen(_req, res) {
+  res.json({ patinadores: await Caja.resumenPatinadores() });
+}

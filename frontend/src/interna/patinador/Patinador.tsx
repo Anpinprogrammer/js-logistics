@@ -5,12 +5,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSesion, useUsuario } from "../../auth/Sesion";
 import * as api from "../../api/servicios";
 import { FalloApi } from "../../api/cliente";
-import type { CajaPatinador, ClienteBreve, RegistroCajaPatinador, ResumenCajaPatinador } from "../../api/tipos";
+import type { CajaPatinador, ClienteBreve, RegistroCajaPatinador } from "../../api/tipos";
 import { DEMO, datosDemo } from "../demo";
 import { buscarRemitentes } from "../acciones";
 import { motivoError } from "../datos";
 import { Icono, IconoSalir, Kpi, Paginador, ProveedorVentana, useVentana } from "../ui";
-import { diaDe, fechaLarga, hoy, hora, horaActual, pesos } from "../motor";
+import { fechaLarga, hoy, hora, horaActual, pesos } from "../motor";
+import { registrosDemo, resumenDe } from "./demoCaja";
 import { useTema } from "../tema";
 import { usePorPagina } from "../../lib/pantalla";
 import { CLAVE_NAV_ADMIN, leerNavegacion, usePersistedTab } from "../../hooks/usePersistedTab";
@@ -21,12 +22,7 @@ type Pestana = "inicio" | "historial";
 const PESTANAS: [Pestana, string][] = [["inicio", "Mi caja"], ["historial", "Historial"]];
 const MAX_CONCEPTO = 80;
 
-/* ---- modo demo: la caja vive en memoria, como el resto de la demo ---- */
-const registrosDemo: RegistroCajaPatinador[] = [];
-function resumenDe(rs: RegistroCajaPatinador[]): ResumenCajaPatinador {
-  const h = hoy(), deHoy = rs.filter(r => diaDe(Date.parse(r.fecha)) === h);
-  return { total: rs.reduce((a, r) => a + r.valor, 0), registros: rs.length, totalHoy: deHoy.reduce((a, r) => a + r.valor, 0), registrosHoy: deHoy.length };
-}
+/* ---- modo demo: la caja vive en memoria, como el resto de la demo (demoCaja.ts) ---- */
 const cajaDemo = (pagina: number, porPagina: number): CajaPatinador => {
   const todos = [...registrosDemo].reverse(), paginas = Math.max(1, Math.ceil(todos.length / porPagina)), p = Math.min(pagina, paginas);
   return { resumen: resumenDe(registrosDemo), registros: todos.slice((p - 1) * porPagina, p * porPagina), pagina: p, porPagina, total: todos.length, paginas };

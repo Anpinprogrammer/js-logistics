@@ -1,12 +1,18 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Caja de oficina: bloque Patinadores — 2026-11-12
+
+- En Caja → Mensajeros, debajo de las tarjetas de mensajeros, hay un bloque **Patinadores** con la misma lógica: el patinador va entregando dinero en el día y la oficina (admin o asistente) toca "Recibir dinero". Se guarda como un `recaudo` normal (mismo `POST /recaudos`), así entra a la caja de la empresa, al libro y a las cajas de oficina como el de un mensajero, y se edita o quita en la tabla "Dinero recibido de mensajeros".
+- Lo que "debe" un patinador es lo anotado en su caja (`caja_patinador`) menos lo entregado (`recaudos`), sin períodos ni liquidación (los patinadores cobran pago fijo). `GET /patinador/resumen` lo calcula; `recibir` devuelve ese `debe` si la ficha es de un patinador. Los patinadores no entran a `esRepartidor` ni a "Pendiente por entregar (todos)": su pendiente va aparte en el bloque.
+- No hace falta migrar (sin cambios de esquema). Demo: `interna/patinador/demoCaja.ts`.
+
 ## Rol patinador y su caja — 2026-11-12
 
 - Rol nuevo `patinador` (`usuarios.rol`, vinculado por `mensajero_id` a una ficha de Personal de tipo `patinador`; se crea desde Personal → Acceso como los demás). Anota el dinero que le pagan los clientes en su ruta (cliente, concepto, valor) en la tabla `caja_patinador`; el total y "hoy" (día de Colombia) los calcula el servidor. Endpoints `GET/POST /patinador/caja`; el patinador solo ve y anota en su propia caja, la oficina consulta con `mensajeroId`.
 - Requiere `npm run db:migrar` (cambia el CHECK de `usuarios.rol` y crea la tabla). `ROLES` de `helpers/negocio.js` agrega `patinador` aparte de `constantes.js` (copia fiel de la app vieja, que no lo tiene).
 - El frontend lo manda a `interna/patinador/Patinador.tsx` (no monta `ProveedorDatos`, ni SSE, ni la oficina): pestañas Mi caja (total, hoy, formulario, últimos pagos) e Historial paginado. Demo: `patinador@demo.co`.
 - Seguridad: las lecturas de `/pedidos` no declaraban rol y confiaban en el filtro del controlador; ahora llevan `permitir(EQUIPO, "cliente")`. Una ruta nueva sin `permitir(...)` expone todo a un rol nuevo.
-- Pendiente: la oficina todavía no ve la caja del patinador en pantalla (el endpoint ya existe) ni la cuadra/liquida; sin cola offline.
+- Sin cola offline.
 - `test/solicitudes.test.js` ("la consulta administrativa filtra en la base…") ya fallaba antes de este cambio.
 
 ## Formato estructurado de JSBot — 2026-11-12

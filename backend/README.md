@@ -302,10 +302,11 @@ Lo ya contado en un arqueo no se cambia: responde `409 YA_CONTADO` con el texto 
 | `POST /clientes/:id/unir` | admin | `{ otros }`: pasa pedidos, movimientos y cuentas a `:id` y borra los otros |
 | `POST /clientes/pagar-saldos` | oficina | `{ clienteIds, medio }`: paga el saldo a favor de cada uno (sin pagar dos veces) |
 | `GET /recaudos` | equipo (el mensajero, lo suyo) | `{ recaudos }` |
-| `POST /recaudos` | oficina | `{ mensajeroId, valor, medio, nota }` → `{ recaudo, debe }` |
+| `POST /recaudos` | oficina | `{ mensajeroId, valor, medio, nota }` → `{ recaudo, debe }`. También sirve para recibir el dinero de un patinador (entra a la caja igual); su `debe` es lo anotado en su caja menos lo entregado |
 | `PATCH /recaudos/:id` | `{ medio }`: el asistente, lo suyo; lo demás: admin | Cambia el medio o corrige |
 | `DELETE /recaudos/:id` | admin | Quita |
 | `GET /patinador/caja?pagina=&porPagina=` | patinador (la suya); oficina con `mensajeroId=` | `{ resumen: { total, registros, totalHoy, registrosHoy }, registros: [{ id, mensajeroId, clienteId, clienteNombre, concepto, valor, fecha }], pagina, porPagina, total, paginas }`. Lo más nuevo primero; "hoy" es el día de Colombia |
+| `GET /patinador/resumen` | oficina | `{ patinadores: [{ mensajeroId, nombre, activo, recibido, recibidoHoy, registros, entregado, entregadoHoy, debe }] }`. `recibido` = suma de su caja; `entregado` = sus `recaudos`; `debe = recibido − entregado` (negativo = entregó de más). Sin períodos: los patinadores no se liquidan |
 | `POST /patinador/caja` | patinador | `{ clienteId, concepto (1–80), valor (> 0) }` → `201 { registro, resumen }`. La hora y el patinador los pone el servidor (la ficha vinculada a su cuenta); queda en el historial |
 | `GET /mensajeros/resumen` | oficina | Período abierto de cada repartidor |
 | `GET /mensajeros/:id/periodo` | oficina; el mensajero, el suyo | `{ periodo: { debe, efectivo, base, gastos, recibido, entregas, … } }` |

@@ -1,7 +1,7 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
 import type { GrupoSolicitud, PaginaSolicitudes, FiltrosSolicitudes, PaginaSolicitudesFiltradas, Archivo, TipoArchivo, Cliente, ClienteBreve, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
-  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal, Solicitud, ListaSolicitudes, CajaPatinador, RegistroCajaPatinador, ResumenCajaPatinador } from "./tipos";
+  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal, Solicitud, ListaSolicitudes, CajaPatinador, RegistroCajaPatinador, ResumenCajaPatinador, ResumenPatinador } from "./tipos";
 import { FalloApi } from "./cliente";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
@@ -138,6 +138,8 @@ export const mensajeros = {
 export const patinador = {
   /** Su caja: el total y los registros de la página (8 en celular, 20 en computador). */
   caja: (pagina: number, porPagina: number) => datos<CajaPatinador>(api.get("/patinador/caja", { params: { pagina, porPagina } })),
+  /** Oficina: cuánto recibió cada patinador, cuánto ya entregó y cuánto debe. */
+  resumen: () => datos<{ patinadores: ResumenPatinador[] }>(api.get("/patinador/resumen")).then(d => d.patinadores),
   /** Anota un pago. La hora y el patinador los pone el servidor. */
   registrar: (d: { clienteId: string; concepto: string; valor: number }) =>
     datos<{ registro: RegistroCajaPatinador; resumen: ResumenCajaPatinador }>(api.post("/patinador/caja", d))
