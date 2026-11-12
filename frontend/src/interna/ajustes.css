@@ -1313,6 +1313,7 @@
 .jsl .lista-patinador .fila-pago{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left}
 .jsl .lista-patinador .fila-pago .info{min-width:0;flex:1;overflow-wrap:anywhere}
 .jsl .lista-patinador .fila-pago-valor{font-weight:700;white-space:nowrap}
+.jsl .lista-patinador .fila-entrega .fila-pago-valor{color:var(--rojo)}
 @media (min-width:960px){.jsl .form-pago{max-width:520px}}
 /* Recepción → Recibir dinero: cómo pagó el cliente (tres botones grandes, para el dedo en la calle) */
 .jsl .form-pago .etq-campo{display:block;margin-bottom:6px;font-size:.82rem;font-weight:600;color:var(--tinta)}

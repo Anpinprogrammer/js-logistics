@@ -399,3 +399,7 @@ Es una receta, no un script del repo. Si lo conviertes en prueba automática, gu
 
 - `GET /patinador/caja` y la respuesta de `POST /patinador/caja` traen en `resumen` también `entregado`, `entregadoHoy` y `enCaja` (= recibido − entregado). `entregado` sale de los mismos `recaudos` que registra la oficina en Caja → Patinadores, así que no hay nada que sincronizar: al tocar "Recibir dinero" (o corregir/quitar la entrega) la caja del patinador cambia sola (su app se refresca cada minuto y al volver a la pestaña).
 - La app del patinador muestra "En mi caja" = `enCaja`, con "Recibido … · entregado …" debajo. `total` sigue siendo el acumulado recibido y el historial no se toca. Sin cambios de esquema: no hace falta `db:migrar`.
+
+## Las entregas a administración salen en el historial del patinador — 2026-11-12
+
+- `GET /patinador/caja` mezcla en `registros` los pagos del patinador (`tipo: "pago"`) con sus entregas a la oficina (`tipo: "entrega"`, tomadas de `recaudos` con una `UNION ALL`, sin tabla nueva), ordenadas por fecha. En la app salen con "Descontado de la caja" y el valor en rojo con signo menos; el título pasó a "Últimos movimientos". Quitar o corregir la entrega en la oficina la quita o corrige también ahí. `resumen.registros` sigue contando solo pagos. Sin cambios de esquema: no hace falta `db:migrar`.
