@@ -23,7 +23,11 @@ export const metodoTxt = p => (p.estado === "devuelto" ? "Devolución" + (p.moti
 export const textoDomi = p => (p.domiPagado ? "pagó domicilio " + pesos(pagoDomi(p)) : "domicilio " + pesos(servicio(p))) + (gastoDe(p) ? " · flete " + pesos(gastoDe(p)) : "");
 export const signoMov = m => (MOVS[m.tipo]?.s || -1) * (Number(m.valor) || 0);
 export const esPago = m => !!MOVS[m.tipo]?.pago;
-export const mueveCaja = m => esPago(m) || !!MOVS[m.tipo]?.caja;
+/** Un pago que recibió un mensajero en la calle (mensajeroId) abona al cliente pero no mueve la caja: entra cuando él lo
+    entrega (recaudo). Mientras tanto suma a lo que debe (periodoMensajero). La app vieja no tiene estos pagos. */
+export const mueveCaja = m => !m.mensajeroId && (esPago(m) || !!MOVS[m.tipo]?.caja);
+/** Pagos de clientes que recibió un mensajero: + lo que le dieron, − si se le devolvió al cliente. */
+export const esCobroMensajero = (m, mid) => !!m.mensajeroId && m.mensajeroId === mid && esPago(m);
 export const cambioPendiente = p => !!p.cambio && !p.cambioRecibido;
 export const sinServicio = p => p.estado === "entregado" && !!p.clienteId && !Number(p.valorServicio);
 export const textoLiq = d => (d > 0 ? "Debe " + pesos(d) : d < 0 ? "Sobró " + pesos(-d) : "Quedó en $ 0");
@@ -128,7 +132,9 @@ export function crearCalculos(S, { corteRemoto = 0 } = {}) {
     const enLiq = new Set(liqs.flatMap(l => l.guias || [])), sinGuias = Math.max(0, ...liqs.filter(l => !Array.isArray(l.guias)).map(l => l.fecha));
     const ps = V("pedidos").filter(p => cerrado(p) && p.mensajeroId === mid && !enLiq.has(p.guia) && p.entregado > sinGuias).sort((a, b) => a.entregado - b.entregado);
     const todosRecs = V("recaudos").filter(r => r.mensajeroId === mid), todasBases = V("cajamovs").filter(c => c.cat === "base" && c.personaId === mid);
+    const todosCobros = V("movimientos").filter(m => esCobroMensajero(m, mid)).map(m => ({ ...m, valor: signoMov(m) }));
     const recs = todosRecs.filter(r => r.fecha > desde).sort((a, b) => a.fecha - b.fecha);
+    const cobrosCli = todosCobros.filter(m => m.fecha > desde).sort((a, b) => a.fecha - b.fecha);
     const bases = todasBases.filter(c => c.fecha > desde).sort((a, b) => a.fecha - b.fecha);
     const enVentana = (xs, l) => xs.filter(x => x.fecha > (Number(l.desde) || 0) && x.fecha <= l.fecha).reduce((a, x) => a + (Number(x.valor) || 0), 0);
     let ajuste = 0;
@@ -136,11 +142,13 @@ export function crearCalculos(S, { corteRemoto = 0 } = {}) {
       if (!Array.isArray(l.guias)) continue;
       const lp = l.guias.map(g => S.pedidos[g]).filter(p => p && cerrado(p));
       ajuste += (totales(lp).efectivo - (Number(l.efectivo) || 0)) - (lp.reduce((a, p) => a + gastoDe(p), 0) - (Number(l.gastos) || 0))
-        + (enVentana(todasBases, l) - (Number(l.base) || 0)) - (enVentana(todosRecs, l) - (Number(l.recibido) || 0)) - (Number(l.ajuste) || 0);
+        + (enVentana(todasBases, l) - (Number(l.base) || 0)) - (enVentana(todosRecs, l) - (Number(l.recibido) || 0)) - (Number(l.ajuste) || 0)
+        + (enVentana(todosCobros, l) - (Number(l.cobros) || 0));
     }
     ajuste = Math.round(ajuste);
     const efectivo = totales(ps).efectivo, recibido = recs.reduce((a, r) => a + (Number(r.valor) || 0), 0), base = bases.reduce((a, c) => a + (Number(c.valor) || 0), 0), gastos = ps.reduce((a, p) => a + gastoDe(p), 0);
-    return { ul, desde, anterior, ajuste, ps, recs, bases, base, gastos, efectivo, recibido, debe: anterior + ajuste + efectivo + base - gastos - recibido };
+    const cobros = cobrosCli.reduce((a, m) => a + m.valor, 0);
+    return { ul, desde, anterior, ajuste, ps, recs, bases, base, gastos, efectivo, recibido, cobros, cobrosCli, debe: anterior + ajuste + efectivo + base + cobros - gastos - recibido };
   }
   const recibidoDia = (mid, dia) => V("recaudos").filter(r => r.mensajeroId === mid && diaDe(r.fecha) === dia).reduce((a, r) => a + (Number(r.valor) || 0), 0);
 
@@ -156,7 +164,7 @@ export function crearCalculos(S, { corteRemoto = 0 } = {}) {
       else if (c.cat === "interna" && !c.inicial && c.porUid === auid) add(c.fecha, (c.tipo === "entra" ? "Entrada de " : "Salida a ") + (S.cuentas[c.cuentaId]?.nombre || "cuenta interna"), (c.tipo === "entra" ? 1 : -1) * (Number(c.valor) || 0), c.medio);
     }
     for (const r of V("recaudos")) if (r.porUid === auid) add(r.fecha, "Entrega de " + nomM(r.mensajeroId) + antesTxt(r), Number(r.valor) || 0, r.medio);
-    for (const m of V("movimientos")) if (m.porUid === auid && ["pago_de_cliente", "pago_a_cliente", "compra_cliente"].includes(m.tipo))
+    for (const m of V("movimientos")) if (m.porUid === auid && !m.mensajeroId && ["pago_de_cliente", "pago_a_cliente", "compra_cliente"].includes(m.tipo))
       add(m.fecha, (m.tipo === "pago_de_cliente" ? "Pago de " : m.tipo === "pago_a_cliente" ? "Pago a " : "Compra para ") + nombreCliente(m.clienteId) + antesTxt(m), (m.tipo === "pago_de_cliente" ? 1 : -1) * (Number(m.valor) || 0), m.medio);
     for (const p of V("pedidos")) if (p.domiPagado && p.domiPagoUid === auid && p.domiPagoMedio) add(p.domiPagoFecha, "Pago de domicilio · " + p.guia, pagoDomi(p), p.domiPagoMedio);
     L.sort((a, b) => a.fecha - b.fecha);

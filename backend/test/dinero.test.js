@@ -184,7 +184,9 @@ test("sincronizar: cada rol recibe solo lo que puede ver", async () => {
   const m = (await mensajero.get("/api/sincronizar")).body.datos;
   assert.ok(m.pedidos[guia]);
   assert.equal(m.clientes, undefined);
-  assert.equal(m.movimientos, undefined);
+  // Del dinero de los clientes solo ve los pagos que él recibió en la calle (Recepción); de las cuentas, nada más.
+  assert.ok(Object.values(m.movimientos).every(x => x.mensajeroId === m1.id));
+  assert.ok(Object.keys(a.movimientos).length > Object.keys(m.movimientos).length);
   const c = (await cliente.get("/api/sincronizar")).body.datos;
   assert.deepEqual(Object.keys(c.clientes), [c1.id]);
 });

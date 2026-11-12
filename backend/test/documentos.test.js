@@ -41,7 +41,7 @@ test("los cálculos dan lo mismo leyendo de Postgres que con los datos originale
     const a = crearCalculos(S), b = crearCalculos(L);
     const cids = Object.keys(S.clientes), mids = Object.keys(S.mensajeros), h = hoy();
     const dias = [...Array(12)].map((_, i) => moverDia(h, -i * 3)), semanas = [0, 1, 2, 3, 5].map(i => moverSemana(semanaDe(h), -i));
-    const periodo = x => mids.map(m => { const p = x.periodoMensajero(m); return { ...p, ul: p.ul?.id, ps: p.ps.map(y => y.guia), recs: p.recs.map(y => y.id), bases: p.bases.map(y => y.id) }; });
+    const periodo = x => mids.map(m => { const p = x.periodoMensajero(m); return { ...p, cobrosCli: p.cobrosCli.map(y => y.id), ul: p.ul?.id, ps: p.ps.map(y => y.guia), recs: p.recs.map(y => y.id), bases: p.bases.map(y => y.id) }; });
     const casos = {
       saldoCliente: x => cids.map(x.saldoCliente),
       filasCuenta: x => cids.map(x.filasCuenta),

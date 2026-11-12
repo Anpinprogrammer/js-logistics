@@ -10,7 +10,8 @@ import { calculosDe, exigirAdmin, exigirOficina, esMio, valorPositivo, medioVali
 import * as CajaPatinador from "../models/cajaPatinador.model.js";
 import { totales, ganaPorcentaje, sueldoPedidos, tipoDe } from "../helpers/calculos.js";
 
-const COLS_PERIODO = ["pedidos", "recaudos", "cajamovs", "liquidaciones", "mensajeros"];
+// movimientos: los pagos de clientes que recibió el mensajero en la calle suman a lo que debe.
+const COLS_PERIODO = ["pedidos", "recaudos", "cajamovs", "liquidaciones", "mensajeros", "movimientos"];
 
 /** GET /liquidaciones/pagina: cierres recientes filtrados, de a 9 en escritorio y 5 en celular. */
 export async function paginaLiquidaciones(ctx, { pagina, porPagina, dia, estado = "todos", buscar = "" } = {}) {
@@ -43,7 +44,7 @@ function vistaPeriodo(calc, mid) {
     mensajeroId: mid, nombre: m?.nombre || "", tipo: tipoDe(m),
     ultimaLiquidacion: pm.ul, desde: pm.desde, anterior: pm.anterior, ajuste: pm.ajuste,
     entregas: pm.ps, recaudos: pm.recs, bases: pm.bases,
-    efectivo: pm.efectivo, base: pm.base, gastos: pm.gastos, recibido: pm.recibido, debe: pm.debe,
+    efectivo: pm.efectivo, base: pm.base, gastos: pm.gastos, recibido: pm.recibido, cobros: pm.cobros, cobrosCli: pm.cobrosCli, debe: pm.debe,
     totales: t, enRuta, sinValorServicio: pm.ps.filter(p => !Number(p.valorServicio)).length,
     sueldo: ganaPorcentaje(m) ? sueldoPedidos(pm.ps) : null
   };
@@ -122,7 +123,7 @@ export async function liquidar(ctx, { mensajeroId: mid, entregaFinal, medio = "e
     const fecha = Math.max(ahora(), t0 + 1), id = mid + "_" + fecha, queda = pm.debe - val, adel = adelanto(queda);
     const liquidacion = await guardar(t, "liquidaciones", {
       id, mensajeroId: mid, desde: pm.desde, fecha, dia: diaDe(fecha), entregas: pm.ps.length, guias: pm.ps.map(p => p.guia),
-      efectivo: tt.efectivo, base: pm.base, gastos: pm.gastos, anterior: pm.anterior, recibidoAntes: pm.recibido, entregaFinal: val,
+      efectivo: tt.efectivo, base: pm.base, gastos: pm.gastos, cobros: pm.cobros, anterior: pm.anterior, recibidoAntes: pm.recibido, entregaFinal: val,
       recibido: pm.recibido + val, debe: queda - adel, adelanto: adel, ajuste: pm.ajuste, transfJs: tt.transfJs, transfCli: tt.transfCli, sueldo, enRuta
     });
     if (adel) // la plata ya la tiene el mensajero: es un adelanto que no sale de la caja (ver libroCaja) y se descuenta del sueldo de esa semana

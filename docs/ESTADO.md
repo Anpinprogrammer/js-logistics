@@ -1,5 +1,13 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Recepción del mensajero: Nuevo pedido y Recibir dinero — 2026-11-12
+
+- La pestaña **Nuevo** del mensajero ahora es **Recepción** (`E.tabM = "recepcion"`, ícono de bandeja) con dos sub-pestañas en `E.subRecM` (`pedido` | `dinero`), recordadas en la URL por `navegacion.ts`. Una pestaña guardada como `nuevo` se abre en Recepción. *Nuevo pedido* es exactamente lo de antes (foto y galería).
+- *Recibir dinero* usa el mismo formulario y lista del patinador, que se movieron a `interna/pagos.tsx` (`FormPago`, `Lista`). Cada pago es un `pago_de_cliente` normal (efectivo, hora del servidor) con **`movimientos.mensajero_id`**: abona a la cuenta del cliente igual que un pago de oficina (`POST /movimientos/recibidos`).
+- **Cuadre:** `mueveCaja(m)` es falso si `m.mensajeroId` (backend `calculos.js` y `motor.ts`): ese pago no entra al libro de caja ni al arqueo. Entra cuando el mensajero lo entrega en Caja → Mensajeros (recaudo de siempre). Mientras tanto `periodoMensajero` lo suma a `debe` (`cobros`, `cobrosCli`), así sale en "Todavía en manos de mensajeros", en el cierre del día y en la liquidación (`liquidaciones.cobros`; corregirlo después de liquidar pasa al ajuste como el resto). `cajaOficina` los ignora. Quitar uno lo borra aunque haya arqueo (nunca estuvo en la caja).
+- `equivalencia.test.js` quita `cobros`/`cobrosCli` al comparar: la app vieja no tiene estos pagos. El mensajero ahora lee `GET /movimientos`, pero el servidor solo le da los que él recibió.
+- Requiere `npm run db:migrar` (columnas `movimientos.mensajero_id` y `liquidaciones.cobros`). El patinador sigue con su caja (`caja_patinador`), aparte.
+
 ## Pagos del patinador abonan a la cuenta del cliente — 2026-11-12
 
 - Cada pago que anota el patinador (`POST /patinador/caja`) crea, en la misma transacción, un movimiento `abono` ("A favor", en verde) en la cuenta del cliente, con la nota "Recibido por <patinador>: <concepto>"; `caja_patinador.movimiento_id` los enlaza. Se usa `abono` y no `pago_de_cliente` a propósito: el abono no mueve la caja de JS (el dinero entra a la caja cuando el patinador lo entrega, como `recaudo`), así no se cuenta dos veces.

@@ -29,7 +29,7 @@ export const aPedido = (p: T.Pedido): Pedido => ({
 });
 const aCliente = (c: T.Cliente): Cliente => ({ id: c.id, nombre: c.nombre, telefono: c.telefono || "", tarifa: c.tarifa || 0 });
 export const aPersona = (m: T.Mensajero): Persona => ({ id: m.id, nombre: m.nombre, telefono: m.telefono || "", tipo: m.tipo || "mensajero", tarifa: m.tarifa || 0 });
-export const aMov = (m: T.Movimiento): Movimiento => ({ id: m.id, clienteId: m.clienteId, tipo: m.tipo, valor: m.valor || 0, medio: m.medio || "", nota: m.nota || "", fecha: ms(m.fecha), porUid: m.porUid || "", porNombre: m.porNombre || "", medioAntes: m.medioAntes || undefined });
+export const aMov = (m: T.Movimiento): Movimiento => ({ id: m.id, clienteId: m.clienteId, tipo: m.tipo, valor: m.valor || 0, medio: m.medio || "", nota: m.nota || "", fecha: ms(m.fecha), porUid: m.porUid || "", porNombre: m.porNombre || "", medioAntes: m.medioAntes || undefined, mensajeroId: m.mensajeroId || undefined });
 const aRec = (r: T.Recaudo): Recaudo => ({ id: r.id, mensajeroId: r.mensajeroId, valor: r.valor || 0, medio: r.medio || "efectivo", nota: r.nota || "", fecha: ms(r.fecha), porUid: r.porUid || "", porNombre: r.porNombre || "", medioAntes: r.medioAntes || undefined });
 export const aLiq = (l: T.Liquidacion): Liquidacion => ({ ...l, fecha: ms(l.fecha), desde: ms(l.desde), guias: l.guias ?? undefined });
 export const aCaja = (c: T.CajaMovimiento): CajaMov => ({
@@ -110,7 +110,8 @@ function cargadorDe(u: T.Usuario, col: Coleccion, modo: string): () => Promise<(
       const us = (u.rol === "admin" ? await api.usuarios.listar() : [u]).map(aUsuario);
       return s => { s.usuarios = porId(us, "uid"); s.vinculos = Object.fromEntries(us.filter(x => x.mensajeroId).map(x => [x.uid, { uid: x.uid, mensajeroId: x.mensajeroId }])); };
     };
-    case "movimientos": return async () => { const xs = oficina ? await api.movimientos.listar() : []; return s => { s.movimientos = porId(xs.map(aMov), "id"); }; };
+    // El mensajero recibe solo los pagos que él anotó en Recepción (los filtra el servidor): suman a lo que debe.
+    case "movimientos": return async () => { const xs = oficina || u.mensajeroId ? await api.movimientos.listar() : []; return s => { s.movimientos = porId(xs.map(aMov), "id"); }; };
     case "recaudos": return async () => { const xs = await api.recaudos.listar(); return s => { s.recaudos = porId(xs.map(aRec), "id"); }; };
     case "liquidaciones": return async () => { const xs = await api.liquidaciones.listar(); return s => { s.liquidaciones = porId(xs.map(aLiq), "id"); }; };
     case "jornadas": return async () => { const xs = await api.jornadas.listar(); return s => { s.jornadas = porId(xs as Jornada[], "id"); }; };

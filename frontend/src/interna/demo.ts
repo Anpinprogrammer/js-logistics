@@ -129,7 +129,8 @@ export function datosDemo(u: Usuario): Almacen {
     for (const id of Object.keys(S.cajamovs)) if (S.cajamovs[id].personaId !== mid) delete S.cajamovs[id];
     // Como GET /clientes/buscar: el mensajero solo busca nombre e id para el remitente.
     remitentesDemo = Object.values(S.clientes).map(c => ({ id: c.id, nombre: c.nombre, tarifa: c.tarifa }));
-    S.clientes = {}; S.movimientos = {}; S.cuentas = {}; S.usuarios = { [u.id]: S.usuarios[u.id] };
+    S.clientes = {}; S.cuentas = {};
+    for (const id of Object.keys(S.movimientos)) if (S.movimientos[id].mensajeroId !== mid) delete S.movimientos[id]; // solo los pagos que él recibió S.usuarios = { [u.id]: S.usuarios[u.id] };
   } else if (u.rol === "asistente") S.usuarios = { [u.id]: S.usuarios[u.id] };
   else if (u.rol === "patinador") remitentesDemo = Object.values(S.clientes).map(c => ({ id: c.id, nombre: c.nombre, tarifa: c.tarifa })); // GET /clientes/buscar: solo nombre e id
   return S;
