@@ -15,7 +15,7 @@ const FILTROS_PEDIDOS = ["todos", "sin", "rec", "pend", "ent", "dev", "dif", "ca
 type Sub = { leer: () => string; poner: (v: string) => void; validos: readonly string[] };
 /** Sub-pestaña (o filtro principal) que se recuerda en cada pestaña de la oficina. */
 const SUB_OFICINA: Record<string, Sub> = {
-  caja: { leer: () => E.tabCaja, poner: v => { E.tabCaja = v as typeof E.tabCaja; }, validos: ["caja", "mensajeros", "liquidaciones", "arqueos"] },
+  caja: { leer: () => E.tabCaja, poner: v => { E.tabCaja = v as typeof E.tabCaja; }, validos: ["caja", "mensajeros", "patinadores", "liquidaciones", "arqueos"] },
   cuentas: { leer: () => E.tabCuentas, poner: v => { E.tabCuentas = v as typeof E.tabCuentas; }, validos: ["cuentas", "movimientos", "ganancias"] },
   mas: { leer: () => E.subMas, poner: v => { E.subMas = v; }, validos: SUBMAS.map(([k]) => k) },
   solicitudes: { leer: () => E.filtroSol, poner: v => { E.filtroSol = v as typeof E.filtroSol; }, validos: ["todas", "pendientes", "por_confirmar", "aceptadas", "rechazadas"] },

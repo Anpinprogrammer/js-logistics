@@ -9,6 +9,8 @@ Invocar este skill es la autorización de Javier para publicar. Sigue los pasos 
 
 Carpeta del proyecto: `~/Proyectos/js-logistics`. Node está en `~/.local/node/bin`, así que antepón `export PATH="$HOME/.local/node/bin:$PATH"` a cada comando de node o de firebase. gh está en `~/.local/bin/gh`.
 
+> **Patinadores:** el rol de patinador, su caja y el bloque de Caja → Patinadores existen solo en el sistema nuevo (`backend/` y `frontend/`). Este skill publica la app vieja en Firebase y no los toca ni los lleva a producción. Los cambios de patinadores se despliegan con el sistema nuevo (Render y Vercel, con `npm run db:migrar` si cambia el esquema).
+
 ## 1. Revisar antes de publicar
 - Corre `git status --short` y `git diff --stat`. Si no hay cambios y HEAD ya está en `origin/main`, salta al paso 4: se publica lo que ya está guardado.
 - Revisa la sintaxis: `node --check app/js/app.js`. Si `app/js/plataforma.js` cambió, revísalo como módulo: `t=$(mktemp -d) && cp app/js/plataforma.js "$t/p.mjs" && node --check "$t/p.mjs"`.

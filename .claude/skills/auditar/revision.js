@@ -25,6 +25,16 @@ await (async()=>{
     cuentasInternas:listaOrdenada(S.cuentas,"nombre").map(cu=>[cu.nombre,saldoCuenta(cu.id)]),
   };
   out.mensajeros=Object.values(S.mensajeros).filter(esRepartidor).map(m=>{ const pm=periodoMensajero(m.id); return {nombre:m.nombre,debe:Math.round(pm.debe),ultimaLiquidacion:pm.ul?f(pm.ul.fecha):"nunca",entregasDelPeriodo:pm.ps.length}; }).filter(x=>x.debe||x.entregasDelPeriodo);
+  // Patinadores: su caja (lo que anotan de los clientes) vive en la API del sistema nuevo (GET /patinador/resumen), no en `S`.
+  // En la app vieja (Firebase) esa ruta no existe y la sección queda como no disponible. Solo lee.
+  out.patinadores=await (async()=>{
+    try {
+      const r=await fetch("/api/patinador/resumen",{credentials:"include"}); if(!r.ok) return {disponible:false};
+      const j=await r.json(); if(!Array.isArray(j.patinadores)) return {disponible:false};
+      const pend=j.patinadores.filter(x=>x.debe||x.recibido||x.entregado).map(x=>({nombre:x.nombre,recibidoDeClientes:x.recibido,yaEntrego:x.entregado,debe:x.debe,debeDeDiasAnteriores:x.debe-(x.recibidoHoy-x.entregadoHoy),anotoHoy:x.recibidoHoy,entregoHoy:x.entregadoHoy,pagosAnotados:x.registros}));
+      return {disponible:true,debenEnTotal:pend.reduce((a,x)=>a+Math.max(0,x.debe),0),lista:pend};
+    } catch { return {disponible:false}; }
+  })();
   const liqs=Object.values(S.liquidaciones).sort((a,b)=>b.fecha-a.fecha);
   out.liquidaciones={
     ultimas:liqs.slice(0,10).map(l=>[S.mensajeros[l.mensajeroId]?.nombre,f(l.fecha),l.debe,l.adelanto||0]),
