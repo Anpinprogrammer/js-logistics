@@ -1254,3 +1254,49 @@
 .jsl .cli-info-acciones{display:grid;grid-template-columns:1fr 1fr;gap:9px;min-width:0}
 .jsl .cli-info-acciones .btn{justify-content:center;gap:6px;min-width:0;min-height:44px;font-size:.8rem}
 .jsl .cli-info-acciones .btn svg{width:17px;height:17px;flex:none}
+
+/* ---------- Clientes → ficha móvil → Ver cuenta: formulario sin choques y movimientos en filas ---------- */
+.jsl .cli-ficha .cuenta-form{display:grid;gap:12px;min-width:0;margin:6px 0 14px;padding:14px;border:1px solid var(--linea);border-radius:16px;background:var(--hueco)}
+.jsl .cli-ficha .cuenta-form h2{margin:0;font-size:.95rem}
+.jsl .cli-ficha .cuenta-form .campo{margin:0;min-width:0}
+.jsl .cli-ficha .cuenta-form label{display:block;margin-bottom:5px;font-size:.75rem;font-weight:700}
+.jsl .cli-ficha .cuenta-form :is(select,input){width:100%;min-width:0;min-height:44px;border:1px solid var(--linea);border-radius:12px;background:var(--papel);color:var(--tinta);font:inherit;font-size:.82rem;font-weight:600}
+.jsl .cli-ficha .cuenta-form :is(select,input):focus{outline:2px solid var(--marca2);outline-offset:1px}
+.jsl .cli-ficha .cuenta-select{position:relative;min-width:0}
+.jsl .cli-ficha .cuenta-select select{appearance:none;-webkit-appearance:none;padding:10px 36px 10px 13px;background-image:none;cursor:pointer;text-overflow:ellipsis}
+.jsl .cli-ficha .cuenta-select svg{position:absolute;right:12px;top:50%;width:16px;height:16px;transform:translateY(-50%);pointer-events:none;color:var(--suave)}
+.jsl .cli-ficha .cuenta-fila{position:relative;display:grid;gap:10px;min-width:0}
+.jsl .cli-ficha .cuenta-fila-dia{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
+.jsl .cli-ficha .cuenta-fila-medio{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}
+/* El calendario se ancla a la fila completa (no a la columna angosta) y se ve dentro del cuerpo con scroll. */
+.jsl .cli-ficha .cuenta-fila .fecha-picker{position:static;min-width:0}
+.jsl .cli-ficha .cuenta-fila .fecha-btn{width:100%;min-width:0;min-height:44px;padding:6px 13px;border-radius:12px}
+.jsl .cli-ficha .cuenta-fila .fecha-etq{display:none}
+.jsl .cli-ficha .cuenta-fila .fecha-valor{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;font-size:.82rem;font-weight:600;white-space:nowrap}
+.jsl .cli-ficha .cuenta-fila .fecha-pop{left:0;right:0;width:auto;max-width:340px;margin-top:6px}
+.jsl .cli-ficha .cuenta-pesos{position:relative;min-width:0}
+.jsl .cli-ficha .cuenta-pesos span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--suave);font-size:.82rem;font-weight:700;pointer-events:none}
+.jsl .cli-ficha .cuenta-pesos input{padding:10px 10px 10px 26px;font-weight:800}
+.jsl .cli-ficha .cuenta-fila-medio input{padding:10px 12px}
+.jsl .cli-ficha .cuenta-registrar{width:100%;min-height:44px;justify-content:center}
+.jsl .cli-ficha .cuenta-movs{display:flex;flex-direction:column;min-width:0;margin:0 0 6px;padding:0;list-style:none;border:1px solid var(--linea);border-radius:16px;background:var(--papel);overflow:hidden}
+.jsl .cli-ficha .cuenta-movs li{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;padding:11px 13px}
+.jsl .cli-ficha .cuenta-movs li + li{border-top:1px solid var(--linea)}
+.jsl .cli-ficha .cuenta-mov-det{display:flex;flex-direction:column;flex:1;min-width:0}
+.jsl .cli-ficha .cuenta-mov-det b{overflow:hidden;font-size:.8rem;font-weight:700;text-overflow:ellipsis;white-space:nowrap}
+.jsl .cli-ficha .cuenta-mov-det small{margin-top:2px;color:var(--suave);font-size:.69rem}
+.jsl .cli-ficha .cuenta-mov-fin{display:flex;align-items:center;gap:8px;flex:none}
+.jsl .cli-ficha .cuenta-mov-fin > span{font-size:.8rem;font-weight:800;white-space:nowrap}
+.jsl .cli-ficha .cuenta-mov-fin button{min-height:32px;padding:5px 10px;border-radius:10px;background:none;font:inherit;font-size:.69rem;font-weight:700;white-space:nowrap;cursor:pointer}
+.jsl .cli-ficha .cuenta-mov-quitar{border:1px solid color-mix(in srgb,var(--rojo) 40%,transparent);color:var(--rojo)}
+.jsl .cli-ficha .cuenta-mov-quitar:hover{background:var(--rojo-claro)}
+.jsl .cli-ficha .cuenta-mov-domi{border:1px solid var(--linea);color:var(--tinta)}
+.jsl .cli-ficha .cuenta-mov-domi:hover{background:var(--hueco)}
+@media (max-width:359px){
+  .jsl .cli-ficha .cuenta-form{padding:12px}
+  .jsl .cli-ficha .cuenta-fila-dia{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .jsl .cli-ficha .cuenta-fila-medio{grid-template-columns:minmax(0,1fr)}
+  .jsl .cli-ficha .cuenta-movs li{flex-wrap:wrap;row-gap:6px}
+  .jsl .cli-ficha .cuenta-mov-det{flex-basis:100%}
+  .jsl .cli-ficha .cuenta-mov-fin{width:100%;justify-content:space-between}
+}
