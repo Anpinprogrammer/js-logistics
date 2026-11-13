@@ -15,11 +15,11 @@ El flujo cruza dos aplicaciones en dominios distintos (portal → campanita de l
 | Pieza | Dónde | Dominio sugerido |
 |---|---|---|
 | Base de datos | Proyecto de Supabase **nuevo** (solo demo) | no es público |
-| API | Servicio de Render **nuevo**, raíz `backend/` | el de Render (`algo.onrender.com`); nadie lo abre, solo pasa por las reescrituras |
+| API | Servicio de Render **nuevo**, raíz `backend/` | `api.ingenieroandrespineda.dev` (dominio propio en Render; el `onrender.com` no sirve para la cookie en Safari) |
 | Portal de clientes y landing | Proyecto de Vercel con el repo `jslogistics-cliente-frontend` | `portal.ingenieroandrespineda.dev` |
 | Oficina y mensajeros | Proyecto de Vercel con este repo, carpeta `frontend/` | `oficina.ingenieroandrespineda.dev` |
 
-Cada frontend llama a `/api` en su propio dominio y una reescritura de Vercel lo manda al Render de la demo. Así la cookie de sesión es de cada subdominio (no se mezclan la del portal y la de la oficina) y funciona en Safari de iPhone.
+Cada frontend llama directo a la API con la variable `VITE_API_URL=https://api.ingenieroandrespineda.dev` de su proyecto de Vercel (el `vercel.json` es el mismo de producción y ya no reenvía `/api`). Como la API y los dos frontends son subdominios de `ingenieroandrespineda.dev`, son del mismo *sitio*: la cookie funciona con `SameSite=Lax`, también en Safari de iPhone. La sesión es una sola para los dos frontends en un mismo navegador (entrar en uno como cliente cierra la de oficina en ese navegador).
 
 ## Paso a paso
 
@@ -44,7 +44,7 @@ Cuentas que crea `db:demo` (todas con la contraseña **`demo-js-2026`**; no es l
 
 ### 2. Backend (Render)
 
-Servicio Web Service con raíz `backend`, build `npm ci`, inicio `npm start`, health check `/api/ready` (ver "Render" en `backend/README.md`). Variables:
+Servicio Web Service con raíz `backend`, build `npm ci`, inicio `npm start`, health check `/api/ready` (ver "Render" en `backend/README.md`). En **Settings → Custom Domains** agrega `api.ingenieroandrespineda.dev` y crea en tu DNS el CNAME que Render indique (si el DNS es Cloudflare, con la nube gris, sin proxy). Variables:
 
 | Variable | Valor en la demo |
 |---|---|
@@ -53,7 +53,7 @@ Servicio Web Service con raíz `backend`, build `npm ci`, inicio `npm start`, he
 | `DATABASE_URL_MIGRACIONES` | Session pooler (5432) del mismo proyecto |
 | `JWT_SECRET` | uno nuevo y largo, distinto al de producción |
 | `CORS_ORIGENES` | `https://portal.ingenieroandrespineda.dev,https://oficina.ingenieroandrespineda.dev` (separados por coma, con `https://`, **sin barra final**) |
-| `TRUST_PROXY` | `2` (Vercel y Render son dos proxies; sin esto el límite por IP cuenta mal) |
+| `TRUST_PROXY` | `1` (el navegador llega directo a Render; con `2` alguien podría falsear su IP y saltarse los límites) |
 | `COOKIE_DOMINIO` | vacío |
 | `COOKIE_SAMESITE` | `lax` |
 | `URL_CLIENTES` / `URL_EQUIPO` | los dos dominios de arriba (solo se usan en correos) |
@@ -69,13 +69,13 @@ Si el origen de un frontend no está en `CORS_ORIGENES`, el servidor responde **
 ### 3. Frontend de la oficina (Vercel)
 
 1. Proyecto nuevo de Vercel con este repo y **Root Directory = `frontend`**.
-2. `frontend/vercel.json` reescribe `/api/*` hacia `https://js-logistics.onrender.com`. Para la demo, la reescritura tiene que apuntar al Render **de la demo**. Opciones, de más a menos limpia: una rama `demo` donde cambias ese destino; o editarlo en la rama que despliega el proyecto de la demo. No lo cambies en `main`, porque es la configuración de producción.
-3. Variables: no pongas `VITE_DEMO` (o ponla en `false`): debe hablar con el backend real. Deja `VITE_API_URL` vacía para usar `/api` en el mismo dominio.
+2. `frontend/vercel.json` es el mismo de producción: no se toca ni hace falta una rama aparte.
+3. Variables (Settings → Environment Variables, para Production): `VITE_API_URL=https://api.ingenieroandrespineda.dev` (sin `/api` y sin barra final) y `VITE_DEMO` sin poner (o `false`): debe hablar con el backend real. Después de cambiarla, vuelve a publicar.
 4. Agrega el dominio `oficina.ingenieroandrespineda.dev` al proyecto y crea el CNAME que Vercel indique en tu DNS.
 
 ### 4. Frontend del portal (Vercel)
 
-Ver `jslogistics-cliente-frontend/docs/demo-publica.md`. Resumen: proyecto aparte, su `vercel.json` apunta al Render de la demo, dominio `portal.ingenieroandrespineda.dev`, y el sitio **debe construirse en modo real** (en el portal, las vistas previas de Vercel se construyen en modo demo en memoria por el `buildCommand`).
+Ver `jslogistics-cliente-frontend/docs/demo-publica.md`. Resumen: proyecto aparte, con `VITE_API_URL=https://api.ingenieroandrespineda.dev`, dominio `portal.ingenieroandrespineda.dev`, y el sitio **debe construirse en modo real** (en el portal, las vistas previas de Vercel se construyen en modo demo en memoria por el `buildCommand`).
 
 ### 5. Reinicio nocturno
 

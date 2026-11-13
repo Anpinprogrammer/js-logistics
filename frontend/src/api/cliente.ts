@@ -3,8 +3,8 @@ import axios, { AxiosError } from "axios";
 import type { ErrorApi } from "./tipos";
 
 /**
- * Dirección de la API. Sin VITE_API_URL se usa /api en el mismo dominio (proxy en desarrollo, reescritura de vercel.json en producción).
- * Con VITE_API_URL (por ejemplo https://api.jslogistics.pro) se llama directo; se le agrega /api si no lo trae.
+ * Dirección de la API. En producción y en la demo es VITE_API_URL (por ejemplo https://api.jslogistics.pro), configurada
+ * en cada proyecto de Vercel; se le agrega /api si no lo trae. Sin ella se usa /api en el mismo dominio (el proxy de Vite en desarrollo).
  */
 function direccionApi(valor?: string): string {
   const v = (valor ?? "").trim().replace(/\/+$/, "");

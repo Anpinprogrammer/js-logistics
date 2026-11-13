@@ -49,7 +49,7 @@ backend/
 - El JWT solo lleva el id de la cuenta y una **versión de sesión**. En cada petición, `autenticar` carga la cuenta de la base: si administración cambia el rol, desactiva la cuenta o cambia la contraseña, las sesiones abiertas dejan de servir al instante.
 - **CSRF:** toda petición que no sea GET debe traer la cabecera `X-JSL: 1` y, si trae `Origin`, debe ser uno de `CORS_ORIGENES`.
 - El frontend debe llamar con `credentials: "include"`.
-- **Recomendado:** servir el frontend y la API en el mismo sitio, por ejemplo con el static site de Render reescribiendo `/api/*` hacia este servicio, o con `app.midominio.com` y `api.midominio.com`. Si quedan en dos dominios `onrender.com` distintos, hay que usar `COOKIE_SAMESITE=none`, y Safari en iOS suele bloquear esas cookies.
+- **Cómo se despliega:** cada frontend llama directo a la API con su `VITE_API_URL` (por ejemplo, `app.jslogistics.pro` y `jslogistics.pro` → `api.jslogistics.pro`). La API va en un subdominio del mismo dominio que los frontends: así son del mismo *sitio* y la cookie funciona con `SameSite=Lax`, también en Safari de iPhone. Los orígenes permitidos se manejan solo con `CORS_ORIGENES` (con `https://`, sin barra final). No uses `COOKIE_SAMESITE=none` con dominios `onrender.com`/`vercel.app`: Safari en iOS bloquea esas cookies.
 
 ## Correr en local
 

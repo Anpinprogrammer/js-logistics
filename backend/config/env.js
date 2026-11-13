@@ -20,7 +20,7 @@ const esquema = z.object({
   JWT_SECRET: z.string().min(32, "JWT_SECRET debe tener al menos 32 caracteres"),
   JWT_EXPIRA: z.string().default("12h"),
   CORS_ORIGENES: z.string().default("http://localhost:5173")
-    .transform(v => v.split(",").map(s => s.trim()).filter(Boolean)),
+    .transform(v => v.split(",").map(s => s.trim().replace(/\/+$/, "")).filter(Boolean)), // sin barra final: el navegador manda el Origin sin ella
   COOKIE_NOMBRE: z.string().default("jsl_sesion"),
   COOKIE_DOMINIO: z.string().optional().transform(v => v || undefined),
   // lax si el frontend y la API están en el mismo sitio (recomendado); none solo si están en dominios distintos

@@ -26,8 +26,8 @@ El portal de **clientes** es otro repositorio: [`jslogistics-cliente-frontend`](
 
 ```
  jslogistics.pro ───────────┐                       ┌──────────────────────────────┐
- (portal de clientes)        │  /api/* (reescritura   │ backend/ (Render)            │
-                             ├─ en el mismo sitio) ──▶│ Express 5, MVC, JWT en cookie│──▶ PostgreSQL (Supabase)
+ (portal de clientes)        │  VITE_API_URL =        │ backend/ (Render)            │
+                             ├─ api.jslogistics.pro ─▶│ Express 5, MVC, JWT en cookie│──▶ PostgreSQL (Supabase)
  admin|app.jslogistics.pro ──┘                       │ toda la autorización y los   │──▶ Supabase Storage (fotos)
  (frontend/: oficina y mensajeros)                   │ cálculos de dinero           │
                                                      └──────────────────────────────┘
@@ -35,7 +35,7 @@ El portal de **clientes** es otro repositorio: [`jslogistics-cliente-frontend`](
 
 - **El servidor decide.** Permisos por rol, validación, consecutivos y cálculos de dinero van en el backend. El frontend solo muestra y pide; nunca le mandes al servidor un valor que él puede calcular (por ejemplo, `difCobro`).
 - **Sesión:** JWT en una cookie `HttpOnly` que pone el backend. Ningún frontend guarda tokens en `localStorage` ni en JavaScript.
-- **Mismo sitio:** cada frontend llama a `/api` en su propio dominio, y una regla de reescritura lo manda al backend. Así la cookie funciona con `SameSite=Lax`, también en Safari de iPhone.
+- **Mismo sitio:** cada frontend llama directo a la API con `VITE_API_URL` (`https://api.jslogistics.pro`), un subdominio del mismo dominio. Así la cookie funciona con `SameSite=Lax`, también en Safari de iPhone. Los orígenes permitidos se manejan con `CORS_ORIGENES` en el backend; `vercel.json` ya no reenvía `/api` (decisión 2026-11-13 en `docs/ESTADO.md`).
 - **CSRF:** toda petición que no sea GET lleva la cabecera `X-JSL: 1`.
 - **Avisos al usuario:** la app interna (`frontend/`) usa SweetAlert2 desde `frontend/src/lib/alertasAdmin.ts`; el portal de clientes y la landing usan react-toastify (`jslogistics-cliente-frontend/src/utils/clientToast.ts`). Ninguno de los dos usa `alert` ni `confirm` del navegador.
 - **Contrato de la API:** está en [`backend/README.md`](backend/README.md). Si un frontend necesita algo nuevo, primero se agrega en el backend (con prueba) y se documenta ahí; después se usa.

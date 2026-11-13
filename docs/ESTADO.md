@@ -1,5 +1,13 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## La API se configura con VITE_API_URL, no con vercel.json — 2026-11-13
+
+- **Decisión:** los frontends (`frontend/` y el portal) llaman directo a la API con `VITE_API_URL` de cada proyecto de Vercel (producción `https://api.jslogistics.pro`; demo `https://api.ingenieroandrespineda.dev`). `frontend/vercel.json` ya no reenvía `/api`: solo tiene la regla de SPA (que sigue excluyendo `api/` para que un `VITE_API_URL` faltante dé 404 y no HTML). Así un mismo código sirve para producción y demo sin ramas con otro `vercel.json`.
+- **Regla:** la API debe ir en un subdominio del mismo dominio que los frontends (mismo *sitio*), para que la cookie siga con `SameSite=Lax` y funcione en Safari de iPhone. Nunca `VITE_API_URL` con `onrender.com` ni `COOKIE_SAMESITE=none`.
+- Backend: `CORS_ORIGENES` ahora ignora la barra final de cada origen. `TRUST_PROXY=1` (ya no hay reescritura de Vercel en medio; `2` solo si Cloudflare hace de proxy).
+- Consecuencia aceptada: el portal y la oficina comparten la cookie de `api.<dominio>`, así que en **un mismo navegador** entrar en uno cierra la sesión del otro. Si molesta, la salida es un nombre de cookie por origen en el backend.
+- En Vercel, el build avisa `⚠️ Falta VITE_API_URL` si el proyecto no la tiene (y no es demo en memoria).
+
 ## Clientes: imprimir tiquetes y descargar Excel, como el prototipo — 2026-11-13
 
 - Volvieron las cuatro opciones de Clientes que tenía el prototipo (`app/js/app.js`, línea 594): **Descargar cartera en Excel**, **Imprimir por cobrar / por pagar**, **Imprimir recibos** y **Excel del cuadre de hoy** (o del día elegido). Los dos Excel son solo de administración, como antes. En el escritorio van en la barra de acciones; en el celular, en el botón "Imprimir y Excel", que abre una ventana con las cuatro.
@@ -342,6 +350,7 @@ Es una receta, no un script del repo. Si lo conviertes en prueba automática, gu
 
 ## Registro de sesiones (lo más reciente arriba)
 
+- **2026-11-13:** la API pasa a configurarse con `VITE_API_URL` en cada proyecto de Vercel; se quitó la reescritura de `/api` de `frontend/vercel.json` (ver la sección de arriba). El portal hizo lo mismo en su repo.
 - **2026-11-12:** cierre del flujo de solicitudes del portal. La oficina ve un aviso de 10 s cuando el cliente acepta una propuesta (`confirmadaPorCliente`) y cuando la solicitud queda confirmada por la oficina, con la tarjeta de asignación para escoger mensajero sin salir del modal. El cliente recibe un aviso final de 10 s cuando queda `asignada` (nombre del mensajero y guía) o `rechazada`. Las solicitudes de la landing siguen por WhatsApp aunque se vinculen a una ficha. `GET /solicitudes/mias` agrega `mensajeroNombre` y `confirmadaPorCliente`; SSE filtra los avisos por `solicitudClienteId` y ambos portales refrescan al instante, con el sondeo de 30 s como respaldo. Probado en demo a 1440/390 y con el filtro de eventos; requiere `npm run db:migrar` por la columna nueva.
 
 - **2026-11-12:** rendimiento de la app interna y del backend (ver la sección "Rendimiento" arriba): pestaña y sub-pestaña que vuelven con F5, carga de datos por pestaña con caché de 30 s, ventanas compartidas y SweetAlert2 bajo demanda (el Panel ya no baja Pedidos, Clientes ni Entrega), compresión, listas de pedidos más livianas y saldos de clientes en una sola pasada. Probado con Playwright contra la API local (`db:demo`) y en modo demo.
