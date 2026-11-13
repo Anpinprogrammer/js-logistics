@@ -1,7 +1,7 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
 import type { GrupoSolicitud, PaginaSolicitudes, FiltrosSolicitudes, PaginaSolicitudesFiltradas, Archivo, TipoArchivo, Cliente, ClienteBreve, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
-  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal, Solicitud, ListaSolicitudes, CajaPatinador, RegistroCajaPatinador, ResumenCajaPatinador, ResumenPatinador } from "./tipos";
+  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal, Solicitud, ListaSolicitudes, CajaPatinador, RegistroCajaPatinador, ResumenCajaPatinador, ResumenPatinador, PaginaSolicitudesRecogida } from "./tipos";
 import { FalloApi } from "./cliente";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
@@ -139,6 +139,9 @@ export const patinador = {
   /** Su caja: el total y los registros de la página. La oficina dice de cuál patinador (`mensajeroId`). */
   caja: (pagina: number, porPagina: number, mensajeroId?: string) =>
     datos<CajaPatinador>(api.get("/patinador/caja", { params: { pagina, porPagina, ...(mensajeroId ? { mensajeroId } : {}) } })),
+  /** Solicitudes de recogida asignadas y sin recoger, por páginas. La oficina dice de cuál patinador (`mensajeroId`). */
+  solicitudes: (page: number, limit: number, mensajeroId?: string) =>
+    datos<PaginaSolicitudesRecogida>(api.get("/patinador/solicitudes", { params: { page, limit, ...(mensajeroId ? { mensajeroId } : {}) } })),
   /** Oficina: cuánto recibió cada patinador, cuánto ya entregó y cuánto debe. */
   resumen: () => datos<{ patinadores: ResumenPatinador[] }>(api.get("/patinador/resumen")).then(d => d.patinadores),
   /** Anota un pago. La hora la pone el servidor; el patinador anota en su caja y administración manda en cuál (`mensajeroId`). */

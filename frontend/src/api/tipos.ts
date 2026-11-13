@@ -313,5 +313,10 @@ export interface RegistroCajaPatinador { id: string; mensajeroId: string; client
 export interface ResumenCajaPatinador { total: number; registros: number; totalHoy: number; registrosHoy: number; entregado?: number; entregadoHoy?: number; enCaja?: number }
 export interface CajaPatinador { resumen: ResumenCajaPatinador; registros: RegistroCajaPatinador[]; pagina: number; porPagina: number; total: number; paginas: number }
 
+/** Una solicitud de recogida que la oficina le asignó al patinador y todavía no recoge (GET /patinador/solicitudes). */
+export interface SolicitudRecogida { guia: string; fecha: string; remitente: string; direccionRecogida: string; paquetes: number; destinatarioNombre: string; direccionEntrega: string }
+/** Respuesta paginada de GET /patinador/solicitudes (`page` desde 1; `limit` 5 en celular y 10 en computador). */
+export interface PaginaSolicitudesRecogida { data: SolicitudRecogida[]; total: number; page: number; totalPages: number }
+
 /** Un patinador en Caja → Mensajeros (GET /patinador/resumen): lo anotado de los clientes, lo ya entregado a la oficina y lo que debe (puede ser negativo). */
 export interface ResumenPatinador { mensajeroId: string; nombre: string; activo: boolean; recibido: number; recibidoHoy: number; registros: number; entregado: number; entregadoHoy: number; debe: number }

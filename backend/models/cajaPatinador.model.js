@@ -86,3 +86,24 @@ export async function resumenDe(mensajeroId, db = { query }) {
   const { rows } = await db.query(`${FILAS_RESUMEN} AND m.id = $1`, [mensajeroId]);
   return rows[0] ? conDebe(rows[0]) : null;
 }
+
+/* ---- solicitudes de recogida del patinador: las guías de solicitudes que la oficina le asignó y todavía no recoge ---- */
+const RECOGIDAS = `
+  FROM pedidos p JOIN solicitudes s ON s.guia = p.guia
+  LEFT JOIN clientes c ON c.id = p.cliente_id
+  WHERE p.mensajero_id = $1 AND p.estado = 'aceptado'`;
+
+/** Las que tiene por recoger, de la más antigua a la más nueva (la que lleva más tiempo esperando va primero), por páginas. */
+export async function recogidasPendientes({ mensajeroId, pagina = 1, porPagina = 10 }) {
+  const r = await paginaEnParalelo({
+    pagina, porPagina,
+    contar: async () => (await query(`SELECT count(*)::int AS total ${RECOGIDAS}`, [mensajeroId])).rows[0].total,
+    traer: async offset => (await query(
+      `SELECT p.guia, p.creado AS fecha, coalesce(c.nombre, s.nombre) AS remitente, s.direccion_recogida, s.paquetes,
+              s.destinatario_nombre, s.direccion_entrega
+       ${RECOGIDAS} ORDER BY p.creado, p.guia LIMIT $2 OFFSET $3`,
+      [mensajeroId, porPagina, offset]
+    )).rows
+  });
+  return { registros: r.filas.map(filaAObjeto), pagina: r.pagina, total: r.total, paginas: r.paginas };
+}

@@ -42,7 +42,7 @@ export const E = {
   subRecM: "pedido" as "pedido" | "dinero",
   miMensajero: leer("js_mensajero"), actuarComo: false, diaPedM: "", diaEntM: hoy(), semM: semanaDe(hoy()), ultimaGuia: "",
   // Modo Patinador de administración: pestaña (Caja o Historial) y el patinador elegido, guardado en js_patinador
-  tabP: "caja" as "caja" | "historial", miPatinador: leer("js_patinador"),
+  tabP: "inicio" as "inicio" | "caja" | "solicitudes", miPatinador: leer("js_patinador"),
   // Más → Resultados
   rangoPanel: "mes",
   // Más → Historial

@@ -403,3 +403,11 @@ Es una receta, no un script del repo. Si lo conviertes en prueba automática, gu
 ## Las entregas a administración salen en el historial del patinador — 2026-11-12
 
 - `GET /patinador/caja` mezcla en `registros` los pagos del patinador (`tipo: "pago"`) con sus entregas a la oficina (`tipo: "entrega"`, tomadas de `recaudos` con una `UNION ALL`, sin tabla nueva), ordenadas por fecha. En la app salen con "Descontado de la caja" y el valor en rojo con signo menos; el título pasó a "Últimos movimientos". Quitar o corregir la entrega en la oficina la quita o corrige también ahí. `resumen.registros` sigue contando solo pagos. Sin cambios de esquema: no hace falta `db:migrar`.
+
+## Patinador: Inicio, Mi caja con historial y Solicitudes — 2026-11-13
+
+- La app del patinador tiene tres pestañas, en el menú lateral y en la barra de abajo del celular: **Inicio** (la de entrada), **Mi caja** y **Solicitudes** (con el número de pendientes). **Historial ya no es pestaña**: el historial de movimientos (pagos y entregas a administración) está en Mi caja, debajo de las cifras y de "Anotar un pago". Una pestaña `historial` guardada de antes cae en Inicio.
+- Inicio tiene dos tarjetas: la caja (saldo `enCaja`, botón "Ir a Mi caja" y los últimos 4 movimientos) y las solicitudes de recogida pendientes, paginadas en el servidor.
+- Nuevo `GET /patinador/solicitudes?page=&limit=` → `{ data, total, page, totalPages }` (ver `backend/README.md`). **Usa `page`/`limit` y `totalPages` en inglés porque así lo pidió el dueño; el resto de la API usa `pagina`/`porPagina`/`paginas`.** La pantalla pide 5 por página en el celular y 10 en el computador (`usePorPaginaRecogidas`). Las "solicitudes" son las guías `aceptado` asignadas a la ficha del patinador; todavía no hay solicitudes "disponibles" sin asignar, ni "recoger" con foto para el patinador (el botón de cada una es "Cómo llegar", que abre el mapa).
+- Para que le lleguen, la oficina ya puede asignar una solicitud a un patinador (la lista de Solicitudes → Asignar incluye a los patinadores).
+- Celular: el header es el del mensajero: logo, campana (lleva a Solicitudes, con el número) y la burbuja con las iniciales, que abre un menú con nombre y rol, modo claro/oscuro y cerrar sesión. El modo Patinador de administración usa las mismas tres pestañas. Sin cambios de esquema: no hace falta `db:migrar`.

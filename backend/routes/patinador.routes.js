@@ -8,6 +8,7 @@ import { permitir, OFICINA } from "../middleware/autorizar.js";
 // modo Mensajero) y la oficina puede consultarlas.
 const r = Router();
 r.get("/caja", permitir("patinador", OFICINA), validar({ query: V.caja }), C.caja);
+r.get("/solicitudes", permitir("patinador", OFICINA), validar({ query: V.solicitudes }), C.solicitudes);
 r.get("/resumen", permitir(OFICINA), C.resumen); // bloque Patinadores de Caja → Mensajeros
 r.post("/caja", permitir("patinador", "admin"), validar({ body: V.registro }), C.registrar);
 export default r;

@@ -36,7 +36,7 @@ const SECCIONES: [string, string[]][] = [
   ["Gestión financiera", ["caja", "cuentas", "sueldo", "sueldos"]],
   ["Administración", ["mas", ...ADMIN_ESCRITORIO.map(([k]) => k)]],
 ];
-/** Modo Patinador de administración: las dos pestañas del patinador, en su propio grupo. */
+/** Modo Patinador de administración: las tres pestañas del patinador (Inicio, Mi caja y Solicitudes), en su propio grupo. */
 const SECCIONES_PATINADOR: [string, string[]][] = [["Patinador", ["caja", "historial"]]];
 const NOMBRE_MODO = { admin: "Administración", mensajero: "Mensajero", patinador: "Patinador" } as const;
 
@@ -82,8 +82,8 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     items = [["inicio", "Inicio"], ["recepcion", "Recepción"], ["pend", "Pedidos", pendientesMios().length + porRecogerMios().length + devolucionesPorDefinirMios().length], ["caja", "Mi caja"], ["sueldo", "Mi sueldo"], ["entregados", "Entregados"]];
     actual = E.tabM; elegir = k => { E.tabM = k; };
   } else if (enPatinador) {
-    items = [["caja", "Caja"], ["historial", "Historial"]];
-    actual = E.tabP; elegir = k => { E.tabP = k === "historial" ? "historial" : "caja"; };
+    items = [["inicio", "Inicio"], ["caja", "Mi caja"], ["solicitudes", "Solicitudes"]];
+    actual = E.tabP; elegir = k => { E.tabP = k === "caja" || k === "solicitudes" ? k : "inicio"; };
   } else {
     const sin = Object.values(S.pedidos).filter((p: Pedido) => !p.clienteId).length;
     const nSol = solicitudesAbiertas.data ? solicitudesAbiertas.data.conteo.pendiente + solicitudesAbiertas.data.conteo.cotizada + solicitudesAbiertas.data.conteo.confirmada : 0;

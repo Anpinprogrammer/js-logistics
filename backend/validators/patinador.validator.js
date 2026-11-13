@@ -17,3 +17,10 @@ export const caja = z.object({
   pagina: z.coerce.number().int().min(1).default(1),
   porPagina: z.coerce.number().int().min(1).max(100).default(8)
 });
+
+/** Solicitudes de recogida: `page` y `limit` (la pantalla pide 5 en el celular y 10 en el computador). */
+export const solicitudes = z.object({
+  mensajeroId: id.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10)
+});

@@ -1,5 +1,5 @@
 /* Modo demo: la caja del patinador vive en memoria (la usan su app y el bloque Patinadores de Caja). */
-import type { RegistroCajaPatinador, ResumenCajaPatinador, ResumenPatinador } from "../../api/tipos";
+import type { PaginaSolicitudesRecogida, RegistroCajaPatinador, ResumenCajaPatinador, ResumenPatinador, SolicitudRecogida } from "../../api/tipos";
 import { diaDe, hoy, S } from "../motor";
 
 const ahoraMenos = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
@@ -27,4 +27,15 @@ export function resumenPatinadoresDemo(): ResumenPatinador[] {
       recibidoHoy: rs.filter(r => diaDe(Date.parse(r.fecha)) === h).reduce((a, r) => a + r.valor, 0),
       entregadoHoy: es.filter(r => diaDe(r.fecha) === h).reduce((a, r) => a + (Number(r.valor) || 0), 0) };
   });
+}
+
+/** Solicitudes de recogida de la demo (las de la ficha del patinador de prueba). */
+const BARRIOS = ["Granada", "San Fernando", "Ciudad Jardín", "Versalles", "El Peñón", "Tequendama", "Pance", "La Flora"];
+const solicitudesDemo: SolicitudRecogida[] = BARRIOS.map((b, i) => ({
+  guia: "JS-0" + (9100 + i), fecha: ahoraMenos(30 + i * 45), remitente: ["Tienda Aurora", "Moda Sol", "Panadería La Espiga", "Ferretería Central"][i % 4],
+  direccionRecogida: `Cra ${10 + i} # ${5 + i}-2${i}, ${b}, Cali`, paquetes: 1 + (i % 3), destinatarioNombre: ["Pedro Ruiz", "Laura Gómez", "Marta Díaz"][i % 3], direccionEntrega: `Calle ${70 - i} # 1-1${i}, Cali`
+}));
+export function solicitudesRecogidaDemo(page: number, limit: number): PaginaSolicitudesRecogida {
+  const totalPages = Math.max(1, Math.ceil(solicitudesDemo.length / limit)), p = Math.min(Math.max(1, page), totalPages);
+  return { data: solicitudesDemo.slice((p - 1) * limit, p * limit), total: solicitudesDemo.length, page: p, totalPages };
 }

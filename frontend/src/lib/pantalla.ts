@@ -64,3 +64,10 @@ export function usePorPaginaPersonal() {
   const esComputador = useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false);
   return esComputador ? POR_PAGINA_PERSONAL.computador : POR_PAGINA_PERSONAL.celular;
 }
+
+/** Solicitudes de recogida del patinador: 5 por página en el celular y 10 en el computador. */
+export const POR_PAGINA_RECOGIDAS = { celular: 5, computador: 10 } as const;
+export function usePorPaginaRecogidas() {
+  const esComputador = useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false);
+  return esComputador ? POR_PAGINA_RECOGIDAS.computador : POR_PAGINA_RECOGIDAS.celular;
+}

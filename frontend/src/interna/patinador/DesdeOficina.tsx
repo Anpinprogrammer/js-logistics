@@ -18,5 +18,5 @@ export default function PatinadorDesdeOficina({ pintar }: { pintar: () => void }
       <select id="selPat" value="" onChange={e => elegir(e.target.value)}><option value="">Elige el patinador…</option>{pats.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select></div>
   </>;
   const ajeno = { id: elegido.id, nombre: elegido.nombre, cambiar: <> · <a href="#" onClick={cambiar}>cambiar</a></> };
-  return <VistaPatinador tab={E.tabP === "historial" ? "historial" : "inicio"} ajeno={ajeno} irHistorial={() => { E.tabP = "historial"; pintar(); scrollTo(0, 0); }} />;
+  return <VistaPatinador tab={E.tabP} ajeno={ajeno} ir={t => { E.tabP = t; pintar(); scrollTo(0, 0); }} />;
 }
