@@ -69,7 +69,7 @@ Si el origen de un frontend no está en `CORS_ORIGENES`, el servidor responde **
 ### 3. Frontend de la oficina (Vercel)
 
 1. Proyecto nuevo de Vercel con este repo y **Root Directory = `frontend`**.
-2. `frontend/vercel.json` reescribe `/api/*` hacia `https://js-logistics.onrender.com`. Para la demo, la reescritura tiene que apuntar al Render **de la demo**. Opciones, de más a menos limpia: una rama `demo` donde cambias ese destino; o editarlo en la rama que despliega el proyecto de la demo. No lo cambies en `main`, porque es la configuración de producción.
+2. `frontend/vercel.json` reescribe `/api/*` hacia `https://api.jslogistics.pro` (el dominio propio del servicio de Render). Para la demo, la reescritura tiene que apuntar al Render **de la demo**. Opciones, de más a menos limpia: una rama `demo` donde cambias ese destino; o editarlo en la rama que despliega el proyecto de la demo. No lo cambies en `main`, porque es la configuración de producción.
 3. Variables: no pongas `VITE_DEMO` (o ponla en `false`): debe hablar con el backend real. Deja `VITE_API_URL` vacía para usar `/api` en el mismo dominio.
 4. Agrega el dominio `oficina.ingenieroandrespineda.dev` al proyecto y crea el CNAME que Vercel indique en tu DNS.
 

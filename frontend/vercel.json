@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/api/:ruta*", "destination": "https://js-logistics.onrender.com/api/:ruta*" },
+    { "source": "/api/:ruta*", "destination": "https://api.jslogistics.pro/api/:ruta*" },
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ],
   "headers": [
