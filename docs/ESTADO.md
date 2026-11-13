@@ -1,5 +1,10 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Personal → Acceso en el celular: fila compacta y hoja de rol — 2026-11-13
+
+- Por debajo de 768 px la tabla de Accesos (`.acc-tabla`) se oculta y se muestra `.acc-lista`: nombre con Pendiente/Tú y el rol en pequeño, el correo debajo (truncado) y a la derecha los 3 íconos (correo de restablecimiento, cambiar contraseña y quitar acceso; este último no sale en tu propia fila). Usan los mismos `enviarReset`, `NuevaClave` y `quitar` de la tabla.
+- Al tocar el nombre o el correo se abre `FichaAcceso` (`oficina/Mas.tsx`) en la ventana de `ui.tsx` (hoja de abajo en el celular) con los selects de Rol y Nombre en Personal, que llaman a los mismos `cambiarRol` y `vincular` (con su confirmación). Tu propia cuenta y las de cliente muestran el rol fijo. La paginación de abajo no cambia.
+
 ## Sueldos: semana en una línea, cifras ordenadas y buscador — 2026-11-13
 
 - En el celular (< 768 px) los botones de semana van en un grid de 3 con textos cortos (Anterior, Actual, Siguiente; `.sd-corto`/`.sd-largo`). Las cifras (`.sd-cifras`) quedan: Adelantos y Ya pagado arriba, Total sueldos y Neto por pagar a lo ancho. Desde 768 px son 4 columnas en el orden de siempre, con el monto sin partir (`clamp`).
