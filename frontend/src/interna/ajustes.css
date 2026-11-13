@@ -1371,3 +1371,35 @@
 .jsl .pat-registrar{width:100%;min-height:48px;margin:0 0 16px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:800}
 .jsl .pat-registrar svg{width:20px;height:20px}
 .jsl .form-pago:not(.tarjeta){padding:0;box-shadow:none;background:none}
+
+/* Personal → Accesos en escritorio: tabla compacta con anchos fijos, para que quepa con el menú lateral abierto
+   en un portátil (1280 px). Los textos largos se cortan con "…" y se leen completos en el title. */
+@media (min-width:960px){
+  .jsl .tabla-accesos{table-layout:fixed;width:100%}
+  .jsl .tabla-accesos th.acc-nombre{width:24%}
+  .jsl .tabla-accesos th.acc-correo{width:30%}
+  .jsl .tabla-accesos th.acc-rol{width:20%}
+  .jsl .tabla-accesos th.acc-personal{width:26%}
+  /* Acciones en px: el botón de tres puntos (menú abierto) o los tres íconos (menú colapsado). El resto se reparte. */
+  .jsl .tabla-accesos th.acciones{width:96px}
+  .jsl .tabla-accesos.con-iconos th.acciones{width:136px}
+  .jsl .tabla-accesos td.acciones{text-align:center}
+  .jsl .tabla-accesos th,.jsl .tabla-accesos td{padding-left:12px;padding-right:12px;overflow:hidden;text-overflow:ellipsis}
+  .jsl .tabla-accesos th{padding-top:12px;padding-bottom:12px;font-size:11px;letter-spacing:.08em}
+  .jsl .tabla-accesos td{padding-top:12px;padding-bottom:12px;font-size:12px}
+  .jsl .tabla-accesos th:first-child,.jsl .tabla-accesos td:first-child{padding-left:16px}
+  .jsl .tabla-accesos th:last-child,.jsl .tabla-accesos td:last-child{padding-right:12px;overflow:visible}
+  .jsl .tabla-accesos .acc-nombre-fila{display:flex;align-items:center;gap:6px;min-width:0}
+  .jsl .tabla-accesos .acc-nombre-fila b{min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+  .jsl .tabla-accesos .acc-nombre-fila .etq{flex:none}
+  .jsl .tabla-accesos td.acc-correo span{display:block;overflow:hidden;text-overflow:ellipsis;color:var(--suave)}
+  .jsl .tabla-accesos td.acc-rol,.jsl .tabla-accesos td.acc-personal{font-weight:600}
+  .jsl .tabla-accesos td select{appearance:none;-webkit-appearance:none;width:100%;max-width:100%;min-width:0;padding:6px 28px 6px 10px;border:1px solid var(--linea);border-radius:10px;background-color:var(--papel);color:var(--tinta);font-size:12px;font-weight:600;text-overflow:ellipsis;cursor:pointer;background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2394A3B8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:9px 9px}
+  .jsl .tabla-accesos td select:hover{border-color:var(--suave)}
+  .jsl .tabla-accesos td select:focus{outline:none;border-color:var(--marca2);box-shadow:0 0 0 3px var(--mango-claro)}
+}
+@media (min-width:1280px){
+  .jsl .tabla-accesos th,.jsl .tabla-accesos td{padding-left:16px;padding-right:16px}
+  .jsl .tabla-accesos th:first-child,.jsl .tabla-accesos td:first-child{padding-left:20px}
+  .jsl .tabla-accesos th:last-child,.jsl .tabla-accesos td:last-child{padding-right:12px}
+}

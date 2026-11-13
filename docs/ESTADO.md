@@ -5,6 +5,7 @@
 - En escritorio (≥ 960 px) y con el menú lateral **expandido**, la columna Acciones de la tabla de Accesos muestra un botón de tres puntos (`MenuAcciones` en `interna/oficina/Mas.tsx`) en vez de los tres íconos, porque con el menú abierto el último ícono se salía de la tabla. Con el menú **colapsado** y en el celular se ven los tres íconos de siempre.
 - El estado del menú lateral llega por contexto: `useMenuColapsado()` de `interna/ui.tsx`, que pone `AppInterna` en `Marco.tsx`. Úsalo si otra tabla necesita lo mismo.
 - El menú cierra al elegir, con clic afuera o con Escape (y devuelve el foco al botón); se mueve con flechas. En las dos últimas filas (si hay más de dos) abre hacia arriba. "Quitar acceso" no aparece en la fila propia ("Tú"). La tabla ya tenía `overflow: visible` en escritorio (`.tabla-env.con-acciones`), así que el menú no se recorta. Estilos en `.acciones-menu*` al final de `ajustes.css`.
+- **Tabla compacta (≥ 960 px):** `.tabla-accesos` usa `table-layout: fixed` con anchos por columna (`acc-nombre` 24 %, `acc-correo` 30 %, `acc-rol` 20 %, `acc-personal` 26 % y Acciones fija en px: 96 con el botón de tres puntos, 136 con los íconos, clase `con-iconos`). Nombre y correo se cortan con "…" y se leen completos en el `title`; letra de 12 px, encabezados de 11 px y selects compactos con flecha propia. Reglas en la última media query de `ajustes.css`; el celular no cambia. Probado de 960 a 1920 px con un correo de 60 caracteres: la tabla nunca pasa del ancho de su tarjeta.
 
 ## Modo Patinador de administración — 2026-11-12
 
