@@ -3,7 +3,9 @@
    Se puede correr las veces que haga falta para SINCRONIZAR mientras la app vieja sigue en producción:
    cada registro se inserta o se actualiza por su ID de Firestore, y las fotos ya subidas no se repiten.
    Con --reemplazar, además, borra primero lo que haya en la base (menos las contraseñas de las cuentas),
-   para que lo borrado en Firebase también desaparezca aquí.
+   para que lo borrado en Firebase también desaparezca aquí. Lo que solo existe en el sistema nuevo: la caja del
+   patinador se vacía con el resto de la operación; las solicitudes de envío se conservan, y el vínculo de cada cuenta
+   con Personal y el rol patinador que haya puesto administración no se pierden (con o sin --reemplazar).
 
    El personal que se "quitó" en la app vieja ya no está en Firestore, pero sus entregas de plata, liquidaciones
    y jornadas sí, y la caja de la app las sigue sumando. Para que los totales den igual, esas personas se crean
@@ -127,14 +129,26 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
 
     // Con --reemplazar se guarda lo que no viene de Firebase y no se debe perder: las contraseñas que los clientes
     // ya crearon en el sistema nuevo y las fotos ya subidas a Storage (así no se vuelven a subir).
-    let clavesClientes = [], fotosSubidas = new Set();
+    // Las solicitudes de envío (landing y portal) no existen en Firebase: se conservan, y sus enlaces con el cliente,
+    // el mensajero y la guía se guardan para volver a ponerlos si esos registros vuelven con la importación.
+    let clavesClientes = [], fotosSubidas = new Set(), enlacesSolicitudes = [];
+    // Lo que administración configuró en el sistema nuevo y Firebase no tiene: el vínculo de cada cuenta con su ficha
+    // de Personal (cuentas nuevas, o de Firebase sin vínculo) y el rol patinador (en la app vieja entraban como mensajeros).
+    const configNueva = (await q(`SELECT id, rol, mensajero_id FROM usuarios
+      WHERE rol <> 'cliente' AND (mensajero_id IS NOT NULL OR rol = 'patinador')`)).rows;
     if (reemplazar) {
       clavesClientes = (await q(`SELECT id, clave_hash, version_sesion, ultimo_ingreso FROM usuarios
         WHERE rol = 'cliente' AND clave_hash IS NOT NULL`)).rows;
       fotosSubidas = new Set((await q(`SELECT ruta FROM pedido_archivos WHERE ruta LIKE '%-fs-%'`)).rows.map(r => r.ruta));
+      enlacesSolicitudes = (await q(`SELECT id, cliente_id, mensajero_id, guia FROM solicitudes
+        WHERE cliente_id IS NOT NULL OR mensajero_id IS NOT NULL OR guia IS NOT NULL`)).rows;
+      // La caja del patinador solo existe en el sistema nuevo, como su operación: se vacía con lo demás (sus abonos
+      // están en movimientos). Si no, su llave hacia clientes y Personal impide vaciarlos.
+      for (const { id } of (await q(`SELECT id FROM caja_patinador ORDER BY id`)).rows)
+        inf.avisar("sistemaNuevo", "pagos de patinador borrados (con su abono)", id);
       // DELETE en orden (no TRUNCATE ... CASCADE, que se llevaría también las cuentas y sus contraseñas).
       await q(`UPDATE usuarios SET cliente_id = NULL, mensajero_id = NULL WHERE rol <> 'cliente'`);
-      for (const t of ["pedido_archivos", "pedido_intentos", "historial", "papelera", "jornadas", "cajamovs", "liquidaciones",
+      for (const t of ["caja_patinador", "pedido_archivos", "pedido_intentos", "historial", "papelera", "jornadas", "cajamovs", "liquidaciones",
         "recaudos", "movimientos", "pedidos", "cuentas"]) await q(`DELETE FROM ${t}`);
       await q(`DELETE FROM usuarios WHERE rol = 'cliente'`); // dependen de un cliente; se vuelven a crear abajo
       await q(`DELETE FROM clientes`);
@@ -206,6 +220,17 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
     }
     await upsert(q, "usuarios", ["id", "email", "nombre", "rol", "cliente_id", "mensajero_id", "activo", "creado"], filasU,
       { conservar: ["creado"], extra: ["actualizado = now()"] }); // nunca toca clave_hash ni version_sesion
+    if (configNueva.length) { // solo donde Firebase no trajo vínculo, y nunca hacia una persona quitada
+      await q(`UPDATE usuarios u SET mensajero_id = c.mensajero_id
+        FROM jsonb_to_recordset($1::jsonb) AS c(id text, mensajero_id text)
+        WHERE u.id = c.id AND u.mensajero_id IS NULL AND c.mensajero_id <> ALL($2::text[])
+          AND EXISTS (SELECT 1 FROM mensajeros m WHERE m.id = c.mensajero_id)`, [JSON.stringify(configNueva), [...referidos]]);
+      // El rol patinador se conserva si la cuenta sigue vinculada a una ficha de tipo patinador (así lo exige la app).
+      await q(`UPDATE usuarios u SET rol = 'patinador'
+        FROM jsonb_to_recordset($1::jsonb) AS c(id text, rol text)
+        WHERE u.id = c.id AND c.rol = 'patinador' AND u.rol = 'mensajero'
+          AND EXISTS (SELECT 1 FROM mensajeros m WHERE m.id = u.mensajero_id AND m.tipo = 'patinador')`, [JSON.stringify(configNueva)]);
+    }
     if (clavesClientes.length) { // contraseñas que los clientes ya crearon en el sistema nuevo
       await q(`UPDATE usuarios u SET clave_hash = c.clave_hash, version_sesion = c.version_sesion, ultimo_ingreso = c.ultimo_ingreso
         FROM jsonb_to_recordset($1::jsonb) AS c(id text, clave_hash text, version_sesion int, ultimo_ingreso timestamptz)
@@ -382,6 +407,19 @@ export async function importar({ carpeta, simular = false, conFotos = true, reem
       await q(`DELETE FROM papelera WHERE grupo LIKE 'firestore:%'`);
       await insertar(q, "papelera", ["tabla", "registro", "datos", "grupo", "fecha", "uid"], filasPa);
       listo("papelera", filasPa.length);
+    }
+
+    // Solicitudes: vuelven a apuntar a su cliente, mensajero y guía si siguen existiendo después de la importación.
+    if (enlacesSolicitudes.length) {
+      const { rows } = await q(`UPDATE solicitudes s SET
+          cliente_id = (SELECT c.id FROM clientes c WHERE c.id = e.cliente_id),
+          mensajero_id = (SELECT m.id FROM mensajeros m WHERE m.id = e.mensajero_id),
+          guia = (SELECT p.guia FROM pedidos p WHERE p.guia = e.guia)
+        FROM jsonb_to_recordset($1::jsonb) AS e(id text, cliente_id text, mensajero_id text, guia text)
+        WHERE s.id = e.id
+        RETURNING s.id, s.guia IS NULL AND e.guia IS NOT NULL AS sin_guia`, [JSON.stringify(enlacesSolicitudes)]);
+      for (const r of rows.filter(r => r.sin_guia).sort((a, b) => a.id.localeCompare(b.id)))
+        inf.avisar("sistemaNuevo", "solicitud que perdió su guía (la guía no está en Firebase)", r.id);
     }
 
     await q(simular ? "ROLLBACK" : "COMMIT");

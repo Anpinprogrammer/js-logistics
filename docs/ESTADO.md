@@ -6,6 +6,14 @@
 - La cabecera queda fija con el nombre, el teléfono, el saldo con su estado y los botones "Registrar pago o ajuste", "Editar cliente" y ×. Los movimientos llenan el resto con el encabezado de la tabla `sticky`. El aviso de WhatsApp va arriba de los movimientos cuando hay saldo.
 - El formulario ahora es `FormMovimiento`, el mismo de la ficha del celular. En el computador se abre en `ModalMovimiento` (`modal-fondo` dentro del `<dialog>`). Escape o tocar afuera cierran solo esa ventana, y al registrar se cierra y la cuenta se repinta sola. La ficha del celular (`enFicha`) sigue con el formulario arriba.
 
+## Migración de Firebase al día con el patinador y las solicitudes — 2026-11-13
+
+- `db:importar --reemplazar` fallaba ("violates foreign key constraint caja_patinador_cliente_id_fkey") en cuanto hubiera un pago de patinador en la base: `caja_patinador` apunta a clientes y Personal con `RESTRICT`. Ahora la vacía primero (es operación del sistema nuevo, como las guías y la caja) y la lista en el informe (`sistemaNuevo`).
+- Las `solicitudes` (landing y portal) no vienen de Firebase: `--reemplazar` las conserva y les vuelve a poner cliente, mensajero y guía si siguen existiendo; las que pierden su guía salen en el informe.
+- Cada importación (con o sin `--reemplazar`) pisaba `usuarios.rol` y `mensajero_id` con lo de Firebase: el rol **patinador** (en la app vieja entraban como mensajeros) volvía a `mensajero` y se perdía el vínculo con Personal de cuentas creadas o vinculadas en el sistema nuevo. Ahora se conservan (el patinador, solo si sigue vinculado a una ficha de tipo patinador).
+- Revisado sin cambios: el exportador lee todas las colecciones; Firebase no tiene rol patinador, Recepción (`movimientos.mensajero_id`, `liquidaciones.cobros`), reintentos (`destino_dev`) ni `direccion_recogida`, y esas columnas quedan con su valor por defecto. Las solicitudes no guardan fotos en el bucket (solo las guías). `db:verificar` no necesita cambios: las cuentas son las de la app vieja en los dos lados.
+- Pruebas nuevas en `test/importar.test.js` (2). Docs: `migracion-firestore.md` y `plan-migracion-16-nov.md` (paso para pasar a Patinador las cuentas de los patinadores).
+
 ## Personal → Acceso en el celular: fila compacta y hoja de rol — 2026-11-13
 
 - Por debajo de 768 px la tabla de Accesos (`.acc-tabla`) se oculta y se muestra `.acc-lista`: nombre con Pendiente/Tú y el rol en pequeño, el correo debajo (truncado) y a la derecha los 3 íconos (correo de restablecimiento, cambiar contraseña y quitar acceso; este último no sale en tu propia fila). Usan los mismos `enviarReset`, `NuevaClave` y `quitar` de la tabla.
