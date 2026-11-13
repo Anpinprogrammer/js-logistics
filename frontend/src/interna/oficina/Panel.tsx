@@ -81,7 +81,7 @@ export default function Panel({ pintar }: { pintar: () => void }) {
             <td className="solo-ancho">{S.mensajeros[p.mensajeroId]?.nombre || ""}</td><td><EtqDash p={p} /></td><td className="n solo-ancho">{p.estado === "entregado" ? pesos(p.valorCobrado) : "—"}</td></tr>)}
         </tbody></table></div> : <div className="vacio">Todavía no hay pedidos.</div>}</section>
       <section className="tarjeta c5"><h3>Clientes que más envían <small>Últimos 30 días</small></h3>
-        {top.length ? <div className="hbarras">{top.map(([id, c]) => <button key={id} style={{ "--w": Math.round((c.n * 100) / maxTop) + "%" } as React.CSSProperties} onClick={() => v.abrir(<AbrirCuenta cid={id} />)}>
+        {top.length ? <div className="hbarras">{top.map(([id, c]) => <button key={id} style={{ "--w": Math.round((c.n * 100) / maxTop) + "%" } as React.CSSProperties} onClick={() => v.abrir(<AbrirCuenta cid={id} />, "cuenta")}>
           <span>{nombreCliente(id) || "(eliminado)"}</span><small>{c.n} {pl(c.n, "entrega")} · {pesos(c.dom)}</small><i /></button>)}</div> : <div className="vacio">Sin entregas en los últimos 30 días.</div>}</section>
     </div>
   </>;

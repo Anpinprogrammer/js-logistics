@@ -1256,29 +1256,29 @@
 .jsl .cli-info-acciones .btn svg{width:17px;height:17px;flex:none}
 
 /* ---------- Clientes → ficha móvil → Ver cuenta: formulario sin choques y movimientos en filas ---------- */
-.jsl .cli-ficha .cuenta-form{display:grid;gap:12px;min-width:0;margin:6px 0 14px;padding:14px;border:1px solid var(--linea);border-radius:16px;background:var(--hueco)}
-.jsl .cli-ficha .cuenta-form h2{margin:0;font-size:.95rem}
-.jsl .cli-ficha .cuenta-form .campo{margin:0;min-width:0}
-.jsl .cli-ficha .cuenta-form label{display:block;margin-bottom:5px;font-size:.75rem;font-weight:700}
-.jsl .cli-ficha .cuenta-form :is(select,input){width:100%;min-width:0;min-height:44px;border:1px solid var(--linea);border-radius:12px;background:var(--papel);color:var(--tinta);font:inherit;font-size:.82rem;font-weight:600}
-.jsl .cli-ficha .cuenta-form :is(select,input):focus{outline:2px solid var(--marca2);outline-offset:1px}
-.jsl .cli-ficha .cuenta-select{position:relative;min-width:0}
-.jsl .cli-ficha .cuenta-select select{appearance:none;-webkit-appearance:none;padding:10px 36px 10px 13px;background-image:none;cursor:pointer;text-overflow:ellipsis}
-.jsl .cli-ficha .cuenta-select svg{position:absolute;right:12px;top:50%;width:16px;height:16px;transform:translateY(-50%);pointer-events:none;color:var(--suave)}
-.jsl .cli-ficha .cuenta-fila{position:relative;display:grid;gap:10px;min-width:0}
-.jsl .cli-ficha .cuenta-fila-dia{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
-.jsl .cli-ficha .cuenta-fila-medio{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-form{display:grid;gap:12px;min-width:0;margin:6px 0 14px;padding:14px;border:1px solid var(--linea);border-radius:16px;background:var(--hueco)}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-form h2{margin:0;font-size:.95rem}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-form .campo{margin:0;min-width:0}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-form label{display:block;margin-bottom:5px;font-size:.75rem;font-weight:700}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-form :is(select,input){width:100%;min-width:0;min-height:44px;border:1px solid var(--linea);border-radius:12px;background:var(--papel);color:var(--tinta);font:inherit;font-size:.82rem;font-weight:600}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-form :is(select,input):focus{outline:2px solid var(--marca2);outline-offset:1px}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-select{position:relative;min-width:0}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-select select{appearance:none;-webkit-appearance:none;padding:10px 36px 10px 13px;background-image:none;cursor:pointer;text-overflow:ellipsis}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-select svg{position:absolute;right:12px;top:50%;width:16px;height:16px;transform:translateY(-50%);pointer-events:none;color:var(--suave)}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-fila{position:relative;display:grid;gap:10px;min-width:0}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-fila-dia{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-fila-medio{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}
 /* El calendario se ancla a la fila completa (no a la columna angosta) y se ve dentro del cuerpo con scroll. */
-.jsl .cli-ficha .cuenta-fila .fecha-picker{position:static;min-width:0}
-.jsl .cli-ficha .cuenta-fila .fecha-btn{width:100%;min-width:0;min-height:44px;padding:6px 13px;border-radius:12px}
-.jsl .cli-ficha .cuenta-fila .fecha-etq{display:none}
-.jsl .cli-ficha .cuenta-fila .fecha-valor{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;font-size:.82rem;font-weight:600;white-space:nowrap}
-.jsl .cli-ficha .cuenta-fila .fecha-pop{left:0;right:0;width:auto;max-width:340px;margin-top:6px}
-.jsl .cli-ficha .cuenta-pesos{position:relative;min-width:0}
-.jsl .cli-ficha .cuenta-pesos span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--suave);font-size:.82rem;font-weight:700;pointer-events:none}
-.jsl .cli-ficha .cuenta-pesos input{padding:10px 10px 10px 26px;font-weight:800}
-.jsl .cli-ficha .cuenta-fila-medio input{padding:10px 12px}
-.jsl .cli-ficha .cuenta-registrar{width:100%;min-height:44px;justify-content:center}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-fila .fecha-picker{position:static;min-width:0}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-fila .fecha-btn{width:100%;min-width:0;min-height:44px;padding:6px 13px;border-radius:12px}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-fila .fecha-etq{display:none}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-fila .fecha-valor{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;font-size:.82rem;font-weight:600;white-space:nowrap}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-fila .fecha-pop{left:0;right:0;width:auto;max-width:340px;margin-top:6px}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-pesos{position:relative;min-width:0}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-pesos span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--suave);font-size:.82rem;font-weight:700;pointer-events:none}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-pesos input{padding:10px 10px 10px 26px;font-weight:800}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-fila-medio input{padding:10px 12px}
+.jsl :is(.cli-ficha,.cuenta-modal) .cuenta-registrar{width:100%;min-height:44px;justify-content:center}
 .jsl .cli-ficha .cuenta-movs{display:flex;flex-direction:column;min-width:0;margin:0 0 6px;padding:0;list-style:none;border:1px solid var(--linea);border-radius:16px;background:var(--papel);overflow:hidden}
 .jsl .cli-ficha .cuenta-movs li{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;padding:11px 13px}
 .jsl .cli-ficha .cuenta-movs li + li{border-top:1px solid var(--linea)}
@@ -1293,9 +1293,9 @@
 .jsl .cli-ficha .cuenta-mov-domi{border:1px solid var(--linea);color:var(--tinta)}
 .jsl .cli-ficha .cuenta-mov-domi:hover{background:var(--hueco)}
 @media (max-width:359px){
-  .jsl .cli-ficha .cuenta-form{padding:12px}
-  .jsl .cli-ficha .cuenta-fila-dia{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-  .jsl .cli-ficha .cuenta-fila-medio{grid-template-columns:minmax(0,1fr)}
+  .jsl :is(.cli-ficha,.cuenta-modal) .cuenta-form{padding:12px}
+  .jsl :is(.cli-ficha,.cuenta-modal) .cuenta-fila-dia{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .jsl :is(.cli-ficha,.cuenta-modal) .cuenta-fila-medio{grid-template-columns:minmax(0,1fr)}
   .jsl .cli-ficha .cuenta-movs li{flex-wrap:wrap;row-gap:6px}
   .jsl .cli-ficha .cuenta-mov-det{flex-basis:100%}
   .jsl .cli-ficha .cuenta-mov-fin{width:100%;justify-content:space-between}
@@ -1596,4 +1596,75 @@
 @media (max-width:360px){
   .jsl .acc-botones .accion-icono>button{width:32px;height:32px}
   .jsl .acc-lista li{gap:6px;padding-right:8px}
+}
+
+/* Cuenta del cliente (variante "cuenta"): panel a la izquierda con todo el alto. En el computador el ancho se ajusta a la
+   tabla de movimientos (mínimo 720 px, máximo 90 % de la pantalla); en el celular ocupa toda la pantalla. */
+.jsl dialog[data-variante="cuenta"]{position:fixed;inset:0 auto 0 0;margin:0;width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border-radius:0;overflow:hidden}
+.jsl dialog[data-variante="cuenta"] .dlg{height:100%;max-height:100dvh;border-radius:0;padding:0;overflow:hidden;display:flex;flex-direction:column}
+.jsl dialog[data-variante="cuenta"] .dlg::before{display:none}
+@media (min-width:768px){
+  .jsl dialog[data-variante="cuenta"]{width:fit-content;min-width:min(720px,100vw);max-width:90vw;border-right:1px solid var(--linea)}
+}
+.jsl .cuenta-panel{display:flex;flex-direction:column;flex:1;min-height:0;width:100%}
+.jsl .cuenta-cab{flex:none;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px;padding:18px 24px;border-bottom:1px solid var(--linea);background:var(--papel)}
+.jsl .cuenta-quien{display:flex;align-items:center;gap:18px;min-width:0}
+.jsl .cuenta-nombre{min-width:0}
+.jsl .cuenta-nombre h2{margin:0;font-size:1.15rem;line-height:1.2;overflow-wrap:anywhere}
+.jsl .cuenta-nombre .sub{margin:2px 0 0;font-size:.8rem}
+.jsl .cuenta-sep{flex:none;width:1px;height:36px;background:var(--linea)}
+.jsl .cuenta-saldo{display:flex;flex-direction:column;flex:none}
+.jsl .cuenta-saldo b{font-size:1.35rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.jsl .cuenta-saldo small{margin-top:4px;font-size:.72rem;font-weight:600;color:var(--suave)}
+.jsl .cuenta-botones{display:flex;align-items:center;gap:10px;flex:none;margin-left:auto}
+.jsl .cuenta-botones .btn{gap:6px;white-space:nowrap;font-weight:700}
+.jsl .cuenta-botones .btn svg{width:16px;height:16px}
+.jsl .cuenta-botones .cerrar{position:static;flex:none}
+.jsl .cuenta-cuerpo{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:18px 24px 24px}
+.jsl .cuenta-wa{margin-bottom:14px}
+.jsl .cuenta-wa .sub{margin:0 0 8px}
+.jsl .cuenta-movs-cab{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
+.jsl .cuenta-movs-cab h3{margin:0;font-size:.95rem}
+.jsl .cuenta-movs-cab span{font-size:.75rem;font-weight:600;color:var(--suave)}
+.jsl .cuenta-tabla{border:1px solid var(--linea);border-radius:14px;background:var(--papel)}
+.jsl .cuenta-tabla table{width:100%;border-collapse:separate;border-spacing:0}
+.jsl .cuenta-tabla thead th{position:sticky;top:0;z-index:1;background:var(--hueco);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--suave)}
+.jsl .cuenta-tabla thead th:first-child{border-top-left-radius:14px}
+.jsl .cuenta-tabla thead th:last-child{border-top-right-radius:14px}
+.jsl .cuenta-tabla td{vertical-align:middle}
+.jsl .cuenta-tabla tbody tr:last-child td{border-bottom:0}
+.jsl .cuenta-tabla .cuenta-fecha,.jsl .cuenta-tabla th,.jsl .cuenta-tabla td.n{white-space:nowrap}
+.jsl .cuenta-tabla .cuenta-det{min-width:200px;max-width:440px;white-space:normal;overflow-wrap:anywhere}
+/* Ventana de "Registrar pago o ajuste" encima de la cuenta. */
+.jsl .cuenta-modal{max-width:520px;padding:22px}
+.jsl .cuenta-modal-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--linea)}
+.jsl .cuenta-modal-cab h2{margin:0;padding:0;font-size:1.1rem}
+.jsl .cuenta-modal-cab .sub{margin:3px 0 0;font-size:.8rem}
+.jsl .cuenta-modal-cab .cerrar{position:static;flex:none}
+.jsl .cuenta-form-modal{margin:0;padding:0;border:0;background:none}
+.jsl .cuenta-modal-pie{display:flex;justify-content:flex-end;gap:10px;margin-top:6px;padding-top:14px;border-top:1px solid var(--linea)}
+.jsl .cuenta-modal-pie .btn{min-height:44px;min-width:120px;justify-content:center;font-weight:700}
+@media (max-width:767px){
+  .jsl .cuenta-cab{padding:16px}
+  .jsl .cuenta-quien{width:100%;justify-content:space-between}
+  .jsl .cuenta-sep{display:none}
+  .jsl .cuenta-saldo{align-items:flex-end}
+  .jsl .cuenta-botones{width:100%;margin-left:0}
+  .jsl .cuenta-botones .btn{flex:1;justify-content:center}
+  .jsl .cuenta-botones .cerrar{position:absolute;top:12px;right:12px}
+  .jsl .cuenta-cab{position:relative;padding-right:56px}
+  .jsl .cuenta-quien{padding-right:0}
+  .jsl .cuenta-cuerpo{padding:14px 16px 20px}
+  .jsl .cuenta-tabla{overflow-x:auto}
+  .jsl .cuenta-tabla .cuenta-det{min-width:160px}
+  .jsl .cuenta-modal-pie .btn{flex:1;min-width:0}
+}
+.jsl .cuenta-modal .cuenta-form.cuenta-form-modal{margin:0;padding:0;border:0;background:none}
+.jsl .cuenta-cuerpo{padding-top:0}
+.jsl .cuenta-cuerpo > :first-child{margin-top:18px}
+@media (min-width:768px) and (min-height:700px){.jsl .cuenta-modal{overflow:visible;max-height:none}}
+@media (max-width:767px){
+  .jsl .cuenta-botones{flex-wrap:wrap}
+  .jsl .cuenta-botones .btn{flex:1 1 100%;min-width:0}
+  .jsl .cuenta-botones .btn span{overflow:hidden;text-overflow:ellipsis}
 }

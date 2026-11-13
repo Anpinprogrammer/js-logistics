@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Cuenta del cliente en el computador: panel a todo el alto y pago en ventana — 2026-11-13
+
+- "Ver cuenta" (Clientes y el top de clientes del Panel) abre `AbrirCuenta` con la variante `"cuenta"` de la ventana (`abrirCuenta(v, cid)` en `oficina/Clientes.tsx`). Es un panel a la izquierda de todo el alto; desde 768 px su ancho es `fit-content` (mínimo 720 px y máximo 90vw), así que se ajusta a la tabla de movimientos, y el Detalle hace salto de línea (máximo 440 px).
+- La cabecera queda fija con el nombre, el teléfono, el saldo con su estado y los botones "Registrar pago o ajuste", "Editar cliente" y ×. Los movimientos llenan el resto con el encabezado de la tabla `sticky`. El aviso de WhatsApp va arriba de los movimientos cuando hay saldo.
+- El formulario ahora es `FormMovimiento`, el mismo de la ficha del celular. En el computador se abre en `ModalMovimiento` (`modal-fondo` dentro del `<dialog>`). Escape o tocar afuera cierran solo esa ventana, y al registrar se cierra y la cuenta se repinta sola. La ficha del celular (`enFicha`) sigue con el formulario arriba.
+
 ## Personal → Acceso en el celular: fila compacta y hoja de rol — 2026-11-13
 
 - Por debajo de 768 px la tabla de Accesos (`.acc-tabla`) se oculta y se muestra `.acc-lista`: nombre con Pendiente/Tú y el rol en pequeño, el correo debajo (truncado) y a la derecha los 3 íconos (correo de restablecimiento, cambiar contraseña y quitar acceso; este último no sale en tu propia fila). Usan los mismos `enviarReset`, `NuevaClave` y `quitar` de la tabla.
