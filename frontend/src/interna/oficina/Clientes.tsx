@@ -238,12 +238,23 @@ function ModalMovimiento({ cid, alCerrar }: { cid: string; alCerrar: () => void 
   </div>;
 }
 
+/** Enviar el saldo por WhatsApp (o copiar el mensaje). Solo aparece si hay saldo. */
+function CompartirSaldo({ cid }: { cid: string }) {
+  const v = useVentana(), c = S.clientes[cid], s = saldoCliente(cid);
+  if (!c || !s) return null;
+  const marcarEnviado = () => { try { const k = "js_wa_saldos_" + hoy(), e = new Set(JSON.parse(localStorage.getItem(k) || "[]")); e.add(cid); guardarLocal(k, JSON.stringify([...e])); } catch { /* sin almacenamiento */ } };
+  return telWhatsApp(c.telefono) ? <div className="acciones cuenta-compartir" style={{ margin: "0 0 6px" }}><a className="btn ok" id="cWa" href={linkSaldo(cid)} target="_blank" rel="noopener" onClick={marcarEnviado}><WhatsAppIcon />Enviar {s < 0 ? "cobro" : "saldo a favor"} por WhatsApp</a>
+      <button className="btn sec" id="cWaCopiar" type="button" onClick={async () => { try { await navigator.clipboard.writeText(textoSaldo(cid)); v.avisar("Mensaje copiado. Pégalo en WhatsApp."); } catch { v.avisar("No se pudo copiar en este navegador"); } }}>Copiar mensaje</button></div>
+    : <div className="aviso">Agrega el celular del cliente para enviarle el saldo por WhatsApp.</div>;
+}
+
 /** Abre la cuenta de un cliente en el panel lateral de la izquierda (variante "cuenta"). */
 export const abrirCuenta = (v: ReturnType<typeof useVentana>, cid: string) => v.abrir(<AbrirCuenta cid={cid} />, "cuenta");
 
 /** Cuenta de un cliente: saldo, WhatsApp, registrar pago o ajuste y sus movimientos (abrirCuenta del prototipo).
- *  En la ficha del celular (`enFicha`) el formulario va arriba de los movimientos; suelta (panel lateral) el
- *  formulario se abre en una ventana desde el botón "Registrar pago o ajuste" y los movimientos ocupan todo el alto. */
+ *  En la ficha del celular (`enFicha`, pestaña "Ver cuenta") solo muestra los movimientos, en tarjetas: la información,
+ *  el WhatsApp y el formulario van en sus propias pestañas. Suelta (panel lateral del computador) el formulario se abre
+ *  en una ventana desde el botón "Registrar pago o ajuste" y los movimientos ocupan todo el alto. */
 export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: boolean; volver?: () => void }) {
   useDatos();
   const v = useVentana(), c = S.clientes[cid];
@@ -253,7 +264,6 @@ export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: b
   const cerrarForm = useCallback(() => setFormAbierto(false), []);
   if (!c) return null;
   const rows = filasCuenta(cid), pendientes = Object.values(S.pedidos).filter(p => p.clienteId === cid && p.estado === "pendiente").length, s = saldoCliente(cid);
-  const marcarEnviado = () => { try { const k = "js_wa_saldos_" + hoy(), e = new Set(JSON.parse(localStorage.getItem(k) || "[]")); e.add(cid); guardarLocal(k, JSON.stringify([...e])); } catch { /* sin almacenamiento */ } };
   const domi = async (g: string) => {
     const ped = S.pedidos[g]; if (!ped) return;
     if (ped.domiPagado) {
@@ -271,28 +281,18 @@ export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: b
     try { await borrarDe("movimientos", mid); v.avisar("Movimiento quitado"); } catch (e) { v.avisar("No se pudo quitar: " + motivoError(e)); }
     reabrir();
   };
-  const editar = () => v.abrir(<FormCliente id={cid} alGuardar={enFicha ? id => v.abrir(<FichaCliente cid={id} pestana="cuenta" />, "cliente") : undefined} />, "centrada");
+  const editar = () => v.abrir(<FormCliente id={cid} />, "centrada");
   const explicacion = s > 0 ? "Cuenta por pagar: JS le debe este valor al cliente." : s < 0 ? "Cuenta por cobrar: el cliente le debe este valor a JS." : "Cuenta a paz y salvo.";
-  const whatsapp = s ? (telWhatsApp(c.telefono) ? <div className="acciones" style={{ margin: "0 0 6px" }}><a className="btn ok" id="cWa" href={linkSaldo(cid)} target="_blank" rel="noopener" onClick={marcarEnviado}><WhatsAppIcon />Enviar {s < 0 ? "cobro" : "saldo a favor"} por WhatsApp</a>
-      <button className="btn sec" id="cWaCopiar" type="button" onClick={async () => { try { await navigator.clipboard.writeText(textoSaldo(cid)); v.avisar("Mensaje copiado. Pégalo en WhatsApp."); } catch { v.avisar("No se pudo copiar en este navegador"); } }}>Copiar mensaje</button></div>
-      : <div className="aviso">Agrega el celular del cliente para enviarle el saldo por WhatsApp.</div>) : null;
-  if (enFicha) return <>
-    <p className="sub">{explicacion}</p>
-    {whatsapp}
-    <div className="cuenta-form">
-      <h2>{yo.esAdmin ? "Registrar pago o ajuste" : "Registrar pago, compra o ganancia"}</h2>
-      <FormMovimiento cid={cid} alListo={reabrir} />
-    </div>
-    <div className="acciones"><button className="btn sec" id="cEdit" onClick={editar}>Editar cliente</button></div>
-    <h2>Movimientos</h2>
+  if (enFicha) return <div className="cuenta-movs-movil">
+    <div className="cuenta-movs-cab"><h3>Movimientos</h3><span>{rows.length} {rows.length === 1 ? "registro" : "registros"}</span></div>
     {rows.length ? <ul className="cuenta-movs">
       {rows.map((r, i) => <li key={(r.pid || r.mid || "") + i}>
-        <div className="cuenta-mov-det"><b title={r.det}>{r.det}</b><small>{hora(r.fecha)}</small></div>
-        <div className="cuenta-mov-fin"><span className={r.v < 0 ? "neg" : "pos"}>{pesos(r.v)}</span>
+        <div className="cuenta-mov-arriba"><p className="cuenta-mov-det" title={r.det}>{r.det}</p><span className={"cuenta-mov-valor " + (r.v < 0 ? "neg" : r.v > 0 ? "pos" : "cero")}>{pesos(r.v)}</span></div>
+        <div className="cuenta-mov-abajo"><small>{hora(r.fecha)}</small>
           {r.mid ? (yo.esAdmin ? <button type="button" className="cuenta-mov-quitar" onClick={() => quitarMov(r.mid!)}>Quitar</button> : null) : r.pid && (r.v < 0 || r.dp) ? <button type="button" className="cuenta-mov-domi" onClick={() => domi(r.pid!)}>{r.dp ? "Desmarcar" : "Pagó domicilio"}</button> : null}</div>
       </li>)}
     </ul> : <div className="vacio">Sin movimientos.</div>}
-  </>;
+  </div>;
   const estado = s < 0 ? "Por cobrar" : s > 0 ? "Por pagar" : "Cuenta a paz y salvo";
   return <div className="cuenta-panel">
     <header className="cuenta-cab">
@@ -308,7 +308,7 @@ export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: b
       </div>
     </header>
     <div className="cuenta-cuerpo">
-      {s ? <div className="cuenta-wa"><p className="sub">{explicacion}</p>{whatsapp}</div> : null}
+      {s ? <div className="cuenta-wa"><p className="sub">{explicacion}</p><CompartirSaldo cid={cid} /></div> : null}
       <div className="cuenta-movs-cab"><h3>Movimientos</h3><span>{rows.length} {rows.length === 1 ? "registro" : "registros"}</span></div>
       {rows.length ? <div className="cuenta-tabla"><table><thead><tr><th>Fecha</th><th>Detalle</th><th className="n">Valor</th><th className="n">Acción</th></tr></thead><tbody>
         {rows.map((r, i) => <tr key={(r.pid || r.mid || "") + i}><td className="cuenta-fecha">{hora(r.fecha)}</td><td className="cuenta-det">{r.det}</td><td className={"n " + (r.v < 0 ? "neg" : "pos")}>{pesos(r.v)}</td>
@@ -332,7 +332,9 @@ function FilaClienteMovil({ c, dia, abrir }: { c: ClienteConSaldo; dia: string; 
 }
 
 /** Ficha del cliente en el celular: hoja con dos pestañas, la información y la misma cuenta del botón "Ver cuenta". */
-export function FichaCliente({ cid, pestana = "info", direccion }: { cid: string; pestana?: "info" | "cuenta"; direccion?: string }) {
+type PestanaFicha = "info" | "cuenta" | "pago";
+const PESTANAS_FICHA: PestanaFicha[] = ["info", "cuenta", "pago"];
+export function FichaCliente({ cid, pestana = "info", direccion }: { cid: string; pestana?: PestanaFicha; direccion?: string }) {
   useDatos();
   const v = useVentana(), c = S.clientes[cid];
   const [tab, setTab] = useState(pestana);
@@ -341,9 +343,14 @@ export function FichaCliente({ cid, pestana = "info", direccion }: { cid: string
   const s = saldoCliente(cid), estado = s < 0 ? "Por cobrar" : s > 0 ? "Por pagar" : "Paz y salvo";
   const enRuta = Object.values(S.pedidos).filter(p => p.clienteId === cid && p.estado === "pendiente").length;
   const wa = telWhatsApp(c.telefono);
-  const reabrir = (t: "info" | "cuenta") => v.abrir(<FichaCliente cid={cid} pestana={t} direccion={direccion} />, "cliente");
-  const cambiar = (t: "info" | "cuenta") => { setTab(t); if (cuerpo.current) cuerpo.current.scrollTop = 0; };
-  const teclas = (e: React.KeyboardEvent) => { if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); const t = tab === "info" ? "cuenta" : "info"; cambiar(t); document.getElementById("cli-tab-" + t)?.focus(); } };
+  const reabrir = (t: PestanaFicha) => v.abrir(<FichaCliente cid={cid} pestana={t} direccion={direccion} />, "cliente");
+  const cambiar = (t: PestanaFicha) => { setTab(t); if (cuerpo.current) cuerpo.current.scrollTop = 0; };
+  const teclas = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+    e.preventDefault();
+    const n = PESTANAS_FICHA.length, t = PESTANAS_FICHA[(PESTANAS_FICHA.indexOf(tab) + (e.key === "ArrowRight" ? 1 : n - 1)) % n];
+    cambiar(t); document.getElementById("cli-tab-" + t)?.focus();
+  };
   return <div className="cli-ficha">
     <header className="cli-ficha-cab">
       <div className="cli-ficha-titulo">
@@ -353,7 +360,8 @@ export function FichaCliente({ cid, pestana = "info", direccion }: { cid: string
       </div>
       <div className="seg cli-ficha-tabs" role="tablist" aria-label="Ficha del cliente" onKeyDown={teclas}>
         <button type="button" role="tab" id="cli-tab-info" aria-controls="cli-panel" aria-selected={tab === "info"} tabIndex={tab === "info" ? 0 : -1} onClick={() => cambiar("info")}><IconoInfo /><span>Información</span></button>
-        <button type="button" role="tab" id="cli-tab-cuenta" aria-controls="cli-panel" aria-selected={tab === "cuenta"} tabIndex={tab === "cuenta" ? 0 : -1} onClick={() => cambiar("cuenta")}><Icono n="cuenta" /><span>Ver cuenta</span></button>
+        <button type="button" role="tab" id="cli-tab-cuenta" aria-controls="cli-panel" aria-selected={tab === "cuenta"} tabIndex={tab === "cuenta" ? 0 : -1} onClick={() => cambiar("cuenta")}><Icono n="cuentas" /><span>Ver cuenta</span></button>
+        <button type="button" role="tab" id="cli-tab-pago" aria-controls="cli-panel" aria-selected={tab === "pago"} tabIndex={tab === "pago" ? 0 : -1} onClick={() => cambiar("pago")}><Icono n="plata" /><span>Registrar pago</span></button>
       </div>
     </header>
     <div className="cli-ficha-cuerpo" ref={cuerpo} id="cli-panel" role="tabpanel" aria-labelledby={"cli-tab-" + tab}>
@@ -366,12 +374,17 @@ export function FichaCliente({ cid, pestana = "info", direccion }: { cid: string
           <div><dt>Saldo</dt><dd className={s < 0 ? "neg" : s > 0 ? "pos" : ""}>{pesos(Math.abs(s))}</dd></div>
         </dl>
         <p className="sub">{s > 0 ? "Cuenta por pagar: JS le debe este valor al cliente." : s < 0 ? "Cuenta por cobrar: el cliente le debe este valor a JS." : "Cuenta a paz y salvo."}</p>
+        <CompartirSaldo cid={cid} />
         <div className="cli-info-acciones">
           {wa ? <a className="btn ok" href={"https://wa.me/" + wa} target="_blank" rel="noopener"><WhatsAppIcon /><span>WhatsApp</span></a> : <button type="button" className="btn ok" disabled><WhatsAppIcon /><span>WhatsApp</span></button>}
           <button type="button" className="btn sec" onClick={() => v.abrir(<FormCliente id={cid} alGuardar={id => (id === cid ? reabrir("info") : v.abrir(<FichaCliente cid={id} />, "cliente"))} />, "centrada")}><IconoEditar /><span>Editar ficha</span></button>
         </div>
       </div>
-        : <AbrirCuenta cid={cid} enFicha volver={() => reabrir("cuenta")} />}
+        : tab === "cuenta" ? <AbrirCuenta cid={cid} enFicha volver={() => reabrir("cuenta")} />
+        : <div className="cuenta-form">
+          <h2>{yo.esAdmin ? "Registrar pago o ajuste" : "Registrar pago, compra o ganancia"}</h2>
+          <FormMovimiento cid={cid} alListo={() => reabrir("cuenta")} />
+        </div>}
     </div>
   </div>;
 }

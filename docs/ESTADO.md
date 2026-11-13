@@ -1,5 +1,10 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Ficha del cliente en el celular: 3 pestañas y movimientos en tarjetas — 2026-11-13
+
+- `FichaCliente` (`oficina/Clientes.tsx`) tiene tres pestañas (`PestanaFicha`: `info | cuenta | pago`), con flechas del teclado en ciclo. **Información** muestra los datos, el estado de la cuenta, `CompartirSaldo` (enviar o copiar el saldo por WhatsApp, el mismo de la cuenta de escritorio) y WhatsApp / Editar ficha. **Ver cuenta** muestra solo los movimientos (`AbrirCuenta enFicha`). **Registrar pago** muestra `FormMovimiento`; al registrar vuelve a abrir la ficha en "Ver cuenta".
+- Cada movimiento del celular es una tarjeta de 2 niveles: detalle (hasta 2 líneas) y valor arriba (verde, rojo o gris si es 0); fecha y la acción (Quitar o Pagó domicilio, con los mismos handlers) abajo. Por debajo de 440 px las pestañas no muestran ícono para que quepa "Registrar pago". El escritorio no cambia.
+
 ## Cuenta del cliente en el computador: panel a todo el alto y pago en ventana — 2026-11-13
 
 - "Ver cuenta" (Clientes y el top de clientes del Panel) abre `AbrirCuenta` con la variante `"cuenta"` de la ventana (`abrirCuenta(v, cid)` en `oficina/Clientes.tsx`). Es un panel a la izquierda de todo el alto; desde 768 px su ancho es `fit-content` (mínimo 720 px y máximo 90vw), así que se ajusta a la tabla de movimientos, y el Detalle hace salto de línea (máximo 440 px).
