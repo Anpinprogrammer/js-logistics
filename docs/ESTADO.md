@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Cuenta del cliente en el computador: panel a todo el alto y pago en ventana — 2026-11-13
+
+- "Ver cuenta" (Clientes y el top de clientes del Panel) abre `AbrirCuenta` con la variante `"cuenta"` de la ventana (`abrirCuenta(v, cid)` en `oficina/Clientes.tsx`). Es un panel a la izquierda de todo el alto; desde 768 px su ancho es `fit-content` (mínimo 720 px y máximo 90vw), así que se ajusta a la tabla de movimientos, y el Detalle hace salto de línea (máximo 440 px).
+- La cabecera queda fija con el nombre, el teléfono, el saldo con su estado y los botones "Registrar pago o ajuste", "Editar cliente" y ×. Los movimientos llenan el resto con el encabezado de la tabla `sticky`. El aviso de WhatsApp va arriba de los movimientos cuando hay saldo.
+- El formulario ahora es `FormMovimiento`, el mismo de la ficha del celular. En el computador se abre en `ModalMovimiento` (`modal-fondo` dentro del `<dialog>`). Escape o tocar afuera cierran solo esa ventana, y al registrar se cierra y la cuenta se repinta sola. La ficha del celular (`enFicha`) sigue con el formulario arriba.
+
 ## Migración de Firebase al día con el patinador y las solicitudes — 2026-11-13
 
 - `db:importar --reemplazar` fallaba ("violates foreign key constraint caja_patinador_cliente_id_fkey") en cuanto hubiera un pago de patinador en la base: `caja_patinador` apunta a clientes y Personal con `RESTRICT`. Ahora la vacía primero (es operación del sistema nuevo, como las guías y la caja) y la lista en el informe (`sistemaNuevo`).

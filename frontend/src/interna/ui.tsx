@@ -64,7 +64,7 @@ export const ProveedorMenuColapsado = CtxMenuColapsado.Provider;
 export const useMenuColapsado = () => useContext(CtxMenuColapsado);
 
 /* ---------- diálogo, avisos y confirmación (una sola ventana, como el prototipo) ---------- */
-interface Ventana { abrir: (contenido: ReactNode, variante?: "drawer" | "drawer-ancho" | "centrada" | "centrada-ancha" | "entrega" | "devolucion" | "solicitud" | "cliente") => void; cerrar: () => void; avisar: (msg: string) => void; confirmar: (titulo: string, msg: string, boton: string) => Promise<boolean>; ampliar: (src: string) => void }
+interface Ventana { abrir: (contenido: ReactNode, variante?: "drawer" | "drawer-ancho" | "centrada" | "centrada-ancha" | "entrega" | "devolucion" | "solicitud" | "cliente" | "cuenta") => void; cerrar: () => void; avisar: (msg: string) => void; confirmar: (titulo: string, msg: string, boton: string) => Promise<boolean>; ampliar: (src: string) => void }
 const CtxV = createContext<Ventana | null>(null);
 export const useVentana = () => { const v = useContext(CtxV); if (!v) throw new Error("useVentana fuera de ProveedorVentana"); return v; };
 
@@ -75,7 +75,7 @@ export function ProveedorVentana({ children }: { children: ReactNode }) {
   const [visor, setVisor] = useState("");
 
   const cerrar = useCallback(() => { dlg.current?.close(); }, []);
-  const abrir = useCallback((c: ReactNode, variante?: "drawer" | "drawer-ancho" | "centrada" | "centrada-ancha" | "entrega" | "devolucion" | "solicitud" | "cliente") => {
+  const abrir = useCallback((c: ReactNode, variante?: "drawer" | "drawer-ancho" | "centrada" | "centrada-ancha" | "entrega" | "devolucion" | "solicitud" | "cliente" | "cuenta") => {
     setContenido(c); setClave(k => k + 1);
     const d = dlg.current;
     if (d) {

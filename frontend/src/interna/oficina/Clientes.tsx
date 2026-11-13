@@ -1,5 +1,5 @@
 /* Oficina → Clientes, la cuenta de un cliente, el formulario y el envío de saldos por WhatsApp, igual al prototipo. */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, listaOrdenada, saldoCliente, filasCuenta, sinTildes, normNom, normTel, parecidos, gruposRepetidos, telWhatsApp, linkSaldo, textoSaldo,
@@ -141,7 +141,7 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
           {filas.map(c => <tr key={c.id}><td><b>{c.nombre}</b>{Number(c.tarifa) ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>Domicilio {pesos(c.tarifa)}</span></> : null}</td><td>{c.telefono || ""}</td>
             <td>{c.saldo < 0 ? <span className="etq sin">Por cobrar</span> : c.saldo > 0 ? <span className="etq ent">Por pagar</span> : <span className="sub">Paz y salvo</span>}</td>
             {dia && <td className={"n " + ((c.delDia ?? 0) < 0 ? "neg" : "pos")}>{(c.delDia ?? 0) < 0 ? "Debe " : "A favor "}{pesos(Math.abs(c.delDia ?? 0))}</td>}
-            <td className={"n " + (c.saldo < 0 ? "neg" : c.saldo > 0 ? "pos" : "")}>{pesos(Math.abs(c.saldo))}</td><td><button className="btn sec chico" onClick={() => v.abrir(<AbrirCuenta cid={c.id} />)}>Ver cuenta</button></td></tr>)}
+            <td className={"n " + (c.saldo < 0 ? "neg" : c.saldo > 0 ? "pos" : "")}>{pesos(Math.abs(c.saldo))}</td><td><button className="btn sec chico" onClick={() => abrirCuenta(v, c.id)}>Ver cuenta</button></td></tr>)}
         </tbody></table></div>
         <Paginador pagina={pag.pagina} paginas={pag.paginas} total={pag.total} porPagina={pag.porPagina} ir={irA} cargando={q.isPlaceholderData} />
       </>
@@ -176,32 +176,84 @@ export function FormCliente({ id, alGuardar, nombre: nombre0 }: { id?: string; a
     <div className="campo"><label htmlFor="cTar">Valor del domicilio de este cliente (opcional)</label><input id="cTar" type="number" inputMode="numeric" min="0" step="100" value={tarifa} onChange={e => setTarifa(e.target.value)} placeholder="Se llena solo al asignarle una guía" /></div>
     {dups.length ? <div className="aviso alerta" id="cDup"><b>{exacto ? "Este cliente ya existe" : "Hay un cliente parecido"}:</b>
       {dups.map(x => <div key={x.c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 6 }}><span>{x.c.nombre} · {x.c.telefono || ""}<br /><span className="sub" style={{ fontSize: ".8rem" }}>{x.igual ? "mismo nombre y número" : x.mismoNom ? "mismo nombre" : "mismo número"}</span></span>
-        <button className="btn sec chico" onClick={() => (alGuardar ? alGuardar(x.c.id) : v.abrir(<AbrirCuenta cid={x.c.id} />))}>Usar este</button></div>)}
+        <button className="btn sec chico" onClick={() => (alGuardar ? alGuardar(x.c.id) : abrirCuenta(v, x.c.id))}>Usar este</button></div>)}
       <p className="sub" style={{ margin: "6px 0 0" }}>{exacto ? "No se puede crear otro con el mismo nombre y número." : "Si de verdad es otro cliente, toca otra vez “Guardar de todos modos”."}</p></div> : null}
     <button className="btn" id="cGuardar" style={{ width: "100%" }} onClick={guardar}>{aunAsi ? "Guardar de todos modos" : "Guardar cliente"}</button>
   </>;
 }
 
-/** Cuenta de un cliente: saldo, WhatsApp, registrar pago o ajuste y sus movimientos (abrirCuenta del prototipo). */
-export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: boolean; volver?: () => void }) {
-  useDatos();
-  const v = useVentana(), c = S.clientes[cid];
-  // Dentro de la ficha móvil se vuelve a la pestaña "Ver cuenta"; suelta, a esta misma ventana.
-  const reabrir = volver ?? (() => v.abrir(<AbrirCuenta cid={cid} />));
-  const s0 = c ? saldoCliente(cid) : 0;
+/** Formulario de pago o ajuste de la cuenta de un cliente. Se usa dentro de la ficha del celular y en la ventana
+ *  "Registrar pago o ajuste" de la cuenta en el computador. `alListo` se llama después de guardar. */
+function FormMovimiento({ cid, alListo, alCancelar }: { cid: string; alListo: () => void; alCancelar?: () => void }) {
+  const v = useVentana(), s0 = saldoCliente(cid);
   const tipos = (Object.keys(MOVS) as TipoMov[]).filter(k => yo.esAdmin || MOVS_OFICINA.includes(k));
   const [tipo, setTipo] = useState<TipoMov>(yo.esAdmin ? (s0 < 0 ? "pago_de_cliente" : "pago_a_cliente") : s0 > 0 ? "pago_a_cliente" : tipos[0]);
   const [dia, setDia] = useState(hoy()), [val, setVal] = useState(!yo.esAdmin && s0 === 0 ? "" : String(Math.abs(s0) || "")), [medio, setMedio] = useState<Medio>("efectivo"), [nota, setNota] = useState("");
-  if (!c) return null;
-  const rows = filasCuenta(cid), pendientes = Object.values(S.pedidos).filter(p => p.clienteId === cid && p.estado === "pendiente").length, s = saldoCliente(cid);
-  const marcarEnviado = () => { try { const k = "js_wa_saldos_" + hoy(), e = new Set(JSON.parse(localStorage.getItem(k) || "[]")); e.add(cid); guardarLocal(k, JSON.stringify([...e])); } catch { /* sin almacenamiento */ } };
+  const [guardando, setGuardando] = useState(false);
   const registrar = async () => {
     const valor = Number(val); if (!(valor > 0)) return v.avisar("Escribe un valor mayor a cero");
     const caja = mueveCaja({ tipo }); if (yo.esAdmin && caja && diaAntesDelArqueo(v, dia)) return;
     const fecha = !yo.esAdmin && esPago({ tipo }) ? Date.now() : caja ? fechaCaja(dia) : fechaDia(dia); // el pago que registra el asistente queda con la hora del momento
-    try { await guardarMovimiento(null, { clienteId: cid, tipo, valor, medio, nota: nota.trim(), fecha }); v.avisar("Movimiento registrado"); reabrir(); }
+    setGuardando(true);
+    try { await guardarMovimiento(null, { clienteId: cid, tipo, valor, medio, nota: nota.trim(), fecha }); v.avisar("Movimiento registrado"); alListo(); }
     catch (e) { v.avisar("No se pudo guardar: " + motivoError(e)); }
+    finally { setGuardando(false); }
   };
+  const flecha = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>;
+  return <>
+    <div className="campo"><label htmlFor="mTipo">Tipo</label><div className="cuenta-select"><select id="mTipo" value={tipo} onChange={e => setTipo(e.target.value as TipoMov)}>{tipos.map(x => <option key={x} value={x}>{MOVS[x].t}</option>)}</select>{flecha}</div></div>
+    <div className="cuenta-fila cuenta-fila-dia">
+      <div className="campo"><label htmlFor="mFecha">Día</label><SelectorFecha id="mFecha" valor={dia} alCambiar={setDia} etiqueta="Día" vacio="Elige el día" obligatorio alinear="izquierda" /></div>
+      <div className="campo"><label htmlFor="mVal">Valor</label><div className="cuenta-pesos"><span aria-hidden="true">$</span><input id="mVal" type="number" inputMode="numeric" min="0" step="100" placeholder="0" value={val} onChange={e => setVal(e.target.value)} /></div></div>
+    </div>
+    <div className="cuenta-fila cuenta-fila-medio">
+      <div className="campo"><label htmlFor="mMedio">{alCancelar ? "Medio (para pagos)" : "Medio"}</label><div className="cuenta-select"><select id="mMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{Object.entries(MEDIOS).map(([x, t]) => <option key={x} value={x}>{t}</option>)}</select>{flecha}</div></div>
+      <div className="campo"><label htmlFor="mNota">Nota (opcional)</label><input id="mNota" placeholder="Ej: compra, transferencia Nequi" value={nota} onChange={e => setNota(e.target.value)} /></div>
+    </div>
+    {alCancelar
+      ? <div className="cuenta-modal-pie"><button type="button" className="btn sec" onClick={alCancelar}>Cancelar</button><button type="button" className="btn ok" id="mReg" disabled={guardando} onClick={registrar}>{guardando ? "Registrando…" : "Registrar"}</button></div>
+      : <button className="btn ok cuenta-registrar" id="mReg" disabled={guardando} onClick={registrar}>Registrar movimiento</button>}
+  </>;
+}
+
+/** Ventana encima de la cuenta (computador) con el formulario de pago o ajuste. Escape o tocar afuera la cierran
+ *  sin cerrar la cuenta; al registrar se cierra y la cuenta se pinta sola con el saldo nuevo (useDatos). */
+function ModalMovimiento({ cid, alCerrar }: { cid: string; alCerrar: () => void }) {
+  const c = S.clientes[cid], s = saldoCliente(cid);
+  useEffect(() => {
+    // La tecla Escape cerraría también la cuenta (el <dialog>): aquí solo cierra esta ventana.
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); alCerrar(); } };
+    document.addEventListener("keydown", tecla, true);
+    return () => document.removeEventListener("keydown", tecla, true);
+  }, [alCerrar]);
+  return <div className="modal-fondo cuenta-modal-fondo" onClick={e => { if (e.target === e.currentTarget) alCerrar(); }}>
+    <div className="modal-caja cuenta-modal" role="dialog" aria-modal="true" aria-labelledby="cuentaModalTit">
+      <header className="cuenta-modal-cab">
+        <div><h2 id="cuentaModalTit">{yo.esAdmin ? "Registrar pago o ajuste" : "Registrar pago, compra o ganancia"}</h2>
+          <p className="sub">{c?.nombre} · Saldo actual: <b className={s < 0 ? "neg" : s > 0 ? "pos" : ""}>{pesos(Math.abs(s))}</b></p></div>
+        <button type="button" className="cerrar" aria-label="Cerrar" onClick={alCerrar}>×</button>
+      </header>
+      <div className="cuenta-form cuenta-form-modal"><FormMovimiento cid={cid} alListo={alCerrar} alCancelar={alCerrar} /></div>
+    </div>
+  </div>;
+}
+
+/** Abre la cuenta de un cliente en el panel lateral de la izquierda (variante "cuenta"). */
+export const abrirCuenta = (v: ReturnType<typeof useVentana>, cid: string) => v.abrir(<AbrirCuenta cid={cid} />, "cuenta");
+
+/** Cuenta de un cliente: saldo, WhatsApp, registrar pago o ajuste y sus movimientos (abrirCuenta del prototipo).
+ *  En la ficha del celular (`enFicha`) el formulario va arriba de los movimientos; suelta (panel lateral) el
+ *  formulario se abre en una ventana desde el botón "Registrar pago o ajuste" y los movimientos ocupan todo el alto. */
+export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: boolean; volver?: () => void }) {
+  useDatos();
+  const v = useVentana(), c = S.clientes[cid];
+  // Dentro de la ficha móvil se vuelve a la pestaña "Ver cuenta"; suelta, a esta misma ventana.
+  const reabrir = volver ?? (() => abrirCuenta(v, cid));
+  const [formAbierto, setFormAbierto] = useState(false);
+  const cerrarForm = useCallback(() => setFormAbierto(false), []);
+  if (!c) return null;
+  const rows = filasCuenta(cid), pendientes = Object.values(S.pedidos).filter(p => p.clienteId === cid && p.estado === "pendiente").length, s = saldoCliente(cid);
+  const marcarEnviado = () => { try { const k = "js_wa_saldos_" + hoy(), e = new Set(JSON.parse(localStorage.getItem(k) || "[]")); e.add(cid); guardarLocal(k, JSON.stringify([...e])); } catch { /* sin almacenamiento */ } };
   const domi = async (g: string) => {
     const ped = S.pedidos[g]; if (!ped) return;
     if (ped.domiPagado) {
@@ -219,28 +271,19 @@ export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: b
     try { await borrarDe("movimientos", mid); v.avisar("Movimiento quitado"); } catch (e) { v.avisar("No se pudo quitar: " + motivoError(e)); }
     reabrir();
   };
-  return <>
-    {!enFicha && <><Cab sub={<span className="sub">{c.telefono || ""}{pendientes ? ` · ${pendientes} en ruta` : ""}</span>}><h2>{c.nombre}</h2></Cab>
-    <div className={"saldo-grande " + (s < 0 ? "neg" : s > 0 ? "pos" : "")}>{pesos(Math.abs(s))}</div></>}
-    <p className="sub">{s > 0 ? "Cuenta por pagar: JS le debe este valor al cliente." : s < 0 ? "Cuenta por cobrar: el cliente le debe este valor a JS." : "Cuenta a paz y salvo."}</p>
-    {s ? (telWhatsApp(c.telefono) ? <div className="acciones" style={{ margin: "0 0 6px" }}><a className="btn ok" id="cWa" href={linkSaldo(cid)} target="_blank" rel="noopener" onClick={marcarEnviado}><WhatsAppIcon />Enviar {s < 0 ? "cobro" : "saldo a favor"} por WhatsApp</a>
+  const editar = () => v.abrir(<FormCliente id={cid} alGuardar={enFicha ? id => v.abrir(<FichaCliente cid={id} pestana="cuenta" />, "cliente") : undefined} />, "centrada");
+  const explicacion = s > 0 ? "Cuenta por pagar: JS le debe este valor al cliente." : s < 0 ? "Cuenta por cobrar: el cliente le debe este valor a JS." : "Cuenta a paz y salvo.";
+  const whatsapp = s ? (telWhatsApp(c.telefono) ? <div className="acciones" style={{ margin: "0 0 6px" }}><a className="btn ok" id="cWa" href={linkSaldo(cid)} target="_blank" rel="noopener" onClick={marcarEnviado}><WhatsAppIcon />Enviar {s < 0 ? "cobro" : "saldo a favor"} por WhatsApp</a>
       <button className="btn sec" id="cWaCopiar" type="button" onClick={async () => { try { await navigator.clipboard.writeText(textoSaldo(cid)); v.avisar("Mensaje copiado. Pégalo en WhatsApp."); } catch { v.avisar("No se pudo copiar en este navegador"); } }}>Copiar mensaje</button></div>
-      : <div className="aviso">Agrega el celular del cliente para enviarle el saldo por WhatsApp.</div>) : null}
-    {enFicha ? <>
+      : <div className="aviso">Agrega el celular del cliente para enviarle el saldo por WhatsApp.</div>) : null;
+  if (enFicha) return <>
+    <p className="sub">{explicacion}</p>
+    {whatsapp}
     <div className="cuenta-form">
       <h2>{yo.esAdmin ? "Registrar pago o ajuste" : "Registrar pago, compra o ganancia"}</h2>
-      <div className="campo"><label htmlFor="mTipo">Tipo</label><div className="cuenta-select"><select id="mTipo" value={tipo} onChange={e => setTipo(e.target.value as TipoMov)}>{tipos.map(x => <option key={x} value={x}>{MOVS[x].t}</option>)}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></div></div>
-      <div className="cuenta-fila cuenta-fila-dia">
-        <div className="campo"><label htmlFor="mFecha">Día</label><SelectorFecha id="mFecha" valor={dia} alCambiar={setDia} etiqueta="Día" vacio="Elige el día" obligatorio alinear="izquierda" /></div>
-        <div className="campo"><label htmlFor="mVal">Valor</label><div className="cuenta-pesos"><span aria-hidden="true">$</span><input id="mVal" type="number" inputMode="numeric" min="0" step="100" placeholder="0" value={val} onChange={e => setVal(e.target.value)} /></div></div>
-      </div>
-      <div className="cuenta-fila cuenta-fila-medio">
-        <div className="campo"><label htmlFor="mMedio">Medio</label><div className="cuenta-select"><select id="mMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{Object.entries(MEDIOS).map(([x, t]) => <option key={x} value={x}>{t}</option>)}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></div></div>
-        <div className="campo"><label htmlFor="mNota">Nota (opcional)</label><input id="mNota" placeholder="Ej: compra, transferencia" value={nota} onChange={e => setNota(e.target.value)} /></div>
-      </div>
-      <button className="btn ok cuenta-registrar" id="mReg" onClick={registrar}>Registrar movimiento</button>
+      <FormMovimiento cid={cid} alListo={reabrir} />
     </div>
-    <div className="acciones"><button className="btn sec" id="cEdit" onClick={() => v.abrir(<FormCliente id={cid} alGuardar={enFicha ? id => v.abrir(<FichaCliente cid={id} pestana="cuenta" />, "cliente") : undefined} />, "centrada")}>Editar cliente</button></div>
+    <div className="acciones"><button className="btn sec" id="cEdit" onClick={editar}>Editar cliente</button></div>
     <h2>Movimientos</h2>
     {rows.length ? <ul className="cuenta-movs">
       {rows.map((r, i) => <li key={(r.pid || r.mid || "") + i}>
@@ -249,21 +292,31 @@ export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: b
           {r.mid ? (yo.esAdmin ? <button type="button" className="cuenta-mov-quitar" onClick={() => quitarMov(r.mid!)}>Quitar</button> : null) : r.pid && (r.v < 0 || r.dp) ? <button type="button" className="cuenta-mov-domi" onClick={() => domi(r.pid!)}>{r.dp ? "Desmarcar" : "Pagó domicilio"}</button> : null}</div>
       </li>)}
     </ul> : <div className="vacio">Sin movimientos.</div>}
-    </> : <>
-    <h2>{yo.esAdmin ? "Registrar pago o ajuste" : "Registrar pago, compra o ganancia"}</h2>
-    <div className="campo"><label htmlFor="mTipo">Tipo</label><select id="mTipo" value={tipo} onChange={e => setTipo(e.target.value as TipoMov)}>{tipos.map(x => <option key={x} value={x}>{MOVS[x].t}</option>)}</select></div>
-    <div className="linea2"><div className="campo"><label htmlFor="mFecha">Día</label><input id="mFecha" type="date" value={dia} onChange={e => setDia(e.target.value)} /></div>
-      <div className="campo"><label htmlFor="mVal">Valor</label><input id="mVal" type="number" inputMode="numeric" min="0" step="100" value={val} onChange={e => setVal(e.target.value)} /></div></div>
-    <div className="linea2"><div className="campo"><label htmlFor="mMedio">Medio (para pagos)</label><select id="mMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{Object.entries(MEDIOS).map(([x, t]) => <option key={x} value={x}>{t}</option>)}</select></div>
-      <div className="campo"><label htmlFor="mNota">Nota (opcional)</label><input id="mNota" placeholder="Ej: compra, transferencia Nequi" value={nota} onChange={e => setNota(e.target.value)} /></div></div>
-    <div className="acciones"><button className="btn ok" id="mReg" onClick={registrar}>Registrar</button><button className="btn sec" id="cEdit" onClick={() => v.abrir(<FormCliente id={cid} alGuardar={enFicha ? id => v.abrir(<FichaCliente cid={id} pestana="cuenta" />, "cliente") : undefined} />, "centrada")}>Editar cliente</button></div>
-    <h2>Movimientos</h2>
-    {rows.length ? <div className="tabla-env"><table><thead><tr><th>Fecha</th><th>Detalle</th><th className="n">Valor</th><th></th></tr></thead><tbody>
-      {rows.map((r, i) => <tr key={(r.pid || r.mid || "") + i}><td>{hora(r.fecha)}</td><td>{r.det}</td><td className={"n " + (r.v < 0 ? "neg" : "pos")}>{pesos(r.v)}</td>
-        <td>{r.mid ? (yo.esAdmin ? <button className="btn peligro chico" onClick={() => quitarMov(r.mid!)}>Quitar</button> : null) : r.pid && (r.v < 0 || r.dp) ? <button className="btn sec chico" onClick={() => domi(r.pid!)}>{r.dp ? "Desmarcar pago" : "Ya pagó domicilio"}</button> : null}</td></tr>)}
-    </tbody></table></div> : <div className="vacio">Sin movimientos.</div>}
-    </>}
   </>;
+  const estado = s < 0 ? "Por cobrar" : s > 0 ? "Por pagar" : "Cuenta a paz y salvo";
+  return <div className="cuenta-panel">
+    <header className="cuenta-cab">
+      <div className="cuenta-quien">
+        <div className="cuenta-nombre"><h2>{c.nombre}</h2><p className="sub">{c.telefono || "Sin celular"}{pendientes ? ` · ${pendientes} en ruta` : ""}</p></div>
+        <span className="cuenta-sep" aria-hidden="true" />
+        <div className="cuenta-saldo" title={explicacion}><b className={s < 0 ? "neg" : s > 0 ? "pos" : ""}>{pesos(Math.abs(s))}</b><small>{estado}</small></div>
+      </div>
+      <div className="cuenta-botones">
+        <button type="button" className="btn ok" id="cRegistrar" onClick={() => setFormAbierto(true)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>{yo.esAdmin ? "Registrar pago o ajuste" : "Registrar movimiento"}</span></button>
+        <button type="button" className="btn sec" id="cEdit" onClick={editar}><IconoEditar /><span>Editar cliente</span></button>
+        <button type="button" className="cerrar" data-cerrar aria-label="Cerrar cuenta">×</button>
+      </div>
+    </header>
+    <div className="cuenta-cuerpo">
+      {s ? <div className="cuenta-wa"><p className="sub">{explicacion}</p>{whatsapp}</div> : null}
+      <div className="cuenta-movs-cab"><h3>Movimientos</h3><span>{rows.length} {rows.length === 1 ? "registro" : "registros"}</span></div>
+      {rows.length ? <div className="cuenta-tabla"><table><thead><tr><th>Fecha</th><th>Detalle</th><th className="n">Valor</th><th className="n">Acción</th></tr></thead><tbody>
+        {rows.map((r, i) => <tr key={(r.pid || r.mid || "") + i}><td className="cuenta-fecha">{hora(r.fecha)}</td><td className="cuenta-det">{r.det}</td><td className={"n " + (r.v < 0 ? "neg" : "pos")}>{pesos(r.v)}</td>
+          <td className="n">{r.mid ? (yo.esAdmin ? <button className="btn peligro chico" onClick={() => quitarMov(r.mid!)}>Quitar</button> : null) : r.pid && (r.v < 0 || r.dp) ? <button className="btn sec chico" onClick={() => domi(r.pid!)}>{r.dp ? "Desmarcar pago" : "Ya pagó domicilio"}</button> : null}</td></tr>)}
+      </tbody></table></div> : <div className="vacio">Sin movimientos.</div>}
+    </div>
+    {formAbierto && <ModalMovimiento cid={cid} alCerrar={cerrarForm} />}
+  </div>;
 }
 
 /** Fila de la lista de clientes en el celular: nombre, domicilio, saldo con su estado y flecha. */
