@@ -1484,3 +1484,47 @@
   .jsl .sd-acciones .btn span{display:none}
 }
 .jsl .sd-resumen dd.sd-cero{font-weight:400;color:var(--suave)}
+
+/* Personal JS en el celular (< 768 px): lista de Nombre, Tipo y Ver, y una hoja con la ficha y las acciones.
+   La tabla de escritorio no cambia. */
+.jsl .per-lista{display:none;background:var(--papel);border:1px solid var(--linea);border-radius:16px;overflow:hidden}
+.jsl .per-lista-cab{display:grid;grid-template-columns:minmax(0,1fr) 104px 64px;gap:8px;padding:10px 14px;background:var(--hueco);border-bottom:1px solid var(--linea);font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--suave)}
+.jsl .per-lista-cab span:nth-child(2){text-align:center}
+.jsl .per-lista-cab span:nth-child(3){text-align:right}
+.jsl .per-lista ul{list-style:none;margin:0;padding:0}
+.jsl .per-lista li + li{border-top:1px solid var(--linea)}
+.jsl .per-lista li button{display:grid;grid-template-columns:minmax(0,1fr) 104px 64px;align-items:center;gap:8px;width:100%;min-height:52px;padding:10px 14px;border:0;background:none;color:var(--tinta);text-align:left;cursor:pointer}
+.jsl .per-lista li button:active{background:var(--hueco)}
+.jsl .per-lista li b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.9rem}
+.jsl .per-tipo-etq{justify-self:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:3px 10px;border-radius:999px;background:var(--hueco);border:1px solid var(--linea);font-size:.7rem;font-weight:700;color:var(--suave)}
+.jsl .per-ver{justify-self:end;display:inline-flex;align-items:center;gap:4px;padding:6px 9px;border-radius:10px;background:var(--mango-claro);color:var(--marca);font-size:.72rem;font-weight:800}
+.jsl .per-ver svg{width:14px;height:14px}
+@media (max-width:767px){
+  .jsl .per-tabla{display:none}
+  .jsl .per-lista{display:block}
+}
+.jsl .per-ficha-cab{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px}
+.jsl .per-ficha-cab h2{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0;font-size:1.15rem;overflow-wrap:anywhere}
+.jsl .per-ficha-cab .sub{margin:2px 0 0;font-size:.8rem}
+.jsl .per-ficha-datos{margin:0 0 16px;padding:6px 16px;border:1px solid var(--linea);border-radius:14px;background:var(--hueco);font-size:.88rem}
+.jsl .per-ficha-datos div{display:flex;justify-content:space-between;align-items:center;gap:14px;min-height:44px;padding:6px 0}
+.jsl .per-ficha-datos div + div{border-top:1px solid var(--linea)}
+.jsl .per-ficha-datos dt{flex:none;color:var(--suave)}
+.jsl .per-ficha-datos dd{margin:0;min-width:0;text-align:right;font-weight:700;overflow-wrap:anywhere}
+.jsl .per-tel-acc{display:inline-flex;align-items:center;gap:10px}
+.jsl .per-wa{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:#25D366;color:#fff}
+.jsl .per-wa svg{width:18px;height:18px}
+.jsl .per-ficha-pie{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.jsl .per-ficha-pie .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;font-weight:700}
+.jsl .per-ficha-pie .btn svg{width:16px;height:16px;flex:none}
+.jsl .per-ficha-pie .btn:disabled{opacity:.4;cursor:default}
+.jsl .btn.per-liberar{background:var(--amarillo-claro);color:var(--amarillo);border:1px solid color-mix(in srgb,var(--amarillo) 30%,transparent)}
+.jsl .btn.per-quitar{grid-column:1/-1;background:var(--rojo-claro);color:var(--rojo);border:1px solid color-mix(in srgb,var(--rojo) 30%,transparent)}
+.jsl .per-ficha-pie .btn{white-space:nowrap;font-size:.85rem;padding-left:10px;padding-right:10px}
+@media (max-width:360px){
+  .jsl .per-lista-cab,.jsl .per-lista li button{grid-template-columns:minmax(0,1fr) 90px 40px;gap:6px;padding-left:12px;padding-right:12px}
+  .jsl .per-lista-cab span:nth-child(3){font-size:0}
+  .jsl .per-ver{padding:7px}
+  .jsl .per-ver span{display:none}
+  .jsl .per-tipo-etq{padding:3px 8px}
+}

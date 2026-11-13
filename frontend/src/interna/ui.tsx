@@ -53,6 +53,7 @@ export const IconoEditar = () => svg(<><path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0
 export const IconoCorreo = () => svg(<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3.5 6.5 12 13l8.5-6.5" /></>);
 export const IconoCargando = () => svg(<path d="M21 12a9 9 0 1 1-3.2-6.9" />);
 export const IconoEnviar = () => svg(<><path d="M21 3 10.5 13.5" /><path d="M21 3l-6.5 18-4-7.5L3 9.5 21 3z" /></>);
+export const IconoOjo = () => svg(<><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="3" /></>);
 export const IconoTresPuntos = () => svg(<><circle cx="12" cy="5" r="1.4" fill="currentColor" /><circle cx="12" cy="12" r="1.4" fill="currentColor" /><circle cx="12" cy="19" r="1.4" fill="currentColor" /></>);
 export const IconoCorreoMasivo = () => svg(<><rect x="3" y="4.5" width="18" height="14" rx="2" /><path d="M3.5 6 12 12.5 20.5 6" /><path d="M15.5 17.5l1.8 1.8 3.2-3.8" /></>);
 
