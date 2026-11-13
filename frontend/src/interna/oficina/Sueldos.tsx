@@ -1,13 +1,13 @@
 /* Oficina → Sueldos: la planilla de la semana, el cálculo del sueldo de Javier y los adelantos (pintarSueldos del prototipo). */
 import { useState } from "react";
 import {
-  S, hoy, hora, pesos, fechaLarga, resumenSemana, moverSemana, semanaDe, tipoDe, jornada, valorAdel, sueldoPrevio, yaContado, liquidacionesDe,
+  S, hoy, hora, pesos, fechaLarga, resumenSemana, sueldoPersonaSemana, moverSemana, semanaDe, tipoDe, jornada, valorAdel, sueldoPrevio, yaContado, liquidacionesDe,
   MEDIOS, TIPOS, PAGO_FIJO, DIAS_SEM, DESC_SUELDO, type Medio, type Persona,
 } from "../motor";
-import { Cab, useVentana } from "../ui";
+import { Cab, IconoCalendario, useVentana } from "../ui";
 import { E } from "../estado";
 import { devolverAdelanto, guardarPersona, ponerJornada, quitarAdelanto } from "../acciones";
-import { motivoError } from "../datos";
+import { motivoError, useDatos } from "../datos";
 import { MovCaja } from "./modales";
 
 type Ventana = ReturnType<typeof useVentana>;
@@ -15,20 +15,14 @@ const MEDIOS_K = Object.keys(MEDIOS) as Medio[];
 const fallo = (v: Ventana) => (e: unknown) => v.avisar("No se pudo guardar: " + motivoError(e));
 
 export default function Sueldos({ pintar }: { pintar: () => void }) {
-  const v = useVentana(), R = resumenSemana(E.semA), hoyS = hoy();
+  const v = useVentana(), R = resumenSemana(E.semA);
   const tot = R.filas.reduce((a, f) => ({ total: a.total + f.total, adel: a.adel + f.adel, pagado: a.pagado + f.pagado, neto: a.neto + f.neto }), { total: 0, adel: 0, pagado: 0, neto: 0 });
   const dueno = Object.values(S.mensajeros).find(m => tipoDe(m) === "dueno");
   const adelSem = R.filas.flatMap(f => f.adelantos.map(c => ({ ...c, nom: f.m.nombre }))).sort((a, b) => a.fecha - b.fecha);
-  const [ocupado, setOcupado] = useState("");
   const sem = (w: string) => { E.semA = w; pintar(); };
-  // Un toque marca el día con el pago por día de la persona; otro toque lo quita
-  const tocarDia = async (m: Persona, dia: string) => {
-    if (!Number(m.tarifa) && !jornada(m.id, dia)) return v.abrir(<PedirTarifa m={m} despues={() => ponerJornada(m.id, dia, Number(S.mensajeros[m.id]?.tarifa) || 0)} />, "centrada-ancha");
-    setOcupado(m.id + dia);
-    try { await ponerJornada(m.id, dia, jornada(m.id, dia) ? 0 : Number(m.tarifa)); } catch (e) { fallo(v)(e); }
-    setOcupado("");
-  };
-  const enlace = (t: string, f: () => void) => <a href="#" className="enlace" onClick={e => { e.preventDefault(); f(); }}>{t}</a>;
+  const detalle = (mid: string) => v.abrir(<DetalleSueldo mid={mid} sem={R.sem} />, "centrada-ancha");
+  const adelanto = (mid: string) => v.abrir(<MovCaja tipo="sale" pre={{ cat: "adelanto", personaId: mid, semana: R.sem }} />, "centrada-ancha");
+  const pagar = (mid: string, neto: number) => v.abrir(<MovCaja tipo="sale" pre={{ cat: "sueldo", personaId: mid, valor: neto, semana: R.sem }} />, "centrada-ancha");
   return <>
     <h1>Sueldos</h1><p className="sub">Semana del {fechaLarga(R.dias[0])} al {fechaLarga(R.dias[6])}</p>
     <div className="acciones" style={{ marginBottom: 14 }}><button className="btn sec chico" id="semAnt" onClick={() => sem(moverSemana(E.semA, -1))}>← Semana anterior</button><button className="btn sec chico" id="semHoy" onClick={() => sem(semanaDe(hoy()))}>Esta semana</button><button className="btn sec chico" id="semSig" onClick={() => sem(moverSemana(E.semA, 1))}>Semana siguiente →</button></div>
@@ -39,16 +33,32 @@ export default function Sueldos({ pintar }: { pintar: () => void }) {
       <div className="cifra"><span>Ya pagado</span><b>{pesos(tot.pagado)}</b></div>
       <div className="cifra fuerte"><span>Neto por pagar</span><b>{pesos(tot.neto)}</b></div>
     </div>
-    {R.filas.length ? <div className="tabla-env"><table><thead><tr><th>Persona</th>{R.dias.map((d, i) => <th className="n" key={d}>{DIAS_SEM[i]} {d.slice(8)}</th>)}<th className="n">Anterior</th><th className="n">Total</th><th className="n">Adelantos</th><th className="n">Pagado</th><th className="n">Neto</th><th></th></tr></thead><tbody>
-      {R.filas.map(f => { const t = tipoDe(f.m), editable = PAGO_FIJO.includes(t); return <tr key={f.m.id}>
-        <td><b>{f.m.nombre}</b><br /><span className="sub" style={{ fontSize: ".8rem" }}>{TIPOS[t]}</span>{editable && <><br /><span className="sub" style={{ fontSize: ".8rem" }}>{f.m.tarifa ? <>{pesos(f.m.tarifa)} por día · {enlace("cambiar", () => v.abrir(<PedirTarifa m={f.m} />, "centrada-ancha"))} · {enlace("otro valor", () => v.abrir(<OtroValor m={f.m} dias={R.dias} />, "centrada-ancha"))}</> : enlace("Poner pago por día", () => v.abrir(<PedirTarifa m={f.m} />, "centrada-ancha"))}</span></>}</td>
-        {R.dias.map((d, i) => { const j = jornada(f.m.id, d); return <td className="n" key={d}>{editable ? <button className="dia-btn" aria-pressed={!!j} disabled={(d > hoyS && !j) || ocupado === f.m.id + d} aria-label={`${f.m.nombre} ${DIAS_SEM[i]} ${d.slice(8)}: ${j ? "trabajó" : "no trabajó"}`} onClick={() => tocarDia(f.m, d)}>{j ? "✓ " + pesos(j) : "—"}</button>
-          : f.vals[i] ? <span className={f.vals[i] < 0 ? "neg" : ""}>{pesos(f.vals[i])}</span> : "—"}</td>; })}
-        <td className="n"><a href="#" className="enlace" title="Sueldo que llevaba antes de la app" onClick={e => { e.preventDefault(); v.abrir(<EditarPrevio m={f.m} sem={R.sem} />, "centrada-ancha"); }}>{f.previo ? pesos(f.previo) : "+"}</a></td>
-        <td className="n"><b>{pesos(f.total)}</b></td><td className="n">{f.adel ? pesos(f.adel) : "—"}</td><td className="n">{f.pagado ? pesos(f.pagado) : "—"}</td><td className="n"><b className={f.neto < 0 ? "neg" : ""}>{pesos(f.neto)}</b></td>
-        <td><div className="acciones" style={{ margin: 0, flexWrap: "nowrap" }}><button className="btn sec chico" onClick={() => v.abrir(<MovCaja tipo="sale" pre={{ cat: "adelanto", personaId: f.m.id, semana: R.sem }} />, "centrada-ancha")}>Adelanto</button>{f.neto > 0 && <button className="btn ok chico" onClick={() => v.abrir(<MovCaja tipo="sale" pre={{ cat: "sueldo", personaId: f.m.id, valor: f.neto, semana: R.sem }} />, "centrada-ancha")}>Pagar</button>}</div></td></tr>; })}
-      <tr><td><b>Total</b></td>{R.dias.map((d, i) => <td className="n" key={d}>{pesos(R.filas.reduce((a, f) => a + f.vals[i], 0))}</td>)}<td className="n">{pesos(R.filas.reduce((a, f) => a + f.previo, 0))}</td><td className="n"><b>{pesos(tot.total)}</b></td><td className="n">{pesos(tot.adel)}</td><td className="n">{pesos(tot.pagado)}</td><td className="n"><b>{pesos(tot.neto)}</b></td><td></td></tr>
-    </tbody></table></div> : <div className="vacio">Registra tu personal en la pestaña Personal.</div>}
+    {R.filas.length ? <>
+      {/* Computador: tabla resumida (el detalle de cada día va en la ventana "Detalle de sueldo"). */}
+      <div className="tabla-env sueldos-tabla"><table><thead><tr><th>Persona</th><th className="n">Anterior</th><th className="n">Total</th><th className="n">Adelantos</th><th className="n">Pagado</th><th className="n">Neto</th><th className="n">Acciones</th></tr></thead><tbody>
+        {R.filas.map(f => <tr key={f.m.id}>
+          <td><b>{f.m.nombre}</b><span className="sd-rol">{TIPOS[tipoDe(f.m)]}</span></td>
+          <td className="n"><a href="#" className="enlace" title="Sueldo que llevaba antes de la app" onClick={e => { e.preventDefault(); v.abrir(<EditarPrevio m={f.m} sem={R.sem} />, "centrada-ancha"); }}>{f.previo ? pesos(f.previo) : "+"}</a></td>
+          <td className="n"><b>{pesos(f.total)}</b></td>
+          <td className={"n" + (f.adel ? " sd-adel" : "")}>{f.adel ? pesos(f.adel) : "—"}</td>
+          <td className={"n" + (f.pagado ? " sd-pagado" : "")}>{f.pagado ? pesos(f.pagado) : "—"}</td>
+          <td className="n"><b className={"sd-neto" + (f.neto < 0 ? " neg" : "")}>{pesos(f.neto)}</b></td>
+          <td className="n"><div className="sd-acciones">
+            <button className="btn sec chico" onClick={() => detalle(f.m.id)} aria-label={"Ver detalle de " + f.m.nombre}><IconoCalendario /><span>Detalle</span></button>
+            <button className="btn sec chico sd-rapido" onClick={() => adelanto(f.m.id)}>Adelanto</button>
+            <button className="btn ok chico sd-rapido" disabled={f.neto <= 0} onClick={() => pagar(f.m.id, f.neto)}>Pagar</button>
+          </div></td></tr>)}
+        <tr className="sd-total"><td><b>Total</b></td><td className="n">{pesos(R.filas.reduce((a, f) => a + f.previo, 0))}</td><td className="n"><b>{pesos(tot.total)}</b></td><td className="n">{pesos(tot.adel)}</td><td className="n">{pesos(tot.pagado)}</td><td className="n"><b>{pesos(tot.neto)}</b></td><td></td></tr>
+      </tbody></table></div>
+      {/* Celular: una fila por persona con su neto; al tocarla se abre el mismo detalle. */}
+      <ul className="sueldos-lista">
+        {R.filas.map(f => <li key={f.m.id}><button type="button" onClick={() => detalle(f.m.id)}>
+          <span className="sd-quien"><b>{f.m.nombre}</b><span className="sd-rol">{TIPOS[tipoDe(f.m)]}</span></span>
+          <span className="sd-cuanto"><b className={f.neto < 0 ? "neg" : ""}>{pesos(f.neto)}</b><small>{f.neto > 0 ? "Neto a pagar" : f.neto < 0 ? "Debe" : f.pagado ? "Pagado" : "Sin saldo"}</small></span>
+          <span className="sd-flecha" aria-hidden="true">›</span>
+        </button></li>)}
+      </ul>
+    </> : <div className="vacio">Registra tu personal en la pestaña Personal.</div>}
     <p className="sub" style={{ marginTop: 10 }}>Mensajeros: 70% de sus domicilios del día − {pesos(DESC_SUELDO)}. Patinadores, oficina y JS: toca cada día que trabajó (se marca con su pago por día); toca otra vez para quitarlo. Para un valor distinto, usa “otro valor”. Los domicilios de pedidos a nombre de oficina son 100% de JS y suman al sueldo de Javier.</p>
     {dueno && <><h2>Cálculo del sueldo de {dueno.nombre}</h2><div className="tabla-env"><table><thead><tr><th>Día</th><th className="n">30% domicilios mensajeros</th><th className="n">Domicilios propios y de oficina</th><th className="n">Ganancias ocasionales</th><th className="n">{pesos(DESC_SUELDO)} × mensajeros</th><th className="n">− Pagos fijos (patinadores, oficina, JS)</th><th className="n">Sueldo</th></tr></thead><tbody>
       {R.dias.some((_, i) => { const x = R.porDia[i]; return x.dom30 || x.propios || x.fijos || x.ganancias; })
@@ -61,6 +71,55 @@ export default function Sueldos({ pintar }: { pintar: () => void }) {
         <td>{valorAdel(c) > 0 ? <button className="btn sec chico" onClick={() => v.abrir(<QuitarAdelanto id={c.id} />, "centrada-ancha")}>Devolvió / Quitar</button> : <span className="sub">Devuelto</span>}</td></tr>)}
     </tbody></table></div> : <div className="vacio">Sin adelantos esta semana. Usa el botón “Adelanto” en cada persona.</div>}
   </>;
+}
+
+const DIAS_LARGOS = ["Sábado", "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const diaCorto = (d: string) => d.slice(8) + " " + MESES[Number(d.slice(5, 7)) - 1];
+
+/** Detalle de sueldo de una persona en la semana: los 7 días, el resumen y los botones de Adelanto y Pagar.
+ *  Lee los datos en cada render (useDatos), así se ve al instante cuando se marca o quita un día. */
+function DetalleSueldo({ mid, sem }: { mid: string; sem: string }) {
+  useDatos();
+  const v = useVentana(), m = S.mensajeros[mid], hoyS = hoy();
+  const [ocupado, setOcupado] = useState("");
+  if (!m) return null;
+  const r = sueldoPersonaSemana(mid, sem), t = tipoDe(m), editable = PAGO_FIJO.includes(t);
+  const volver = () => v.abrir(<DetalleSueldo mid={mid} sem={sem} />, "centrada-ancha");
+  const tocarDia = async (dia: string) => {
+    if (!Number(m.tarifa) && !jornada(mid, dia)) return v.abrir(<PedirTarifa m={m} despues={async () => { await ponerJornada(mid, dia, Number(S.mensajeros[mid]?.tarifa) || 0); volver(); }} />, "centrada-ancha");
+    setOcupado(dia);
+    try { await ponerJornada(mid, dia, jornada(mid, dia) ? 0 : Number(m.tarifa)); } catch (e) { fallo(v)(e); }
+    setOcupado("");
+  };
+  const enlace = (txt: string, f: () => void) => <a href="#" className="enlace" onClick={e => { e.preventDefault(); f(); }}>{txt}</a>;
+  return <div className="sd-detalle">
+    <header className="sd-cab">
+      <div><h2>{m.nombre} <span className="sd-badge">{TIPOS[t]}</span></h2><p className="sub">{DIAS_SEM[0]} {diaCorto(r.dias[0])} – {DIAS_SEM[6]} {diaCorto(r.dias[6])}</p></div>
+      <button className="cerrar" data-cerrar aria-label="Cerrar">×</button>
+    </header>
+    <h3 className="sd-titulo">Desglose diario de la semana</h3>
+    {editable && <p className="sub sd-ayuda">{m.tarifa ? <>Toca un día para marcarlo con {pesos(m.tarifa)}; otro toque lo quita. {enlace("Cambiar pago por día", () => v.abrir(<PedirTarifa m={m} despues={async () => volver()} />, "centrada-ancha"))} · {enlace("otro valor", () => v.abrir(<OtroValor m={m} dias={r.dias} />, "centrada-ancha"))}</> : enlace("Poner pago por día", () => v.abrir(<PedirTarifa m={m} despues={async () => volver()} />, "centrada-ancha"))}</p>}
+    <ul className="sd-dias">
+      {r.dias.map((d, i) => { const val = r.vals[i], j = jornada(mid, d); return <li key={d}>
+        <span>{DIAS_LARGOS[i]} <small>{diaCorto(d)}</small></span>
+        {editable
+          ? <button className="dia-btn" aria-pressed={!!j} disabled={(d > hoyS && !j) || ocupado === d} aria-label={`${DIAS_LARGOS[i]} ${diaCorto(d)}: ${j ? "trabajó" : "no trabajó"}`} onClick={() => tocarDia(d)}>{j ? "✓ " + pesos(j) : "—"}</button>
+          : <b className={val < 0 ? "neg" : val ? "" : "sd-cero"}>{val ? pesos(val) : "—"}</b>}
+      </li>; })}
+    </ul>
+    <dl className="sd-resumen">
+      <div><dt>Sueldo anterior</dt><dd>{enlace(r.previo ? pesos(r.previo) : "Agregar", () => v.abrir(<EditarPrevio m={m} sem={sem} despues={volver} />, "centrada-ancha"))}</dd></div>
+      <div><dt>Total semana</dt><dd>{pesos(r.total)}</dd></div>
+      <div><dt>Adelantos</dt><dd className={r.adel ? "sd-adel" : "sd-cero"}>{r.adel ? "− " + pesos(r.adel) : "—"}</dd></div>
+      <div><dt>Ya pagado</dt><dd className={r.pagado ? "sd-pagado" : "sd-cero"}>{r.pagado ? "− " + pesos(r.pagado) : "—"}</dd></div>
+      <div className="sd-neto-fila"><dt>Neto por pagar</dt><dd className={r.neto < 0 ? "neg" : ""}>{pesos(r.neto)}</dd></div>
+    </dl>
+    <div className="sd-pie">
+      <button className="btn sec" onClick={() => v.abrir(<MovCaja tipo="sale" pre={{ cat: "adelanto", personaId: mid, semana: sem }} />, "centrada-ancha")}>Adelanto</button>
+      <button className="btn ok" disabled={r.neto <= 0} onClick={() => v.abrir(<MovCaja tipo="sale" pre={{ cat: "sueldo", personaId: mid, valor: r.neto, semana: sem }} />, "centrada-ancha")}>Pagar</button>
+    </div>
+  </div>;
 }
 
 /** Adelanto que se devuelve (entra hoy a la caja) o que se registró por error (se borra). */
@@ -111,12 +170,12 @@ function PedirTarifa({ m, despues }: { m: Persona; despues?: () => Promise<unkno
 }
 
 /** Lo que ya llevaba ganado esa semana antes de registrarlo en la app. */
-function EditarPrevio({ m, sem }: { m: Persona; sem: string }) {
+function EditarPrevio({ m, sem, despues }: { m: Persona; sem: string; despues?: () => void }) {
   const v = useVentana(), actual = sueldoPrevio(m.id, sem);
   const [val, setVal] = useState(actual ? String(actual) : ""), [guardando, setGuardando] = useState(false);
   const guardar = async () => {
     const x = Number(val) || 0; setGuardando(true);
-    try { if (x > 0 || actual) await ponerJornada(m.id, sem, x, true); v.cerrar(); v.avisar("Sueldo anterior de " + m.nombre + ": " + pesos(x)); }
+    try { if (x > 0 || actual) await ponerJornada(m.id, sem, x, true); if (despues) despues(); else v.cerrar(); v.avisar("Sueldo anterior de " + m.nombre + ": " + pesos(x)); }
     catch (e) { setGuardando(false); fallo(v)(e); }
   };
   return <div className="form-modal">

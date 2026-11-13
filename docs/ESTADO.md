@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Sueldos: tabla resumida y "Detalle de sueldo" — 2026-11-13
+
+- La tabla de Sueldos ya no muestra los 7 días: tiene Persona (con su tipo), Anterior, Total, Adelantos, Pagado, Neto y Acciones (Detalle, Adelanto, Pagar). Si la tabla queda de menos de 900 px (menú lateral abierto en una pantalla chica), una container query deja solo "Detalle". En el celular (< 768 px) es una lista: nombre, tipo y neto, y al tocarla se abre el detalle.
+- `DetalleSueldo` (en `oficina/Sueldos.tsx`) es la ventana "centrada-ancha" con los 7 días, el resumen y Adelanto/Pagar (las mismas `MovCaja` de antes). Usa `sueldoPersonaSemana` y `useDatos()` para pintarse de nuevo al marcar un día. A patinadores, oficina y JS se les marcan los días ahí mismo (`dia-btn`), con "Cambiar pago por día" y "otro valor"; el sueldo anterior se edita desde el resumen y vuelve al detalle.
+- Los cálculos no cambiaron (`resumenSemana` y `sueldoPersonaSemana` de `motor.ts`).
+
 ## "Más" del celular sin pestañas repetidas — 2026-11-13
 
 - En el celular la barra de abajo tiene Inicio, Pedidos, Solicitudes, Clientes y **Más**. "Más" abre la hoja "Más secciones" (`abrirMenu` en `interna/Marco.tsx`) solo con lo que no cabe en la barra: Caja, Cuentas, Sueldos, Resultados, Personal, Historial, Papelera y Respaldo, en dos columnas y con la activa resaltada. El botón dice siempre "Más" y se marca como activo si la pestaña abierta es una de esas.
