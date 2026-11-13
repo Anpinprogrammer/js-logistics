@@ -252,3 +252,50 @@ test("ensayo con datos generados como los de la app (varias semillas, con una pe
     assert.ok(r.firebase.conteos.pedidos > 400);
   }
 });
+
+test("--reemplazar con datos que solo existen en el sistema nuevo: borra la caja del patinador y conserva las solicitudes con su remitente", async () => {
+  await reiniciarBase();
+  await escribir(exportacion());
+  await importar({ carpeta, conFotos: false, log: silencio });
+  // Un pago anotado por el patinador (m2) y su abono en la cuenta del cliente, como lo hace POST /patinador/pagos.
+  await pool.query(`INSERT INTO movimientos (id, cliente_id, tipo, valor, nota) VALUES ('pat_x1', 'c1', 'abono', 12000, 'Recibido por Patricia')`);
+  await pool.query(`INSERT INTO caja_patinador (id, mensajero_id, cliente_id, concepto, valor, movimiento_id) VALUES ('x1', 'm2', 'c1', 'Domicilios', 12000, 'pat_x1')`);
+  // Una solicitud del portal (con remitente), una pública y una asignada a una guía que se creó en el sistema nuevo.
+  await pool.query(`INSERT INTO pedidos (guia, n, mensajero_id, cliente_id) VALUES ('JS-00050', 50, 'm1', 'c1')`);
+  const sol = `INSERT INTO solicitudes (id, estado, origen, nombre, telefono, email, direccion_recogida, paquetes, destinatario_nombre, direccion_entrega, cliente_id, mensajero_id, guia)
+    VALUES ($1, $2, $3, 'Moda Bella', '3104567890', 'tienda@js.co', 'Cra 1', 1, 'Laura', 'Cl 2', $4, $5, $6)`;
+  await pool.query(sol, ["s1", "pendiente", "portal", "c1", null, null]);
+  await pool.query(sol, ["s2", "pendiente", "publico", null, null, null]);
+  await pool.query(sol, ["s3", "asignada", "portal", "c1", "m1", "JS-00050"]);
+
+  const inf = await importar({ carpeta, reemplazar: true, conFotos: false, log: silencio });
+  assert.equal(await cuantos("caja_patinador"), 0, "la caja del patinador es operación del sistema nuevo: se vacía como lo demás");
+  assert.equal(await cuantos("movimientos WHERE id = 'pat_x1'"), 0);
+  assert.equal(await cuantos("solicitudes"), 3, "las solicitudes no vienen de Firebase: se conservan");
+  assert.equal((await uno(`SELECT cliente_id FROM solicitudes WHERE id = 's1'`)).cliente_id, "c1", "conserva el remitente");
+  const s3 = await uno(`SELECT cliente_id, mensajero_id, guia FROM solicitudes WHERE id = 's3'`);
+  assert.deepEqual(s3, { cliente_id: "c1", mensajero_id: "m1", guia: null }, "la guía del sistema nuevo ya no existe");
+  assert.deepEqual(inf.colecciones.sistemaNuevo.avisos["pagos de patinador borrados (con su abono)"], ["x1"]);
+  assert.deepEqual(inf.colecciones.sistemaNuevo.avisos["solicitud que perdió su guía (la guía no está en Firebase)"], ["s3"]);
+});
+
+test("volver a importar no deshace lo que administración configuró en el sistema nuevo: rol patinador y vínculo con Personal", async () => {
+  await reiniciarBase();
+  const datos = exportacion();
+  // En la app vieja la patinadora entra como mensajera, vinculada a su ficha de tipo patinador.
+  datos.auth.push({ id: "uPat", datos: { email: "patricia@js.co" } });
+  datos.usuarios.push({ id: "uPat", datos: { email: "patricia@js.co", nombre: "Patricia", rol: "mensajero" } });
+  datos.vinculos.push({ id: "uPat", datos: { mensajeroId: "m2" } });
+  await escribir(datos);
+  await importar({ carpeta, conFotos: false, log: silencio });
+  await pool.query(`UPDATE usuarios SET rol = 'patinador' WHERE id = 'uPat'`);
+  // Una cuenta creada solo en el sistema nuevo y una de Firebase sin vínculo, que administración vinculó aquí.
+  await pool.query(`INSERT INTO usuarios (id, email, rol, mensajero_id) VALUES ('uNueva', 'nueva@js.co', 'asistente', 'm1')`);
+  await pool.query(`UPDATE usuarios SET mensajero_id = 'm1' WHERE id = 'uAdmin'`);
+  for (const reemplazar of [false, true]) {
+    await importar({ carpeta, reemplazar, conFotos: false, log: silencio });
+    assert.deepEqual(await uno(`SELECT rol, mensajero_id FROM usuarios WHERE id = 'uPat'`), { rol: "patinador", mensajero_id: "m2" }, `reemplazar=${reemplazar}`);
+    assert.equal((await uno(`SELECT mensajero_id FROM usuarios WHERE id = 'uNueva'`)).mensajero_id, "m1", `reemplazar=${reemplazar}`);
+    assert.equal((await uno(`SELECT mensajero_id FROM usuarios WHERE id = 'uAdmin'`)).mensajero_id, "m1", `reemplazar=${reemplazar}`);
+  }
+});

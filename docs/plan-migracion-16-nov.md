@@ -6,7 +6,7 @@ Paso a paso para pasar de Firebase (app vieja) a Supabase (sistema nuevo). Los c
 
 ## Antes de empezar (miércoles 11 y jueves 12)
 
-1. Unir los PR de esta revisión en `js-logistics` (importación y verificación) y en `jslogistics-cliente-frontend` (pantalla `/activar-cuenta`), y desplegarlos.
+1. Unir los PR de esta revisión en `js-logistics` (importación y verificación) y en `jslogistics-cliente-frontend` (pantalla `/activar-cuenta`), y desplegarlos. También el de la revisión del 13 de noviembre (`--reemplazar` con la caja del patinador, las solicitudes y las cuentas configuradas en el sistema nuevo).
 2. Tener a mano:
    - la llave de la cuenta de servicio de Firebase (`backend/migracion/llave.json`), solo en el computador de quien exporta;
    - un `.env` para el **ensayo** (base de pruebas + un bucket de Storage de pruebas) y otro para **producción**, con `DATABASE_URL_MIGRACIONES` apuntando al **Session pooler** (puerto 5432): los scripts de base (`db:migrar`, `db:importar`, `db:verificar`) la usan en vez del Transaction pooler de la app;
@@ -41,6 +41,8 @@ Qué hacer con lo que salga:
 | `categoría desconocida` (caja) | Cambia la caja. Revisar qué es y corregirlo en la app vieja. |
 | `el correo ya lo usa otra cuenta` | Dos cuentas con el mismo correo en Firebase: dejar una. |
 | `persona quitada… queda inactiva` | Normal: conserva la plata de quien ya no trabaja. No hay que hacer nada. |
+| `pagos de patinador borrados` (`sistemaNuevo`) | Solo con `--reemplazar`: eran pruebas en el sistema nuevo. Si alguno era real, anótalo de nuevo después del cambio. |
+| `solicitud que perdió su guía` (`sistemaNuevo`) | Solo con `--reemplazar`: la guía se creó en el sistema nuevo. Revisa esa solicitud en la oficina después del cambio. |
 | `cerrada sin hora de entrega` | Se usó la hora de salida. Revisar si importa. |
 
 ## Ensayo 2 (viernes 13)
@@ -48,7 +50,8 @@ Qué hacer con lo que salga:
 Con lo corregido, repetir todo en la base de ensayo **desde cero** y comprobar:
 1. `db:verificar` dice **"Todo da igual"** (o solo diferencias que ya se revisaron y se aceptaron por escrito).
 2. Entrar con `npm run db:admin -- --email <tu correo> --clave … --restablecer` y revisar: algunas guías, el saldo de 3 o 4 clientes conocidos, la caja del día, lo pendiente de cada mensajero y una foto de entrega.
-3. Mandarte a ti mismo una invitación desde **Restablecimiento masivo** y activar la cuenta en `/activar-cuenta`.
+3. En **Personal → Acceso**, pasar a **Patinador** las cuentas de los patinadores (en la app vieja entraban como mensajeros) y entrar con una para ver que abre Mi caja.
+4. Mandarte a ti mismo una invitación desde **Restablecimiento masivo** y activar la cuenta en `/activar-cuenta`.
 
 ## Precarga en producción (sábado 14 o domingo 15)
 
@@ -62,7 +65,9 @@ npm run db:importar -- --carpeta ../exportacion-… --reemplazar --si
 npm run db:verificar -- --carpeta ../exportacion-…
 ```
 
-No mandes invitaciones todavía y no le pongas contraseña a nadie salvo a administración.
+No mandes invitaciones todavía y no le pongas contraseña a nadie salvo a administración. Sí puedes pasar a Patinador las cuentas de los patinadores: el `--reemplazar` del lunes lo conserva.
+
+Desde la precarga, lo que se anote en la base de producción (pagos de patinador, guías, caja) se borra el lunes con `--reemplazar`. Las solicitudes que lleguen por la landing o el portal sí se conservan.
 
 ## El lunes 16
 
@@ -76,7 +81,7 @@ Hora de Colombia. Los tiempos son de ejemplo: ajústalos con lo que tardó el en
 | 6:40 | `db:migrar` → `db:importar --simular` → revisar el informe | Backend |
 | 6:50 | `db:importar --reemplazar --si` (las fotos ya subidas no se repiten) | Backend |
 | 7:10 | `db:verificar`. **Punto de decisión** (abajo). | Backend + administración |
-| 7:20 | Contraseña de administración (`db:admin … --restablecer`), revisión rápida en la app nueva. | Administración |
+| 7:20 | Contraseña de administración (`db:admin … --restablecer`), revisión rápida en la app nueva y rol Patinador de los patinadores (si no se hizo en la precarga). | Administración |
 | 7:30 | Cambiar los dominios hacia Render/Vercel. | Backend |
 | 7:40 | Invitaciones: primero el equipo de oficina y los mensajeros, después los clientes (de a 100). | Administración |
 | 8:00 | El equipo empieza a operar en la app nueva. | Todos |
