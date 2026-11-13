@@ -1569,3 +1569,31 @@
 @media (min-width:768px){.jsl .sd-cifras{grid-template-columns:repeat(4,minmax(0,1fr))}.jsl .sd-cifras .cifra{min-width:0}}
 @media (min-width:768px){.jsl .sd-cifras .cifra{padding:14px 16px}.jsl .sd-cifras .cifra b{white-space:nowrap;font-size:clamp(1rem,1.75vw,1.45rem)}}
 @media (max-width:360px){.jsl .sd-buscar input{font-size:.8rem}.jsl .sd-semanas .btn{font-size:.8rem}}
+
+/* Personal → Acceso en el celular (< 768 px): fila con nombre, correo y las 3 acciones; la tabla de escritorio no cambia. */
+.jsl .acc-lista{display:none;list-style:none;margin:14px 0 0;padding:0;background:var(--papel);border:1px solid var(--linea);border-radius:16px;overflow:hidden}
+.jsl .acc-lista li{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 0}
+.jsl .acc-lista li + li{border-top:1px solid var(--linea)}
+.jsl .acc-quien{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;padding:6px 0 6px 14px;border:0;background:none;color:var(--tinta);text-align:left;cursor:pointer}
+.jsl .acc-quien:active{background:var(--hueco)}
+.jsl .acc-linea{display:flex;align-items:center;flex-wrap:wrap;gap:4px 6px;min-width:0}
+.jsl .acc-linea b{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.88rem}
+.jsl .acc-linea .etq{flex:none;font-size:.62rem;padding:1px 7px}
+.jsl .acc-linea small{flex:none;font-size:.66rem;font-weight:600;color:var(--suave)}
+.jsl .acc-mail{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.76rem;color:var(--suave)}
+.jsl .acc-botones{display:flex;align-items:center;gap:4px;flex:none}
+.jsl .acc-botones .accion-icono>button{width:36px;height:36px;border-color:var(--linea);background:var(--hueco)}
+.jsl .acc-botones .accion-icono.peligro>button{color:var(--rojo);border-color:color-mix(in srgb,var(--rojo) 25%,transparent);background:color-mix(in srgb,var(--rojo) 8%,transparent)}
+.jsl .acc-ficha-tit{min-width:0}
+.jsl .acc-ficha-tit .sub{overflow-wrap:anywhere}
+.jsl .acc-ficha .campo select{min-height:46px}
+.jsl .acc-fijo{display:flex;flex-direction:column;gap:2px;margin:0;padding:11px 13px;border:1.5px dashed var(--linea);border-radius:12px;font-weight:600}
+.jsl .acc-fijo small{font-weight:400;font-size:.78rem;color:var(--suave)}
+@media (max-width:767px){
+  .jsl .acc-tabla{display:none}
+  .jsl .acc-lista{display:block}
+}
+@media (max-width:360px){
+  .jsl .acc-botones .accion-icono>button{width:32px;height:32px}
+  .jsl .acc-lista li{gap:6px;padding-right:8px}
+}

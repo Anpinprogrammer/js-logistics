@@ -393,6 +393,7 @@ function Accesos({ modalAbierto, alCerrar }: { modalAbierto: boolean; alCerrar: 
     if (!await v.confirmar("Quitar acceso a " + (u?.nombre || u?.email || ""), "Esa cuenta ya no podrá entrar a la app. Sus pedidos y registros anteriores se conservan.", "Quitar acceso")) return;
     try { await quitarAcceso(uid); v.avisar("Acceso quitado"); } catch (e) { v.avisar("No se pudo quitar el acceso: " + motivoError(e)); }
   };
+  const abrirFicha = (u: UsuarioS) => v.abrir(<FichaAcceso u={u} esYo={u.uid === yo.uid} alRol={cambiarRol} alVincular={vincular} />);
   return <>
     <h2>Accesos a la app</h2>
     <p className="sub">Cada persona entra con su correo y contraseña. Si eliges su nombre de Personal, queda vinculada de una vez. {ROLES_AYUDA}</p>
@@ -417,7 +418,7 @@ function Accesos({ modalAbierto, alCerrar }: { modalAbierto: boolean; alCerrar: 
     {qAcc.isError ? <div className="aviso alerta">No se pudieron traer los accesos: {motivoError(qAcc.error)} <button className="btn chico" onClick={() => qAcc.refetch()}>Intentar otra vez</button></div>
       : !pag ? <div className="vacio">Cargando accesos…</div>
       : us.length ? <>
-        <div className="tabla-env con-acciones tabla-marco" style={{ marginTop: 14 }} aria-busy={qAcc.isFetching}><table className={"tabla-accesos" + (compacto ? "" : " con-iconos")}><thead><tr><th className="acc-nombre">Nombre</th><th className="acc-correo">Correo</th><th className="acc-rol">Rol</th><th className="acc-personal">Personal</th><th className="acciones">Acciones</th></tr></thead><tbody>
+        <div className="tabla-env con-acciones tabla-marco acc-tabla" style={{ marginTop: 14 }} aria-busy={qAcc.isFetching}><table className={"tabla-accesos" + (compacto ? "" : " con-iconos")}><thead><tr><th className="acc-nombre">Nombre</th><th className="acc-correo">Correo</th><th className="acc-rol">Rol</th><th className="acc-personal">Personal</th><th className="acciones">Acciones</th></tr></thead><tbody>
           {us.map((u, i) => <tr key={u.uid}><td className="acc-nombre"><span className="acc-nombre-fila"><b title={u.nombre || ""}>{u.nombre || ""}</b>{u.uid === yo.uid ? <> <span className="etq ent">Tú</span></> : null}{u.status === "pending_activation" ? <> <span className="etq pend">Pendiente</span></> : null}</span></td><td className="acc-correo"><span title={u.email || ""}>{u.email || ""}</span></td>
             <td className="acc-rol">{u.uid === yo.uid || u.rol === "cliente" ? ROLES[u.rol] || u.rol || "" : <select aria-label={"Rol de " + (u.nombre || "")} value={u.rol} onChange={e => cambiarRol(u.uid, e.target.value as Rol)}>{ROLES_EQUIPO.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>}</td>
             <td className="acc-personal">{u.rol === "cliente" ? "Cliente: " + (S.clientes[u.clienteId]?.nombre || "(no existe)") : <select aria-label={"Nombre en Personal de " + (u.nombre || "")} value={S.vinculos[u.uid]?.mensajeroId || ""} onChange={e => vincular(u.uid, e.target.value)}><option value="">— Ninguno —</option>{reps.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select>}</td>
@@ -446,6 +447,20 @@ function Accesos({ modalAbierto, alCerrar }: { modalAbierto: boolean; alCerrar: 
               </span> : null}
             </div>}</td></tr>)}
         </tbody></table></div>
+        {/* Celular (< 768 px): nombre y correo a la izquierda (abre la hoja con rol y personal) y las 3 acciones a la derecha. */}
+        <ul className="acc-lista" aria-busy={qAcc.isFetching}>
+          {us.map(u => { const esYo = u.uid === yo.uid; return <li key={u.uid}>
+            <button type="button" className="acc-quien" onClick={() => abrirFicha(u)} aria-label={"Ver rol y personal de " + (u.nombre || u.email || "")}>
+              <span className="acc-linea"><b>{u.nombre || u.email || ""}</b>{u.status === "pending_activation" ? <span className="etq pend">Pendiente</span> : null}{esYo ? <span className="etq ent">Tú</span> : null}<small>{ROLES[u.rol] || u.rol || ""}</small></span>
+              <span className="acc-mail">{u.email || ""}</span>
+            </button>
+            <span className="acc-botones">
+              <span className="accion-icono correo"><button type="button" onClick={() => enviarReset(u)} disabled={enviando === u.uid} aria-label={"Enviar correo de restablecimiento a " + (u.nombre || u.email || "")}>{enviando === u.uid ? <span className="girando"><IconoCargando /></span> : <IconoCorreo />}</button></span>
+              <span className="accion-icono"><button type="button" onClick={() => v.abrir(<NuevaClave uid={u.uid} />)} aria-label={"Cambiar contraseña de " + (u.nombre || u.email || "")}><IconoLlave /></button></span>
+              {esYo ? null : <span className="accion-icono peligro"><button type="button" onClick={() => quitar(u.uid)} aria-label={"Quitar acceso a " + (u.nombre || u.email || "")}><IconoQuitarUsuario /></button></span>}
+            </span>
+          </li>; })}
+        </ul>
         <nav className="accesos-pie" aria-label="Paginación de accesos">
           <span>Mostrando <b>{desde}</b> a <b>{hasta}</b> de <b>{pag.total}</b> {pag.total === 1 ? "acceso" : "accesos"}</span>
           <span className="accesos-pag">
@@ -482,6 +497,29 @@ function Accesos({ modalAbierto, alCerrar }: { modalAbierto: boolean; alCerrar: 
       </div>
     </Modal> : null}
   </>;
+}
+
+/** Hoja del celular para cambiar el rol y el nombre de Personal de una cuenta, con los mismos selects y acciones de la tabla.
+ *  Lee los datos en cada render (useDatos), así muestra el valor nuevo después de guardar. */
+function FichaAcceso({ u: base, esYo, alRol, alVincular }: { u: UsuarioS; esYo: boolean; alRol: (uid: string, r: Rol) => Promise<void>; alVincular: (uid: string, mid: string) => Promise<void> }) {
+  useDatos();
+  const u = { ...base, ...S.usuarios[base.uid] }, reps = listaOrdenada(S.mensajeros, "nombre").filter(esRepartidor), id = "acc-" + u.uid;
+  return <div className="per-ficha acc-ficha">
+    <header className="per-ficha-cab">
+      <div className="acc-ficha-tit"><h2>{u.nombre || u.email} {u.status === "pending_activation" ? <span className="etq pend">Pendiente</span> : null}{esYo ? <span className="etq ent">Tú</span> : null}</h2><p className="sub">{u.email}</p></div>
+      <button className="cerrar" data-cerrar aria-label="Cerrar">×</button>
+    </header>
+    <div className="campo"><label htmlFor={id + "-rol"}>Rol</label>
+      {esYo || u.rol === "cliente"
+        ? <p className="acc-fijo" id={id + "-rol"}>{ROLES[u.rol] || u.rol}<small>{esYo ? "No puedes cambiar tu propio rol." : "Las cuentas de cliente no cambian de rol."}</small></p>
+        : <select id={id + "-rol"} value={u.rol} onChange={e => alRol(u.uid, e.target.value as Rol)}>{ROLES_EQUIPO.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>}
+    </div>
+    <div className="campo"><label htmlFor={id + "-per"}>Nombre en Personal</label>
+      {u.rol === "cliente"
+        ? <p className="acc-fijo" id={id + "-per"}>{"Cliente: " + (S.clientes[u.clienteId]?.nombre || "(no existe)")}</p>
+        : <select id={id + "-per"} value={S.vinculos[u.uid]?.mensajeroId || ""} onChange={e => alVincular(u.uid, e.target.value)}><option value="">— Ninguno —</option>{reps.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select>}
+    </div>
+  </div>;
 }
 
 /** Dar acceso a la app en 3 pasos: rol, persona/cliente y correo (el nombre sale de la ficha). */
