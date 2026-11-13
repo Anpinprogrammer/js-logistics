@@ -51,9 +51,9 @@ Desde `backend/`, con el `.env` apuntando a la base y al Storage donde quieres l
 ```bash
 cd backend
 npm run db:migrar                                                    # crea o actualiza las tablas
-npm run db:importar -- --carpeta ../exportacion-2026-11-08-1030 --simular
-npm run db:importar -- --carpeta ../exportacion-2026-11-08-1030
-npm run db:verificar -- --carpeta ../exportacion-2026-11-08-1030                  # compara con la app vieja
+npm run db:importar -- --carpeta ./migracion/exportacion-2026-11-13-1438 --simular
+npm run db:importar -- --carpeta ./migracion/exportacion-2026-11-13-1438
+npm run db:verificar -- --carpeta ./migracion/exportacion-2026-11-13-1438                 # compara con la app vieja
 ```
 
 1. `--simular` hace todo dentro de una transacción y al final la deshace. Así ves cuántos registros entrarían y cuáles se omitirían, sin guardar nada ni subir fotos.
