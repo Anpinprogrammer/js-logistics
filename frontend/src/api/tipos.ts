@@ -59,6 +59,13 @@ export interface PaginaClientes {
   repetidos?: number;
 }
 
+/** Respuesta de `POST /clientes/pagar-saldos`: ids de los pagos creados, cuánto se pagó y a cuántos clientes. */
+export interface PagoDeSaldos {
+  hechos: string[];
+  total: number;
+  clientes: number;
+}
+
 export interface Mensajero {
   id: string;
   nombre: string;

@@ -17,17 +17,29 @@ import { usePorPagina } from "../../lib/pantalla";
 import type { ClienteConSaldo, PaginaClientes } from "../../api/tipos";
 import { avisoContado, diaAntesDelArqueo } from "./comun";
 import { SelectorFecha } from "../Calendario";
+import { armarListaClientes } from "../tiquete";
+import { RecibosVarios, VentanaTiquete } from "./impresion";
+
+const trazo = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+const IconoImprimir = () => <svg {...trazo}><path d="M7 9V3.5h10V9" /><rect x="3" y="9" width="18" height="8" rx="2" /><path d="M7 14h10v6.5H7z" /></svg>;
+const IconoExcel = () => <svg {...trazo}><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z" /><path d="M14 3v5h5" /><path d="m9 12 5 5M14 12l-5 5" /></svg>;
 
 
-/** La misma página que arma el servidor, calculada con los datos en memoria (modo demo). */
-function paginaClientesDemo(filtro: string, dia: string, buscar: string, pagina: number, porPagina: number): PaginaClientes {
+/** Todos los clientes con su saldo (y lo de ese día, si hay día), separados en por cobrar y por pagar, como el
+ *  prototipo. `k` da el valor con el que se mide cada uno: lo de ese día o el saldo. */
+function clientesConSaldo(dia: string) {
   const cs: ClienteConSaldo[] = listaOrdenada(S.clientes, "nombre").map(c => ({
     ...c,
     saldo: saldoCliente(c.id),
     ...(dia ? { delDia: filasCuenta(c.id).filter(r => diaDe(r.fecha) === dia).reduce((a, r) => a + r.v, 0) } : {})
   }));
   const k = (c: ClienteConSaldo) => (dia ? c.delDia ?? 0 : c.saldo);
-  const cobrar = cs.filter(c => k(c) < 0), pagar = cs.filter(c => k(c) > 0);
+  return { cs, k, cobrar: cs.filter(c => k(c) < 0), pagar: cs.filter(c => k(c) > 0) };
+}
+
+/** La misma página que arma el servidor, calculada con los datos en memoria (modo demo). */
+function paginaClientesDemo(filtro: string, dia: string, buscar: string, pagina: number, porPagina: number): PaginaClientes {
+  const { cs, k, cobrar, pagar } = clientesConSaldo(dia);
   const q = sinTildes(buscar.trim()), qt = buscar.replace(/\D/g, "");
   const pasa = (c: ClienteConSaldo) => {
     const bus = sinTildes(c.nombre) + " " + normTel(c.telefono);
@@ -69,6 +81,48 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
   const enviarSaldos = () => v.abrir(<EnvioMasivo tipo0={E.filtroCli === "pagar" ? "pagar" : "cobrar"} />, "drawer-ancho");
   const registrar = () => v.abrir(<FormCliente />, "centrada");
 
+  // Imprimir y Excel (como el prototipo): se arman con todos los clientes en memoria, no solo con la página que se ve.
+  const textoImprimir = "Imprimir " + (E.filtroCli === "cobrar" ? "por cobrar" : E.filtroCli === "pagar" ? "por pagar" : "por cobrar y por pagar");
+  const textoCuadre = "Excel del cuadre " + (dia && dia !== hoy() ? "del día elegido" : "de hoy");
+  const imprimirLista = () => {
+    const { k, cobrar, pagar } = clientesConSaldo(dia);
+    const fila = (c: ClienteConSaldo) => ({ nombre: c.nombre, v: k(c) });
+    const secciones: [string, string, { nombre: string; v: number }[], number][] = [];
+    if (E.filtroCli !== "pagar") secciones.push(["Cuentas por cobrar", "Te deben", cobrar.map(fila), cobrar.reduce((a, c) => a - k(c), 0)]);
+    if (E.filtroCli !== "cobrar") secciones.push(["Cuentas por pagar", "Les debes", pagar.map(fila), pagar.reduce((a, c) => a + k(c), 0)]);
+    v.abrir(<VentanaTiquete titulo="Imprimir lista" lista={[armarListaClientes(secciones, dia)]} />);
+  };
+  const imprimirRecibos = () => {
+    const { cs, k, cobrar, pagar } = clientesConSaldo(dia);
+    const lista = E.filtroCli === "cobrar" ? cobrar : E.filtroCli === "pagar" ? pagar : dia ? cs.filter(c => c.delDia) : cs;
+    const valor = new Map(lista.map(c => [c.id, k(c)]));
+    v.abrir(<RecibosVarios clientes={lista} k={id => valor.get(id) ?? 0} dia={dia} />);
+  };
+  const [preparando, setPreparando] = useState("");
+  const excel = async (cual: "cartera" | "cuadre") => {
+    if (preparando) return;
+    setPreparando(cual);
+    try {
+      const { descargarCartera, descargarCuadre } = await import("./excelClientes");
+      if (cual === "cartera") await descargarCartera();
+      else if (!await descargarCuadre(dia || hoy())) v.avisar("No hay entregas ni pagos de clientes ese día");
+    } catch (e) { console.error(e); v.avisar("No se pudo generar el Excel. Revisa la conexión e intenta otra vez."); }
+    finally { setPreparando(""); }
+  };
+  // En la hoja del celular, la impresión abre su ventana encima (reemplaza la hoja); el Excel la cierra y se descarga.
+  const botonesExtra = (enHoja?: boolean) => {
+    return <>
+      {yo.esAdmin && <button type="button" className="btn sec" disabled={!!preparando} onClick={() => { if (enHoja) v.cerrar(); void excel("cartera"); }}><IconoExcel /><span>{preparando === "cartera" ? "Preparando…" : "Descargar cartera en Excel"}</span></button>}
+      <button type="button" className="btn sec" onClick={imprimirLista}><IconoImprimir /><span>{textoImprimir}</span></button>
+      <button type="button" className="btn sec" onClick={imprimirRecibos}><Icono n="recibos" /><span>Imprimir recibos{dia ? " del día" : ""}</span></button>
+      {yo.esAdmin && <button type="button" className="btn sec" disabled={!!preparando} onClick={() => { if (enHoja) v.cerrar(); void excel("cuadre"); }}><IconoExcel /><span>{preparando === "cuadre" ? "Preparando…" : textoCuadre}</span></button>}
+    </>;
+  };
+  const abrirOpciones = () => v.abrir(<>
+    <Cab><h2>Imprimir y Excel</h2></Cab>
+    <div className="cli-opciones">{botonesExtra(true)}</div>
+  </>, "centrada");
+
   // Celular: la cuenta y el día se preparan en una hoja y se aplican juntos, igual que en Pedidos y Solicitudes.
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
   const [borrador, setBorrador] = useState({ cuenta: E.filtroCli, dia });
@@ -102,6 +156,7 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
       <div className="cli-movil-acciones">
         <button type="button" className="btn ok" onClick={enviarSaldos}><WhatsAppIcon /><span>Enviar saldos</span></button>
         <button type="button" className="btn" onClick={registrar}><IconoAgregarUsuario /><span>Registrar cliente</span></button>
+        <button type="button" className="btn sec cli-movil-mas" onClick={abrirOpciones} aria-haspopup="dialog"><IconoImprimir /><span>{preparando ? "Preparando Excel…" : "Imprimir y Excel"}</span></button>
       </div>
     </div>
     {filtrosAbiertos && <div className="tp-capa" onMouseDown={e => { if (e.target === e.currentTarget) cerrarFiltros(); }}>
@@ -118,6 +173,7 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
       <div className="barra-acciones">
         <button className="btn ok" id="waMasivo" onClick={enviarSaldos}><WhatsAppIcon />Enviar saldos por WhatsApp</button>
         <button className="btn" id="nuevoCli" onClick={registrar}>Registrar cliente</button>
+        {botonesExtra()}
       </div>
       <div className="toolbar">
         <div className="campo" role="search"><input id="buscarCli" type="search" placeholder="Buscar por nombre o número" value={buscar} autoComplete="off" aria-label="Buscar cliente por nombre o número"

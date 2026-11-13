@@ -18,6 +18,8 @@ export default defineConfig({
             { name: "intro-motion", test: /node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/ },
             // SweetAlert2 se descarga con el primer aviso (lib/alertasAdmin.ts), no al abrir la app.
             { name: "avisos", test: /node_modules[\\/]sweetalert2[\\/]/ },
+            // ExcelJS solo se baja al pedir un Excel en Clientes (oficina/excelClientes.ts).
+            { name: "excel", test: /node_modules[\\/]exceljs[\\/]/ },
             { name: "librerias", test: /node_modules[\\/]/ }
           ]
         }

@@ -1691,3 +1691,14 @@
 .jsl .cuenta-mov-abajo small{font-size:.69rem;font-weight:500;color:var(--suave)}
 .jsl .cli-ficha .cuenta-mov-abajo button{flex:none;min-height:30px;padding:4px 12px;border-radius:12px;background:none;font:inherit;font-size:.69rem;font-weight:800;cursor:pointer}
 .jsl .cli-ficha .cuenta-mov-abajo .cuenta-mov-quitar{background:color-mix(in srgb,var(--rojo) 8%,transparent)}
+
+/* Clientes: imprimir y Excel (tiquetes térmicos y descargas del prototipo). */
+.jsl .cli-movil-acciones .cli-movil-mas{grid-column:1/-1}
+.jsl .cli-opciones{display:grid;grid-template-columns:1fr;gap:8px;padding-bottom:2px}
+.jsl .cli-opciones .btn{justify-content:flex-start;gap:10px;min-height:44px;width:100%}
+.jsl .cli-opciones .btn svg{width:18px;height:18px;flex:none}
+.jsl .tiquete-previa{background:#fff;color:#000;padding:8px;border:1px solid var(--linea);border-radius:8px;overflow:auto;max-height:50vh}
+.jsl .tiquete-previa pre{margin:0 0 12px;font-family:"Courier New",Courier,monospace;font-weight:700;line-height:1.25;color:#000;white-space:pre}
+.jsl .tiquete-previa pre:last-child{margin-bottom:0}
+.jsl .recibos-lista{max-height:45vh;overflow:auto}
+.jsl .recibos-lista table{width:100%}
