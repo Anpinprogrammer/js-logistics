@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Personal → Accesos: menú de tres puntos con el menú lateral abierto — 2026-11-13
+
+- En escritorio (≥ 960 px) y con el menú lateral **expandido**, la columna Acciones de la tabla de Accesos muestra un botón de tres puntos (`MenuAcciones` en `interna/oficina/Mas.tsx`) en vez de los tres íconos, porque con el menú abierto el último ícono se salía de la tabla. Con el menú **colapsado** y en el celular se ven los tres íconos de siempre.
+- El estado del menú lateral llega por contexto: `useMenuColapsado()` de `interna/ui.tsx`, que pone `AppInterna` en `Marco.tsx`. Úsalo si otra tabla necesita lo mismo.
+- El menú cierra al elegir, con clic afuera o con Escape (y devuelve el foco al botón); se mueve con flechas. En las dos últimas filas (si hay más de dos) abre hacia arriba. "Quitar acceso" no aparece en la fila propia ("Tú"). La tabla ya tenía `overflow: visible` en escritorio (`.tabla-env.con-acciones`), así que el menú no se recorta. Estilos en `.acciones-menu*` al final de `ajustes.css`.
+
 ## Modo Patinador de administración — 2026-11-12
 
 - El admin tiene un tercer modo de vista, **Patinador**, junto a Mensajero y Administración (botones de la barra en computador y "Cambiar modo de vista" del perfil en el celular). Como en el modo Mensajero, elige el patinador (`E.miPatinador`, guardado en `js_patinador`, con "cambiar") y ve sus pestañas Caja e Historial (`E.tabP`). El asistente no tiene este modo (tampoco tiene el de Mensajero).

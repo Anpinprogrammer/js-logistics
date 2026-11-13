@@ -1,11 +1,11 @@
 /* Oficina → Más: Resultados, Personal (con accesos), Historial, Papelera y Respaldo, igual al prototipo. */
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, moverDia, fechaLarga, cerrado, servicio, totales, sueldosDia, saldoCliente, nombreCliente, listaOrdenada, sinTildes, tipoDe, esRepartidor, vinculosDe,
   SUBMAS, TIPOS, ROLES, telWhatsApp, type Persona, type TipoPersonal, type UsuarioS,
 } from "../motor";
-import { Cab, IconoCargando, IconoCorreo, IconoCorreoMasivo, IconoEditar, IconoEnviar, IconoLiberar, IconoLlave, IconoQuitarUsuario, Paginador, useVentana } from "../ui";
+import { Cab, IconoCargando, IconoCorreo, IconoCorreoMasivo, IconoEditar, IconoEnviar, IconoLiberar, IconoLlave, IconoQuitarUsuario, IconoTresPuntos, Paginador, useMenuColapsado, useVentana } from "../ui";
 import { WhatsAppIcon } from "../../components/icons/WhatsAppIcon";
 import { E, guardarLocal } from "../estado";
 import { cambiarAcceso, cambiarClaveDe, crearAcceso, guardarPersona, quitarAcceso, quitarPersona, type AccesoWhatsApp } from "../acciones";
@@ -239,6 +239,42 @@ const ROLES_CALLOUT = <div className="modal-ayuda">
   <p><b>Administración:</b> todo.</p>
 </div>;
 
+/** Opción del menú de tres puntos de Accesos. */
+type OpcionMenu = { texto: string; icono: ReactNode; tono: "correo" | "clave" | "peligro"; desactivada?: boolean; alElegir: () => void };
+/** Botón de tres puntos con su menú flotante; cierra al elegir, con clic afuera o con Escape. */
+function MenuAcciones({ abierto, haciaArriba, nombre, opciones, alAlternar, alCerrar }: { abierto: boolean; haciaArriba: boolean; nombre: string; opciones: OpcionMenu[]; alAlternar: () => void; alCerrar: () => void }) {
+  const caja = useRef<HTMLDivElement>(null), boton = useRef<HTMLButtonElement>(null);
+  // Se guarda en una ref para que los oyentes no se vuelvan a poner (ni muevan el foco) en cada render.
+  const cerrar = useRef(alCerrar);
+  cerrar.current = alCerrar;
+  useEffect(() => {
+    if (!abierto) return;
+    caja.current?.querySelector<HTMLButtonElement>("[role=menuitem]:not(:disabled)")?.focus();
+    const afuera = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) cerrar.current(); };
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); cerrar.current(); boton.current?.focus(); } };
+    document.addEventListener("mousedown", afuera);
+    document.addEventListener("keydown", tecla);
+    return () => { document.removeEventListener("mousedown", afuera); document.removeEventListener("keydown", tecla); };
+  }, [abierto]);
+  // Flechas arriba y abajo para moverse entre las opciones, como en un menú del sistema.
+  const mover = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const items = [...(caja.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]:not(:disabled)") ?? [])];
+    const k = items.indexOf(document.activeElement as HTMLButtonElement);
+    items[(k + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
+  };
+  return <div className={"acciones-menu" + (abierto ? " abierto" : "")} ref={caja}>
+    <button type="button" ref={boton} className="acciones-menu-boton" aria-haspopup="menu" aria-expanded={abierto} aria-label={"Opciones de acceso de " + nombre} onClick={alAlternar}><IconoTresPuntos /></button>
+    {abierto ? <div className={"acciones-menu-lista " + (haciaArriba ? "arriba" : "abajo")} role="menu" aria-label={"Opciones de acceso de " + nombre} onKeyDown={mover}>
+      {opciones.map((o, k) => <Fragment key={o.texto}>
+        {o.tono === "peligro" && k > 0 ? <div className="acciones-menu-sep" role="separator" /> : null}
+        <button type="button" role="menuitem" className={o.tono} disabled={o.desactivada} onClick={() => { alCerrar(); o.alElegir(); }}>{o.icono}<span>{o.texto}</span></button>
+      </Fragment>)}
+    </div> : null}
+  </div>;
+}
+
 /** Una página de accesos en memoria (modo demo). */
 type PaginaAccesosUI = { usuarios: UsuarioS[]; pagina: number; porPagina: number; total: number; paginas: number };
 function paginaAccesosDemo(f: { buscar: string; rol: string }, pagina: number, porPagina: number): PaginaAccesosUI {
@@ -270,6 +306,10 @@ function Accesos({ modalAbierto, alCerrar }: { modalAbierto: boolean; alCerrar: 
   });
   const pag = qAcc.data, us = pag?.usuarios ?? [];
   const [enviando, setEnviando] = useState<string | null>(null);
+  // Con el menú lateral abierto la tabla queda angosta: las acciones van en un menú de tres puntos (solo escritorio).
+  const compacto = useEscritorio() && !useMenuColapsado();
+  const [menuAbierto, setMenuAbierto] = useState<string | null>(null);
+  useEffect(() => { setMenuAbierto(null); }, [compacto, pagina, buscar, rol]);
   // Selección del modal de restablecimiento masivo (no toca la tabla principal).
   const [modalMasivo, setModalMasivo] = useState(false);
   const [selMasivo, setSelMasivo] = useState<string[]>([]);
@@ -344,10 +384,18 @@ function Accesos({ modalAbierto, alCerrar }: { modalAbierto: boolean; alCerrar: 
       : !pag ? <div className="vacio">Cargando accesos…</div>
       : us.length ? <>
         <div className="tabla-env con-acciones tabla-marco" style={{ marginTop: 14 }} aria-busy={qAcc.isFetching}><table className="tabla-accesos"><thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Personal</th><th className="acciones">Acciones</th></tr></thead><tbody>
-          {us.map(u => <tr key={u.uid}><td><b>{u.nombre || ""}</b>{u.uid === yo.uid ? <> <span className="etq ent">Tú</span></> : null}{u.status === "pending_activation" ? <> <span className="etq pend">Pendiente</span></> : null}</td><td>{u.email || ""}</td>
+          {us.map((u, i) => <tr key={u.uid}><td><b>{u.nombre || ""}</b>{u.uid === yo.uid ? <> <span className="etq ent">Tú</span></> : null}{u.status === "pending_activation" ? <> <span className="etq pend">Pendiente</span></> : null}</td><td>{u.email || ""}</td>
             <td>{u.uid === yo.uid || u.rol === "cliente" ? ROLES[u.rol] || u.rol || "" : <select aria-label={"Rol de " + (u.nombre || "")} value={u.rol} onChange={e => cambiarRol(u.uid, e.target.value as Rol)}>{ROLES_EQUIPO.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select>}</td>
             <td>{u.rol === "cliente" ? "Cliente: " + (S.clientes[u.clienteId]?.nombre || "(no existe)") : <select aria-label={"Nombre en Personal de " + (u.nombre || "")} value={S.vinculos[u.uid]?.mensajeroId || ""} onChange={e => vincular(u.uid, e.target.value)}><option value="">— Ninguno —</option>{reps.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}</select>}</td>
-            <td className="acciones"><div className="acciones-celda">
+            <td className="acciones">{compacto
+              ? <MenuAcciones abierto={menuAbierto === u.uid} haciaArriba={us.length > 2 && i >= us.length - 2} nombre={u.nombre || u.email || ""}
+                  alAlternar={() => setMenuAbierto(m => m === u.uid ? null : u.uid)} alCerrar={() => setMenuAbierto(null)}
+                  opciones={[
+                    { texto: "Enviar correo de restablecimiento", tono: "correo", icono: enviando === u.uid ? <span className="girando"><IconoCargando /></span> : <IconoCorreo />, desactivada: enviando === u.uid, alElegir: () => enviarReset(u) },
+                    { texto: "Cambiar contraseña", tono: "clave", icono: <IconoLlave />, alElegir: () => v.abrir(<NuevaClave uid={u.uid} />) },
+                    ...(u.uid !== yo.uid ? [{ texto: "Quitar acceso", tono: "peligro" as const, icono: <IconoQuitarUsuario />, alElegir: () => quitar(u.uid) }] : []),
+                  ]} />
+              : <div className="acciones-celda">
               <span className="accion-icono correo">
                 <button type="button" onClick={() => enviarReset(u)} disabled={enviando === u.uid} aria-label="Enviar correo de restablecimiento">
                   {enviando === u.uid ? <span className="girando"><IconoCargando /></span> : <IconoCorreo />}
@@ -362,7 +410,7 @@ function Accesos({ modalAbierto, alCerrar }: { modalAbierto: boolean; alCerrar: 
                 <button type="button" onClick={() => quitar(u.uid)} aria-label="Quitar acceso"><IconoQuitarUsuario /></button>
                 <span className="accion-tip" role="tooltip"><i /><span>Quitar acceso</span></span>
               </span> : null}
-            </div></td></tr>)}
+            </div>}</td></tr>)}
         </tbody></table></div>
         <nav className="accesos-pie" aria-label="Paginación de accesos">
           <span>Mostrando <b>{desde}</b> a <b>{hasta}</b> de <b>{pag.total}</b> {pag.total === 1 ? "acceso" : "accesos"}</span>
