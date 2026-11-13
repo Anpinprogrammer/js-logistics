@@ -1423,3 +1423,64 @@
   .jsl.jsl-patinador .pat-tarjetas{grid-template-columns:minmax(0,1fr)}
   .jsl.jsl-patinador .pestanas{display:flex;left:50%;right:auto;width:min(560px,calc(100% - 20px));transform:translateX(-50%)}
 }
+
+/* Sueldos: tabla resumida en el computador, lista compacta en el celular y ventana "Detalle de sueldo". */
+.jsl .sd-rol{display:block;margin-top:2px;font-size:.76rem;font-weight:500;color:var(--suave)}
+.jsl .sd-adel{color:var(--amarillo)}
+.jsl .sd-pagado{color:var(--verde)}
+.jsl .sd-neto{font-weight:800}
+.jsl .sueldos-tabla table{width:100%}
+.jsl .sueldos-tabla td{vertical-align:middle}
+.jsl .sueldos-tabla .sd-total td{background:var(--hueco);border-bottom:0}
+.jsl .sd-acciones{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px}
+.jsl .sd-acciones .btn{white-space:nowrap}
+.jsl .sd-acciones .btn svg{width:15px;height:15px}
+.jsl .sd-acciones .btn:disabled{opacity:.4;cursor:default}
+.jsl .sueldos-lista{display:none;list-style:none;margin:0;padding:0;background:var(--papel);border-radius:var(--radio);box-shadow:var(--sombra);overflow:hidden}
+.jsl .sueldos-lista li + li{border-top:1px solid var(--linea)}
+.jsl .sueldos-lista button{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:12px 14px;border:0;background:none;color:var(--tinta);text-align:left;cursor:pointer}
+.jsl .sueldos-lista button:active{background:var(--hueco)}
+.jsl .sd-quien{flex:1;min-width:0}
+.jsl .sd-quien b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsl .sd-cuanto{display:flex;flex-direction:column;align-items:flex-end;flex:none;text-align:right}
+.jsl .sd-cuanto b{font-weight:800;font-variant-numeric:tabular-nums}
+.jsl .sd-cuanto small{font-size:.72rem;color:var(--suave)}
+.jsl .sd-flecha{flex:none;font-size:1.4rem;line-height:1;color:var(--suave)}
+@media (max-width:767px){
+  .jsl .sueldos-tabla{display:none}
+  .jsl .sueldos-lista{display:block}
+}
+/* Ventana de detalle: cabecera y botones fijos, el medio hace scroll con la ventana. */
+.jsl .sd-cab{position:sticky;top:-22px;z-index:2;margin:-22px -22px 14px;padding:18px 22px 12px;background:var(--papel);border-bottom:1px solid var(--linea)}
+.jsl .sd-cab h2{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:1.15rem}
+.jsl .sd-cab .sub{margin:2px 0 0;font-size:.8rem}
+.jsl .sd-badge{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--mango-claro);color:var(--marca);font-size:.7rem;font-weight:700}
+.jsl .sd-titulo{margin:0 0 8px;font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--suave)}
+.jsl .sd-ayuda{margin:-2px 0 10px;font-size:.8rem}
+.jsl .sd-dias{list-style:none;margin:0 0 14px;padding:0;border:1px solid var(--linea);border-radius:14px;background:var(--hueco)}
+.jsl .sd-dias li{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:6px 14px}
+.jsl .sd-dias li + li{border-top:1px solid var(--linea)}
+.jsl .sd-dias li > span{font-weight:600;font-size:.88rem}
+.jsl .sd-dias li > span small{margin-left:4px;font-weight:400;color:var(--suave)}
+.jsl .sd-dias li > b{font-weight:800;font-variant-numeric:tabular-nums}
+.jsl .sd-dias .sd-cero{font-weight:400;color:var(--suave)}
+.jsl .sd-resumen{margin:0;padding:14px 16px;border:1px solid var(--linea);border-radius:14px;font-size:.88rem}
+.jsl .sd-resumen div{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+.jsl .sd-resumen dt{color:var(--suave)}
+.jsl .sd-resumen dd{margin:0;font-weight:700;font-variant-numeric:tabular-nums}
+.jsl .sd-resumen .sd-neto-fila{margin-top:6px;padding-top:10px;border-top:1px solid var(--linea)}
+.jsl .sd-resumen .sd-neto-fila dt{color:var(--tinta);font-weight:800}
+.jsl .sd-resumen .sd-neto-fila dd{font-size:1.1rem;font-weight:800;color:var(--marca2)}
+.jsl .sd-resumen .sd-neto-fila dd.neg{color:var(--rojo)}
+.jsl .sd-pie{position:sticky;bottom:-22px;z-index:2;display:flex;gap:10px;margin:16px -22px -22px;padding:14px 22px calc(14px + env(safe-area-inset-bottom,0px));background:var(--papel);border-top:1px solid var(--linea)}
+.jsl .sd-pie .btn{flex:1;justify-content:center;min-height:46px;font-weight:700}
+.jsl .sd-pie .btn:disabled{opacity:.4;cursor:default}
+/* Si la tabla queda angosta (menú lateral abierto en una pantalla pequeña), solo queda "Detalle": Adelanto y Pagar están adentro. */
+.jsl .sueldos-tabla{container-type:inline-size}
+@container (max-width:900px){.jsl .sd-acciones .sd-rapido{display:none}}
+@container (max-width:900px){
+  .jsl .sueldos-tabla th,.jsl .sueldos-tabla td{padding-left:8px;padding-right:8px}
+  .jsl .sueldos-tabla td:first-child{white-space:normal}
+  .jsl .sd-acciones .btn span{display:none}
+}
+.jsl .sd-resumen dd.sd-cero{font-weight:400;color:var(--suave)}
