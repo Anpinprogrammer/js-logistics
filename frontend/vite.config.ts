@@ -3,7 +3,10 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 // En desarrollo, /api va al backend local: el navegador ve un solo sitio y la cookie de sesión funciona con SameSite=Lax.
-// En producción se hace lo mismo con una regla de reescritura (/api/* → servicio del backend). Ver README.
+// En producción la app llama directo a VITE_API_URL (api.<dominio>), que es del mismo sitio que la app. Ver README.
+if (process.env.VERCEL && !process.env.VITE_API_URL && process.env.VITE_DEMO !== "true") {
+  console.warn("\n⚠️  Falta VITE_API_URL en este proyecto de Vercel: la app llamará a /api en su propio dominio y no encontrará el backend.\n");
+}
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {

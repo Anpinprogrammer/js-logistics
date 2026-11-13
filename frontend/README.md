@@ -88,16 +88,16 @@ Para tener datos de prueba inventados, carga el demo en una base **vacía** de p
 
 - **Root Directory:** `frontend`. Vercel detecta Vite: build `npm run build`, carpeta `dist`.
 - **Variables de entorno** (están todas en [`.env.example`](.env.example)):
-  - `VITE_API_URL`: la URL del backend, sin `/api` (se agrega solo). En producción: `https://api.jslogistics.pro`.
+  - `VITE_API_URL` (**obligatoria**): la URL del backend, sin `/api` (se agrega solo). En producción: `https://api.jslogistics.pro`. Cada proyecto de Vercel (producción, demo) pone la de su backend: así el mismo código sirve para todos y `vercel.json` no cambia entre despliegues.
   - `VITE_DEMO`: `true` solo para una vista previa con datos inventados.
-  - Las variables `VITE_*` se leen al construir: si cambias una en Vercel, vuelve a publicar.
-- **Con `VITE_API_URL=https://api.jslogistics.pro`**, la app llama directo al backend. `app.jslogistics.pro` y `api.jslogistics.pro` son del mismo sitio (`jslogistics.pro`), así que la cookie de sesión funciona con `SameSite=Lax`, también en Safari de iPhone. No uses la URL de `onrender.com` aquí: es otro sitio, el navegador no manda la cookie y todo da 401.
-- **Sin `VITE_API_URL`**, la app llama a `/api` en su propio dominio y `vercel.json` lo reenvía al backend.
-- `vercel.json` también manda las rutas de React a `index.html`, para que no den 404 al recargar.
+  - Las variables `VITE_*` se leen al construir: si cambias una en Vercel, vuelve a publicar (Deployments → ⋯ → Redeploy).
+- **La API tiene que estar en un subdominio del mismo dominio de la app** (`app.jslogistics.pro` → `api.jslogistics.pro`). Son del mismo *sitio*, así que la cookie de sesión funciona con `SameSite=Lax`, también en Safari de iPhone. No uses la URL de `onrender.com` aquí: es otro sitio, Safari no guarda la cookie y todo da 401.
+- `vercel.json` ya no reenvía `/api`: solo manda las rutas de React a `index.html` (para que no den 404 al recargar). Si falta `VITE_API_URL`, la app pide `/api/…` a su propio dominio y recibe 404; el build en Vercel avisa con `⚠️ Falta VITE_API_URL`.
 - En el backend (Render):
-  - `CORS_ORIGENES` debe incluir `https://app.jslogistics.pro`, separado por comas de los demás.
+  - `CORS_ORIGENES` debe incluir el origen exacto de la app (`https://app.jslogistics.pro`), separado por comas de los demás.
   - `COOKIE_DOMINIO` vacío y `COOKIE_SAMESITE=lax`.
-  - `TRUST_PROXY=1` si el frontend llama directo a `api.jslogistics.pro`, o `2` si pasa por la reescritura de Vercel.
+  - `TRUST_PROXY=1` (solo Render delante del backend; `2` si además pasa por Cloudflare con proxy).
+- El portal de clientes y la oficina usan la misma API, así que en un **mismo navegador** comparten la sesión: entrar al portal como cliente cierra la sesión de oficina en ese navegador, y al revés. En celulares y computadores de trabajo no pasa, porque cada persona usa una sola de las dos.
 
 ## Publicar (Render)
 
