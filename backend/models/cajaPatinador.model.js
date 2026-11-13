@@ -49,14 +49,31 @@ const MOVIMIENTOS = `
          e.nota, e.valor, e.fecha, 'entrega', e.medio
   FROM recaudos e WHERE e.mensajero_id = $1`;
 
-export async function listarPagina({ mensajeroId, pagina = 1, porPagina = 8 }) {
+/** Filtros del historial: `tipo` (ingresos = pagos, salidas = entregas), `dia` (día de Colombia, AAAA-MM-DD) y `buscar` (en el
+    cliente o el concepto, sin importar mayúsculas). Los aplica el servidor para que el paginador cuente solo lo que se ve. */
+function filtrosMovimientos({ tipo = "todos", dia, buscar }, params) {
+  const cond = [];
+  if (tipo === "ingresos") cond.push(`m.tipo = 'pago'`);
+  if (tipo === "salidas") cond.push(`m.tipo = 'entrega'`);
+  if (dia) { params.push(dia); cond.push(`(m.fecha AT TIME ZONE 'America/Bogota')::date = $${params.length}::date`); }
+  if (buscar) {
+    params.push("%" + buscar.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_") + "%"); // % _ y \ del texto no son comodines
+    cond.push(`(m.cliente_nombre ILIKE $${params.length} OR m.concepto ILIKE $${params.length})`);
+  }
+  return cond.length ? " WHERE " + cond.join(" AND ") : "";
+}
+
+export async function listarPagina({ mensajeroId, pagina = 1, porPagina = 8, tipo, dia, buscar }) {
   const r = await paginaEnParalelo({
     pagina, porPagina,
-    contar: async () => (await query(`SELECT count(*)::int AS total FROM (${MOVIMIENTOS}) m`, [mensajeroId])).rows[0].total,
-    traer: async offset => (await query(
-      `SELECT * FROM (${MOVIMIENTOS}) m ORDER BY m.fecha DESC, m.id LIMIT $2 OFFSET $3`,
-      [mensajeroId, porPagina, offset]
-    )).rows
+    contar: async () => {
+      const params = [mensajeroId], donde = filtrosMovimientos({ tipo, dia, buscar }, params);
+      return (await query(`SELECT count(*)::int AS total FROM (${MOVIMIENTOS}) m${donde}`, params)).rows[0].total;
+    },
+    traer: async offset => {
+      const params = [mensajeroId, porPagina, offset], donde = filtrosMovimientos({ tipo, dia, buscar }, params);
+      return (await query(`SELECT * FROM (${MOVIMIENTOS}) m${donde} ORDER BY m.fecha DESC, m.id LIMIT $2 OFFSET $3`, params)).rows;
+    }
   });
   return { registros: r.filas.map(filaAObjeto), pagina: r.pagina, porPagina, total: r.total, paginas: r.paginas };
 }

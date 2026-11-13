@@ -14,6 +14,10 @@ export const registro = z.object({
 /** El patinador ve su caja; la oficina dice de cuál patinador (mensajeroId). */
 export const caja = z.object({
   mensajeroId: id.optional(),
+  // Filtros del historial (celular): texto en el cliente o el concepto, ingresos (pagos) o salidas (entregas a administración) y un día de Colombia.
+  buscar: z.string().trim().max(60).optional(),
+  tipo: z.enum(["todos", "ingresos", "salidas"]).default("todos"),
+  dia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida").optional(),
   pagina: z.coerce.number().int().min(1).default(1),
   porPagina: z.coerce.number().int().min(1).max(100).default(8)
 });

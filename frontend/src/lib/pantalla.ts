@@ -13,6 +13,8 @@ const suscribirComputador = suscribir(COMPUTADOR), suscribirEscritorio = suscrib
 const esComputadorAhora = coincide(COMPUTADOR), esEscritorioAhora = coincide(ESCRITORIO);
 
 /** 8 o 20, y cambia solo si se gira el celular o se cambia el tamaño de la ventana. */
+/** true desde 768 px (computador y tableta). Para mostrar una sola versión de algo (no dos con los mismos id). */
+export function useComputador() { return useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false); }
 export function usePorPagina() {
   const esComputador = useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false);
   return esComputador ? POR_PAGINA.computador : POR_PAGINA.celular;
