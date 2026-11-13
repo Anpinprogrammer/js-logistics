@@ -5,7 +5,7 @@ import {
   S, yo, hoy, hora, pesos, diaDe, moverDia, fechaLarga, cerrado, servicio, totales, sueldosDia, saldoCliente, nombreCliente, listaOrdenada, sinTildes, tipoDe, esRepartidor, vinculosDe,
   TIPOS, ROLES, telWhatsApp, type Persona, type TipoPersonal, type UsuarioS,
 } from "../motor";
-import { Cab, IconoCargando, IconoCorreo, IconoCorreoMasivo, IconoEditar, IconoEnviar, IconoLiberar, IconoLlave, IconoQuitarUsuario, IconoTresPuntos, Paginador, useMenuColapsado, useVentana } from "../ui";
+import { Cab, IconoCargando, IconoCorreo, IconoCorreoMasivo, IconoEditar, IconoEnviar, IconoLiberar, IconoLlave, IconoOjo, IconoQuitarUsuario, IconoTresPuntos, Paginador, useMenuColapsado, useVentana } from "../ui";
 import { WhatsAppIcon } from "../../components/icons/WhatsAppIcon";
 import { E, guardarLocal } from "../estado";
 import { cambiarAcceso, cambiarClaveDe, crearAcceso, guardarPersona, quitarAcceso, quitarPersona, type AccesoWhatsApp } from "../acciones";
@@ -139,6 +139,7 @@ function Personal() {
     if (!await v.confirmar("Quitar a " + S.mensajeros[id].nombre, "Ya no aparecerá en la lista de personal. Sus pedidos, pagos y movimientos anteriores se conservan.", "Quitar")) return;
     try { await quitarPersona(id); if (E.miMensajero === id) { E.miMensajero = ""; guardarLocal("js_mensajero", ""); } v.avisar("Persona quitada"); } catch (e) { v.avisar("No se pudo quitar: " + motivoError(e)); }
   };
+  const abrirFicha = (id: string) => v.abrir(<FichaPersonal id={id} alEditar={m => { v.cerrar(); setEditando(m); }} alLiberar={id => { v.cerrar(); void liberar(id); }} alQuitar={id => { v.cerrar(); void quitar(id); }} />);
   return <>
     <h1>Personal</h1><p className="sub">Mensajeros y el dueño entregan pedidos desde la app. Patinadores y la empresa (JS) aparecen en Sueldos; un patinador con acceso a la app anota desde el celular el dinero que le pagan en su ruta. Cuando un mensajero elige su nombre por primera vez, queda vinculado a su cuenta; “Liberar” le permite elegir de nuevo (por ejemplo, si cambió de celular o de cuenta).</p>
     <div className="cab-personal">
@@ -167,7 +168,7 @@ function Personal() {
       {qPer.isError ? <div className="aviso alerta">No se pudo traer el personal: {motivoError(qPer.error)} <button className="btn chico" onClick={() => qPer.refetch()}>Intentar otra vez</button></div>
         : !pag ? <div className="vacio">Cargando personal…</div>
         : lista.length ? <>
-        <div className="tabla-env con-acciones tabla-marco" aria-busy={qPer.isFetching} style={qPer.isPlaceholderData ? { opacity: .6 } : undefined}><table className="tabla-personal"><thead><tr><th className="per-nombre">Nombre</th><th className="per-tel">Teléfono</th><th className="per-tipo">Tipo</th><th className="per-pago">Pago por día</th><th className="per-cuenta">Estado / Cuenta</th><th className="per-acciones">Acciones</th></tr></thead><tbody>
+        <div className="tabla-env con-acciones tabla-marco per-tabla" aria-busy={qPer.isFetching} style={qPer.isPlaceholderData ? { opacity: .6 } : undefined}><table className="tabla-personal"><thead><tr><th className="per-nombre">Nombre</th><th className="per-tel">Teléfono</th><th className="per-tipo">Tipo</th><th className="per-pago">Pago por día</th><th className="per-cuenta">Estado / Cuenta</th><th className="per-acciones">Acciones</th></tr></thead><tbody>
         {lista.map(m => { const vs = vinculosDe(m.id); return <tr key={m.id}><td className="per-nombre"><b>{m.nombre}</b></td><td className="per-tel">{m.telefono || ""}</td>
           <td className="per-tipo"><select aria-label={"Tipo de " + m.nombre} value={tipoDe(m)} onChange={async e => { try { await guardarPersona(m.id, { tipo: e.target.value as TipoPersonal }); v.avisar("Tipo actualizado"); } catch (er) { fallo(er); } }}>{Object.entries(TIPOS).map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></td>
           <td className="per-pago">{["patinador", "oficina"].includes(tipoDe(m)) ? <input type="number" step="1000" min="0" defaultValue={Number(m.tarifa) || ""} style={{ width: 110 }} aria-label={"Pago por día de " + m.nombre} onChange={async e => { try { await guardarPersona(m.id, { tarifa: Number(e.target.value) || 0 }); v.avisar("Pago por día actualizado"); } catch (er) { fallo(er); } }} /> : "—"}</td>
@@ -187,6 +188,13 @@ function Personal() {
             </span>
           </div></td></tr>; })}
       </tbody></table></div>
+        {/* Celular: lista de Nombre, Tipo y Ver; la ficha completa y las acciones van en una hoja. */}
+        <div className="per-lista" aria-busy={qPer.isFetching} style={qPer.isPlaceholderData ? { opacity: .6 } : undefined}>
+          <div className="per-lista-cab" aria-hidden="true"><span>Nombre</span><span>Tipo</span><span>Acciones</span></div>
+          <ul>{lista.map(m => <li key={m.id}><button type="button" onClick={() => abrirFicha(m.id)} aria-label={"Ver ficha de " + m.nombre}>
+            <b>{m.nombre}</b><span className="per-tipo-etq">{TIPOS[tipoDe(m)]}</span><span className="per-ver"><IconoOjo /><span>Ver</span></span>
+          </button></li>)}</ul>
+        </div>
         <Paginador pagina={pag.pagina} paginas={pag.paginas} total={pag.total} porPagina={pag.porPagina} ir={ir} cargando={qPer.isPlaceholderData} />
         </> : <div className="vacio">{hayFiltros ? "No hay personal con esos filtros." : "Agrega a tu personal para empezar."}</div>}
       {modalPersonal ? <ModalPersonal alCerrar={() => setModalPersonal(false)} /> : null}
@@ -195,6 +203,34 @@ function Personal() {
       {yo.esAdmin ? <Accesos modalAbierto={modalAcceso} alCerrar={() => setModalAcceso(false)} /> : <div className="vacio">Los accesos los maneja administración.</div>}
     </div>}
   </>;
+}
+
+/** Ficha de una persona en el celular: tipo, teléfono, pago por día y cuenta, con Editar, Liberar y Quitar.
+ *  Se lee de S en cada render (useDatos) para que muestre lo último. */
+function FichaPersonal({ id, alEditar, alLiberar, alQuitar }: { id: string; alEditar: (m: Persona) => void; alLiberar: (id: string) => void; alQuitar: (id: string) => void }) {
+  useDatos();
+  const m = S.mensajeros[id];
+  if (!m) return null;
+  const t = tipoDe(m), repartidor = esRepartidor(m), vs = vinculosDe(id), vinculado = vs.length > 0;
+  const correos = vs.map(x => S.usuarios[x.uid]?.email).filter(Boolean);
+  const wa = telWhatsApp(m.telefono || ""), tarifa = ["patinador", "oficina"].includes(t) ? Number(m.tarifa) || 0 : 0;
+  return <div className="per-ficha">
+    <header className="per-ficha-cab">
+      <div><h2>{m.nombre} {repartidor ? <span className={"etq " + (vinculado ? "ent" : "sin")}>{vinculado ? "Vinculado" : "Sin vincular"}</span> : null}</h2><p className="sub">Ficha del personal</p></div>
+      <button className="cerrar" data-cerrar aria-label="Cerrar">×</button>
+    </header>
+    <dl className="per-ficha-datos">
+      <div><dt>Tipo</dt><dd>{TIPOS[t]}</dd></div>
+      <div><dt>Teléfono</dt><dd>{m.telefono ? <span className="per-tel-acc"><a className="enlace" href={"tel:" + m.telefono.replace(/\s/g, "")}>{m.telefono}</a>{wa.length >= 11 ? <a className="per-wa" href={"https://wa.me/" + wa} target="_blank" rel="noopener noreferrer" aria-label={"Escribir por WhatsApp a " + m.nombre}><WhatsAppIcon /></a> : null}</span> : <span className="sub">No registrado</span>}</dd></div>
+      <div><dt>Pago por día</dt><dd>{tarifa ? pesos(tarifa) : "—"}</dd></div>
+      <div><dt>Estado / cuenta</dt><dd>{!repartidor ? <span className="sub">No usa la app</span> : vinculado ? (correos.join(", ") || "Vinculado") : <span className="sub">Sin cuenta vinculada</span>}</dd></div>
+    </dl>
+    <div className="per-ficha-pie">
+      <button type="button" className="btn sec" onClick={() => alEditar(m)}><IconoEditar />Editar</button>
+      <button type="button" className="btn per-liberar" disabled={!repartidor || !vinculado} onClick={() => alLiberar(id)}><IconoLiberar />Liberar cuenta</button>
+      <button type="button" className="btn per-quitar" onClick={() => alQuitar(id)}><IconoQuitarUsuario />Quitar del personal</button>
+    </div>
+  </div>;
 }
 
 /** Agregar o editar una persona del personal (patinador, oficina, mensajero…). */

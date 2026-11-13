@@ -1,5 +1,10 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Personal JS en el celular: lista y ficha — 2026-11-13
+
+- Por debajo de 768 px, Personal → Personal JS ya no muestra la tabla (`.per-tabla` se oculta) sino `.per-lista`: Nombre, Tipo (píldora) y "Ver" (a 360 px o menos queda solo el ojo). Desde 768 px la tabla es la de siempre.
+- Al tocar una fila se abre `FichaPersonal` (`oficina/Mas.tsx`) en la ventana de `ui.tsx` (en el celular es la hoja de abajo): tipo, teléfono (`tel:` y WhatsApp si el número es válido), pago por día, cuenta vinculada (correo) y los botones Editar, Liberar cuenta y Quitar del personal, que usan los mismos `setEditando`, `liberar` y `quitar` de la tabla. El tipo y el pago por día se cambian desde Editar.
+
 ## Sueldos: tabla resumida y "Detalle de sueldo" — 2026-11-13
 
 - La tabla de Sueldos ya no muestra los 7 días: tiene Persona (con su tipo), Anterior, Total, Adelantos, Pagado, Neto y Acciones (Detalle, Adelanto, Pagar). Si la tabla queda de menos de 900 px (menú lateral abierto en una pantalla chica), una container query deja solo "Detalle". En el celular (< 768 px) es una lista: nombre, tipo y neto, y al tocarla se abre el detalle.
