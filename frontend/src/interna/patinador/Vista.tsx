@@ -1,6 +1,6 @@
 /* Las pantallas del patinador (Inicio, Mi caja con su historial y Solicitudes). Las usan su app (Patinador.tsx) y el modo Patinador de administración
    (DesdeOficina.tsx), que pasa `ajeno` con el patinador elegido: las cifras y lo anotado van a la caja de ese patinador. */
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import * as api from "../../api/servicios";
 import type { CajaPatinador, FiltrosCajaPatinador, PaginaSolicitudesRecogida, RegistroCajaPatinador, SolicitudRecogida } from "../../api/tipos";
@@ -10,7 +10,7 @@ import { FiltroDia, IconoFiltro, Kpi, Paginador, useVentana } from "../ui";
 import { FormPago, Lista, type Anotar } from "../pagos";
 import { diaDe, hora, pesos, S } from "../motor";
 import { registrosDemo, resumenDe, solicitudesRecogidaDemo } from "./demoCaja";
-import { useComputador, usePorPagina, usePorPaginaRecogidas } from "../../lib/pantalla";
+import { POR_PAGINA, POR_PAGINA_RECOGIDAS, useComputador, usePorPagina, usePorPaginaRecogidas } from "../../lib/pantalla";
 
 const DEMO_PROPIO = "m-pat"; // la ficha de patinador@demo.co
 
@@ -45,6 +45,13 @@ export interface Ajeno { id: string; nombre: string; cambiar: React.ReactNode }
 const claveCaja = (ajeno?: Ajeno) => ["patinador", "caja", ajeno?.id ?? "mia"];
 const claveSolicitudes = (ajeno?: Ajeno) => ["patinador", "solicitudes", ajeno?.id ?? "mia"];
 
+/** En la app del patinador todo se ve y se comporta como en el celular (barra de abajo, "Registrar pago" en una ventana, filtros en
+    la hoja, 5 solicitudes por página), también en el computador. El modo Patinador de administración sigue el tamaño de la pantalla. */
+export const SoloCelular = createContext(false);
+const usePorPaginaPat = () => { const solo = useContext(SoloCelular), p = usePorPagina(); return solo ? POR_PAGINA.celular : p; };
+const usePorPaginaRecogidasPat = () => { const solo = useContext(SoloCelular), p = usePorPaginaRecogidas(); return solo ? POR_PAGINA_RECOGIDAS.celular : p; };
+const useComputadorPat = () => { const solo = useContext(SoloCelular), c = useComputador(); return !solo && c; };
+
 export type TabPatinador = "inicio" | "caja" | "solicitudes";
 
 /** Cuántas solicitudes de recogida tiene pendientes (el número de la pestaña Solicitudes y de la campana). Se comparte la consulta. */
@@ -60,7 +67,7 @@ export function VistaPatinador({ tab, ir, ajeno }: { tab: TabPatinador; ir: (t: 
 
 /* ---- Inicio: dos tarjetas, la caja con sus últimos 4 movimientos y las solicitudes de recogida pendientes ---- */
 function Inicio({ ir, ajeno }: { ir: (t: TabPatinador) => void; ajeno?: Ajeno }) {
-  const porPagina = usePorPagina();
+  const porPagina = usePorPaginaPat();
   const q = useQuery({ queryKey: [...claveCaja(ajeno), 1, porPagina], queryFn: () => traerCaja(1, porPagina, ajeno?.id), refetchInterval: 60_000 });
   const r = q.data?.resumen;
   return <>
@@ -86,7 +93,7 @@ function Inicio({ ir, ajeno }: { ir: (t: TabPatinador) => void; ajeno?: Ajeno })
 
 /* ---- Solicitudes de recogida, paginadas en el servidor: 5 por página en el celular y 10 en el computador ---- */
 function ListaSolicitudes({ ajeno }: { ajeno?: Ajeno }) {
-  const limite = usePorPaginaRecogidas(), [pagina, setPagina] = useState(1);
+  const limite = usePorPaginaRecogidasPat(), [pagina, setPagina] = useState(1);
   const q = useQuery({ queryKey: [...claveSolicitudes(ajeno), pagina, limite], queryFn: () => traerSolicitudes(pagina, limite, ajeno?.id), placeholderData: prev => prev, refetchInterval: 60_000 });
   const d = q.data;
   if (q.isLoading) return <div className="vacio" role="status">Cargando…</div>;
@@ -128,7 +135,7 @@ const TIPOS_MOV: [FiltrosCajaPatinador["tipo"] & string, string][] = [["todos", 
 type FiltrosHoja = { tipo: NonNullable<FiltrosCajaPatinador["tipo"]>; dia: string };
 
 function MiCaja({ ajeno }: { ajeno?: Ajeno }) {
-  const porPagina = usePorPagina(), v = useVentana(), computador = useComputador(), [pagina, setPagina] = useState(1);
+  const porPagina = usePorPaginaPat(), v = useVentana(), computador = useComputadorPat(), [pagina, setPagina] = useState(1);
   // Búsqueda: se pide al servidor cuando deja de escribir. Tipo y día se preparan en la hoja y se aplican juntos.
   const [buscar, setBuscar] = useState(""), [buscarYa, setBuscarYa] = useState(""), temporizador = useRef<number | undefined>(undefined);
   const [filtros, setFiltros] = useState<FiltrosHoja>({ tipo: "todos", dia: "" });

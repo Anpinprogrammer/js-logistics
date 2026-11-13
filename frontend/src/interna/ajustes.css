@@ -1410,3 +1410,16 @@
 .jsl .menu-grid.menu-mas button{border:1px solid var(--linea);transition:transform .08s,background .15s}
 .jsl .menu-grid.menu-mas button:active{transform:scale(.97)}
 .jsl .menu-grid.menu-mas button[aria-current="page"]{border-color:color-mix(in srgb,var(--marca2) 45%,transparent)}
+
+/* App del patinador en el computador: la misma barra de abajo, el mismo header y las mismas pantallas que en el celular
+   (sin menú lateral). Se contiene el ancho para que no quede estirado en una pantalla grande. */
+@media (min-width:768px){.jsl.jsl-patinador .tp-movil{display:flex}.jsl.jsl-patinador .tp-capa{display:flex}.jsl.jsl-patinador .tp-hoja{max-width:560px}}
+@media (min-width:960px){
+  .jsl.jsl-patinador .barra-movil{display:flex}
+  .jsl.jsl-patinador .barra{background:var(--lateral);color:#fff;padding:10px 14px}
+  .jsl.jsl-patinador .barra .marca{display:flex}
+  .jsl.jsl-patinador .barra{margin-left:0}
+  .jsl.jsl-patinador main{max-width:760px;margin:0 auto;padding:18px 16px 110px}
+  .jsl.jsl-patinador .pat-tarjetas{grid-template-columns:minmax(0,1fr)}
+  .jsl.jsl-patinador .pestanas{display:flex;left:50%;right:auto;width:min(560px,calc(100% - 20px));transform:translateX(-50%)}
+}
