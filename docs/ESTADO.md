@@ -1,5 +1,10 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Sueldos: cálculo del sueldo de Javier en 5 columnas — 2026-11-13
+
+- La tabla "Cálculo del sueldo de …" (componente `JaviSemana` en `oficina/Sueldos.tsx`) tiene Día, Ingresos del día, Pagos fijos, Sueldo y Acciones, más una fila "Total semana". "Ingresos del día" es `dom30 + propios + ganancias + desc` (`ingresosJavi`); el sueldo sigue siendo `javier` de `sueldosDia` en `motor.ts`, sin cambios en el cálculo.
+- En el celular (< 768 px) es una lista (reusa `.sueldos-lista`): día, micro-resumen "Ingresos · Fijos", sueldo y el ojo. Al tocar una fila o "Detalle" se abre `DetalleJavi` (ventana "centrada-ancha", hoja de abajo en el celular) con la fórmula paso a paso y el "Sueldo neto del día". Solo se listan los días con movimiento, como antes.
+
 ## Personal JS en el celular: lista y ficha — 2026-11-13
 
 - Por debajo de 768 px, Personal → Personal JS ya no muestra la tabla (`.per-tabla` se oculta) sino `.per-lista`: Nombre, Tipo (píldora) y "Ver" (a 360 px o menos queda solo el ojo). Desde 768 px la tabla es la de siempre.
