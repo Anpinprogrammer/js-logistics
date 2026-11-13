@@ -1,32 +1,35 @@
 /* Las pantallas del patinador (Inicio, Mi caja con su historial y Solicitudes). Las usan su app (Patinador.tsx) y el modo Patinador de administración
    (DesdeOficina.tsx), que pasa `ajeno` con el patinador elegido: las cifras y lo anotado van a la caja de ese patinador. */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import * as api from "../../api/servicios";
-import type { CajaPatinador, PaginaSolicitudesRecogida, RegistroCajaPatinador, SolicitudRecogida } from "../../api/tipos";
+import type { CajaPatinador, FiltrosCajaPatinador, PaginaSolicitudesRecogida, RegistroCajaPatinador, SolicitudRecogida } from "../../api/tipos";
 import { DEMO } from "../demo";
 import { motivoError } from "../datos";
-import { Kpi, Paginador } from "../ui";
+import { FiltroDia, IconoFiltro, Kpi, Paginador, useVentana } from "../ui";
 import { FormPago, Lista, type Anotar } from "../pagos";
-import { hora, pesos, S } from "../motor";
+import { diaDe, hora, pesos, S } from "../motor";
 import { registrosDemo, resumenDe, solicitudesRecogidaDemo } from "./demoCaja";
-import { usePorPagina, usePorPaginaRecogidas } from "../../lib/pantalla";
+import { useComputador, usePorPagina, usePorPaginaRecogidas } from "../../lib/pantalla";
 
 const DEMO_PROPIO = "m-pat"; // la ficha de patinador@demo.co
 
 /* ---- modo demo: la caja vive en memoria, como el resto de la demo (demoCaja.ts) ---- */
-const cajaDemo = (pagina: number, porPagina: number, mensajeroId = DEMO_PROPIO): CajaPatinador => {
+const cajaDemo = (pagina: number, porPagina: number, mensajeroId = DEMO_PROPIO, filtros: FiltrosCajaPatinador = {}): CajaPatinador => {
   const suyos = registrosDemo.filter(r => r.mensajeroId === mensajeroId);
   // Las entregas a administración (S.recaudos) también salen en su historial, como en el servidor.
   const entregas: RegistroCajaPatinador[] = Object.values(S.recaudos).filter(r => r.mensajeroId === mensajeroId).map(r => ({
     id: r.id, mensajeroId, clienteId: "", clienteNombre: r.porNombre ? "Entregado a " + r.porNombre : "Entregado a la oficina", concepto: r.nota, valor: Number(r.valor) || 0,
     fecha: new Date(r.fecha).toISOString(), medio: r.medio, tipo: "entrega"
   }));
-  const todos = [...suyos, ...entregas].sort((a, b) => Date.parse(b.fecha) - Date.parse(a.fecha)), paginas = Math.max(1, Math.ceil(todos.length / porPagina)), p = Math.min(pagina, paginas);
+  const q = (filtros.buscar || "").toLowerCase();
+  const todos = [...suyos, ...entregas].sort((a, b) => Date.parse(b.fecha) - Date.parse(a.fecha)).filter(r =>
+    (filtros.tipo !== "ingresos" || r.tipo !== "entrega") && (filtros.tipo !== "salidas" || r.tipo === "entrega")
+    && (!filtros.dia || diaDe(Date.parse(r.fecha)) === filtros.dia) && (!q || (r.clienteNombre + " " + r.concepto).toLowerCase().includes(q))), paginas = Math.max(1, Math.ceil(todos.length / porPagina)), p = Math.min(pagina, paginas);
   return { resumen: resumenDe(suyos, mensajeroId), registros: todos.slice((p - 1) * porPagina, p * porPagina), pagina: p, porPagina, total: todos.length, paginas };
 };
-const traerCaja = (pagina: number, porPagina: number, mensajeroId?: string) =>
-  (DEMO ? Promise.resolve(cajaDemo(pagina, porPagina, mensajeroId)) : api.patinador.caja(pagina, porPagina, mensajeroId));
+const traerCaja = (pagina: number, porPagina: number, mensajeroId?: string, filtros?: FiltrosCajaPatinador) =>
+  (DEMO ? Promise.resolve(cajaDemo(pagina, porPagina, mensajeroId, filtros)) : api.patinador.caja(pagina, porPagina, mensajeroId, filtros));
 const traerSolicitudes = (page: number, limit: number, mensajeroId?: string): Promise<PaginaSolicitudesRecogida> =>
   (DEMO ? Promise.resolve(solicitudesRecogidaDemo(page, limit)) : api.patinador.solicitudes(page, limit, mensajeroId));
 const anotar = async (d: { mensajeroId?: string; clienteId: string; clienteNombre: string; concepto: string; valor: number }) => {
@@ -118,11 +121,41 @@ function Solicitudes({ ajeno }: { ajeno?: Ajeno }) {
   </>;
 }
 
-/* ---- Mi caja: las cifras, el formulario y el historial de movimientos (pagos y entregas a administración) ---- */
+/* ---- Mi caja: las cifras, el formulario y el historial de movimientos (pagos y entregas a administración) ----
+   Celular: el formulario se abre en una ventana desde "Registrar pago" y el historial tiene buscador y filtros (hoja inferior).
+   Computador: el formulario fijo y el historial de siempre. */
+const TIPOS_MOV: [FiltrosCajaPatinador["tipo"] & string, string][] = [["todos", "Todos los movimientos"], ["ingresos", "Ingresos (pagos recibidos)"], ["salidas", "Salidas (entregas a administración)"]];
+type FiltrosHoja = { tipo: NonNullable<FiltrosCajaPatinador["tipo"]>; dia: string };
+
 function MiCaja({ ajeno }: { ajeno?: Ajeno }) {
-  const porPagina = usePorPagina(), [pagina, setPagina] = useState(1);
-  const q = useQuery({ queryKey: [...claveCaja(ajeno), pagina, porPagina], queryFn: () => traerCaja(pagina, porPagina, ajeno?.id), placeholderData: prev => prev, refetchInterval: 60_000 });
-  const d = q.data, r = d?.resumen;
+  const porPagina = usePorPagina(), v = useVentana(), computador = useComputador(), [pagina, setPagina] = useState(1);
+  // Búsqueda: se pide al servidor cuando deja de escribir. Tipo y día se preparan en la hoja y se aplican juntos.
+  const [buscar, setBuscar] = useState(""), [buscarYa, setBuscarYa] = useState(""), temporizador = useRef<number | undefined>(undefined);
+  const [filtros, setFiltros] = useState<FiltrosHoja>({ tipo: "todos", dia: "" });
+  const [hoja, setHoja] = useState(false), [borrador, setBorrador] = useState<FiltrosHoja>(filtros);
+  const cambiarBusqueda = (x: string) => { setBuscar(x); window.clearTimeout(temporizador.current); temporizador.current = window.setTimeout(() => { setBuscarYa(x.trim()); setPagina(1); }, 300); };
+  const limpiarBusqueda = () => { window.clearTimeout(temporizador.current); setBuscar(""); setBuscarYa(""); setPagina(1); };
+  useEffect(() => () => window.clearTimeout(temporizador.current), []);
+  const activos = Number(filtros.tipo !== "todos") + Number(!!filtros.dia);
+  const abrirHoja = () => { setBorrador(filtros); setHoja(true); };
+  const aplicar = () => { setFiltros(borrador); setPagina(1); setHoja(false); };
+  useEffect(() => {
+    if (!hoja) return;
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") setHoja(false); };
+    document.addEventListener("keydown", tecla);
+    return () => { document.body.style.overflow = anterior; document.removeEventListener("keydown", tecla); };
+  }, [hoja]);
+
+  const f: FiltrosCajaPatinador = { buscar: buscarYa, tipo: filtros.tipo, dia: filtros.dia };
+  const q = useQuery({ queryKey: [...claveCaja(ajeno), pagina, porPagina, buscarYa, filtros.tipo, filtros.dia], queryFn: () => traerCaja(pagina, porPagina, ajeno?.id, f), placeholderData: prev => prev, refetchInterval: 60_000 });
+  const d = q.data, r = d?.resumen, filtrando = !!buscarYa || activos > 0;
+  const abrirPago = () => v.abrir(<>
+    <header><h2>Anotar un pago</h2><button className="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <p className="sub">{ajeno ? "Registra el dinero que recibió el patinador de un cliente" : "Registra el dinero recibido de un cliente en ruta"}</p>
+    <FormPago enModal anotar={x => anotarYContar(x, ajeno)} invalidar={["patinador"]} deOtro={!!ajeno} alGuardar={() => v.cerrar()} />
+  </>, "centrada");
   return <>
     <h1>{ajeno ? "Caja del patinador" : "Mi caja"}</h1>
     {ajeno
@@ -133,9 +166,25 @@ function MiCaja({ ajeno }: { ajeno?: Ajeno }) {
       <Kpi ico="plata" lbl={ajeno ? "En su caja" : "En mi caja"} val={r ? pesos(r.enCaja ?? r.total) : "…"} pie={<small>{r ? (r.entregado ? `Recibido ${pesos(r.total)} · entregado ${pesos(r.entregado)}` : `${r.registros} ${r.registros === 1 ? "pago" : "pagos"}`) : ""}</small>} />
       <Kpi ico="caja" lbl="Recibido hoy" val={r ? pesos(r.totalHoy) : "…"} pie={<small>{r ? `${r.registrosHoy} ${r.registrosHoy === 1 ? "pago" : "pagos"}` : ""}</small>} />
     </div>
-    <FormPago anotar={d => anotarYContar(d, ajeno)} invalidar={["patinador"]} deOtro={!!ajeno} />
+    {computador
+      ? <FormPago anotar={x => anotarYContar(x, ajeno)} invalidar={["patinador"]} deOtro={!!ajeno} />
+      : <button type="button" className="btn pat-registrar" onClick={abrirPago}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" /></svg>Registrar pago</button>}
     <div className="cab-lista"><h2>Historial de movimientos</h2></div>
-    <Lista registros={d?.registros} cargando={q.isLoading} vacio={ajeno ? VACIO_AJENO : undefined} />
+    <div className="tp-movil" role="search">
+      <div className="tp-movil-buscar"><input type="search" value={buscar} placeholder="Buscar cliente o concepto…" autoComplete="off" aria-label="Buscar por cliente o concepto" onChange={e => cambiarBusqueda(e.target.value)} />{buscar && <button type="button" aria-label="Limpiar búsqueda" onClick={limpiarBusqueda}>×</button>}</div>
+      <button type="button" className="tp-movil-abrir" onClick={abrirHoja} aria-haspopup="dialog" aria-label={`Filtros${activos ? `, ${activos} activos` : ""}`}><IconoFiltro /><span>Filtros</span>{activos > 0 && <b>{activos}</b>}</button>
+    </div>
+    {hoja && <div className="tp-capa" onMouseDown={e => { if (e.target === e.currentTarget) setHoja(false); }}>
+      <div className="tp-hoja" role="dialog" aria-modal="true" aria-labelledby="pat-filtros-titulo">
+        <header><h2 id="pat-filtros-titulo"><IconoFiltro /> Filtrar movimientos</h2><button type="button" className="cerrar" aria-label="Cerrar filtros" onClick={() => setHoja(false)}>×</button></header>
+        <div className="tp-hoja-cuerpo">
+          <div className="campo"><label htmlFor="pat-tipo">Tipo de movimiento</label><div className="tp-hoja-select"><select id="pat-tipo" value={borrador.tipo} onChange={e => setBorrador(b => ({ ...b, tipo: e.target.value as FiltrosHoja["tipo"] }))}>{TIPOS_MOV.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></div></div>
+          <div className="campo"><label htmlFor="pat-dia">Fecha del movimiento</label><FiltroDia compacto id="pat-dia" d={borrador.dia} poner={dia => setBorrador(b => ({ ...b, dia }))} /></div>
+        </div>
+        <footer><button type="button" className="btn sec" onClick={() => setBorrador({ tipo: "todos", dia: "" })}>Limpiar filtros</button><button type="button" className="btn" onClick={aplicar}>Aplicar filtros</button></footer>
+      </div>
+    </div>}
+    <Lista registros={d?.registros} cargando={q.isLoading} vacio={filtrando ? "No hay movimientos con esos filtros." : ajeno ? VACIO_AJENO : undefined} />
     {d && <Paginador pagina={d.pagina} paginas={d.paginas} total={d.total} porPagina={d.porPagina} cargando={q.isFetching} ir={p => { setPagina(p); }} />}
   </>;
 }

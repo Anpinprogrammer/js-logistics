@@ -313,6 +313,8 @@ export interface RegistroCajaPatinador { id: string; mensajeroId: string; client
 export interface ResumenCajaPatinador { total: number; registros: number; totalHoy: number; registrosHoy: number; entregado?: number; entregadoHoy?: number; enCaja?: number }
 export interface CajaPatinador { resumen: ResumenCajaPatinador; registros: RegistroCajaPatinador[]; pagina: number; porPagina: number; total: number; paginas: number }
 
+/** Filtros del historial de la caja (celular): texto en el cliente o el concepto, ingresos (pagos) o salidas (entregas a administración) y un día. */
+export interface FiltrosCajaPatinador { buscar?: string; tipo?: "todos" | "ingresos" | "salidas"; dia?: string }
 /** Una solicitud de recogida que la oficina le asignó al patinador y todavía no recoge (GET /patinador/solicitudes). */
 export interface SolicitudRecogida { guia: string; fecha: string; remitente: string; direccionRecogida: string; paquetes: number; destinatarioNombre: string; direccionEntrega: string }
 /** Respuesta paginada de GET /patinador/solicitudes (`page` desde 1; `limit` 5 en celular y 10 en computador). */

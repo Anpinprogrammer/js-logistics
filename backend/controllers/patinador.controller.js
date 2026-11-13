@@ -31,13 +31,13 @@ async function fichaElegida(mensajeroId, db) {
 
 /** GET /patinador/caja: { resumen, registros, pagina, porPagina, total, paginas }. */
 export async function caja(req, res) {
-  const { mensajeroId: pedido, pagina, porPagina } = req.valido.query;
+  const { mensajeroId: pedido, pagina, porPagina, tipo, dia, buscar } = req.valido.query;
   let mensajeroId;
   if (esOficina(req.usuario)) {
     if (!pedido) throw invalido("Elige el patinador", { mensajeroId: "Elige el patinador" });
     mensajeroId = pedido;
   } else mensajeroId = fichaPropia(req.usuario); // lo que mande la petición no cuenta
-  const [resumen, lista] = await Promise.all([Caja.resumen(mensajeroId), Caja.listarPagina({ mensajeroId, pagina, porPagina })]);
+  const [resumen, lista] = await Promise.all([Caja.resumen(mensajeroId), Caja.listarPagina({ mensajeroId, pagina, porPagina, tipo, dia, buscar })]);
   res.json({ resumen, ...lista });
 }
 

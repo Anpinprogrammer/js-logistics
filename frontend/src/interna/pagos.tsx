@@ -22,8 +22,10 @@ export type Anotar = (d: { clienteId: string; clienteNombre: string; concepto: s
 
 /** Formulario "¿Quién te pagó? · Concepto · Valor". Lo usan el patinador (Mi caja) y el mensajero (Recepción → Recibir dinero). */
 /** conMedio: pregunta cómo pagó (efectivo, Nequi o Bancolombia). Sin él, todo es efectivo (la caja del patinador).
-    deOtro: administración anota por el patinador ("le pagó" en vez de "te pagó"). */
-export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un pago", boton = "Anotar pago", conMedio = false, deOtro = false }: { anotar: Anotar; invalidar: readonly unknown[]; titulo?: string; boton?: string; conMedio?: boolean; deOtro?: boolean }) {
+    deOtro: administración anota por el patinador ("le pagó" en vez de "te pagó").
+    enModal: va dentro de una ventana (el celular de Mi caja): sin tarjeta ni título propio, que pone la ventana.
+    alGuardar: se llama al guardar con éxito (la ventana se cierra); los campos quedan limpios. */
+export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un pago", boton = "Anotar pago", conMedio = false, deOtro = false, enModal = false, alGuardar }: { anotar: Anotar; invalidar: readonly unknown[]; titulo?: string; boton?: string; conMedio?: boolean; deOtro?: boolean; enModal?: boolean; alGuardar?: () => void }) {
   const v = useVentana(), qc = useQueryClient(), te = deOtro ? "le" : "te";
   const [cliente, setCliente] = useState<ClienteBreve | null>(null);
   const [busca, setBusca] = useState(""), [abierto, setAbierto] = useState(false), [opciones, setOpciones] = useState<ClienteBreve[]>([]);
@@ -48,6 +50,7 @@ export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un p
     onSuccess: aviso => {
       qc.invalidateQueries({ queryKey: invalidar });
       setCliente(null); setBusca(""); setConcepto(""); setValor(""); setMedio("efectivo");
+      alGuardar?.();
       v.avisar(aviso);
     },
     onError: e => v.avisar("No se pudo anotar: " + (e instanceof FalloApi ? e.message : motivoError(e)))
@@ -63,8 +66,8 @@ export function FormPago({ anotar: guardarPago, invalidar, titulo = "Anotar un p
   };
 
   return (
-    <form className="tarjeta form-pago" onSubmit={enviar} noValidate aria-label={titulo}>
-      <h2>{titulo}</h2>
+    <form className={enModal ? "form-pago" : "tarjeta form-pago"} onSubmit={enviar} noValidate aria-label={titulo}>
+      {!enModal && <h2>{titulo}</h2>}
       <div className="campo">
         <label htmlFor="pgCliente">¿Quién {te} pagó?</label>
         <div className="combo-cliente" ref={comboRef}>
