@@ -1341,3 +1341,8 @@
 .jsl .fila-recogida .info{min-width:0;flex:1;overflow-wrap:anywhere}
 .jsl .fila-recogida .info p{margin:2px 0 0;white-space:normal;overflow:visible;text-overflow:clip}
 .jsl .fila-recogida .btn{flex:none;white-space:nowrap;text-decoration:none}
+
+/* Mi caja del patinador: en el celular el formulario va en una ventana ("Registrar pago"); en el computador sigue fijo. */
+.jsl .pat-registrar{width:100%;min-height:48px;margin:0 0 16px;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:800}
+.jsl .pat-registrar svg{width:20px;height:20px}
+.jsl .form-pago:not(.tarjeta){padding:0;box-shadow:none;background:none}

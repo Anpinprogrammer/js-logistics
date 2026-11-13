@@ -204,6 +204,21 @@ test("recibir dinero de un patinador usa la misma entrega de los mensajeros y ba
   assert.deepEqual([ent.valor, ent.concepto, m1.registros.filter(x => x.tipo === "pago").length], [20000, "Primera entrega", 2]);
   assert.equal(m1.registros[0].tipo, "entrega"); // la más nueva primero
   assert.equal((await oficina.get(`/api/patinador/caja?mensajeroId=${idPatinador}`)).body.registros.filter(x => x.tipo === "entrega").length, 1);
+  // Filtros del historial (celular): los aplica el servidor y el paginador cuenta solo lo filtrado.
+  const filtrar = q => patinador.get("/api/patinador/caja").query(q).then(r => r.body);
+  const ing = await filtrar({ tipo: "ingresos" }), sal = await filtrar({ tipo: "salidas" });
+  assert.deepEqual([ing.total, ing.registros.every(x => x.tipo === "pago"), sal.total, sal.registros.every(x => x.tipo === "entrega")], [2, true, 1, true]);
+  assert.equal(ing.resumen.enCaja, 12000); // los filtros no cambian las cifras de arriba
+  assert.equal((await filtrar({ buscar: "ESPIGA" })).total, 2); // cliente, sin importar mayúsculas
+  assert.equal((await filtrar({ buscar: "domicilios" })).total, 1); // concepto
+  assert.equal((await filtrar({ buscar: "primera" })).total, 1); // concepto de la entrega
+  assert.equal((await filtrar({ buscar: "%" })).total, 0); // el % no es comodín
+  const hoyCo = new Date(Date.now() - 5 * 36e5).toISOString().slice(0, 10);
+  assert.equal((await filtrar({ dia: hoyCo })).total, 3);
+  assert.equal((await filtrar({ dia: "2020-01-01" })).total, 0);
+  assert.equal((await filtrar({ tipo: "salidas", dia: hoyCo, buscar: "primera" })).total, 1);
+  assert.equal((await patinador.get("/api/patinador/caja?tipo=otro")).status, 400);
+  assert.equal((await patinador.get("/api/patinador/caja?dia=ayer")).status, 400);
   const b = await asistente.post("/api/recaudos").send({ mensajeroId: idPatinador, valor: 15000, medio: "nequi" });
   assert.equal(b.body.debe, -3000); // entregó de más: queda a favor
   const t = (await oficina.get("/api/patinador/resumen")).body.patinadores.find(p => p.mensajeroId === idPatinador);
