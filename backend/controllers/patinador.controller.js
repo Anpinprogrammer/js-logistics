@@ -75,3 +75,16 @@ export async function registrar(req, res) {
 export async function resumen(_req, res) {
   res.json({ patinadores: await Caja.resumenPatinadores() });
 }
+
+/** GET /patinador/solicitudes?page=&limit=: las solicitudes de recogida que la oficina le asignó y aún no recoge.
+    Responde { data, total, page, totalPages }. La oficina manda `mensajeroId` para ver las de un patinador. */
+export async function solicitudes(req, res) {
+  const { mensajeroId: pedido, page, limit } = req.valido.query;
+  let mensajeroId;
+  if (esOficina(req.usuario)) {
+    if (!pedido) throw invalido("Elige el patinador", { mensajeroId: "Elige el patinador" });
+    mensajeroId = pedido;
+  } else mensajeroId = fichaPropia(req.usuario); // lo que mande la petición no cuenta
+  const r = await Caja.recogidasPendientes({ mensajeroId, pagina: page, porPagina: limit });
+  res.json({ data: r.registros, total: r.total, page: r.pagina, totalPages: r.paginas });
+}

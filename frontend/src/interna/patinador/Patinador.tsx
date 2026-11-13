@@ -1,18 +1,20 @@
-/* App del patinador: anota el dinero que le pagan los clientes en su ruta y ve su caja. Es la única pantalla de este rol:
+/* App del patinador: Inicio (su caja y sus solicitudes de recogida), Mi caja (anota lo que le pagan los clientes, con su historial) y Solicitudes.
+   Es la única pantalla de este rol:
    no baja la oficina ni el mensajero, y no usa los datos en memoria (`S`). Todo lo suma el servidor. */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSesion, useUsuario } from "../../auth/Sesion";
 import { DEMO, datosDemo } from "../demo";
 import { Icono, IconoSalir, ProveedorVentana } from "../ui";
 import { fechaLarga, hoy, horaActual } from "../motor";
 import { useTema } from "../tema";
-import { VistaPatinador } from "./Vista";
+import { VistaPatinador, useSolicitudesPendientes, type TabPatinador } from "./Vista";
+import { IconoCampana } from "../Solicitudes";
 import { CLAVE_NAV_ADMIN, leerNavegacion, usePersistedTab } from "../../hooks/usePersistedTab";
 import "../estilos.css";
 import "../ajustes.css";
 
-type Pestana = "inicio" | "historial";
-const PESTANAS: [Pestana, string][] = [["inicio", "Mi caja"], ["historial", "Historial"]];
+type Pestana = TabPatinador;
+const PESTANAS: [Pestana, string][] = [["inicio", "Inicio"], ["caja", "Mi caja"], ["solicitudes", "Solicitudes"]];
 
 const IconoSol = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg>;
 const IconoLuna = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8z" /></svg>;
@@ -39,8 +41,20 @@ function Marco({ oscuro, cambiarTema }: { oscuro: boolean; cambiarTema: () => vo
   const nom = usuario.nombre || usuario.email, h = horaActual();
   const iniciales = nom.replace(/@.*/, "").split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join("").toUpperCase();
   const ir = (k: Pestana) => { setTab(k); scrollTo(0, 0); };
+  // Solicitudes de recogida por recoger: el número de la pestaña y de la campana.
+  const pendientes = useSolicitudesPendientes();
+  // Menú de la burbuja de perfil (tema y cerrar sesión), igual al del mensajero; se cierra al tocar fuera.
+  const [perfilAbierto, setPerfilAbierto] = useState(false);
+  const perfilRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!perfilAbierto) return;
+    const alTocar = (e: PointerEvent) => { if (!perfilRef.current?.contains(e.target as Node)) setPerfilAbierto(false); };
+    const alTeclear = (e: KeyboardEvent) => { if (e.key === "Escape") setPerfilAbierto(false); };
+    document.addEventListener("pointerdown", alTocar); document.addEventListener("keydown", alTeclear);
+    return () => { document.removeEventListener("pointerdown", alTocar); document.removeEventListener("keydown", alTeclear); };
+  }, [perfilAbierto]);
   const boton = ([k, t]: [Pestana, string]) => (
-    <button key={k} aria-current={tab === k ? "page" : undefined} aria-label={t} title={t} onClick={() => ir(k)}><Icono n={k === "inicio" ? "caja" : "historial"} /><span className="t">{t}</span></button>
+    <button key={k} aria-current={tab === k ? "page" : undefined} aria-label={t} title={t} onClick={() => ir(k)}><Icono n={k === "caja" ? "caja" : k} /><span className="t">{t}</span>{k === "solicitudes" && pendientes > 0 ? <span className="num">{pendientes}</span> : null}</button>
   );
   return <>
     <aside className="lateral" id="lateral">
@@ -58,12 +72,19 @@ function Marco({ oscuro, cambiarTema }: { oscuro: boolean; cambiarTema: () => vo
       <div className="barra-movil">
         <div className="marca marca-movil"><img src="/logo_JS_sin_texto.webp" alt="JS Logistics" /></div>
         <div className="barra-movil-acciones">
-          <button type="button" className="campana" aria-label={oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro"} onClick={cambiarTema}>{oscuro ? <IconoSol /> : <IconoLuna />}</button>
-          <button type="button" className="campana" aria-label="Cerrar sesión" onClick={() => void salir()}><IconoSalir /></button>
+          <button type="button" className="campana" aria-label={`Solicitudes de recogida pendientes: ${pendientes}`} onClick={() => ir("solicitudes")}><IconoCampana />{pendientes > 0 && <span className="campana-num" aria-hidden="true">{pendientes > 9 ? "9+" : pendientes}</span>}</button>
+          <div className="perfil-area" ref={perfilRef}>
+            <button type="button" className="perfil-disparador avatar" aria-label="Menú de perfil y opciones" aria-expanded={perfilAbierto} aria-controls="perfil-movil" onClick={() => setPerfilAbierto(v => !v)}>{iniciales || "JS"}</button>
+            {perfilAbierto && <div className="perfil-popover" id="perfil-movil" role="group" aria-label="Opciones de perfil">
+              <div className="perfil-info"><b>{nom}</b><small>Patinador</small></div>
+              <button type="button" className="perfil-opcion" onClick={() => { cambiarTema(); setPerfilAbierto(false); }}>{oscuro ? <IconoSol /> : <IconoLuna />}<span>{oscuro ? "Modo claro" : "Modo oscuro"}</span></button>
+              <button type="button" className="perfil-opcion perfil-salir" onClick={() => { setPerfilAbierto(false); void salir(); }}><IconoSalir /><span>Cerrar sesión</span></button>
+            </div>}
+          </div>
         </div>
       </div>
     </header>
-    <main id="vista"><VistaPatinador tab={tab} irHistorial={() => ir("historial")} /></main>
+    <main id="vista"><VistaPatinador tab={tab} ir={ir} /></main>
     <nav className="pestanas" id="pestanas" aria-label="Secciones">{PESTANAS.map(boton)}</nav>
   </>;
 }

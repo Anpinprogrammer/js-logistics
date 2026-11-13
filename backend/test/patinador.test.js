@@ -1,6 +1,6 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { pool, app, request, reiniciarBase, crearCuenta, sesion } from "./ayuda.js";
+import { pool, app, request, ORIGEN, reiniciarBase, crearCuenta, sesion } from "./ayuda.js";
 
 let oficina, asistente, mensajero, patinador, idPatinador, idOtroPatinador, idMensajero, idCliente, idOtroCliente;
 
@@ -218,4 +218,39 @@ test("recibir dinero de un patinador usa la misma entrega de los mensajeros y ba
   assert.equal((await oficina.get("/api/patinador/resumen")).body.patinadores.find(p => p.mensajeroId === idPatinador).debe, 12000);
   const m2 = (await patinador.get("/api/patinador/caja")).body;
   assert.deepEqual([m2.resumen.enCaja, m2.registros.filter(x => x.tipo === "entrega").length], [12000, 1]); // la entrega quitada sale del historial
+});
+
+test("solicitudes de recogida: el patinador ve solo las que le asignaron, paginadas", async () => {
+  const pub = c => request(app).post("/api/solicitudes/publico").set("Origin", ORIGEN).set("X-JSL", "1").send(c);
+  const datos = i => ({ nombre: `Cliente ${i}`, telefono: `30000000${i}0`, email: `c${i}@correo.co`, direccionRecogida: `Calle ${i} # 1-10, Cali`, paquetes: i,
+    destinatarioNombre: "Pedro Ruiz", destinatarioTelefono: "3110000000", direccionEntrega: "Calle 70 # 1-10, Cali" });
+  for (let i = 1; i <= 3; i++) assert.equal((await pub(datos(i))).status, 201);
+  const abiertas = (await oficina.get("/api/solicitudes?abiertas=true")).body.solicitudes;
+  assert.equal(abiertas.length, 3);
+  const guias = [];
+  for (const [i, s] of abiertas.entries()) {
+    assert.equal((await oficina.post(`/api/solicitudes/${s.id}/aceptar`).send({ valor: 9000 })).status, 200);
+    assert.equal((await oficina.post(`/api/solicitudes/${s.id}/confirmar`)).status, 200);
+    // La tercera se la asignan a otro patinador: no la debe ver.
+    const r = await oficina.post(`/api/solicitudes/${s.id}/asignar`).send({ mensajeroId: i === 2 ? idOtroPatinador : idPatinador });
+    assert.equal(r.status, 200);
+    guias.push(r.body.pedido.guia);
+  }
+  const p1 = await patinador.get("/api/patinador/solicitudes?page=1&limit=1");
+  assert.equal(p1.status, 200);
+  assert.deepEqual([p1.body.total, p1.body.page, p1.body.totalPages, p1.body.data.length], [2, 1, 2, 1]);
+  assert.equal(p1.body.data[0].guia, guias[0]); // la más antigua primero
+  assert.ok(p1.body.data[0].direccionRecogida && p1.body.data[0].paquetes && p1.body.data[0].remitente);
+  assert.equal(p1.body.data[0].telefono, undefined); // sin datos de contacto del remitente
+  const p2 = await patinador.get("/api/patinador/solicitudes?page=2&limit=1");
+  assert.equal(p2.body.data[0].guia, guias[1]);
+  assert.equal((await patinador.get("/api/patinador/solicitudes?page=9&limit=1")).body.page, 2); // una página que no existe devuelve la última
+  assert.equal((await patinador.get("/api/patinador/solicitudes?limit=0")).status, 400);
+  // La oficina elige el patinador; lo que mande el patinador sobre otro no cuenta.
+  assert.equal((await oficina.get("/api/patinador/solicitudes")).status, 400);
+  assert.equal((await oficina.get(`/api/patinador/solicitudes?mensajeroId=${idOtroPatinador}`)).body.total, 1);
+  assert.equal((await patinador.get(`/api/patinador/solicitudes?mensajeroId=${idOtroPatinador}`)).body.total, 2);
+  // Otros roles no entran.
+  assert.equal((await mensajero.get("/api/patinador/solicitudes")).status, 403);
+  assert.equal((await request(app).get("/api/patinador/solicitudes")).status, 401);
 });

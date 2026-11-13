@@ -118,7 +118,7 @@ export function TarjetaSolicitud({ s, enDetalle = false, alCompletar }: { s: Sol
   const [error, setError] = useState("");
   // Rechazar pide la razón: el cliente la ve en "Mis solicitudes" de su portal.
   const [rechazando, setRechazando] = useState(false), [motivo, setMotivo] = useState("");
-  const mensajeros = Object.values(S.mensajeros).filter(m => m.tipo === "mensajero");
+  const mensajeros = Object.values(S.mensajeros).filter(m => m.tipo === "mensajero" || m.tipo === "patinador");
 
   const correr = async (fn: () => Promise<unknown>, aviso: string) => {
     setOcupado(true); setError("");
@@ -215,7 +215,7 @@ export function TarjetaSolicitud({ s, enDetalle = false, alCompletar }: { s: Sol
           <label htmlFor={"men" + s.id}>Mensajero</label>
           <select id={"men" + s.id} value={mensajero} onChange={e => setMensajero(e.target.value)}>
             <option value="">Elige un mensajero…</option>
-            {mensajeros.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+            {mensajeros.map(m => <option key={m.id} value={m.id}>{m.nombre}{m.tipo === "patinador" ? " (patinador)" : ""}</option>)}
           </select>
         </div></div>
         <div className="acciones">

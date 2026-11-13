@@ -10,7 +10,7 @@ import { SUBMAS } from "./motor";
 const TABS_ADMIN = ["inicio", "pedidos", "solicitudes", "clientes", "caja", "cuentas", "sueldos", "mas"];
 const TABS_ASISTENTE = ["inicio", "pedidos", "solicitudes", "clientes", "caja", "cuentas"];
 const TABS_MENSAJERO = ["inicio", "recepcion", "pend", "caja", "sueldo", "entregados"];
-const TABS_PATINADOR = ["caja", "historial"];
+const TABS_PATINADOR = ["inicio", "caja", "solicitudes"];
 const FILTROS_PEDIDOS = ["todos", "sin", "rec", "pend", "ent", "dev", "dif", "cambio", "serv"];
 
 type Sub = { leer: () => string; poner: (v: string) => void; validos: readonly string[] };
@@ -37,7 +37,7 @@ const modosDe = (rol: Rol) => (rol === "admin" ? ["admin", "mensajero", "patinad
  * Se llama una vez, al entrar a la app interna.
  */
 export function restaurarNavegacion(uid: string, rol: Rol) {
-  E.tabA = "inicio"; E.tabM = "inicio"; E.tabP = "caja"; // nada de la sesión anterior en esta misma pestaña del navegador
+  E.tabA = "inicio"; E.tabM = "inicio"; E.tabP = "inicio"; // nada de la sesión anterior en esta misma pestaña del navegador
   const nav = leerNavegacion(CLAVE_NAV_ADMIN, uid);
   if (!nav) return;
   if (nav.tab === "nuevo") nav.tab = "recepcion"; // la pestaña Nuevo del mensajero ahora es Recepción → Nuevo pedido
