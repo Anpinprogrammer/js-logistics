@@ -1,5 +1,13 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Clientes: imprimir tiquetes y descargar Excel, como el prototipo — 2026-11-13
+
+- Volvieron las cuatro opciones de Clientes que tenía el prototipo (`app/js/app.js`, línea 594): **Descargar cartera en Excel**, **Imprimir por cobrar / por pagar**, **Imprimir recibos** y **Excel del cuadre de hoy** (o del día elegido). Los dos Excel son solo de administración, como antes. En el escritorio van en la barra de acciones; en el celular, en el botón "Imprimir y Excel", que abre una ventana con las cuatro.
+- **Impresión térmica sin servidor:** `interna/tiquete.ts` es la copia de `imprimirTicket`, `tkLineas`, `armarRecibo` y `armarReciboDia`. Arma el tiquete como texto de 40 columnas (papel de 80 mm) o 32 (58 mm), lo pone en un `<iframe>` oculto y llama a `print()`: la persona elige la SAT-16TU en la ventana del sistema, con márgenes "Ninguno" y escala 100 %. El ancho del papel se recuerda en `js_papel` (localStorage). La ventana con la vista previa está en `oficina/impresion.tsx` (`VentanaTiquete`, `RecibosVarios`).
+- **Pagar e imprimir:** usa `POST /clientes/pagar-saldos` (el servidor paga con el saldo del momento, sin pagar dos veces) y "Reversar los pagos" usa `POST /movimientos/reversar`. Si el pago falla, no se imprime. El backend solo deja que administración quite un pago todavía no contado en un arqueo; al asistente le sale el error del servidor.
+- **Excel:** `oficina/excelClientes.ts` (copia de `descargarCartera` y `descargarExcel`). ExcelJS (`exceljs` 4.4.0, la misma versión del prototipo) se carga con `import()` solo al pedir un Excel, y `vite.config.ts` lo deja en su propio archivo (`excel-*.js`, ~930 kB) para que no entre en `librerias`. La pestaña Clientes ahora también pide `recaudos` (`DE_PESTANA` de `datos.tsx`), que usa la hoja Mensajeros del cuadre.
+- Los listados se arman con todos los clientes en memoria (`clientesConSaldo` de `Clientes.tsx`, la misma que usa la página en demo), no solo con la página que se ve. Igual que el resto de Clientes, las cifras salen de `motor.ts`; cuando se pasen al backend, estas impresiones deben usar `/clientes/saldos` y `/clientes/cuadre`.
+
 ## Ficha del cliente en el celular: 3 pestañas y movimientos en tarjetas — 2026-11-13
 
 - `FichaCliente` (`oficina/Clientes.tsx`) tiene tres pestañas (`PestanaFicha`: `info | cuenta | pago`), con flechas del teclado en ciclo. **Información** muestra los datos, el estado de la cuenta, `CompartirSaldo` (enviar o copiar el saldo por WhatsApp, el mismo de la cuenta de escritorio) y WhatsApp / Editar ficha. **Ver cuenta** muestra solo los movimientos (`AbrirCuenta enFicha`). **Registrar pago** muestra `FormMovimiento`; al registrar vuelve a abrir la ficha en "Ver cuenta".
@@ -290,7 +298,7 @@ El orden de trabajo de siempre: backend primero (con prueba y documentado en `ba
 
 ## Qué falta
 
-Está en la sección "Qué falta" de [`CLAUDE.md`](../CLAUDE.md) (la fuente única; no la copies aquí). Resumen: `Idempotency-Key` para la cola sin señal, pasar los cálculos del navegador (`interna/motor.ts`) a los endpoints del backend, tiquetes, descargas de Excel, respaldo y PWA para el mensajero.
+Está en la sección "Qué falta" de [`CLAUDE.md`](../CLAUDE.md) (la fuente única; no la copies aquí). Resumen: `Idempotency-Key` para la cola sin señal, pasar los cálculos del navegador (`interna/motor.ts`) a los endpoints del backend, los tiquetes y Excel que faltan fuera de Clientes, respaldo y PWA para el mensajero.
 
 ## Decisiones de diseño que no son obvias (no las deshagas sin preguntar)
 

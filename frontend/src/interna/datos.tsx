@@ -56,7 +56,7 @@ const BASE: Coleccion[] = ["pedidos", "mensajeros", "corte"];
 const DE_PESTANA: Record<string, Coleccion[]> = {
   pedidos: [...BASE, "clientes", "cajamovs", "liquidaciones"],
   solicitudes: [...BASE, "clientes"],
-  clientes: [...BASE, "clientes", "movimientos", "cajamovs", "usuarios"],
+  clientes: [...BASE, "clientes", "movimientos", "cajamovs", "usuarios", "recaudos"], // recaudos: hoja Mensajeros del Excel del cuadre
 };
 /** Colecciones que necesita la vista. El modo mensajero y las pestañas que muestran el resumen de la caja o los sueldos
     (Inicio, Caja, Cuentas, Sueldos, Más) piden todas: esos cálculos cruzan pedidos, movimientos, caja, jornadas y usuarios. */
