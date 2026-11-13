@@ -80,6 +80,8 @@ Si ya habías importado antes de esta versión, corre primero `npm run db:migrar
 | `meta/contador`, `meta/caja` | `contadores`, `ajustes.caja` | Hora del último arqueo. |
 | `historial`, `papelera` | mismas tablas | El historial pasa de un documento por día a una fila por cambio. |
 | `papelera_fotos`, `meta/config` | — | No se importan. |
+| — (solo existe en el sistema nuevo) | `solicitudes`, `caja_patinador`, `enlaces` | Firebase no tiene solicitudes de envío (landing y portal), caja del patinador ni enlaces de correo: la importación no los crea. Qué hace `--reemplazar` con ellos está en la sección 3. |
+| — (columnas nuevas) | `movimientos.mensajero_id`, `liquidaciones.cobros`, `pedidos.destino_dev`, `reintento_de`, `reintento_pedido`, `clientes.direccion_recogida` | Recepción del mensajero, reintentos de devueltos y dirección de recogida no existían en la app vieja: quedan con su valor por defecto (vacío o 0). Un devuelto de Firebase queda con `destino_dev = ''` (devuelto de antes del cambio: no entra al flujo de reintento) y ninguna guía importada queda en `aceptado`. |
 
 Datos que la app vieja dejaba pasar y aquí se limpian (todos quedan en el informe):
 
@@ -96,8 +98,9 @@ Firebase no entrega las contraseñas, así que **las cuentas importadas quedan s
    npm run db:admin -- --email dueno@correo.com --clave "una-clave-larga" --restablecer
    ```
 
-2. Con esa cuenta, en **Personal → Acceso → Restablecimiento masivo**, se eligen las cuentas y se manda el correo (**máximo 100 por envío**: si son más, hazlo en varias tandas). A una cuenta sin contraseña le llega el enlace de **activación** (vale 7 días); a la persona de clientes la lleva a `jslogistics.pro/activar-cuenta`, y a la de oficina, al subdominio de la app. Necesita `RESEND_API_KEY`, el dominio verificado en Resend, `URL_CLIENTES` y `URL_EQUIPO` de producción.
-3. Manda las invitaciones **solo después de la importación final**: un `--reemplazar` posterior borra los enlaces pendientes de los clientes (las contraseñas que ya crearon sí se conservan).
+2. **Patinadores.** En la app vieja entraban con rol de mensajero. Después de importar, en **Personal → Acceso** cámbiales el rol a **Patinador** (su cuenta debe estar vinculada a su ficha de tipo Patinador). Una importación posterior, con o sin `--reemplazar`, ya no les devuelve el rol de mensajero.
+3. Con esa cuenta, en **Personal → Acceso → Restablecimiento masivo**, se eligen las cuentas y se manda el correo (**máximo 100 por envío**: si son más, hazlo en varias tandas). A una cuenta sin contraseña le llega el enlace de **activación** (vale 7 días); a la persona de clientes la lleva a `jslogistics.pro/activar-cuenta`, y a la de oficina, al subdominio de la app. Necesita `RESEND_API_KEY`, el dominio verificado en Resend, `URL_CLIENTES` y `URL_EQUIPO` de producción.
+4. Manda las invitaciones **solo después de la importación final**: un `--reemplazar` posterior borra los enlaces pendientes de los clientes (las contraseñas que ya crearon sí se conservan).
 
 ---
 
@@ -112,6 +115,10 @@ Cada vez que quieras ponerte al día, exporta (con `--sin-fotos` es rápido) e i
   - Conserva las cuentas de oficina y mensajeros con la contraseña que ya les pusiste en el sistema nuevo.
   - Las cuentas de clientes se vuelven a crear con la contraseña que ya hayan creado en el sistema nuevo (los enlaces pendientes sí se pierden).
   - Las fotos que ya estaban en Storage no se vuelven a subir: solo se anotan otra vez.
+  - Lo que solo existe en el sistema nuevo:
+    - **Caja del patinador** (`caja_patinador`) y sus abonos: se borran, como el resto de la operación. Salen en el informe, en `sistemaNuevo`, como "pagos de patinador borrados".
+    - **Solicitudes de envío** (landing y portal): se conservan, con su cliente y su mensajero. Si estaban asignadas a una guía creada en el sistema nuevo, esa guía desaparece y la solicitud queda sin guía: sale en el informe como "solicitud que perdió su guía".
+    - **Cuentas:** se conserva el vínculo con Personal que se haya puesto en el sistema nuevo (cuentas nuevas o de Firebase sin vínculo) y el rol Patinador. Las demás cuentas de oficina y mensajeros se conservan con su contraseña y toman el rol que traiga Firebase.
 
 > Mientras se sincroniza, **el sistema nuevo no se usa para operar**: Firebase es la fuente de verdad, y una importación pisa lo que se haya cambiado aquí.
 
