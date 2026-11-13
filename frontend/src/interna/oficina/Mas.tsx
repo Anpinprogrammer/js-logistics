@@ -3,7 +3,7 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, moverDia, fechaLarga, cerrado, servicio, totales, sueldosDia, saldoCliente, nombreCliente, listaOrdenada, sinTildes, tipoDe, esRepartidor, vinculosDe,
-  SUBMAS, TIPOS, ROLES, telWhatsApp, type Persona, type TipoPersonal, type UsuarioS,
+  TIPOS, ROLES, telWhatsApp, type Persona, type TipoPersonal, type UsuarioS,
 } from "../motor";
 import { Cab, IconoCargando, IconoCorreo, IconoCorreoMasivo, IconoEditar, IconoEnviar, IconoLiberar, IconoLlave, IconoQuitarUsuario, IconoTresPuntos, Paginador, useMenuColapsado, useVentana } from "../ui";
 import { WhatsAppIcon } from "../../components/icons/WhatsAppIcon";
@@ -17,10 +17,8 @@ import type { Cambio, EnPapelera, PaginaHistorial, PaginaPersonal, Rol } from ".
 import { FormCliente } from "./modales";
 
 export default function Mas({ pintar }: { pintar: () => void }) {
-  // En el escritorio cada sub-pestaña es un acceso directo del menú lateral; en el celular siguen aquí.
-  const escritorio = useEscritorio();
+  // Cada sub-pestaña se abre directo desde el menú lateral (escritorio) o desde "Más" (celular), sin chips arriba.
   return <>
-    {!escritorio && <div className="filtros" style={{ marginBottom: 16 }}>{SUBMAS.map(([k, t]) => <button key={k} aria-pressed={E.subMas === k} onClick={() => { E.subMas = k; pintar(); }}>{t}</button>)}</div>}
     {E.subMas === "personal" ? <Personal /> : E.subMas === "historial" ? <Historial /> : E.subMas === "papelera" ? <Papelera /> : E.subMas === "respaldo" ? <Respaldo /> : <Resultados pintar={pintar} />}
   </>;
 }

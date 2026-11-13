@@ -1404,6 +1404,13 @@
   .jsl .tabla-accesos th:last-child,.jsl .tabla-accesos td:last-child{padding-right:12px}
 }
 
+/* "Más" del celular: solo las secciones que no están en la barra de abajo, en dos columnas, y la activa resaltada. */
+.jsl .menu-sub{margin:2px 0 0;font-size:.78rem;line-height:1.35}
+.jsl .menu-grid.menu-mas{grid-template-columns:repeat(2,minmax(0,1fr))}
+.jsl .menu-grid.menu-mas button{border:1px solid var(--linea);transition:transform .08s,background .15s}
+.jsl .menu-grid.menu-mas button:active{transform:scale(.97)}
+.jsl .menu-grid.menu-mas button[aria-current="page"]{border-color:color-mix(in srgb,var(--marca2) 45%,transparent)}
+
 /* App del patinador en el computador: la misma barra de abajo, el mismo header y las mismas pantallas que en el celular
    (sin menú lateral). Se contiene el ancho para que no quede estirado en una pantalla grande. */
 @media (min-width:768px){.jsl.jsl-patinador .tp-movil{display:flex}.jsl.jsl-patinador .tp-capa{display:flex}.jsl.jsl-patinador .tp-hoja{max-width:560px}}

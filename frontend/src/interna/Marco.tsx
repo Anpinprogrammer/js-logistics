@@ -92,10 +92,11 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     const base: ItemNav[] = [["inicio", "Inicio"], ["pedidos", "Pedidos", sin], ["solicitudes", "Solicitudes", nSol], ["clientes", "Clientes"], ["caja", "Caja"], ["cuentas", "Cuentas"], ["sueldos", "Sueldos"]];
     // El asistente no ve Sueldos ni Administración, como en el prototipo.
     const propias = esAdmin ? base : base.filter(([k]) => ["inicio", "pedidos", "solicitudes", "clientes", "caja", "cuentas"].includes(k));
-    // En el escritorio no hay "Más": sus sub-pestañas se abren desde el menú lateral. En el celular sigue igual.
-    items = esAdmin ? (escritorio ? [...propias, ...ADMIN_ESCRITORIO] : [...propias, ["mas", "Más"]]) : propias;
+    // Resultados, Personal, Historial, Papelera y Respaldo son pestañas propias, en el menú lateral y en el "Más" del celular.
+    // Por dentro siguen siendo E.tabA = "mas" con E.subMas (así se guardan en la URL y al recargar).
+    items = esAdmin ? [...propias, ...ADMIN_ESCRITORIO] : propias;
     if (!items.some(([k]) => k === E.tabA) && !(esAdmin && E.tabA === "mas")) E.tabA = "inicio";
-    actual = escritorio && esAdmin && E.tabA === "mas" ? E.subMas : E.tabA;
+    actual = esAdmin && E.tabA === "mas" ? E.subMas : E.tabA;
     elegir = k => { if (ADMIN_ESCRITORIO.some(([x]) => x === k)) { E.tabA = "mas"; E.subMas = k; } else E.tabA = k; };
   }
   // Apuntar o tocar un botón del menú ya empieza a bajar esa pestaña (solo en la oficina; el mensajero va en un solo archivo).
@@ -114,10 +115,11 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
   usePersistedTab(CLAVE_NAV_ADMIN, usuario?.id || "", navegacionActual());
   const cabe = items.length <= 5, vis = cabe ? items : items.slice(0, 4), resto = cabe ? [] : items.slice(4);
   const enResto = resto.find(([k]) => k === actual), nResto = resto.reduce((a, [, , n]) => a + (n || 0), 0);
+  // "Más" del celular: solo las secciones que no caben en la barra de abajo (las primeras cuatro ya están ahí).
   const abrirMenu = () => ventana.abrir(<>
-    <header><h2>Menú</h2><button className="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
-    <div className="menu-grid">
-      {items.map(([k, t, n]) => <button key={k} aria-current={actual === k ? "page" : undefined} onTouchStart={() => intencion(k)} onFocus={() => intencion(k)} onClick={() => { ventana.cerrar(); ir(k); }}><Icono n={k} /><span>{t}{n ? <> <span className="etq sin">{n}</span></> : null}</span></button>)}
+    <header><div><h2>Más secciones</h2>{enOficina && esAdmin ? <p className="sub menu-sub">Gestión financiera y administración</p> : null}</div><button className="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <div className="menu-grid menu-mas">
+      {resto.map(([k, t, n]) => <button key={k} aria-current={actual === k ? "page" : undefined} onTouchStart={() => intencion(k)} onFocus={() => intencion(k)} onClick={() => { ventana.cerrar(); ir(k); }}><Icono n={k} /><span>{t}{n ? <> <span className="etq sin">{n}</span></> : null}</span></button>)}
     </div>
   </>);
 
@@ -199,7 +201,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     </main>
     <nav className="pestanas" id="pestanas" aria-label="Secciones">
       {vis.map(boton)}
-      {resto.length > 0 && <button aria-current={enResto ? "page" : undefined} onClick={abrirMenu}><Icono n={enResto ? enResto[0] : "menu"} /><span className="t">{enResto ? enResto[1] : "Menú"}</span>{nResto ? <span className="num">{nResto}</span> : null}</button>}
+      {resto.length > 0 && <button aria-current={enResto ? "page" : undefined} aria-label={enResto ? "Más secciones (estás en " + enResto[1] + ")" : "Más secciones"} onClick={abrirMenu}><Icono n="menu" /><span className="t">Más</span>{nResto ? <span className="num">{nResto}</span> : null}</button>}
     </nav>
     {!enMensajero && <AvisoSolicitud solicitudes={solicitudesAbiertas.data?.solicitudes} />}
   </>;
