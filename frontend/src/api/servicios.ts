@@ -1,7 +1,7 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
 import type { GrupoSolicitud, PaginaSolicitudes, FiltrosSolicitudes, PaginaSolicitudesFiltradas, Archivo, TipoArchivo, Cliente, ClienteBreve, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
-  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal, Solicitud, ListaSolicitudes, CajaPatinador, RegistroCajaPatinador, ResumenCajaPatinador, ResumenPatinador, PaginaSolicitudesRecogida, FiltrosCajaPatinador } from "./tipos";
+  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PagoDeSaldos, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal, Solicitud, ListaSolicitudes, CajaPatinador, RegistroCajaPatinador, ResumenCajaPatinador, ResumenPatinador, PaginaSolicitudesRecogida, FiltrosCajaPatinador } from "./tipos";
 import { FalloApi } from "./cliente";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
@@ -120,7 +120,9 @@ export const clientes = {
     datos<{ cliente: Cliente }>(api.patch(`/clientes/${id}`, d)).then(r => r.cliente),
   eliminar: (id: string) => api.delete(`/clientes/${id}`),
   /** Une clientes repetidos en `id`: le pasa pedidos, movimientos y cuentas de acceso de `otros`, y los borra. */
-  unir: (id: string, otros: string[]) => datos<{ cliente: Cliente }>(api.post(`/clientes/${id}/unir`, { otros })).then(r => r.cliente)
+  unir: (id: string, otros: string[]) => datos<{ cliente: Cliente }>(api.post(`/clientes/${id}/unir`, { otros })).then(r => r.cliente),
+  /** "Pagar e imprimir" recibos: paga el saldo a favor de cada cliente elegido (el servidor usa el saldo del momento). */
+  pagarSaldos: (clienteIds: string[], medio: string) => datos<PagoDeSaldos>(api.post("/clientes/pagar-saldos", { clienteIds, medio }))
 };
 
 export const mensajeros = {
@@ -203,7 +205,9 @@ export const movimientos = {
     datos<PaginaMovimientos>(api.get("/movimientos/pagina", { params: limpio({ ...f, pagina, porPagina }) })),
   /** Ganancias por cliente (pestaña Ganancias de Cuentas). */
   ganancias: (f: { buscar?: string; desde?: string; hasta?: string }, pagina: number, porPagina: number) =>
-    datos<PaginaGanancias>(api.get("/movimientos/ganancias", { params: limpio({ ...f, pagina, porPagina }) }))
+    datos<PaginaGanancias>(api.get("/movimientos/ganancias", { params: limpio({ ...f, pagina, porPagina }) })),
+  /** "Reversar los pagos" que se acaban de registrar al imprimir recibos. */
+  reversar: (ids: string[]) => datos<{ reversados: { id: string; accion: "borrado" | "reversado"; reverso?: string }[]; total: number }>(api.post("/movimientos/reversar", { ids }))
 };
 export const recaudos = coleccion<Recaudo, Sin<Recaudo>>("/recaudos", "recaudos", "recaudo");
 export const liquidaciones = {

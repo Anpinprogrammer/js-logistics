@@ -4,7 +4,7 @@
  */
 import * as api from "../api/servicios";
 import type * as T from "../api/tipos";
-import { S, yo, type Pedido, type Medio, type Motivo, type Metodo, type TipoMov, type TipoPersonal, type Almacen, type CajaMov, type Liquidacion, hora, sinTildes, pesos, diaDe, MEDIOS } from "./motor";
+import { S, yo, type Pedido, type Medio, type Motivo, type Metodo, type TipoMov, type TipoPersonal, type Almacen, type CajaMov, type Liquidacion, hora, sinTildes, pesos, diaDe, MEDIOS, saldoCliente } from "./motor";
 import { aPedido, aPersona } from "./datos";
 import { DEMO, remitentesDemo } from "./demo";
 import { comprimir, firmaABlob, FOTO, MINI } from "../lib/imagen";
@@ -175,6 +175,24 @@ export async function borrarDe(col: "movimientos" | "recaudos" | "cajamovs" | "j
     await svc.eliminar(k);
   }
   tocar(s => { delete s[col][k]; });
+}
+/** "Pagar e imprimir" recibos: el servidor paga el saldo a favor de cada cliente con el saldo de ese momento
+ *  (si ya quedó en 0, no se paga dos veces). Devuelve los ids de los pagos, para poder reversarlos. */
+export async function pagarSaldos(clienteIds: string[], medio: Medio): Promise<{ hechos: string[]; total: number }> {
+  if (DEMO) {
+    const pagos = [...new Set(clienteIds)].map(cid => ({ cid, v: Math.round(saldoCliente(cid)), k: id() })).filter(x => x.v > 0);
+    // Objeto nuevo: los saldos agrupados de motor.ts se vuelven a armar aunque se acaben de leer en esta misma tarea.
+    tocar(s => { s.movimientos = { ...s.movimientos }; pagos.forEach(({ cid, v, k }) => { s.movimientos[k] = { id: k, clienteId: cid, tipo: "pago_a_cliente", valor: v, medio, nota: "Pago con recibo impreso", fecha: Date.now(), porUid: yo.uid, porNombre: yo.nombre }; }); });
+    return { hechos: pagos.map(x => x.k), total: pagos.reduce((a, x) => a + x.v, 0) };
+  }
+  const r = await api.clientes.pagarSaldos(clienteIds, medio);
+  await recargar();
+  return { hechos: r.hechos, total: r.total };
+}
+/** "Reversar los pagos" recién hechos al imprimir: si no se han contado en un arqueo se borran; si ya, se registra el pago contrario. */
+export async function reversarPagos(ids: string[]) {
+  if (DEMO) return tocar(s => { s.movimientos = { ...s.movimientos }; ids.forEach(k => delete s.movimientos[k]); });
+  await tras(api.movimientos.reversar(ids));
 }
 /** El asistente puede cambiar el medio de un pago que registró hoy (antes del arqueo). */
 export async function cambiarMedio(col: "movimientos" | "recaudos", k: string, medio: Medio) {
