@@ -118,10 +118,6 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     <header><h2>Menú</h2><button className="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
     <div className="menu-grid">
       {items.map(([k, t, n]) => <button key={k} aria-current={actual === k ? "page" : undefined} onTouchStart={() => intencion(k)} onFocus={() => intencion(k)} onClick={() => { ventana.cerrar(); ir(k); }}><Icono n={k} /><span>{t}{n ? <> <span className="etq sin">{n}</span></> : null}</span></button>)}
-      <button type="button" onClick={() => { cambiarTema(); ventana.cerrar(); }}>
-        {oscuro ? <IconoSol /> : <IconoLuna />}
-        <span>{oscuro ? "Modo claro" : "Modo oscuro"}</span>
-      </button>
     </div>
   </>);
 
