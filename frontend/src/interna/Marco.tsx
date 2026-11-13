@@ -3,7 +3,7 @@ import { DashboardSkeleton } from "../components/skeletons/DashboardSkeleton";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSesion, useUsuario } from "../auth/Sesion";
 import { necesarias, ProveedorDatos, useColecciones, useDatos } from "./datos";
-import { ProveedorVentana, Icono, IconoSalir, useVentana } from "./ui";
+import { ProveedorMenuColapsado, ProveedorVentana, Icono, IconoSalir, useVentana } from "./ui";
 import { E, estadoInicialPedidos, guardarLocal } from "./estado";
 import { useTema } from "./tema";
 import { AvisoSolicitud, Campanita, IconoCampana, useSolicitudes } from "./Solicitudes";
@@ -55,7 +55,9 @@ export default function AppInterna() {
   return (
     <div className={"jsl" + (menuColapsado ? " menu-colapsado" : "")} data-theme={tema === "sistema" ? undefined : tema}>
       <ProveedorDatos usuario={usuario}>
-        <ProveedorVentana><Marco oscuro={oscuro} cambiarTema={cambiar} colapsado={menuColapsado} alternarMenu={() => setMenuColapsado(v => !v)} /></ProveedorVentana>
+        <ProveedorMenuColapsado value={menuColapsado}>
+          <ProveedorVentana><Marco oscuro={oscuro} cambiarTema={cambiar} colapsado={menuColapsado} alternarMenu={() => setMenuColapsado(v => !v)} /></ProveedorVentana>
+        </ProveedorMenuColapsado>
       </ProveedorDatos>
     </div>
   );
