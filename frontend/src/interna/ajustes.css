@@ -1528,3 +1528,22 @@
   .jsl .per-ver span{display:none}
   .jsl .per-tipo-etq{padding:3px 8px}
 }
+
+/* Sueldos → cálculo del sueldo de Javier: 5 columnas en el computador, lista en el celular y ventana con la fórmula del día. */
+.jsl .jv-tabla th:first-child,.jsl .jv-tabla td:first-child{width:22%}
+.jsl .jv-tabla .neg,.jsl .jv-lista .neg,.jsl .jv-detalle .neg{color:var(--rojo);font-weight:700}
+.jsl .jv-tabla .sd-cero{color:var(--suave)}
+.jsl .jv-ver{display:inline-flex;align-items:center;justify-content:center;flex:none;width:36px;height:36px;border-radius:10px;background:var(--hueco);color:var(--suave)}
+.jsl .jv-ver svg{width:18px;height:18px}
+.jsl .jv-lista .jv-total{display:flex;align-items:center;gap:12px;padding:12px 62px 12px 14px;background:var(--hueco)}
+.jsl .jv-formula{background:var(--hueco)}
+.jsl .jv-formula dt{color:var(--tinta)}
+.jsl .jv-formula .jv-resta{margin-top:6px;padding-top:10px;border-top:1px solid var(--linea)}
+.jsl .jv-neto{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding:14px 16px;border:1px solid color-mix(in srgb,var(--marca2) 30%,transparent);border-radius:14px;background:color-mix(in srgb,var(--marca2) 10%,transparent)}
+.jsl .jv-neto span{font-weight:800;font-size:.9rem}
+.jsl .jv-neto b{font-size:1.15rem;font-weight:900;color:var(--marca2);font-variant-numeric:tabular-nums}
+.jsl .jv-neto b.neg{color:var(--rojo)}
+.jsl .jv-par{white-space:nowrap}
+.jsl .jv-formula dd,.jsl .jv-neto b{flex:none;white-space:nowrap}
+.jsl .jv-formula dt{min-width:0}
+@media (max-width:360px){.jsl .jv-formula{padding:12px;font-size:.82rem}.jsl .jv-neto{padding:12px}.jsl .jv-neto b{font-size:1.05rem}}

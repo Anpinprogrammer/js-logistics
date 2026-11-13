@@ -4,7 +4,7 @@ import {
   S, hoy, hora, pesos, fechaLarga, resumenSemana, sueldoPersonaSemana, moverSemana, semanaDe, tipoDe, jornada, valorAdel, sueldoPrevio, yaContado, liquidacionesDe,
   MEDIOS, TIPOS, PAGO_FIJO, DIAS_SEM, DESC_SUELDO, type Medio, type Persona,
 } from "../motor";
-import { Cab, IconoCalendario, useVentana } from "../ui";
+import { Cab, IconoCalendario, IconoOjo, useVentana } from "../ui";
 import { E } from "../estado";
 import { devolverAdelanto, guardarPersona, ponerJornada, quitarAdelanto } from "../acciones";
 import { motivoError, useDatos } from "../datos";
@@ -60,11 +60,7 @@ export default function Sueldos({ pintar }: { pintar: () => void }) {
       </ul>
     </> : <div className="vacio">Registra tu personal en la pestaña Personal.</div>}
     <p className="sub" style={{ marginTop: 10 }}>Mensajeros: 70% de sus domicilios del día − {pesos(DESC_SUELDO)}. Patinadores, oficina y JS: toca cada día que trabajó (se marca con su pago por día); toca otra vez para quitarlo. Para un valor distinto, usa “otro valor”. Los domicilios de pedidos a nombre de oficina son 100% de JS y suman al sueldo de Javier.</p>
-    {dueno && <><h2>Cálculo del sueldo de {dueno.nombre}</h2><div className="tabla-env"><table><thead><tr><th>Día</th><th className="n">30% domicilios mensajeros</th><th className="n">Domicilios propios y de oficina</th><th className="n">Ganancias ocasionales</th><th className="n">{pesos(DESC_SUELDO)} × mensajeros</th><th className="n">− Pagos fijos (patinadores, oficina, JS)</th><th className="n">Sueldo</th></tr></thead><tbody>
-      {R.dias.some((_, i) => { const x = R.porDia[i]; return x.dom30 || x.propios || x.fijos || x.ganancias; })
-        ? R.dias.map((d, i) => { const x = R.porDia[i]; if (!x.dom30 && !x.propios && !x.fijos && !x.ganancias) return null; return <tr key={d}><td>{DIAS_SEM[i]} {d.slice(8)}</td><td className="n">{pesos(x.dom30)}</td><td className="n">{pesos(x.propios)}</td><td className="n">{pesos(x.ganancias)}</td><td className="n">{pesos(x.desc)} ({x.nMens})</td><td className="n neg">{pesos(-x.fijos)}</td><td className="n"><b>{pesos(x.javier)}</b></td></tr>; })
-        : <tr><td colSpan={7} className="sub">Sin movimiento esta semana.</td></tr>}
-    </tbody></table></div></>}
+    {dueno && <JaviSemana R={R} nombre={dueno.nombre} />}
     <h2>Adelantos de la semana</h2>
     {adelSem.length ? <div className="tabla-env"><table><thead><tr><th>Día</th><th>Persona</th><th>Medio</th><th>Detalle</th><th className="n">Valor</th><th></th></tr></thead><tbody>
       {adelSem.map(c => <tr key={c.id}><td>{hora(c.fecha)}</td><td>{c.nom}</td><td>{MEDIOS[c.medio as Medio] || ""}</td><td>{c.concepto || ""}</td><td className="n">{pesos(c.valor)}{Number(c.devuelto) ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>devolvió {pesos(c.devuelto || 0)}</span></> : null}</td>
@@ -74,6 +70,66 @@ export default function Sueldos({ pintar }: { pintar: () => void }) {
 }
 
 const DIAS_LARGOS = ["Sábado", "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+const MESES_LARGOS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+type Semana = ReturnType<typeof resumenSemana>;
+type DiaJavi = Semana["porDia"][number];
+/** Lo que entra en el día para Javier: 30% de mensajeros, domicilios propios y de oficina, ganancias ocasionales y el descuento fijo por mensajero. */
+const ingresosJavi = (x: DiaJavi) => x.dom30 + x.propios + x.ganancias + x.desc;
+const conMovimiento = (x: DiaJavi) => !!(x.dom30 || x.propios || x.fijos || x.ganancias);
+
+/** Cálculo del sueldo de Javier: tabla de 5 columnas en el computador y lista en el celular.
+ *  El desglose de cada día (la fórmula completa) va en la ventana "DetalleJavi". */
+function JaviSemana({ R, nombre }: { R: Semana; nombre: string }) {
+  const v = useVentana();
+  const dias = R.dias.map((d, i) => ({ d, i, x: R.porDia[i] })).filter(o => conMovimiento(o.x));
+  const tot = dias.reduce((a, o) => ({ ing: a.ing + ingresosJavi(o.x), fijos: a.fijos + o.x.fijos, sueldo: a.sueldo + o.x.javier }), { ing: 0, fijos: 0, sueldo: 0 });
+  const detalle = (i: number) => v.abrir(<DetalleJavi sem={R.sem} i={i} nombre={nombre} />, "centrada-ancha");
+  const fijosTxt = (n: number) => <span className={n ? "neg" : "sd-cero"}>{pesos(-n)}</span>;
+  return <>
+    <h2>Cálculo del sueldo de {nombre}</h2>
+    {!dias.length ? <div className="vacio">Sin movimiento esta semana.</div> : <>
+      <div className="tabla-env sueldos-tabla jv-tabla"><table><thead><tr><th>Día</th><th className="n">Ingresos del día</th><th className="n">Pagos fijos</th><th className="n">Sueldo</th><th className="n">Acciones</th></tr></thead><tbody>
+        {dias.map(({ d, i, x }) => <tr key={d}>
+          <td><b>{DIAS_SEM[i]} {d.slice(8)}</b></td>
+          <td className="n"><b>{pesos(ingresosJavi(x))}</b></td>
+          <td className="n">{fijosTxt(x.fijos)}</td>
+          <td className="n"><b className={"sd-neto" + (x.javier < 0 ? " neg" : "")}>{pesos(x.javier)}</b></td>
+          <td className="n"><div className="sd-acciones"><button className="btn sec chico" onClick={() => detalle(i)} aria-label={`Ver el cálculo del ${DIAS_LARGOS[i].toLowerCase()} ${d.slice(8)}`}><IconoOjo /><span>Detalle</span></button></div></td>
+        </tr>)}
+        <tr className="sd-total"><td><b>Total semana</b></td><td className="n"><b>{pesos(tot.ing)}</b></td><td className="n">{fijosTxt(tot.fijos)}</td><td className="n"><b className={"sd-neto" + (tot.sueldo < 0 ? " neg" : "")}>{pesos(tot.sueldo)}</b></td><td></td></tr>
+      </tbody></table></div>
+      <ul className="sueldos-lista jv-lista">
+        {dias.map(({ d, i, x }) => <li key={d}><button type="button" onClick={() => detalle(i)} aria-label={`${DIAS_LARGOS[i]} ${d.slice(8)}: sueldo ${pesos(x.javier)}. Ver el cálculo`}>
+          <span className="sd-quien"><b>{DIAS_SEM[i]} {d.slice(8)}</b><span className="sd-rol"><span className="jv-par">Ingresos {pesos(ingresosJavi(x))}</span> · <span className="jv-par">Fijos {pesos(-x.fijos)}</span></span></span>
+          <span className="sd-cuanto"><b className={x.javier < 0 ? "neg" : ""}>{pesos(x.javier)}</b><small>Sueldo</small></span>
+          <span className="jv-ver" aria-hidden="true"><IconoOjo /></span>
+        </button></li>)}
+        <li className="jv-total"><span className="sd-quien"><b>Total semana</b><span className="sd-rol"><span className="jv-par">Ingresos {pesos(tot.ing)}</span> · <span className="jv-par">Fijos {pesos(-tot.fijos)}</span></span></span><span className="sd-cuanto"><b className={tot.sueldo < 0 ? "neg" : ""}>{pesos(tot.sueldo)}</b></span></li>
+      </ul>
+    </>}
+  </>;
+}
+
+/** Desglose de un día del sueldo de Javier, paso a paso. Lee los datos en cada render para estar al día. */
+function DetalleJavi({ sem, i, nombre }: { sem: string; i: number; nombre: string }) {
+  useDatos();
+  const R = resumenSemana(sem), d = R.dias[i], x = R.porDia[i];
+  const fila = (txt: string, val: number, clase = "") => <div><dt>{txt}</dt><dd className={clase || (val ? "" : "sd-cero")}>{pesos(val)}</dd></div>;
+  return <div className="sd-detalle jv-detalle">
+    <header className="sd-cab">
+      <div><h2>Cálculo del sueldo de {nombre}</h2><p className="sub">{DIAS_LARGOS[i]} {d.slice(8)} de {MESES_LARGOS[Number(d.slice(5, 7)) - 1]}</p></div>
+      <button className="cerrar" data-cerrar aria-label="Cerrar">×</button>
+    </header>
+    <dl className="sd-resumen jv-formula">
+      {fila("+ 30% domicilios mensajeros", x.dom30)}
+      {fila("+ Domicilios propios y de oficina", x.propios)}
+      {fila("+ Ganancias ocasionales", x.ganancias)}
+      {fila(`+ ${pesos(DESC_SUELDO)} × mensajeros (${x.nMens})`, x.desc)}
+      <div className="jv-resta"><dt>− Pagos fijos (patinadores, oficina, JS)</dt><dd className={x.fijos ? "neg" : "sd-cero"}>{pesos(-x.fijos)}</dd></div>
+    </dl>
+    <div className="jv-neto"><span>Sueldo neto del día</span><b className={x.javier < 0 ? "neg" : ""}>{pesos(x.javier)}</b></div>
+  </div>;
+}
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const diaCorto = (d: string) => d.slice(8) + " " + MESES[Number(d.slice(5, 7)) - 1];
 
