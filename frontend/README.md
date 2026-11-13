@@ -10,7 +10,7 @@ Con sesión, la app muestra **lo mismo que el prototipo** (`app/` del sistema vi
 |---|---|
 | Mensajero (celular) | **Inicio** (KPIs, recomendaciones, efectividad, entregas por día, motivos, tus números), **Recepción** (Nuevo pedido con la foto; Recibir dinero de un cliente en la calle, que abona a su cuenta y suma a lo que el mensajero entrega), **Por entregar** (entregar con foto y firma, no entregado), **Mi caja**, **Mi sueldo**, **Entregados**. |
 | Asistente | **Inicio** (panel de control), **Pedidos**, **Clientes** (saldos, WhatsApp, paginados de 8 en celular y 20 en computador), **Caja** (recibir dinero de mensajeros, su caja de oficina), **Cuentas** (pagos, compras y ganancias de clientes). |
-| Administración | Todo lo anterior, más cierre del día, caja general y arqueos, liquidaciones, **Sueldos** y **Más** (Resultados, Personal y accesos, Historial, Papelera y Respaldo). En el escritorio, Resultados, Personal, Historial, Papelera y Respaldo son accesos directos del menú lateral; en el celular siguen dentro de **Más**. Puede pasar a modo Mensajero. |
+| Administración | Todo lo anterior, más cierre del día, caja general y arqueos, liquidaciones, **Sueldos** y **Más** (Resultados, Personal y accesos, Historial, Papelera y Respaldo). En el escritorio, Resultados, Personal, Historial, Papelera y Respaldo son accesos directos del menú lateral; en el celular se abren desde el botón **Más** de la barra de abajo. Puede pasar a modo Mensajero. |
 
 Los saldos, la caja y los sueldos se calculan en el navegador con las mismas reglas de `app/js/app.js` (en `src/interna/motor.ts`) mientras el backend no los calcule. Lo que todavía no está: tiquetes para imprimir, descargas de Excel y respaldo (llegan después).
 
