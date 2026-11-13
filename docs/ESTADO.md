@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## "Más" del celular sin pestañas repetidas — 2026-11-13
+
+- En el celular la barra de abajo tiene Inicio, Pedidos, Solicitudes, Clientes y **Más**. "Más" abre la hoja "Más secciones" (`abrirMenu` en `interna/Marco.tsx`) solo con lo que no cabe en la barra: Caja, Cuentas, Sueldos, Resultados, Personal, Historial, Papelera y Respaldo, en dos columnas y con la activa resaltada. El botón dice siempre "Más" y se marca como activo si la pestaña abierta es una de esas.
+- Resultados, Personal, Historial, Papelera y Respaldo ya no van dentro de una pantalla "Más" con chips: se abren directo, igual que en el menú lateral de escritorio (`items` incluye `ADMIN_ESCRITORIO` en los dos anchos). Por dentro siguen siendo `E.tabA = "mas"` + `E.subMas`, así que la URL (`?tab=mas&subtab=personal`) y la recarga con F5 funcionan igual en celular y escritorio.
+- Lo mismo vale para el asistente (Más: Caja y Cuentas) y para el modo Mensajero (Más: Mi sueldo y Entregados).
+
 ## Personal → Accesos: menú de tres puntos con el menú lateral abierto — 2026-11-13
 
 - En escritorio (≥ 960 px) y con el menú lateral **expandido**, la columna Acciones de la tabla de Accesos muestra un botón de tres puntos (`MenuAcciones` en `interna/oficina/Mas.tsx`) en vez de los tres íconos, porque con el menú abierto el último ícono se salía de la tabla. Con el menú **colapsado** y en el celular se ven los tres íconos de siempre.
