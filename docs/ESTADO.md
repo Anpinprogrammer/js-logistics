@@ -1,5 +1,10 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Sueldos: semana en una línea, cifras ordenadas y buscador — 2026-11-13
+
+- En el celular (< 768 px) los botones de semana van en un grid de 3 con textos cortos (Anterior, Actual, Siguiente; `.sd-corto`/`.sd-largo`). Las cifras (`.sd-cifras`) quedan: Adelantos y Ya pagado arriba, Total sueldos y Neto por pagar a lo ancho. Desde 768 px son 4 columnas en el orden de siempre, con el monto sin partir (`clamp`).
+- El buscador de Sueldos (`.sd-buscar`, estado local) filtra por nombre o tipo, sin tildes ni mayúsculas, solo las filas de la tabla y de la lista. Las cifras, la fila Total y el cálculo de Javier siguen siendo de toda la semana.
+
 ## Sueldos: cálculo del sueldo de Javier en 5 columnas — 2026-11-13
 
 - La tabla "Cálculo del sueldo de …" (componente `JaviSemana` en `oficina/Sueldos.tsx`) tiene Día, Ingresos del día, Pagos fijos, Sueldo y Acciones, más una fila "Total semana". "Ingresos del día" es `dom30 + propios + ganancias + desc` (`ingresosJavi`); el sueldo sigue siendo `javier` de `sueldosDia` en `motor.ts`, sin cambios en el cálculo.

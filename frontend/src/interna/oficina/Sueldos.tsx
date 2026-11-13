@@ -2,7 +2,7 @@
 import { useState } from "react";
 import {
   S, hoy, hora, pesos, fechaLarga, resumenSemana, sueldoPersonaSemana, moverSemana, semanaDe, tipoDe, jornada, valorAdel, sueldoPrevio, yaContado, liquidacionesDe,
-  MEDIOS, TIPOS, PAGO_FIJO, DIAS_SEM, DESC_SUELDO, type Medio, type Persona,
+  MEDIOS, TIPOS, PAGO_FIJO, DIAS_SEM, DESC_SUELDO, sinTildes, type Medio, type Persona,
 } from "../motor";
 import { Cab, IconoCalendario, IconoOjo, useVentana } from "../ui";
 import { E } from "../estado";
@@ -16,6 +16,10 @@ const fallo = (v: Ventana) => (e: unknown) => v.avisar("No se pudo guardar: " + 
 
 export default function Sueldos({ pintar }: { pintar: () => void }) {
   const v = useVentana(), R = resumenSemana(E.semA);
+  const [buscar, setBuscar] = useState("");
+  // El buscador solo filtra las filas de la tabla y de la lista; las cifras, el total y el cálculo de Javier son de toda la semana.
+  const q = sinTildes(buscar.trim());
+  const filas = q ? R.filas.filter(f => sinTildes(f.m.nombre + " " + TIPOS[tipoDe(f.m)]).includes(q)) : R.filas;
   const tot = R.filas.reduce((a, f) => ({ total: a.total + f.total, adel: a.adel + f.adel, pagado: a.pagado + f.pagado, neto: a.neto + f.neto }), { total: 0, adel: 0, pagado: 0, neto: 0 });
   const dueno = Object.values(S.mensajeros).find(m => tipoDe(m) === "dueno");
   const adelSem = R.filas.flatMap(f => f.adelantos.map(c => ({ ...c, nom: f.m.nombre }))).sort((a, b) => a.fecha - b.fecha);
@@ -25,18 +29,28 @@ export default function Sueldos({ pintar }: { pintar: () => void }) {
   const pagar = (mid: string, neto: number) => v.abrir(<MovCaja tipo="sale" pre={{ cat: "sueldo", personaId: mid, valor: neto, semana: R.sem }} />, "centrada-ancha");
   return <>
     <h1>Sueldos</h1><p className="sub">Semana del {fechaLarga(R.dias[0])} al {fechaLarga(R.dias[6])}</p>
-    <div className="acciones" style={{ marginBottom: 14 }}><button className="btn sec chico" id="semAnt" onClick={() => sem(moverSemana(E.semA, -1))}>← Semana anterior</button><button className="btn sec chico" id="semHoy" onClick={() => sem(semanaDe(hoy()))}>Esta semana</button><button className="btn sec chico" id="semSig" onClick={() => sem(moverSemana(E.semA, 1))}>Semana siguiente →</button></div>
+    <div className="acciones sd-semanas" style={{ marginBottom: 14 }}>
+      <button className="btn sec chico" id="semAnt" onClick={() => sem(moverSemana(E.semA, -1))} aria-label="Semana anterior">← <span className="sd-corto">Anterior</span><span className="sd-largo">Semana anterior</span></button>
+      <button className="btn sec chico" id="semHoy" onClick={() => sem(semanaDe(hoy()))} aria-label="Esta semana"><span className="sd-corto">Actual</span><span className="sd-largo">Esta semana</span></button>
+      <button className="btn sec chico" id="semSig" onClick={() => sem(moverSemana(E.semA, 1))} aria-label="Semana siguiente"><span className="sd-corto">Siguiente</span><span className="sd-largo">Semana siguiente</span> →</button>
+    </div>
     {!dueno && <div className="aviso">Para calcular el sueldo de Javier, márcalo como “Dueño (Javier)” en la pestaña Personal.</div>}
-    <div className="cifras" style={{ marginBottom: 14 }}>
-      <div className="cifra"><span>Total sueldos</span><b>{pesos(tot.total)}</b></div>
-      <div className="cifra"><span>Adelantos</span><b>{pesos(tot.adel)}</b></div>
-      <div className="cifra"><span>Ya pagado</span><b>{pesos(tot.pagado)}</b></div>
+    <div className="cifras sd-cifras" style={{ marginBottom: 14 }}>
+      <div className="cifra sd-k-total"><span>Total sueldos</span><b>{pesos(tot.total)}</b></div>
+      <div className="cifra sd-k-adel"><span>Adelantos</span><b>{pesos(tot.adel)}</b></div>
+      <div className="cifra sd-k-pagado"><span>Ya pagado</span><b>{pesos(tot.pagado)}</b></div>
       <div className="cifra fuerte"><span>Neto por pagar</span><b>{pesos(tot.neto)}</b></div>
     </div>
     {R.filas.length ? <>
+      <label className="lista-buscar sd-buscar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+        <input type="text" placeholder="Buscar mensajero o personal…" aria-label="Buscar por nombre o tipo de personal" autoComplete="off" value={buscar} onChange={e => setBuscar(e.target.value)} onKeyDown={e => { if (e.key === "Escape") setBuscar(""); }} />
+        {buscar && <button type="button" className="sd-limpiar" aria-label="Limpiar búsqueda" onClick={() => setBuscar("")}>×</button>}
+      </label>
+      {!filas.length ? <div className="vacio">Nadie coincide con “{buscar.trim()}”.</div> : <>
       {/* Computador: tabla resumida (el detalle de cada día va en la ventana "Detalle de sueldo"). */}
       <div className="tabla-env sueldos-tabla"><table><thead><tr><th>Persona</th><th className="n">Anterior</th><th className="n">Total</th><th className="n">Adelantos</th><th className="n">Pagado</th><th className="n">Neto</th><th className="n">Acciones</th></tr></thead><tbody>
-        {R.filas.map(f => <tr key={f.m.id}>
+        {filas.map(f => <tr key={f.m.id}>
           <td><b>{f.m.nombre}</b><span className="sd-rol">{TIPOS[tipoDe(f.m)]}</span></td>
           <td className="n"><a href="#" className="enlace" title="Sueldo que llevaba antes de la app" onClick={e => { e.preventDefault(); v.abrir(<EditarPrevio m={f.m} sem={R.sem} />, "centrada-ancha"); }}>{f.previo ? pesos(f.previo) : "+"}</a></td>
           <td className="n"><b>{pesos(f.total)}</b></td>
@@ -52,12 +66,12 @@ export default function Sueldos({ pintar }: { pintar: () => void }) {
       </tbody></table></div>
       {/* Celular: una fila por persona con su neto; al tocarla se abre el mismo detalle. */}
       <ul className="sueldos-lista">
-        {R.filas.map(f => <li key={f.m.id}><button type="button" onClick={() => detalle(f.m.id)}>
+        {filas.map(f => <li key={f.m.id}><button type="button" onClick={() => detalle(f.m.id)}>
           <span className="sd-quien"><b>{f.m.nombre}</b><span className="sd-rol">{TIPOS[tipoDe(f.m)]}</span></span>
           <span className="sd-cuanto"><b className={f.neto < 0 ? "neg" : ""}>{pesos(f.neto)}</b><small>{f.neto > 0 ? "Neto a pagar" : f.neto < 0 ? "Debe" : f.pagado ? "Pagado" : "Sin saldo"}</small></span>
           <span className="sd-flecha" aria-hidden="true">›</span>
         </button></li>)}
-      </ul>
+      </ul></>}
     </> : <div className="vacio">Registra tu personal en la pestaña Personal.</div>}
     <p className="sub" style={{ marginTop: 10 }}>Mensajeros: 70% de sus domicilios del día − {pesos(DESC_SUELDO)}. Patinadores, oficina y JS: toca cada día que trabajó (se marca con su pago por día); toca otra vez para quitarlo. Para un valor distinto, usa “otro valor”. Los domicilios de pedidos a nombre de oficina son 100% de JS y suman al sueldo de Javier.</p>
     {dueno && <JaviSemana R={R} nombre={dueno.nombre} />}

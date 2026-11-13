@@ -1547,3 +1547,25 @@
 .jsl .jv-formula dd,.jsl .jv-neto b{flex:none;white-space:nowrap}
 .jsl .jv-formula dt{min-width:0}
 @media (max-width:360px){.jsl .jv-formula{padding:12px;font-size:.82rem}.jsl .jv-neto{padding:12px}.jsl .jv-neto b{font-size:1.05rem}}
+
+/* Sueldos: semana en una línea en el celular, cifras sin huecos y buscador de personas. */
+.jsl .sd-semanas .sd-corto{display:none}
+.jsl .sd-buscar{margin:0 0 12px}
+.jsl .sd-buscar input{padding-right:38px;font-size:.84rem}
+.jsl .sd-limpiar{position:absolute;right:6px;display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;border-radius:8px;background:none;color:var(--suave);font-size:1.15rem;line-height:1;cursor:pointer}
+.jsl .sd-limpiar:hover{color:var(--tinta);background:var(--linea)}
+@media (min-width:768px){.jsl .sd-buscar{width:min(380px,100%)}}
+@media (max-width:767px){
+  .jsl .sd-semanas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .jsl .sd-semanas .btn{justify-content:center;gap:4px;min-height:42px;padding-left:6px;padding-right:6px;white-space:nowrap}
+  .jsl .sd-semanas .sd-corto{display:inline}
+  .jsl .sd-semanas .sd-largo{display:none}
+  .jsl .sd-cifras{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .jsl .sd-cifras .sd-k-adel{order:1}
+  .jsl .sd-cifras .sd-k-pagado{order:2}
+  .jsl .sd-cifras .sd-k-total{order:3;grid-column:1/-1}
+  .jsl .sd-cifras .fuerte{order:4;grid-column:1/-1}
+}
+@media (min-width:768px){.jsl .sd-cifras{grid-template-columns:repeat(4,minmax(0,1fr))}.jsl .sd-cifras .cifra{min-width:0}}
+@media (min-width:768px){.jsl .sd-cifras .cifra{padding:14px 16px}.jsl .sd-cifras .cifra b{white-space:nowrap;font-size:clamp(1rem,1.75vw,1.45rem)}}
+@media (max-width:360px){.jsl .sd-buscar input{font-size:.8rem}.jsl .sd-semanas .btn{font-size:.8rem}}
