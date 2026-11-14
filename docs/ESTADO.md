@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Caja → Mensajeros: cifras alineadas y sin huecos — 2026-11-14
+
+Las 4 cifras llevan `cifras-mens`: en escritorio son 4 columnas con el monto anclado abajo (misma línea aunque el título ocupe 1 o 2 renglones); en el celular son 2 columnas con la primera y la última a todo el ancho, para que no quede un hueco. Solo CSS.
+
 ## Liquidar período rediseñado (Caja → Mensajeros) — 2026-11-14
 
 El modal usa la variante `"liquidacion"` (hoja inferior en el celular, 768 px en escritorio) con cabecera fija, cuerpo con scroll y pie fijo (`lq-*` en `ajustes.css`). Escritorio: izquierda pendiente + sueldo y el desglose en dos grupos (Efectivo y base, Otros medios); derecha el cierre (entrega final con `$`, botón "Usar el pendiente exacto", medio y adelanto de sueldo). Celular: el desglose se pliega con "Ver desglose del período". El resultado (exacto, faltante o adelanto) y el botón "Liquidar y cerrar período" quedan siempre visibles en el pie. Los cálculos y el `guardar` no cambiaron.
