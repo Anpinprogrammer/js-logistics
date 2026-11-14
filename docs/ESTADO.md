@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Caja → Mensajeros: buscador, estado y orden — 2026-11-14
+
+Entre las 4 cifras y las tarjetas hay una barra de filtros (clases `aq-filtros-*` de Arqueos): buscar por nombre sin tildes, estado (Todos, Con deuda `debe > 0`, En ruta con pedidos pendientes, Al día `debe === 0`) y orden (A-Z o mayor deuda). En el celular el estado y el orden van en una hoja con Aplicar/Limpiar; en escritorio, píldoras, select y "Mostrando X de Y". Las cifras de arriba siguen sumando a todos los mensajeros: los filtros solo cambian qué tarjetas se ven. Todo se calcula en el navegador con los períodos que ya estaban cargados; no hay cambios de API.
+
 ## Recepción del mensajero: pestaña Historial — 2026-11-14
 
 Recepción tiene tres sub-pestañas: Nuevo pedido, Recibir dinero e Historial (`E.subRecM` acepta `"historial"`). Recibir dinero ya no lista lo recibido: deja los dos KPI y el formulario, y pide solo el resumen. Historial junta, de más nuevo a más viejo, los pagos de clientes (entradas, `+` verde) y las entregas a la oficina o liquidaciones (salidas, `−` rojo) con `GET /movimientos/recibidos/historial` (`buscar`, `tipo`, `dia`, páginas; en demo se arma en memoria con `historialDe`). Las claves empiezan por `["recibidos", …]`, así registrar un pago refresca KPIs e historial. Las clases son `hm-*` en `ajustes.css`; la lista deja 112 px abajo para que la barra inferior no tape la última fila.

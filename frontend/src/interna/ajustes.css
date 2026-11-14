@@ -1995,3 +1995,8 @@
 .jsl .hm-fila.ent .hm-valor b{color:var(--verde)}
 .jsl .hm-fila.sal .hm-valor b{color:var(--rojo)}
 @media (min-width:768px){.jsl .hm-lista{padding-bottom:32px}}
+
+/* Caja → Mensajeros: orden y contador en la barra de filtros */
+.jsl .mc-orden{flex:none;width:auto}
+.jsl .mc-orden select{width:auto;min-width:150px;min-height:40px;font-size:.82rem;font-weight:700}
+.jsl .mc-cuenta{margin:0;white-space:nowrap}
