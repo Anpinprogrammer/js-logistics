@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Recuperar y restablecer con modo claro (2026-11-14)
+
+- Por pedido del dueño, `/recuperar` y `/restablecer` (también `/activar`) siguen el tema claro/oscuro como el ingreso, con el mismo botón flotante Sol/Luna (`BotonTema` en `pages/AccesoComun.tsx`, guardado en `js_tema`). `MarcoAcceso` ya no fuerza `dark` y se quitó la prop `seguirTema`.
+- Las clases que repetían las tres pantallas están en `AccesoComun.tsx`: `ETIQUETA`, `AYUDA`, `BOTON_OJO`, `BOTON_ENLACE` y `BOTON_SECUNDARIO`. No vuelvas a poner clases solo oscuras (`text-slate-300`, `text-slate-100`, `bg-[#070B19]`) sin su pareja `dark:`.
+- Revisado a 320, 390 y 1280 px en claro y oscuro con `VITE_DEMO=true`. La lógica del flujo de código no cambió.
+
 ## Recuperar la contraseña con código de 6 dígitos por correo (2026-11-14)
 
 - **Decisión:** el autoservicio de "Olvidé mi contraseña" ya no manda un enlace: manda un código numérico de 6 dígitos por correo (Resend). `POST /auth/recuperar` crea el código (`servicios/codigos.js`, tabla `codigos_clave`) y `POST /auth/restablecer-con-codigo { email, codigo, clave }` lo canjea. Funciona para todos los roles y también activa una cuenta sin contraseña.
@@ -235,7 +241,7 @@ Recepción tiene tres sub-pestañas: Nuevo pedido, Recibir dinero e Historial (`
 ## Tema en el ingreso administrativo — 2026-11-12
 
 - El ingreso sigue `useTema` y la misma clave `js_tema` del panel, con botón flotante Sol/Luna (Lucide React) accesible antes de iniciar sesión. El hook sincroniza además la clase `dark` y `color-scheme` de `<html>`; ya no importa el estado/motor de la oficina para guardar la preferencia.
-- Tailwind 4 usa ahora la variante `dark` por clase. `MarcoAcceso` permite `seguirTema` solo en el ingreso; recuperar/restablecer conservan su apariencia oscura. Tarjeta sólida y campos claros con contraste; decoración y animaciones conservadas. Esta decisión sustituye la regla previa de ingreso siempre oscuro.
+- Tailwind 4 usa ahora la variante `dark` por clase. Desde 2026-11-14, `MarcoAcceso` siempre sigue el tema (se quitó `seguirTema`) y recuperar/restablecer también tienen modo claro. Tarjeta sólida y campos claros con contraste; decoración y animaciones conservadas. Esta decisión sustituye la regla previa de ingreso siempre oscuro.
 
 Este archivo es la **memoria compartida** entre sesiones y agentes. Léelo después de `CLAUDE.md` y antes de tocar nada. Si cambias algo que otro agente necesitaría saber (una decisión, una trampa, algo pendiente), **actualiza este archivo en el mismo PR**. Última revisión: 2026-11-12.
 

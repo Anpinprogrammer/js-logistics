@@ -1,6 +1,8 @@
 /* Piezas compartidas de las pantallas de acceso de la oficina: ingreso, recuperar y restablecer.
-   Las clases son exactamente las del ingreso original: aquí solo se reutilizan, no se cambia el diseño. */
+   Las clases son exactamente las del ingreso original: aquí solo se reutilizan, no se cambia el diseño.
+   Las tres siguen el tema claro/oscuro de la app (interna/tema.ts) y muestran el mismo botón para cambiarlo. */
 import type { CSSProperties, ReactNode, Ref } from "react";
+import { Moon, Sun } from "lucide-react";
 
 /*
  * Animación de entrada del ingreso (pages/intro/). Solo `Ingreso.tsx` pasa estas props, y solo mientras la animación corre:
@@ -55,10 +57,40 @@ export const IcAlerta = () => <svg {...ic} className="mt-0.5 size-5 shrink-0"><p
 export const IcCheck = () => <svg {...ic} className="size-7"><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.8 2.8L16.5 9.5" /></svg>;
 export const IcVolver = () => <svg {...ic} className="size-5"><path d="M19 12H5M11 18l-6-6 6-6" /></svg>;
 
-/** Fondo, tarjeta con borde brillante y ancho: el mismo marco del ingreso. */
-export function MarcoAcceso({ children, intro, seguirTema = false, controles }: { children: ReactNode; intro?: IntroMarco; seguirTema?: boolean; controles?: ReactNode }) {
+/** Botón flotante de modo claro/oscuro, arriba a la derecha, igual en las tres pantallas de acceso. */
+export function BotonTema({ oscuro, alCambiar }: { oscuro: boolean; alCambiar: () => void }) {
   return (
-    <div ref={intro?.raiz.ref} style={intro?.raiz.style} className={`${seguirTema ? "" : "dark"} [--acceso-red:#0284c7] dark:[--acceso-red:#38bdf8] [--acceso-grid:rgba(2,132,199,0.08)] dark:[--acceso-grid:rgba(56,189,248,0.09)] relative isolate grid min-h-dvh place-items-center overflow-hidden bg-slate-50 dark:bg-[#0b0f19] px-4 py-6 sm:py-10 text-slate-700 dark:text-slate-200 transition-colors duration-300`}>
+    <button type="button" onClick={alCambiar}
+      aria-label={oscuro ? "Activar modo claro" : "Activar modo oscuro"}
+      className="fixed top-4 right-4 z-50 flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3.5 py-2 text-xs font-bold text-slate-700 shadow-lg shadow-slate-900/5 backdrop-blur-md transition-all hover:border-sky-500/50 active:scale-95 dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200 dark:shadow-black/30 sm:top-6 sm:right-6">
+      {oscuro ? <Sun aria-hidden className="size-4 text-amber-400" /> : <Moon aria-hidden className="size-4 text-sky-600" />}
+      <span className="hidden sm:inline">{oscuro ? "Modo claro" : "Modo oscuro"}</span>
+    </button>
+  );
+}
+
+/** Etiqueta de un campo del acceso: más gruesa y oscura en modo claro, como en el ingreso. */
+export const ETIQUETA = "mb-1 block text-sm font-bold text-slate-700 dark:font-medium dark:text-slate-300 sm:mb-1.5";
+
+/** Texto de ayuda pequeño (mínimo de caracteres, "¿No te llegó?"), legible en los dos temas. */
+export const AYUDA = "text-xs leading-relaxed text-slate-500 dark:text-slate-400";
+
+/** Botón del ojo para mostrar u ocultar la contraseña. */
+export const BOTON_OJO =
+  "absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-200/70 dark:hover:bg-slate-700/50 hover:text-[#38bdf8] focus-visible:outline-2 focus-visible:outline-[#38bdf8]";
+
+/** Enlace con forma de botón principal (mismo degradado de BotonAcceso). */
+export const BOTON_ENLACE =
+  "flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#0284c7] to-[#22d3ee] px-5 py-3 text-base font-bold text-white shadow-[0_8px_24px_-8px_rgba(34,211,238,.6)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-8px_rgba(34,211,238,.8)] active:translate-y-0";
+
+/** Enlace con forma de botón secundario, con borde. */
+export const BOTON_SECUNDARIO =
+  "flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-slate-50 px-5 py-3 text-base font-bold text-slate-700 transition duration-200 hover:border-slate-400 hover:text-slate-900 dark:border-[#334155] dark:bg-[#070B19]/70 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white";
+
+/** Fondo, tarjeta con borde brillante y ancho: el mismo marco del ingreso. Sigue la clase `dark` de <html>. */
+export function MarcoAcceso({ children, intro, controles }: { children: ReactNode; intro?: IntroMarco; controles?: ReactNode }) {
+  return (
+    <div ref={intro?.raiz.ref} style={intro?.raiz.style} className={`[--acceso-red:#0284c7] dark:[--acceso-red:#38bdf8] [--acceso-grid:rgba(2,132,199,0.08)] dark:[--acceso-grid:rgba(56,189,248,0.09)] relative isolate grid min-h-dvh place-items-center overflow-hidden bg-slate-50 dark:bg-[#0b0f19] px-4 py-6 sm:py-10 text-slate-700 dark:text-slate-200 transition-colors duration-300`}>
       {controles}
       <div aria-hidden style={intro?.fondo} className="pointer-events-none absolute inset-0 -z-10">
         <div

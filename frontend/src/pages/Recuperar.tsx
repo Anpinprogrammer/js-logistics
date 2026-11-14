@@ -3,13 +3,14 @@ import { Link } from "react-router";
 import { auth } from "../api/servicios";
 import { mensajeDe } from "../api/cliente";
 import { DEMO } from "../interna/cuentasDemo";
+import { useTema } from "../interna/tema";
 import {
-  MarcoAcceso, CabeceraAcceso, BotonAcceso, AvisoError,
+  MarcoAcceso, CabeceraAcceso, BotonAcceso, AvisoError, BotonTema,
+  ETIQUETA, AYUDA, BOTON_OJO, BOTON_SECUNDARIO,
   TARJETA, ENTRADA, ICONO, ENLACE, IcCorreo, IcCandado, IcOjo, IcOjoTachado, IcCheck, IcVolver
 } from "./AccesoComun";
 
 const CLAVE_MINIMA = 10;
-const BOTON_OJO = "absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-700/50 hover:text-[#38bdf8] focus-visible:outline-2 focus-visible:outline-[#38bdf8]";
 
 type Paso = "correo" | "codigo" | "listo";
 
@@ -18,6 +19,8 @@ type Paso = "correo" | "codigo" | "listo";
  * 1) se pide con el correo, 2) se escribe el código con la contraseña nueva, 3) listo.
  */
 export default function Recuperar() {
+  const { oscuro, cambiar } = useTema();
+  const tema = <BotonTema oscuro={oscuro} alCambiar={cambiar} />;
   const idCorreo = useId();
   const idCodigo = useId();
   const idClave = useId();
@@ -90,7 +93,7 @@ export default function Recuperar() {
   );
 
   return (
-    <MarcoAcceso>
+    <MarcoAcceso controles={tema}>
       <div className={TARJETA}>
         {paso === "listo" && (
           <>
@@ -98,7 +101,7 @@ export default function Recuperar() {
             <div className="flex justify-center py-1">
               <span className="grid size-14 place-items-center rounded-full border border-[#38bdf8]/40 bg-[#38bdf8]/10 text-[#38bdf8]"><IcCheck /></span>
             </div>
-            <Link to="/" className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#334155] bg-[#070B19]/70 px-5 py-3 text-base font-bold text-slate-200 transition duration-200 hover:border-slate-500 hover:text-white">
+            <Link to="/" className={BOTON_SECUNDARIO}>
               <IcVolver /> Ir al ingreso
             </Link>
           </>
@@ -108,11 +111,11 @@ export default function Recuperar() {
           <>
             <CabeceraAcceso
               titulo="Escribe el código"
-              descripcion={<>Si <b className="font-semibold text-slate-100">{email.trim()}</b> tiene una cuenta, te enviamos un código de 6 números. Vence en 10 minutos.</>}
+              descripcion={<>Si <b className="font-semibold text-slate-900 dark:text-slate-100">{email.trim()}</b> tiene una cuenta, te enviamos un código de 6 números. Vence en 10 minutos.</>}
             />
             <form onSubmit={guardar} className="space-y-3 sm:space-y-4">
               <div>
-                <label htmlFor={idCodigo} className="mb-1.5 block text-sm font-medium text-slate-300">Código del correo</label>
+                <label htmlFor={idCodigo} className={ETIQUETA}>Código del correo</label>
                 <input
                   id={idCodigo} inputMode="numeric" pattern="\d{6}" maxLength={6} autoComplete="one-time-code" placeholder="000000" autoFocus
                   value={codigo} onChange={e => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))} required disabled={enviando}
@@ -120,7 +123,7 @@ export default function Recuperar() {
                 />
               </div>
               <div>
-                <label htmlFor={idClave} className="mb-1.5 block text-sm font-medium text-slate-300">Contraseña nueva</label>
+                <label htmlFor={idClave} className={ETIQUETA}>Contraseña nueva</label>
                 <div className="relative">
                   <input id={idClave} type={ver ? "text" : "password"} autoComplete="new-password" placeholder="••••••••••"
                     value={clave} onChange={e => setClave(e.target.value)} required disabled={enviando} className={`${ENTRADA} pr-12`} />
@@ -129,21 +132,21 @@ export default function Recuperar() {
                 </div>
               </div>
               <div>
-                <label htmlFor={idRepetir} className="mb-1.5 block text-sm font-medium text-slate-300">Repite la contraseña</label>
+                <label htmlFor={idRepetir} className={ETIQUETA}>Repite la contraseña</label>
                 <div className="relative">
                   <input id={idRepetir} type={ver ? "text" : "password"} autoComplete="new-password" placeholder="••••••••••"
                     value={repetir} onChange={e => setRepetir(e.target.value)} required disabled={enviando} className={`${ENTRADA} pr-12`} />
                   <span className={ICONO}><IcCandado /></span>
                 </div>
               </div>
-              <p className="text-xs leading-relaxed text-slate-400">Mínimo {CLAVE_MINIMA} caracteres. Si no llega, revisa la carpeta de spam.</p>
+              <p className={AYUDA}>Mínimo {CLAVE_MINIMA} caracteres. Si no llega, revisa la carpeta de spam.</p>
 
               {error && <AvisoError>{error}</AvisoError>}
-              {aviso && <p role="status" className="rounded-xl border border-[#38bdf8]/25 bg-[#38bdf8]/10 px-3.5 py-3 text-sm leading-relaxed text-slate-300">{aviso}</p>}
+              {aviso && <p role="status" className="rounded-xl border border-[#38bdf8]/25 bg-[#38bdf8]/10 px-3.5 py-3 text-sm leading-relaxed text-slate-700 dark:text-slate-300">{aviso}</p>}
 
               <BotonAcceso cargando={enviando} cargandoTexto="Guardando…">Guardar contraseña</BotonAcceso>
 
-              <p className="text-center text-xs leading-relaxed text-slate-400">
+              <p className={`text-center ${AYUDA}`}>
                 ¿No te llegó?{" "}
                 <button type="button" onClick={reenviar} disabled={enviando} className={ENLACE}>Pedir otro código</button>
                 {" · "}
@@ -161,7 +164,7 @@ export default function Recuperar() {
             />
             <form onSubmit={enviarCorreo} className="space-y-3 sm:space-y-4">
               <div>
-                <label htmlFor={idCorreo} className="mb-1.5 block text-sm font-medium text-slate-300">Correo</label>
+                <label htmlFor={idCorreo} className={ETIQUETA}>Correo</label>
                 <div className="relative">
                   <input
                     id={idCorreo} type="email" autoComplete="email" placeholder="tu@correo.co" autoFocus
@@ -176,7 +179,7 @@ export default function Recuperar() {
 
               <BotonAcceso cargando={enviando} cargandoTexto="Enviando…">Enviar código</BotonAcceso>
 
-              <p className="text-center text-xs leading-relaxed text-slate-400">
+              <p className={`text-center ${AYUDA}`}>
                 <Link to="/" className={ENLACE}>Volver al ingreso</Link>
               </p>
             </form>
