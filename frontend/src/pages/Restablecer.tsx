@@ -5,8 +5,10 @@ import { mensajeDe } from "../api/cliente";
 import type { EnlaceCorreo } from "../api/tipos";
 import { useSesion } from "../auth/Sesion";
 import { DEMO } from "../interna/cuentasDemo";
+import { useTema } from "../interna/tema";
 import {
-  MarcoAcceso, CabeceraAcceso, BotonAcceso, AvisoError,
+  MarcoAcceso, CabeceraAcceso, BotonAcceso, AvisoError, BotonTema,
+  ETIQUETA, AYUDA, BOTON_OJO, BOTON_ENLACE,
   TARJETA, ENTRADA, ICONO, ENLACE, IcCandado, IcOjo, IcOjoTachado, IcCheck, IcVolver
 } from "./AccesoComun";
 
@@ -17,6 +19,8 @@ export default function Restablecer() {
   const [params] = useSearchParams();
   const token = params.get("token") ?? "";
   const { salir } = useSesion();
+  const { oscuro, cambiar } = useTema();
+  const tema = <BotonTema oscuro={oscuro} alCambiar={cambiar} />;
   const idClave = useId();
   const idRepetir = useId();
 
@@ -78,7 +82,7 @@ export default function Restablecer() {
 
   if (revisando) {
     return (
-      <MarcoAcceso>
+      <MarcoAcceso controles={tema}>
         <div className={`${TARJETA} text-center`}>
           <CabeceraAcceso titulo="Revisando el enlace" descripcion="Un momento, estamos comprobando que el enlace siga sirviendo." />
           <div className="flex justify-center py-2">
@@ -94,17 +98,17 @@ export default function Restablecer() {
 
   if (errorEnlace || !enlace) {
     return (
-      <MarcoAcceso>
+      <MarcoAcceso controles={tema}>
         <div className={TARJETA}>
           <CabeceraAcceso titulo="Este enlace no sirve" descripcion="Puede que ya se haya usado o que lo haya reemplazado un correo más reciente. Usa el último que te llegó o pide uno nuevo." />
           {errorEnlace && <AvisoError>{errorEnlace}</AvisoError>}
           <Link
             to="/recuperar"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#0284c7] to-[#22d3ee] px-5 py-3 text-base font-bold text-white shadow-[0_8px_24px_-8px_rgba(34,211,238,.6)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-8px_rgba(34,211,238,.8)] active:translate-y-0"
+            className={BOTON_ENLACE}
           >
             Pedir un enlace nuevo
           </Link>
-          <p className="text-center text-xs leading-relaxed text-slate-400">
+          <p className={`text-center ${AYUDA}`}>
             <Link to="/" className={ENLACE}>Volver al ingreso</Link>
           </p>
         </div>
@@ -114,7 +118,7 @@ export default function Restablecer() {
 
   if (listo) {
     return (
-      <MarcoAcceso>
+      <MarcoAcceso controles={tema}>
         <div className={TARJETA}>
           <CabeceraAcceso titulo="Contraseña lista" descripcion="Ya puedes entrar con tu contraseña nueva." />
           <div className="flex justify-center py-1">
@@ -124,7 +128,7 @@ export default function Restablecer() {
           </div>
           <Link
             to="/"
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#0284c7] to-[#22d3ee] px-5 py-3 text-base font-bold text-white shadow-[0_8px_24px_-8px_rgba(34,211,238,.6)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_-8px_rgba(34,211,238,.8)] active:translate-y-0"
+            className={BOTON_ENLACE}
           >
             Ingresar
           </Link>
@@ -135,15 +139,15 @@ export default function Restablecer() {
 
   const activacion = enlace.tipo === "activacion";
   return (
-    <MarcoAcceso>
+    <MarcoAcceso controles={tema}>
       <div className={TARJETA}>
         <CabeceraAcceso
           titulo={activacion ? "Activa tu cuenta" : "Cambia tu contraseña"}
-          descripcion={<>{activacion ? "Crea la contraseña con la que entrarás" : "Escribe una contraseña nueva"} para <b className="font-semibold text-slate-100">{enlace.email}</b>.</>}
+          descripcion={<>{activacion ? "Crea la contraseña con la que entrarás" : "Escribe una contraseña nueva"} para <b className="font-semibold text-slate-900 dark:text-slate-100">{enlace.email}</b>.</>}
         />
         <form onSubmit={enviar} className="space-y-3 sm:space-y-4">
           <div>
-            <label htmlFor={idClave} className="mb-1.5 block text-sm font-medium text-slate-300">Contraseña nueva</label>
+            <label htmlFor={idClave} className={ETIQUETA}>Contraseña nueva</label>
             <div className="relative">
               <input
                 id={idClave} type={ver ? "text" : "password"} autoComplete="new-password" placeholder="••••••••••" autoFocus
@@ -154,7 +158,7 @@ export default function Restablecer() {
               <button
                 type="button" onClick={() => setVer(v => !v)}
                 aria-label={ver ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={ver}
-                className="absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-700/50 hover:text-[#38bdf8] focus-visible:outline-2 focus-visible:outline-[#38bdf8]"
+                className={BOTON_OJO}
               >
                 {ver ? <IcOjoTachado /> : <IcOjo />}
               </button>
@@ -162,7 +166,7 @@ export default function Restablecer() {
           </div>
 
           <div>
-            <label htmlFor={idRepetir} className="mb-1.5 block text-sm font-medium text-slate-300">Repite la contraseña</label>
+            <label htmlFor={idRepetir} className={ETIQUETA}>Repite la contraseña</label>
             <div className="relative">
               <input
                 id={idRepetir} type={ver ? "text" : "password"} autoComplete="new-password" placeholder="••••••••••"
@@ -173,14 +177,14 @@ export default function Restablecer() {
               <button
                 type="button" onClick={() => setVer(v => !v)}
                 aria-label={ver ? "Ocultar contraseñas" : "Mostrar contraseñas"} aria-pressed={ver}
-                className="absolute right-2 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-700/50 hover:text-[#38bdf8] focus-visible:outline-2 focus-visible:outline-[#38bdf8]"
+                className={BOTON_OJO}
               >
                 {ver ? <IcOjoTachado /> : <IcOjo />}
               </button>
             </div>
           </div>
 
-          <p className="text-xs leading-relaxed text-slate-400">Mínimo {CLAVE_MINIMA} caracteres.</p>
+          <p className={AYUDA}>Mínimo {CLAVE_MINIMA} caracteres.</p>
 
           {error && <AvisoError>{error}</AvisoError>}
 
@@ -188,7 +192,7 @@ export default function Restablecer() {
             {activacion ? "Crear contraseña" : "Guardar contraseña"}
           </BotonAcceso>
 
-          <p className="text-center text-xs leading-relaxed text-slate-400">
+          <p className={`text-center ${AYUDA}`}>
             <Link to="/" className={ENLACE}><span className="inline-flex items-center gap-1.5"><IcVolver /> Volver al ingreso</span></Link>
           </p>
         </form>
