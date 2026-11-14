@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Liquidar período rediseñado (Caja → Mensajeros) — 2026-11-14
+
+El modal usa la variante `"liquidacion"` (hoja inferior en el celular, 768 px en escritorio) con cabecera fija, cuerpo con scroll y pie fijo (`lq-*` en `ajustes.css`). Escritorio: izquierda pendiente + sueldo y el desglose en dos grupos (Efectivo y base, Otros medios); derecha el cierre (entrega final con `$`, botón "Usar el pendiente exacto", medio y adelanto de sueldo). Celular: el desglose se pliega con "Ver desglose del período". El resultado (exacto, faltante o adelanto) y el botón "Liquidar y cerrar período" quedan siempre visibles en el pie. Los cálculos y el `guardar` no cambiaron.
+
 ## Caja → Mensajeros: buscador, estado y orden — 2026-11-14
 
 Entre las 4 cifras y las tarjetas hay una barra de filtros (clases `aq-filtros-*` de Arqueos): buscar por nombre sin tildes, estado (Todos, Con deuda `debe > 0`, En ruta con pedidos pendientes, Al día `debe === 0`) y orden (A-Z o mayor deuda). En el celular el estado y el orden van en una hoja con Aplicar/Limpiar; en escritorio, píldoras, select y "Mostrando X de Y". Las cifras de arriba siguen sumando a todos los mensajeros: los filtros solo cambian qué tarjetas se ven. Todo se calcula en el navegador con los períodos que ya estaban cargados; no hay cambios de API.

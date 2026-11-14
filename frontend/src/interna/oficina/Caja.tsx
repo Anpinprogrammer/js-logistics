@@ -1,6 +1,6 @@
 /* Oficina → Caja: cierre del día, caja general, mensajeros, cajas de oficina, dinero recibido y liquidaciones (igual al prototipo). */
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Clock, Eye, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, Clock, Eye, Info, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, horaCorta, listaOrdenada, periodoMensajero, totales, tipoDe, esRepartidor, sueldoTexto, textoLiq, ajusteTxt, ganaPorcentaje, sueldoPedidos,
@@ -191,7 +191,7 @@ export default function Caja({ pintar }: { pintar: () => void }) {
           <dt>Directo al cliente</dt><dd>{pesos(tt.transfCli)}</dd>
           {yo.esAdmin && <><dt>Sueldo del período</dt><dd>{sueldoTexto(id, pm.ps)}</dd></>}
         </dl>
-        <div className="liq"><span className={"liq-est " + (pm.ul && pm.ul.debe > 0 ? "neg" : "")}>{pm.ul ? "Última: " + textoLiq(pm.ul.debe) : "Sin liquidaciones"}</span>{yo.esAdmin && <button className="btn chico" onClick={() => v.abrir(<Liquidar mid={id} />, "centrada")}>Liquidar</button>}</div>
+        <div className="liq"><span className={"liq-est " + (pm.ul && pm.ul.debe > 0 ? "neg" : "")}>{pm.ul ? "Última: " + textoLiq(pm.ul.debe) : "Sin liquidaciones"}</span>{yo.esAdmin && <button className="btn chico" onClick={() => v.abrir(<Liquidar mid={id} />, "liquidacion")}>Liquidar</button>}</div>
       </div>; })}</div> : <div className="vacio">No hay mensajeros con movimiento pendiente.</div>}
       {dineroRecibido(recsTodos.filter(r => !esDePatinador(r)), "mensajeros", "Mensajero")}
 </>}
@@ -589,7 +589,7 @@ function Liquidar({ mid }: { mid: string }) {
   const v = useVentana(), m = S.mensajeros[mid], pm = periodoMensajero(mid), t = totales(pm.ps), sueldo = ganaPorcentaje(m) ? sueldoPedidos(pm.ps) : 0;
   const enRuta = Object.values(S.pedidos).filter(p => p.estado === "pendiente" && p.mensajeroId === mid).length, sinValor = pm.ps.filter(p => !Number(p.valorServicio)).length;
   const sems = semanasAdelanto();
-  const [val, setVal] = useState(String(pm.debe > 0 ? pm.debe : 0)), [medio, setMedio] = useState<Medio>("efectivo"), [conAdel, setConAdel] = useState(true), [sem, setSem] = useState(sems[0][0]), [guardando, setGuardando] = useState(false);
+  const [desglose, setDesglose] = useState(false), [val, setVal] = useState(String(pm.debe > 0 ? pm.debe : 0)), [medio, setMedio] = useState<Medio>("efectivo"), [conAdel, setConAdel] = useState(true), [sem, setSem] = useState(sems[0][0]), [guardando, setGuardando] = useState(false);
   if (!m) return null;
   // adelanto = lo que queda debiendo, sin pasar del sueldo que le falta por cobrar esa semana (el sueldo no puede quedar negativo)
   const adelanto = (d: number) => (d > 0 && conAdel ? Math.max(0, Math.min(d, Math.round(sueldoPersonaSemana(mid, sem).neto))) : 0);
@@ -604,28 +604,53 @@ function Liquidar({ mid }: { mid: string }) {
       v.avisar(`${m.nombre}: ${ad ? "adelanto de " + pesos(ad) + " en su sueldo" : textoLiq(queda).toLowerCase()}`); v.abrir(<VerLiquidacion id={id} />, "liquidacion");
     } catch (e) { setGuardando(false); noSePudo(v, "No se pudo guardar")(e); }
   };
-  return <>
-    <Cab sub={<span className="sub">{m.nombre} · desde {pm.ul ? hora(pm.ul.fecha) : "el inicio"} hasta ahora</span>}><h2>Liquidar período</h2></Cab>
-    {enRuta ? <div className="aviso">Tiene {enRuta} {pl(enRuta, "pedido")} en ruta. Cuando los entregue, contarán para el siguiente período.</div> : null}
-    {sinValor ? <div className="aviso">{sinValor} {pl(sinValor, "entrega")} sin valor de servicio: el sueldo puede salir más bajo.</div> : null}
-    <dl className="datos">
-      <dt>Entregas</dt><dd>{pm.ps.length}</dd>
-      <dt>Efectivo cobrado</dt><dd>{pesos(t.efectivo)}</dd>
-      {pm.base ? <><dt>Base para vueltos</dt><dd>{pesos(pm.base)}</dd></> : null}{pm.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(pm.gastos)}</dd></> : null}{pm.cobros ? <><dt>Pagos de clientes que recibió</dt><dd>{pesos(pm.cobros)}</dd></> : null}
-      {pm.anterior ? <><dt>Pendiente de la liquidación anterior</dt><dd>{pesos(pm.anterior)}</dd></> : null}<FilaAjuste a={pm.ajuste} />
-      <dt>Ya entregó</dt><dd>{pesos(pm.recibido)}</dd>
-      <dt>Pendiente por entregar</dt><dd className="neg">{pesos(pm.debe)}</dd>
-      <dt>Transferencias a JS</dt><dd>{pesos(t.transfJs)}</dd>
-      <dt>Pagado directo al cliente</dt><dd>{pesos(t.transfCli)}</dd>
-      <dt>Sueldo del período</dt><dd>{ganaPorcentaje(m) ? pesos(sueldo) : sueldoTexto(mid, pm.ps)}</dd>
-    </dl>
-    <div className="linea2"><div className="campo"><label htmlFor="lVal">Entrega final (lo que te da ahora)</label><input id="lVal" type="number" inputMode="numeric" min="0" step="1000" autoFocus value={val} onFocus={e => e.target.select()} onChange={e => setVal(e.target.value)} /></div>
-      <div className="campo"><label htmlFor="lMedio">Medio</label><select id="lMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{MEDIOS_K.map(k => <option key={k} value={k}>{MEDIOS[k]}</option>)}</select></div></div>
-    <div className={"res-liq " + (resto > 0 ? "debe" : d < 0 ? "sobra" : "cero")} id="lRes"><span>Resultado</span><b>{adel ? (resto > 0 ? "Adelanto de " + pesos(adel) + " · sigue debiendo " + pesos(resto) : "Quedó en $ 0 · adelanto de " + pesos(adel)) : d > 0 && conAdel ? textoLiq(d) + " (no tiene sueldo por cobrar esa semana)" : textoLiq(d)}</b></div>
-    <div id="lAdelC" className={d > 0 ? "" : "oculto"} style={{ margin: "10px 0" }}><label style={{ display: "flex", gap: 8, alignItems: "flex-start" }}><input type="checkbox" id="lAdel" checked={conAdel} onChange={e => setConAdel(e.target.checked)} style={{ width: "auto", marginTop: 3 }} /><span>Pasar lo que queda debiendo a <b>adelanto de sueldo</b>, hasta lo que tiene por cobrar de sueldo esa semana. Si debe más, el resto queda pendiente para el próximo período.</span></label>
-      <div className="campo" style={{ marginTop: 6 }}><label htmlFor="lSem">Descontar del sueldo de la semana</label><select id="lSem" value={sem} disabled={!conAdel} onChange={e => setSem(e.target.value)}>{sems.map(([w, tx]) => <option key={w} value={w}>{tx}</option>)}</select></div></div>
-    <button className="btn ok" id="lGuardar" style={{ width: "100%" }} disabled={guardando} onClick={guardar}>Liquidar y cerrar período</button>
-  </>;
+  const clase = resto > 0 ? "debe" : d < 0 ? "sobra" : "cero";
+  const resultado = adel ? (resto > 0 ? "Adelanto de " + pesos(adel) + " · sigue debiendo " + pesos(resto) : "Quedó en $ 0 · adelanto de " + pesos(adel)) : d > 0 && conAdel ? textoLiq(d) + " (no tiene sueldo por cobrar esa semana)" : textoLiq(d);
+  const fila = (k: string, x: ReactNode, c = "") => <div className="liq-fila"><dt>{k}</dt><dd className={c}>{x}</dd></div>;
+  return <div className="entrega-modal liq-modal lq-modal">
+    <header className="entrega-cab"><div className="liq-titulo"><h2>Liquidar período <span className="entrega-estado">{m.nombre}</span></h2>
+      <p><Clock size={13} aria-hidden="true" /> desde {pm.ul ? hora(pm.ul.fecha) : "el inicio"} hasta ahora</p></div>
+      <button type="button" className="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <div className="liq-cuerpo">
+      {enRuta ? <div className="lq-aviso"><Info size={15} aria-hidden="true" /><span>Tiene {enRuta} {pl(enRuta, "pedido")} en ruta; contarán para el siguiente período.</span></div> : null}
+      {sinValor ? <div className="lq-aviso"><Info size={15} aria-hidden="true" /><span>{sinValor} {pl(sinValor, "entrega")} sin valor de servicio: el sueldo puede salir más bajo.</span></div> : null}
+      <div className="lq-grid">
+        <div className="lq-col">
+          <div className="lq-clave">
+            <div><span>Pendiente por entregar</span><b className="neg">{pesos(pm.debe)}</b></div>
+            <div><span>Sueldo del período</span><b>{ganaPorcentaje(m) ? pesos(sueldo) : sueldoTexto(mid, pm.ps)}</b></div>
+          </div>
+          <button type="button" className="btn sec lq-ver" aria-expanded={desglose} onClick={() => setDesglose(x => !x)}><span>Ver desglose del período ({pm.ps.length} {pl(pm.ps.length, "entrega")})</span><ChevronDown size={16} aria-hidden="true" className={desglose ? "gira" : ""} /></button>
+          <div className={"lq-desglose" + (desglose ? " abierto" : "")}>
+            <section className="liq-grupo"><h3>Efectivo y base</h3><dl>
+              {fila("Entregas", pm.ps.length)}{fila("Efectivo cobrado", pesos(t.efectivo))}
+              {pm.base ? fila("Base para vueltos", pesos(pm.base)) : null}{pm.gastos ? fila("Fletes / gastos pagados", "− " + pesos(pm.gastos)) : null}{pm.cobros ? fila("Pagos de clientes que recibió", pesos(pm.cobros)) : null}
+              {pm.anterior ? fila("Pendiente de la liquidación anterior", pesos(pm.anterior)) : null}<FilaAjuste a={pm.ajuste} />
+              {fila("Ya entregó", pesos(pm.recibido))}
+            </dl></section>
+            <section className="liq-grupo"><h3>Otros medios</h3><dl>
+              {fila("Transferencias a JS", pesos(t.transfJs))}{fila("Pagado directo al cliente", pesos(t.transfCli))}
+            </dl></section>
+          </div>
+        </div>
+        <div className="lq-col lq-cierre">
+          <h3>Cierre de entrega</h3>
+          <div className="lq-campos">
+            <div className="campo"><label htmlFor="lVal">Entrega final <small>lo que entrega ahora</small></label>
+              <div className="lq-valor"><span aria-hidden="true">$</span><input id="lVal" type="number" inputMode="numeric" min="0" step="1000" autoFocus value={val} onFocus={e => e.target.select()} onChange={e => setVal(e.target.value)} /></div></div>
+            <div className="campo"><label htmlFor="lMedio">Medio <small>cómo lo entrega</small></label><select id="lMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{MEDIOS_K.map(k => <option key={k} value={k}>{MEDIOS[k]}</option>)}</select></div>
+          </div>
+          <button type="button" className="btn sec chico lq-exacto" onClick={() => setVal(String(Math.max(0, pm.debe)))}>Usar el pendiente exacto: {pesos(Math.max(0, pm.debe))}</button>
+          <div id="lAdelC" className={d > 0 ? "" : "oculto"}><label className="lq-adel"><input type="checkbox" id="lAdel" checked={conAdel} onChange={e => setConAdel(e.target.checked)} /><span>Pasar lo que queda debiendo a <b>adelanto de sueldo</b>, hasta lo que tiene por cobrar de sueldo esa semana. Si debe más, se queda como pendiente.</span></label>
+            <div className="campo"><label htmlFor="lSem">Descontar del sueldo de la semana</label><select id="lSem" value={sem} disabled={!conAdel} onChange={e => setSem(e.target.value)}>{sems.map(([w, tx]) => <option key={w} value={w}>{tx}</option>)}</select></div></div>
+        </div>
+      </div>
+    </div>
+    <footer className="lq-pie">
+      <div className={"liq-resultado " + clase} id="lRes"><span className="lq-res-t">Resultado del cierre</span><b>{resultado}</b></div>
+      <button className="btn ok" id="lGuardar" disabled={guardando} onClick={guardar}>Liquidar y cerrar período</button>
+    </footer>
+  </div>;
 }
 
 export function VerLiquidacion({ id }: { id: string }) {

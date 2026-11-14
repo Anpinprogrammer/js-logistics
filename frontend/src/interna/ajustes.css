@@ -2000,3 +2000,47 @@
 .jsl .mc-orden{flex:none;width:auto}
 .jsl .mc-orden select{width:auto;min-width:150px;min-height:40px;font-size:.82rem;font-weight:700}
 .jsl .mc-cuenta{margin:0;white-space:nowrap}
+
+/* Liquidar período: cabecera fija, cuerpo en 2 columnas en escritorio y pie fijo con el resultado y el botón */
+.jsl .lq-aviso{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:14px;background:var(--azul-claro);color:var(--azul);font-size:.78rem}
+.jsl .lq-aviso svg{flex:none}
+.jsl .lq-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+.jsl .lq-col{display:grid;gap:10px;min-width:0}
+.jsl .lq-clave{display:grid;gap:8px;padding:12px 14px;border:1px solid var(--linea);border-radius:14px;background:var(--hueco)}
+.jsl .lq-clave>div{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.jsl .lq-clave>div+div{padding-top:8px;border-top:1px solid var(--linea)}
+.jsl .lq-clave span{color:var(--suave);font-size:.8rem;font-weight:700}
+.jsl .lq-clave b{font-size:1.1rem;font-variant-numeric:tabular-nums}
+.jsl .lq-clave b.neg{color:var(--rojo);font-size:1.25rem}
+.jsl .lq-ver{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:40px;font-size:.8rem}
+.jsl .lq-ver svg{flex:none;transition:transform .15s}
+.jsl .lq-ver svg.gira{transform:rotate(180deg)}
+.jsl .lq-desglose{display:none;gap:10px}
+.jsl .lq-desglose.abierto{display:grid}
+.jsl .lq-cierre{padding:14px;border:1px solid var(--linea);border-radius:14px;background:var(--hueco)}
+.jsl .lq-cierre h3{margin:0;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--suave)}
+.jsl .lq-campos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:end}
+.jsl .lq-campos .campo{margin:0;display:flex;flex-direction:column;justify-content:flex-end;gap:4px;min-width:0}
+.jsl .lq-campos label{text-align:left;display:flex;flex-direction:column;min-height:2.4em;justify-content:flex-end;margin:0;font-size:.78rem;line-height:1.15}
+.jsl .lq-campos label small{font-weight:500;color:var(--suave);font-size:.68rem}
+.jsl .lq-campos select,.jsl .lq-valor input{min-height:44px;width:100%}
+.jsl .lq-valor{position:relative}
+.jsl .lq-valor span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--suave);font-weight:800;pointer-events:none}
+.jsl .lq-valor input{padding-left:26px;font-weight:800}
+.jsl .lq-exacto{justify-self:start}
+.jsl .lq-adel{display:flex;gap:8px;align-items:flex-start;margin:4px 0 8px;font-size:.8rem}
+.jsl .lq-adel input{width:auto;margin-top:3px}
+.jsl .lq-pie{display:grid;gap:10px;flex:none;padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--linea);background:var(--hueco)}
+.jsl .lq-pie .liq-resultado{padding:9px 14px}
+.jsl .lq-pie .liq-resultado b{font-size:1rem;text-align:right;overflow-wrap:anywhere}
+.jsl .lq-pie .btn{width:100%;min-height:46px}
+@media (min-width:768px){
+  .jsl .lq-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .jsl .lq-ver{display:none}
+  .jsl .lq-desglose{display:grid}
+  .jsl .lq-pie{padding-left:24px;padding-right:24px}
+  .jsl .lq-campos{grid-template-columns:minmax(0,1fr)}
+  .jsl .lq-campos label{min-height:0;flex-direction:row;gap:6px;align-items:baseline}
+}
+.jsl .lq-pie .liq-resultado{flex-wrap:nowrap}
+.jsl .lq-pie .liq-resultado .lq-res-t{padding:0;background:none;font-size:.78rem;white-space:nowrap}
