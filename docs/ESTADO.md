@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Mi caja → Entregas del período con filtros y páginas en el servidor (2026-11-14)
+
+- Nuevo `GET /mensajeros/:id/periodo/entregas` (`servicios/mensajeros.js › entregasPeriodo`): mismas reglas del período abierto que `periodoMensajero` (sin guías liquidadas, y por hora las de liquidaciones viejas), búsqueda por guía o quien recibió (con `%`, `_` y `\` escapados), filtro por método y `LIMIT/OFFSET`, lo más nuevo primero. Los totales son de lo filtrado; las 9 cifras de arriba siguen saliendo de `/periodo`. Prueba: `test/entregas-periodo.test.js`.
+- Los métodos reales de un pedido son `efectivo`, `transf_js`, `transf_cliente` y `devuelto` (Nequi/Bancolombia solo es la cuenta de `transf_js`), así que el filtro ofrece esos.
+- Frontend: `mensajero/EntregasPeriodo.tsx` reemplaza a `TablaEntregas` (se borró). 5 filas en celular y 10 en computador (`usePorPaginaEntregas`), búsqueda con 300 ms de espera, hoja de filtros en celular, esqueleto al cargar y pie con "Mostrando X a Y de Z" y Anterior/Siguiente. En demo se filtra en memoria (`entregasPeriodoDe`).
+
 ## Recepción del mensajero en escritorio: Recibir dinero e Historial en una sola vista — 2026-11-14
 
 Desde 768 px (`useComputador`) Recepción tiene solo 2 sub-pestañas, Nuevo pedido y Recibir dinero; `E.subRecM === "historial"` (que viene del celular o de la URL) cuenta como "dinero". La vista trae el botón **Agregar pago** (el formulario `FormPago` va en una ventana centrada y se cierra al guardar), las 2 cifras y debajo el historial con filtros en una línea (búsqueda, tipo, día, medio, Limpiar) y tabla a todo el ancho. En el celular sigue todo igual (3 sub-pestañas, formulario fijo y filtros en hoja). El historial acepta ahora `medio` (`GET /movimientos/recibidos/historial?medio=`).

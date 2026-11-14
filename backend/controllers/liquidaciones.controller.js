@@ -16,4 +16,5 @@ export const crear = responder((ctx, req) => {
 export const ajustar = responder((ctx, req) => confirmarQuitarAdelanto(ctx, req.valido.params.id, req.valido.body), { clave: "liquidacion" });
 export const reabrir = responder((ctx, req) => M.reabrirLiquidacion(ctx, req.valido.params.id));
 export const periodo = responder((ctx, req) => M.periodo(ctx, req.valido.params.id), { clave: "periodo" });
+export const entregasPeriodo = responder((ctx, req) => M.entregasPeriodo(ctx, req.valido.params.id, req.valido.query));
 export const resumen = responder(ctx => M.resumenMensajeros(ctx), { clave: "mensajeros" });

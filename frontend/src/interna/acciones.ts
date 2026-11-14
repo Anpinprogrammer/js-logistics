@@ -4,7 +4,7 @@
  */
 import * as api from "../api/servicios";
 import type * as T from "../api/tipos";
-import { S, yo, type Pedido, type Medio, type Motivo, type Metodo, type TipoMov, type TipoPersonal, type Almacen, type CajaMov, type Liquidacion, hora, sinTildes, pesos, diaDe, MEDIOS, saldoCliente } from "./motor";
+import { periodoMensajero, servicio, S, yo, type Pedido, type Medio, type Motivo, type Metodo, type TipoMov, type TipoPersonal, type Almacen, type CajaMov, type Liquidacion, hora, sinTildes, pesos, diaDe, MEDIOS, saldoCliente } from "./motor";
 import { aPedido, aPersona } from "./datos";
 import { DEMO, remitentesDemo } from "./demo";
 import { comprimir, firmaABlob, FOTO, MINI } from "../lib/imagen";
@@ -233,6 +233,27 @@ export async function recibidosDe(mensajeroId: string, pagina: number, porPagina
     pagina: p, porPagina, total: todos.length, paginas
   };
 }
+/** Mi caja → Entregas del período: una página con búsqueda y filtro por método. En demo se arma en memoria con las mismas reglas del servidor. */
+export async function entregasPeriodoDe(mensajeroId: string, pagina: number, porPagina: number, f: { buscar?: string; metodo?: T.FiltroMetodoEntregas } = {}): Promise<T.PaginaEntregasPeriodo> {
+  if (!DEMO) return api.entregasPeriodo(mensajeroId, pagina, porPagina, f);
+  const q = sinTildes((f.buscar || "").trim());
+  const filtradas = periodoMensajero(mensajeroId).ps
+    .filter(p => !f.metodo || f.metodo === "todos" || (f.metodo === "devuelto" ? p.estado === "devuelto" : p.estado === "entregado" && p.metodo === f.metodo))
+    .filter(p => !q || sinTildes(p.guia).includes(q) || sinTildes(p.destinatario || "").includes(q))
+    .sort((a, b) => (b.entregado || 0) - (a.entregado || 0));
+  const paginas = Math.max(1, Math.ceil(filtradas.length / porPagina)), pag = Math.min(Math.max(1, pagina), paginas);
+  const suma = (g: (p: Pedido) => number) => filtradas.reduce((a, p) => a + g(p), 0);
+  return {
+    entregas: filtradas.slice((pag - 1) * porPagina, pag * porPagina).map(p => ({
+      guia: p.guia, estado: p.estado === "devuelto" ? "devuelto" : "entregado", entregado: p.entregado ? iso(p.entregado) : null, destinatario: p.destinatario || "",
+      metodo: p.metodo, cuentaJs: p.cuentaJs === "nequi" || p.cuentaJs === "bancolombia" ? p.cuentaJs : "", motivoDev: p.motivoDev || "", cobrarDev: !!p.cobrarDev,
+      valorServicio: p.valorServicio, valorCobrado: p.valorCobrado, gasto: p.gasto || 0
+    })),
+    pagina: pag, porPagina, total: filtradas.length, paginas,
+    totales: { servicio: suma(servicio), flete: suma(p => Number(p.gasto) || 0), cobrado: suma(p => Number(p.valorCobrado) || 0) }
+  };
+}
+
 /** Historial de dinero del mensajero (Recepción → Historial): lo recibido de clientes y lo entregado a la oficina, con filtros y páginas. */
 export async function historialDe(mensajeroId: string, pagina: number, porPagina: number, f: T.FiltrosCajaPatinador = {}): Promise<T.HistorialRecibidos> {
   if (!DEMO) return api.recibidos.historial(pagina, porPagina, f, yo.esAdmin ? mensajeroId : undefined);

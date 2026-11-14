@@ -331,3 +331,17 @@ export interface PaginaSolicitudesRecogida { data: SolicitudRecogida[]; total: n
 
 /** Un patinador en Caja → Mensajeros (GET /patinador/resumen): lo anotado de los clientes, lo ya entregado a la oficina y lo que debe (puede ser negativo). */
 export interface ResumenPatinador { mensajeroId: string; nombre: string; activo: boolean; recibido: number; recibidoHoy: number; registros: number; entregado: number; entregadoHoy: number; debe: number }
+
+/** Filtro por método de Mi caja → Entregas del período. */
+export type FiltroMetodoEntregas = "todos" | "efectivo" | "transf_js" | "transf_cliente" | "devuelto";
+/** Una entrega o devolución del período del mensajero (solo lo que muestra la lista). */
+export type EntregaPeriodo = Pick<Pedido, "guia" | "estado" | "entregado" | "destinatario" | "metodo" | "cuentaJs" | "motivoDev" | "cobrarDev" | "valorServicio" | "valorCobrado" | "gasto">;
+/** Una página de las entregas del período (5 en celular, 10 en computador). Los totales son de todo lo filtrado, no de la página. */
+export interface PaginaEntregasPeriodo {
+  entregas: EntregaPeriodo[];
+  pagina: number;
+  porPagina: number;
+  total: number;
+  paginas: number;
+  totales: { servicio: number; flete: number; cobrado: number };
+}

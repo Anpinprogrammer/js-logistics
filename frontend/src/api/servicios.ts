@@ -1,6 +1,6 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
-import type { GrupoSolicitud, PaginaSolicitudes, FiltrosSolicitudes, PaginaSolicitudesFiltradas, Archivo, TipoArchivo, Cliente, ClienteBreve, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
+import type { FiltroMetodoEntregas, PaginaEntregasPeriodo, GrupoSolicitud, PaginaSolicitudes, FiltrosSolicitudes, PaginaSolicitudesFiltradas, Archivo, TipoArchivo, Cliente, ClienteBreve, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
   Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PagoDeSaldos, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal, Solicitud, ListaSolicitudes, CajaPatinador, RegistroCajaPatinador, ResumenCajaPatinador, ResumenPatinador, PaginaSolicitudesRecogida, FiltrosCajaPatinador, HistorialRecibidos } from "./tipos";
 import { FalloApi } from "./cliente";
 
@@ -152,6 +152,9 @@ export const patinador = {
     datos<{ registro: RegistroCajaPatinador; resumen: ResumenCajaPatinador }>(api.post("/patinador/caja", d))
 };
 
+/** Mi caja → Entregas del período: una página, con búsqueda por guía o quien recibió y filtro por método. */
+export const entregasPeriodo = (mensajeroId: string, pagina: number, porPagina: number, f: { buscar?: string; metodo?: FiltroMetodoEntregas } = {}) =>
+  datos<PaginaEntregasPeriodo>(api.get(`/mensajeros/${mensajeroId}/periodo/entregas`, { params: limpio({ pagina, porPagina, buscar: f.buscar?.trim(), metodo: f.metodo && f.metodo !== "todos" ? f.metodo : undefined }) }));
 /** Recepción → Recibir dinero del mensajero: misma forma que la caja del patinador. */
 export const recibidos = {
   /** Lo que ha recibido (el servidor pone el mensajero si quien pide es mensajero; la oficina o un admin dicen cuál). */
