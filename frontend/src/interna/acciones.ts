@@ -242,7 +242,7 @@ export async function historialDe(mensajeroId: string, pagina: number, porPagina
     id: r.id, mensajeroId, clienteId: "", clienteNombre: r.nota === "Liquidación" ? "Liquidación de período" : "Entregado en oficina",
     concepto: r.nota === "Liquidación" ? "Cierre del período" : [r.nota, r.porNombre && "Recibió " + r.porNombre].filter(Boolean).join(" · "), valor: r.valor, fecha: new Date(r.fecha).toISOString(), medio: r.medio || "efectivo" as Medio, tipo: "entrega" as const }));
   const q = (f.buscar || "").trim().toLowerCase();
-  const todos = [...pagos, ...entregas].filter(x => (f.tipo !== "ingresos" || x.tipo === "pago") && (f.tipo !== "salidas" || x.tipo === "entrega")
+  const todos = [...pagos, ...entregas].filter(x => (f.tipo !== "ingresos" || x.tipo === "pago") && (f.tipo !== "salidas" || x.tipo === "entrega") && (!f.medio || x.medio === f.medio)
     && (!f.dia || diaDe(Date.parse(x.fecha)) === f.dia) && (!q || (x.clienteNombre + " " + x.concepto).toLowerCase().includes(q))).sort((a, b) => Date.parse(b.fecha) - Date.parse(a.fecha));
   const paginas = Math.max(1, Math.ceil(todos.length / porPagina)), p = Math.min(pagina, paginas);
   return { registros: todos.slice((p - 1) * porPagina, p * porPagina), pagina: p, porPagina, total: todos.length, paginas };

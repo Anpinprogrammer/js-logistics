@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Recepción del mensajero en escritorio: Recibir dinero e Historial en una sola vista — 2026-11-14
+
+Desde 768 px (`useComputador`) Recepción tiene solo 2 sub-pestañas, Nuevo pedido y Recibir dinero; `E.subRecM === "historial"` (que viene del celular o de la URL) cuenta como "dinero". La vista trae el botón **Agregar pago** (el formulario `FormPago` va en una ventana centrada y se cierra al guardar), las 2 cifras y debajo el historial con filtros en una línea (búsqueda, tipo, día, medio, Limpiar) y tabla a todo el ancho. En el celular sigue todo igual (3 sub-pestañas, formulario fijo y filtros en hoja). El historial acepta ahora `medio` (`GET /movimientos/recibidos/historial?medio=`).
+
 ## Mi caja del mensajero: cifras simétricas y entregas en lista en el celular — 2026-11-14
 
 Las cifras llevan `cifras-mi-caja`: 3 columnas en escritorio y 2 en el celular, con la primera a todo el ancho, montos anclados abajo y, como algunas cifras solo aparecen si tienen valor, la última se estira para no dejar hueco. `TablaEntregas` (`ui.tsx`) pinta además una lista de tarjetas en dos niveles (`te-lista`) que se ve bajo 768 px; la tabla queda desde 768 px. Solo CSS y marcado, sin cambios de cálculo.

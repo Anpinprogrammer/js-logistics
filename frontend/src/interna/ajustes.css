@@ -2081,3 +2081,27 @@
 .jsl .te-total{background:var(--hueco)}
 .jsl .te-tabla{display:none}
 @media (min-width:768px){.jsl .te-lista{display:none}.jsl .te-tabla{display:block}}
+
+/* Recepción → Recibir dinero en el computador: cabecera con "Agregar pago", filtros en una línea y tabla del historial */
+.jsl .hm-cab{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 8px}
+.jsl .hm-cab .sub{margin:0}
+.jsl .hm-cab .btn{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:44px}
+.jsl .hm-filtros{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin:16px 0 14px;min-width:0}
+.jsl .hm-filtros .tp-movil-buscar{flex:1 1 260px;max-width:420px}
+.jsl .hm-filtros .seg{flex:none}
+.jsl .hm-fecha{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
+.jsl .hm-fecha .tp-hoja-select select{min-height:40px;width:auto;min-width:150px}
+.jsl .hm-tabla{margin-bottom:32px}
+.jsl .hm-tabla table{width:100%;table-layout:auto}
+.jsl .hm-t-mov{display:flex;align-items:center;gap:10px;min-width:0}
+.jsl .hm-t-mov .hm-ico{width:30px;height:30px}
+.jsl .hm-fila-t.ent .hm-ico{background:var(--verde-claro);color:var(--verde)}
+.jsl .hm-fila-t.sal .hm-ico{background:var(--rojo-claro);color:var(--rojo)}
+.jsl .hm-fila-t td{vertical-align:middle}
+.jsl .hm-valor-t{white-space:nowrap}
+.jsl .hm-valor-t b{display:block;font-variant-numeric:tabular-nums}
+.jsl .hm-valor-t small{display:block;color:var(--suave);font-size:.7rem}
+.jsl .hm-fila-t.ent .hm-valor-t b{color:var(--verde)}
+.jsl .hm-fila-t.sal .hm-valor-t b{color:var(--rojo)}
+.jsl .hm-filtros .tp-movil-buscar button{display:grid}
+.jsl .hm-fecha .tp-hoja-select select{padding:8px 14px;border:1px solid var(--linea);border-radius:14px;background:var(--papel);color:var(--tinta);font:inherit;font-size:.85rem;font-weight:700}

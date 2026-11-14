@@ -49,6 +49,6 @@ export async function recibidos(req, res) {
 /** GET /movimientos/recibidos/historial?buscar=&tipo=&dia=&pagina=&porPagina=&mensajeroId=: { registros, pagina, porPagina, total, paginas }.
     Mezcla lo que recibió de clientes (`tipo: "pago"`) con lo que entregó a la oficina (`tipo: "entrega"`, incluida la liquidación). */
 export async function historialRecibidos(req, res) {
-  const { pagina, porPagina, buscar, tipo, dia } = req.valido.query;
-  res.json(await Movimiento.historialRecibidos({ mensajeroId: mensajeroDePeticion(req), pagina, porPagina, buscar, tipo, dia }));
+  const { pagina, porPagina, buscar, tipo, dia, medio } = req.valido.query;
+  res.json(await Movimiento.historialRecibidos({ mensajeroId: mensajeroDePeticion(req), pagina, porPagina, buscar, tipo, dia, medio }));
 }

@@ -60,10 +60,11 @@ const HISTORIAL_RECIBIDOS = `
   FROM recaudos e WHERE e.mensajero_id = $1`;
 
 /** Filtros del historial: `tipo` (ingresos = pagos, salidas = entregas), `dia` (día de Colombia) y `buscar` (en el título o el detalle). */
-function filtrosHistorial({ tipo = "todos", dia, buscar }, params) {
+function filtrosHistorial({ tipo = "todos", dia, buscar, medio }, params) {
   const cond = [];
   if (tipo === "ingresos") cond.push(`h.tipo = 'pago'`);
   if (tipo === "salidas") cond.push(`h.tipo = 'entrega'`);
+  if (medio) { params.push(medio); cond.push(`h.medio = $${params.length}`); }
   if (dia) { params.push(dia); cond.push(`(h.fecha AT TIME ZONE 'America/Bogota')::date = $${params.length}::date`); }
   if (buscar) {
     params.push("%" + buscar.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_") + "%"); // % _ y \ del texto no son comodines
@@ -72,15 +73,15 @@ function filtrosHistorial({ tipo = "todos", dia, buscar }, params) {
   return cond.length ? " WHERE " + cond.join(" AND ") : "";
 }
 
-export async function historialRecibidos({ mensajeroId, pagina = 1, porPagina = 8, tipo, dia, buscar }) {
+export async function historialRecibidos({ mensajeroId, pagina = 1, porPagina = 8, tipo, dia, buscar, medio }) {
   const r = await paginaEnParalelo({
     pagina, porPagina,
     contar: async () => {
-      const params = [mensajeroId], donde = filtrosHistorial({ tipo, dia, buscar }, params);
+      const params = [mensajeroId], donde = filtrosHistorial({ tipo, dia, buscar, medio }, params);
       return (await query(`SELECT count(*)::int AS total FROM (${HISTORIAL_RECIBIDOS}) h${donde}`, params)).rows[0].total;
     },
     traer: async offset => {
-      const params = [mensajeroId, porPagina, offset], donde = filtrosHistorial({ tipo, dia, buscar }, params);
+      const params = [mensajeroId, porPagina, offset], donde = filtrosHistorial({ tipo, dia, buscar, medio }, params);
       return (await query(`SELECT * FROM (${HISTORIAL_RECIBIDOS}) h${donde} ORDER BY h.fecha DESC, h.id LIMIT $2 OFFSET $3`, params)).rows;
     }
   });
