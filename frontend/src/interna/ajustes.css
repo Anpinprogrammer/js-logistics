@@ -1828,9 +1828,9 @@
 }
 
 /* Liquidación (Caja → Liquidaciones recientes): hoja inferior en el celular, modal ancho en escritorio, sin scroll horizontal. */
-.jsl dialog[data-variante="liquidacion"]{position:fixed;inset:auto 0 0;margin:0;width:100%;max-width:100%;max-height:92dvh;border-radius:24px 24px 0 0;overflow:hidden}
-.jsl dialog[data-variante="liquidacion"] .dlg{padding:0;max-height:92dvh;overflow:hidden}
-.jsl dialog[data-variante="liquidacion"] .dlg::before{display:none}
+.jsl dialog:is([data-variante="liquidacion"],[data-variante="arqueo"]){position:fixed;inset:auto 0 0;margin:0;width:100%;max-width:100%;max-height:92dvh;border-radius:24px 24px 0 0;overflow:hidden}
+.jsl dialog:is([data-variante="liquidacion"],[data-variante="arqueo"]) .dlg{padding:0;max-height:92dvh;overflow:hidden}
+.jsl dialog:is([data-variante="liquidacion"],[data-variante="arqueo"]) .dlg::before{display:none}
 .jsl .liq-modal{max-height:92dvh}
 .jsl .liq-titulo{min-width:0}
 .jsl .liq-titulo p{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -1869,8 +1869,8 @@
 .jsl .liq-pie p{margin:0;max-width:34rem;color:var(--suave);font-size:.72rem;line-height:1.3}
 .jsl .liq-pie .btn{flex:none;display:inline-flex;align-items:center;gap:6px}
 @media (min-width:768px){
-  .jsl dialog[data-variante="liquidacion"]{inset:0;margin:auto;width:min(768px,calc(100vw - 48px));max-width:768px;max-height:88dvh;border-radius:24px}
-  .jsl dialog[data-variante="liquidacion"] .dlg,.jsl .liq-modal{max-height:88dvh}
+  .jsl dialog:is([data-variante="liquidacion"],[data-variante="arqueo"]){inset:0;margin:auto;width:min(768px,calc(100vw - 48px));max-width:768px;max-height:88dvh;border-radius:24px}
+  .jsl dialog:is([data-variante="liquidacion"],[data-variante="arqueo"]) .dlg,.jsl .liq-modal{max-height:88dvh}
   .jsl .liq-tabla{display:block}
   .jsl .liq-entregas{display:none}
   .jsl .liq-cuerpo{padding:16px 24px}
@@ -1880,3 +1880,58 @@
 .jsl .liq-tabla table{font-size:.8rem}
 .jsl .liq-tabla th,.jsl .liq-tabla td{padding:9px 8px;white-space:normal;overflow-wrap:anywhere}
 .jsl .liq-tabla th.n,.jsl .liq-tabla td.n,.jsl .liq-tabla td.guia{white-space:nowrap}
+
+/* Arqueos recientes: filtros, tabla compacta (escritorio), lista (celular) y detalle en hoja. */
+.jsl .aq-filtros-movil{display:flex;align-items:center;gap:8px;margin:12px 0}
+.jsl .aq-filtros-movil .aq-buscar{flex:1;min-width:0}
+.jsl .aq-filtros-movil .aq-buscar input{width:100%}
+.jsl .aq-filtros-movil .btn{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:8px 14px}
+.jsl .aq-filtros-movil .btn b{display:grid;place-items:center;min-width:18px;height:18px;border-radius:9px;background:var(--marca2);color:#fff;font-size:.68rem}
+.jsl .aq-filtros-escritorio{display:none}
+.jsl .aq-hoja-fecha{display:flex;align-items:center;gap:8px}
+.jsl .aq-tabla{display:none;box-shadow:none;border:1px solid var(--linea);overflow-x:visible}
+.jsl .aq-tabla table{table-layout:auto;font-size:.8rem}
+.jsl .aq-tabla th,.jsl .aq-tabla td{padding:9px 8px;white-space:normal;overflow-wrap:anywhere}
+.jsl .aq-tabla th.n,.jsl .aq-tabla td.n{white-space:nowrap}
+.jsl .aq-acciones{white-space:nowrap!important;text-align:right}
+.jsl .aq-acciones .btn{display:inline-flex;align-items:center;gap:5px;margin-left:6px}
+.jsl .aq-pildora{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.jsl .aq-pildora.faltante{background:var(--rojo-claro);color:var(--rojo)}
+.jsl .aq-pildora.sobrante{background:var(--mango-claro);color:var(--marca)}
+.jsl .aq-pildora.exacto{background:var(--verde-claro);color:var(--verde)}
+.jsl .aq-lista{display:block;margin:0 0 calc(96px + env(safe-area-inset-bottom,0px));padding:0;list-style:none;border:1px solid var(--linea);border-radius:16px;background:var(--papel);overflow:hidden}
+.jsl .aq-lista li+li{border-top:1px solid var(--linea)}
+.jsl .aq-lista button{display:flex;align-items:center;gap:10px;width:100%;min-width:0;padding:12px 14px;border:0;background:none;color:inherit;text-align:left;font:inherit;cursor:pointer}
+.jsl .aq-izq{display:grid;flex:1;min-width:0;gap:2px}
+.jsl .aq-izq b{font-size:.88rem}
+.jsl .aq-izq span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--suave);font-size:.75rem}
+.jsl .aq-ver{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--hueco);color:var(--suave)}
+.jsl .aq-mas{display:flex;justify-content:center;margin:10px 0}
+.jsl .aq-banner{padding:12px 14px;border-radius:14px;font-weight:800;font-size:.9rem}
+.jsl .aq-banner.faltante{background:var(--rojo-claro);color:var(--rojo)}
+.jsl .aq-banner.sobrante{background:var(--mango-claro);color:var(--marca)}
+.jsl .aq-banner.exacto{background:var(--verde-claro);color:var(--verde)}
+.jsl .aq-medio-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.jsl .aq-medio-cab h3{margin:0;font-size:.85rem;letter-spacing:0;text-transform:none;color:var(--tinta)}
+.jsl .aq-cifras{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.jsl .aq-cifras>div{display:grid;gap:2px;padding:8px 10px;border:1px solid var(--linea);border-radius:12px;background:var(--papel)}
+.jsl .aq-cifras small{color:var(--suave);font-size:.7rem}
+.jsl .aq-cifras b,.jsl .aq-cifras span{font-variant-numeric:tabular-nums;font-size:.9rem}
+.jsl .aq-cifras span{color:var(--suave);font-weight:600}
+@media (min-width:768px){
+  .jsl .aq-filtros-movil{display:none}
+  .jsl .aq-filtros-escritorio{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0 16px}
+  .jsl .aq-filtros-escritorio .aq-buscar input{width:220px}
+  .jsl .aq-filtros-escritorio .seg{flex:none}
+  .jsl .aq-fecha{display:flex;align-items:center;gap:8px;flex:none}
+  .jsl .aq-tabla{display:block}
+  .jsl .aq-lista{display:none}
+  .jsl .aq-tabla{margin-bottom:32px}
+  .jsl dialog[data-variante="arqueo"]{width:min(512px,calc(100vw - 48px));max-width:512px}
+}
+.jsl .aq-tabla td:first-child{min-width:84px}
+.jsl .aq-tabla th,.jsl .aq-tabla td{padding-left:6px;padding-right:6px}
+.jsl .aq-tabla th small{display:none}
+.jsl .aq-txt{display:none}
+@media (min-width:768px){.jsl .aq-filtros-escritorio{flex-wrap:wrap}.jsl .aq-filtros-escritorio .aq-buscar{flex:1 1 180px}.jsl .aq-filtros-escritorio .aq-buscar input{width:100%}}
+@media (min-width:1280px){.jsl .aq-tabla th small{display:inline}.jsl .aq-txt{display:inline}.jsl .aq-filtros-escritorio .aq-buscar{flex:0 1 240px}}

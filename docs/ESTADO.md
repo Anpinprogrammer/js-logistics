@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Arqueos recientes: filtros, tabla compacta y detalle en hoja — 2026-11-14
+
+- `Arqueos` (`oficina/Caja.tsx`) filtra por texto (quién contó, nota o resultado), estado (Faltante, Sobrante, Exacto) y día (`SelectorFecha`). En el celular los filtros están en la hoja `tp-hoja`. Los filtros son locales y recorren todos los arqueos; se muestran de 10 en 10 con "Ver más".
+- Escritorio: tabla sin scroll horizontal con el resultado en píldora corta; por debajo de 1280 px los botones de acción quedan solo con ícono. Celular: lista de dos niveles que abre el detalle. El detalle (variante de ventana `"arqueo"`, comparte reglas con `"liquidacion"`) muestra el resultado completo y contado, esperado y diferencia por medio.
+- "Deshacer" solo aparece en el último arqueo de todos (no el último del filtro) y mantiene su confirmación.
+
 ## Modal de Liquidación rediseñado (Caja → Liquidaciones recientes) — 2026-11-14
 
 - `VerLiquidacion` (`oficina/Caja.tsx`) usa la variante de ventana `"liquidacion"` (hoja inferior en el celular, modal de 768 px en escritorio; reglas `liq-*` al final de `ajustes.css`). Cabecera fija, banner compacto de resultado, dos subpestañas locales (Resumen financiero / Entregas incluidas) y pie fijo con "Reabrir período". Los datos y la función de reabrir no cambiaron.
