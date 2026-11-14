@@ -19,6 +19,7 @@ import { avisoContado, diaAntesDelArqueo } from "./comun";
 import { SelectorFecha } from "../Calendario";
 import { armarListaClientes } from "../tiquete";
 import { RecibosVarios, VentanaTiquete } from "./impresion";
+import { ChevronDown, FileSpreadsheet, Plus, Printer } from "lucide-react";
 
 const trazo = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 const IconoImprimir = () => <svg {...trazo}><path d="M7 9V3.5h10V9" /><rect x="3" y="9" width="18" height="8" rx="2" /><path d="M7 14h10v6.5H7z" /></svg>;
@@ -109,18 +110,15 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
     } catch (e) { console.error(e); v.avisar("No se pudo generar el Excel. Revisa la conexión e intenta otra vez."); }
     finally { setPreparando(""); }
   };
-  // En la hoja del celular, la impresión abre su ventana encima (reemplaza la hoja); el Excel la cierra y se descarga.
-  const botonesExtra = (enHoja?: boolean) => {
-    return <>
-      {yo.esAdmin && <button type="button" className="btn sec" disabled={!!preparando} onClick={() => { if (enHoja) v.cerrar(); void excel("cartera"); }}><IconoExcel /><span>{preparando === "cartera" ? "Preparando…" : "Descargar cartera en Excel"}</span></button>}
-      <button type="button" className="btn sec" onClick={imprimirLista}><IconoImprimir /><span>{textoImprimir}</span></button>
-      <button type="button" className="btn sec" onClick={imprimirRecibos}><Icono n="recibos" /><span>Imprimir recibos{dia ? " del día" : ""}</span></button>
-      {yo.esAdmin && <button type="button" className="btn sec" disabled={!!preparando} onClick={() => { if (enHoja) v.cerrar(); void excel("cuadre"); }}><IconoExcel /><span>{preparando === "cuadre" ? "Preparando…" : textoCuadre}</span></button>}
-    </>;
-  };
+  // Celular: hoja con las cuatro opciones. La impresión abre su ventana encima (reemplaza la hoja); el Excel la cierra y se descarga.
   const abrirOpciones = () => v.abrir(<>
     <Cab><h2>Imprimir y Excel</h2></Cab>
-    <div className="cli-opciones">{botonesExtra(true)}</div>
+    <div className="cli-opciones">
+      {yo.esAdmin && <button type="button" className="btn sec" disabled={!!preparando} onClick={() => { v.cerrar(); void excel("cartera"); }}><IconoExcel /><span>Descargar cartera en Excel</span></button>}
+      <button type="button" className="btn sec" onClick={imprimirLista}><IconoImprimir /><span>{textoImprimir}</span></button>
+      <button type="button" className="btn sec" onClick={imprimirRecibos}><Icono n="recibos" /><span>Imprimir recibos{dia ? " del día" : ""}</span></button>
+      {yo.esAdmin && <button type="button" className="btn sec" disabled={!!preparando} onClick={() => { v.cerrar(); void excel("cuadre"); }}><IconoExcel /><span>{textoCuadre}</span></button>}
+    </div>
   </>, "centrada");
 
   // Celular: la cuenta y el día se preparan en una hoja y se aplican juntos, igual que en Pedidos y Solicitudes.
@@ -143,7 +141,21 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
   }, [filtrosAbiertos]);
 
   return <>
-    <h1>Clientes</h1><p className="sub">Saldo de cada cliente = lo cobrado menos el valor del servicio.</p>
+    <div className="cli-cab">
+      <div className="cli-cab-titulo"><h1>Clientes</h1><p className="sub">Saldo de cada cliente = lo cobrado menos el valor del servicio.</p></div>
+      <div className="cli-cab-acciones">
+        <button type="button" className="btn cli-wa" id="waMasivo" onClick={enviarSaldos}><WhatsAppIcon /><span>Enviar saldos por WhatsApp</span></button>
+        <MenuExportar ocupado={!!preparando} opciones={[
+          ...(yo.esAdmin ? [
+            { grupo: "Reportes Excel", texto: preparando === "cartera" ? "Preparando…" : "Descargar cartera en Excel", tipo: "excel" as const, accion: () => void excel("cartera"), off: !!preparando },
+            { grupo: "Reportes Excel", texto: preparando === "cuadre" ? "Preparando…" : textoCuadre, tipo: "excel" as const, accion: () => void excel("cuadre"), off: !!preparando },
+          ] : []),
+          { grupo: "Impresión", texto: textoImprimir, tipo: "imprimir" as const, accion: imprimirLista },
+          { grupo: "Impresión", texto: "Imprimir recibos" + (dia ? " del día" : ""), tipo: "imprimir" as const, accion: imprimirRecibos },
+        ]} />
+        <button type="button" className="btn cli-registrar" id="nuevoCli" onClick={registrar}><Plus aria-hidden="true" strokeWidth={2.5} /><span>Registrar cliente</span></button>
+      </div>
+    </div>
     <div className="cifras" style={{ marginBottom: 12 }}>
       <div className="cifra"><span>{dia ? "Ese día te quedaron debiendo" : "Cuentas por cobrar (te deben)"}</span><b className="neg">{pesos(pag?.porCobrar.total ?? 0)}</b><span>{pag?.porCobrar.clientes ?? 0} {pl(pag?.porCobrar.clientes ?? 0, "cliente")}</span></div>
       <div className="cifra"><span>{dia ? "Ese día les quedaste debiendo" : "Cuentas por pagar (les debes)"}</span><b className="pos">{pesos(pag?.porPagar.total ?? 0)}</b><span>{pag?.porPagar.clientes ?? 0} {pl(pag?.porPagar.clientes ?? 0, "cliente")}</span></div>
@@ -169,20 +181,11 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
         <footer><button type="button" className="btn sec" onClick={() => setBorrador({ cuenta: "todos", dia: "" })}>Limpiar filtros</button><button type="button" className="btn" onClick={aplicarFiltros}>Aplicar filtros</button></footer>
       </div>
     </div>}
-    <div className="controles tp-escritorio">
-      <div className="barra-acciones">
-        <button className="btn ok" id="waMasivo" onClick={enviarSaldos}><WhatsAppIcon />Enviar saldos por WhatsApp</button>
-        <button className="btn" id="nuevoCli" onClick={registrar}>Registrar cliente</button>
-        {botonesExtra()}
-      </div>
-      <div className="toolbar">
-        <div className="campo" role="search"><input id="buscarCli" type="search" placeholder="Buscar por nombre o número" value={buscar} autoComplete="off" aria-label="Buscar cliente por nombre o número"
-          onChange={e => cambiarBusqueda(e.target.value)} /></div>
-        <div className="toolbar-filtros">
-          <div className="seg" role="group" aria-label="Filtrar por estado de la cuenta">{[["todos", "Todos"], ["cobrar", "Por cobrar"], ["pagar", "Por pagar"]].map(([x, t]) => <button key={x} aria-pressed={E.filtroCli === x} onClick={() => poner({ filtroCli: x, paginaCli: 1 })}>{t}</button>)}</div>
-          <FiltroDia compacto d={dia} poner={x => poner({ diaCliF: x, paginaCli: 1 })} />
-        </div>
-      </div>
+    <div className="cli-filtros tp-escritorio">
+      <div className="campo cli-filtros-buscar" role="search"><input id="buscarCli" type="search" placeholder="Buscar por nombre o número" value={buscar} autoComplete="off" aria-label="Buscar cliente por nombre o número"
+        onChange={e => cambiarBusqueda(e.target.value)} /></div>
+      <div className="seg" role="group" aria-label="Filtrar por estado de la cuenta">{[["todos", "Todos"], ["cobrar", "Por cobrar"], ["pagar", "Por pagar"]].map(([x, t]) => <button key={x} aria-pressed={E.filtroCli === x} onClick={() => poner({ filtroCli: x, paginaCli: 1 })}>{t}</button>)}</div>
+      <FiltroDia compacto d={dia} poner={x => poner({ diaCliF: x, paginaCli: 1 })} />
     </div>
     {dia && <p className="sub">Clientes con movimiento ese día: lo que les quedó de ese día y, al lado, su saldo total de hoy.</p>}
     {reps > 0 ? <div className="aviso">{reps === 1 ? "Hay 1 cliente que parece repetido" : "Hay " + reps + " clientes que parecen repetidos"} (mismo nombre o mismo número). <button className="btn sec chico" id="cliRep" onClick={() => v.abrir(<Repetidos />)}>Revisar y unir</button></div> : null}
@@ -205,6 +208,47 @@ export default function Clientes({ pintar }: { pintar: () => void }) {
         ? "Registra tus clientes (los remitentes) para llevar su saldo."
         : buscar.trim() ? "Ningún cliente con ese nombre o número en esta lista." : "No hay clientes en esta lista."}</div>}
   </>;
+}
+
+/** Menú "Exportar / Imprimir" de la cabecera de escritorio: las opciones van agrupadas (Excel e Impresión) en un
+ *  popover que se cierra al elegir, al tocar afuera o con Escape. */
+interface OpcionExportar { grupo: string; texto: string; tipo: "excel" | "imprimir"; accion: () => void; off?: boolean }
+function MenuExportar({ opciones, ocupado }: { opciones: OpcionExportar[]; ocupado: boolean }) {
+  const [abierto, setAbierto] = useState(false);
+  const caja = useRef<HTMLDivElement>(null), boton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!abierto) return;
+    const fuera = (e: MouseEvent) => { if (!caja.current?.contains(e.target as Node)) setAbierto(false); };
+    const tecla = (e: KeyboardEvent) => { if (e.key === "Escape") { setAbierto(false); boton.current?.focus(); } };
+    document.addEventListener("mousedown", fuera);
+    document.addEventListener("keydown", tecla);
+    return () => { document.removeEventListener("mousedown", fuera); document.removeEventListener("keydown", tecla); };
+  }, [abierto]);
+  // Flechas arriba y abajo recorren las opciones, como en un menú.
+  const flechas = (e: React.KeyboardEvent) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const items = [...(caja.current?.querySelectorAll<HTMLButtonElement>("[role=menuitem]:not(:disabled)") ?? [])];
+    const i = items.indexOf(document.activeElement as HTMLButtonElement);
+    items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1) + items.length) % items.length]?.focus();
+  };
+  const grupos = [...new Set(opciones.map(o => o.grupo))];
+  return <div className="cli-exportar" ref={caja} onKeyDown={abierto ? flechas : undefined}>
+    <button type="button" ref={boton} className="btn sec cli-exportar-boton" aria-haspopup="menu" aria-expanded={abierto} onClick={() => setAbierto(x => !x)}>
+      <FileSpreadsheet aria-hidden="true" className="cli-exportar-ico" /><span>{ocupado ? "Preparando Excel…" : "Exportar / Imprimir"}</span>
+      <ChevronDown aria-hidden="true" className={"cli-exportar-flecha" + (abierto ? " girada" : "")} />
+    </button>
+    {abierto && <div className="cli-exportar-menu" role="menu" aria-label="Exportar o imprimir">
+      {grupos.map((g, i) => <div key={g} role="group" aria-label={g}>
+        {i > 0 && <div className="cli-exportar-sep" role="separator" />}
+        <p className="cli-exportar-grupo" aria-hidden="true">{g}</p>
+        {opciones.filter(o => o.grupo === g).map(o => <button key={o.tipo + o.texto} type="button" role="menuitem" disabled={o.off} className="cli-exportar-item"
+          onClick={() => { setAbierto(false); o.accion(); }}>
+          {o.tipo === "excel" ? <FileSpreadsheet aria-hidden="true" className="ico-excel" /> : <Printer aria-hidden="true" className="ico-imprimir" />}<span>{o.texto}</span>
+        </button>)}
+      </div>)}
+    </div>}
+  </div>;
 }
 
 /** Nuevo cliente o editar uno. Avisa si ya hay otro con el mismo nombre o número. */

@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Clientes en escritorio: acciones junto al título y menú Exportar / Imprimir — 2026-11-14
+
+- Desde 768 px la cabecera de Clientes (`.cli-cab`) lleva el título a la izquierda y tres acciones a la derecha: **Enviar saldos por WhatsApp** (verde `#059669`), el menú **Exportar / Imprimir** (`MenuExportar` en `oficina/Clientes.tsx`, con los grupos "Reportes Excel", solo administración, e "Impresión") y **Registrar cliente** (azul `#0284c7`). El menú se cierra al elegir, al hacer clic afuera (mousedown) o con Escape, y se recorre con las flechas. Íconos de `lucide-react`.
+- Las cifras quedan justo debajo, y luego una sola barra de filtros (`.cli-filtros`): búsqueda, Todos / Por cobrar / Por pagar y el día. Va en una fila desde 1280 px; por debajo se acomoda en dos sin scroll lateral (con el menú lateral abierto, a 1024 px no cabe en una).
+- Se pidió con clases de Tailwind, pero dentro de `interna/` no se usa Tailwind: los mismos tamaños, radios y colores están en `ajustes.css`. El celular no cambia (título, cifras, buscador con Filtros, Enviar saldos, Registrar y "Imprimir y Excel").
+
 ## La API se configura con VITE_API_URL, no con vercel.json — 2026-11-13
 
 - **Decisión:** los frontends (`frontend/` y el portal) llaman directo a la API con `VITE_API_URL` de cada proyecto de Vercel (producción `https://api.jslogistics.pro`; demo `https://api.ingenieroandrespineda.dev`). `frontend/vercel.json` ya no reenvía `/api`: solo tiene la regla de SPA (que sigue excluyendo `api/` para que un `VITE_API_URL` faltante dé 404 y no HTML). Así un mismo código sirve para producción y demo sin ramas con otro `vercel.json`.
