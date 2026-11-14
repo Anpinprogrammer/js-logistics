@@ -1607,8 +1607,10 @@
   .jsl dialog[data-variante="cuenta"]{width:fit-content;min-width:min(720px,100vw);max-width:90vw;border-right:1px solid var(--linea)}
 }
 .jsl .cuenta-panel{display:flex;flex-direction:column;flex:1;min-height:0;width:100%}
-.jsl .cuenta-cab{flex:none;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px;padding:18px 24px;border-bottom:1px solid var(--linea);background:var(--papel)}
-.jsl .cuenta-quien{display:flex;align-items:center;gap:18px;min-width:0}
+.jsl .dlg .cuenta-cab{flex:none;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:14px;margin-bottom:0;padding:18px 24px;border-bottom:1px solid var(--linea);background:var(--papel)}
+.jsl .cuenta-fila-uno{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;min-width:0}
+.jsl .cuenta-quien{display:flex;flex-wrap:wrap;align-items:center;flex:1;gap:10px 20px;min-width:0}
+.jsl .cuenta-fila-uno .cerrar{position:static;flex:none}
 .jsl .cuenta-nombre{min-width:0}
 .jsl .cuenta-nombre h2{margin:0;font-size:1.15rem;line-height:1.2;overflow-wrap:anywhere}
 .jsl .cuenta-nombre .sub{margin:2px 0 0;font-size:.8rem}
@@ -1616,10 +1618,9 @@
 .jsl .cuenta-saldo{display:flex;flex-direction:column;flex:none}
 .jsl .cuenta-saldo b{font-size:1.35rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
 .jsl .cuenta-saldo small{margin-top:4px;font-size:.72rem;font-weight:600;color:var(--suave)}
-.jsl .cuenta-botones{display:flex;align-items:center;gap:10px;flex:none;margin-left:auto}
+.jsl .cuenta-botones{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:10px}
 .jsl .cuenta-botones .btn{gap:6px;white-space:nowrap;font-weight:700}
 .jsl .cuenta-botones .btn svg{width:16px;height:16px}
-.jsl .cuenta-botones .cerrar{position:static;flex:none}
 .jsl .cuenta-cuerpo{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:18px 24px 24px}
 .jsl .cuenta-wa{margin-bottom:14px}
 .jsl .cuenta-wa .sub{margin:0 0 8px}
@@ -1645,18 +1646,12 @@
 .jsl .cuenta-modal-pie{display:flex;justify-content:flex-end;gap:10px;margin-top:6px;padding-top:14px;border-top:1px solid var(--linea)}
 .jsl .cuenta-modal-pie .btn{min-height:44px;min-width:120px;justify-content:center;font-weight:700}
 @media (max-width:767px){
-  .jsl .cuenta-cab{padding:16px}
-  .jsl .cuenta-quien{width:100%;justify-content:space-between}
+  .jsl .dlg .cuenta-cab{padding:16px}
   .jsl .cuenta-sep{display:none}
-  .jsl .cuenta-saldo{align-items:flex-end}
-  .jsl .cuenta-botones{width:100%;margin-left:0}
+  .jsl .cuenta-botones{width:100%}
   .jsl .cuenta-botones .btn{flex:1;justify-content:center}
-  .jsl .cuenta-botones .cerrar{position:absolute;top:12px;right:12px}
-  .jsl .cuenta-cab{position:relative;padding-right:56px}
-  .jsl .cuenta-quien{padding-right:0}
   .jsl .cuenta-cuerpo{padding:14px 16px 20px}
-  .jsl .cuenta-tabla{overflow-x:auto}
-  .jsl .cuenta-tabla .cuenta-det{min-width:160px}
+  .jsl .cuenta-tabla{display:none}
   .jsl .cuenta-modal-pie .btn{flex:1;min-width:0}
 }
 .jsl .cuenta-modal .cuenta-form.cuenta-form-modal{margin:0;padding:0;border:0;background:none}
@@ -1815,3 +1810,19 @@
 .jsl .solicitud a.sol-chip{color:var(--tinta)}
 .jsl .solicitud a.sol-chip-correo{color:var(--suave)}
 .jsl .solicitud a.sol-chip:hover{color:var(--mango)}
+
+/* Cuenta del cliente: en el celular los movimientos van en filas compactas (sin scroll horizontal) y en el computador, la tabla. */
+.jsl .cuenta-movs-compacta{display:none;margin:0;padding:0;list-style:none;border:1px solid var(--linea);border-radius:16px;background:var(--papel);overflow:hidden}
+@media (max-width:767px){
+  .jsl .cuenta-movs-compacta{display:block}
+  .jsl .cuenta-movs-compacta li{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:12px 16px}
+  .jsl .cuenta-movs-compacta li + li{border-top:1px solid var(--linea)}
+  .jsl .cmc-txt{display:flex;flex-direction:column;align-items:flex-start;flex:1;min-width:0}
+  .jsl .cmc-txt b{font-size:.75rem;font-weight:800;color:var(--tinta)}
+  .jsl .cmc-txt span{margin-top:2px;font-size:.75rem;font-weight:400;line-height:1.35;color:var(--suave);overflow-wrap:anywhere}
+  .jsl .cmc-valor{flex:none;font-size:.78rem;font-weight:800;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .jsl .cmc-valor.cero{color:var(--suave)}
+  .jsl .cmc-accion{flex:none;width:56px;display:flex;justify-content:flex-end}
+  .jsl .cmc-accion button{padding:4px 10px;border-radius:12px;border:1px solid color-mix(in srgb,var(--rojo) 40%,transparent);background:color-mix(in srgb,var(--rojo) 8%,transparent);color:var(--rojo);font:inherit;font-size:.69rem;font-weight:800;cursor:pointer}
+  .jsl .cmc-domi{margin-top:6px;padding:3px 10px;border:1px solid var(--linea);border-radius:10px;background:none;color:var(--tinta);font:inherit;font-size:.69rem;font-weight:700;cursor:pointer}
+}

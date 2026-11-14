@@ -396,15 +396,19 @@ export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: b
   const estado = s < 0 ? "Por cobrar" : s > 0 ? "Por pagar" : "Cuenta a paz y salvo";
   return <div className="cuenta-panel">
     <header className="cuenta-cab">
-      <div className="cuenta-quien">
-        <div className="cuenta-nombre"><h2>{c.nombre}</h2><p className="sub">{c.telefono || "Sin celular"}{pendientes ? ` · ${pendientes} en ruta` : ""}</p></div>
-        <span className="cuenta-sep" aria-hidden="true" />
-        <div className="cuenta-saldo" title={explicacion}><b className={s < 0 ? "neg" : s > 0 ? "pos" : ""}>{pesos(Math.abs(s))}</b><small>{estado}</small></div>
+      {/* Fila 1: quién es y cuánto debe o tiene a favor, con el cerrar a la derecha */}
+      <div className="cuenta-fila-uno">
+        <div className="cuenta-quien">
+          <div className="cuenta-nombre"><h2>{c.nombre}</h2><p className="sub">{c.telefono || "Sin celular"}{pendientes ? ` · ${pendientes} en ruta` : ""}</p></div>
+          <span className="cuenta-sep" aria-hidden="true" />
+          <div className="cuenta-saldo" title={explicacion}><b className={s < 0 ? "neg" : s > 0 ? "pos" : ""}>{pesos(Math.abs(s))}</b><small>{estado}</small></div>
+        </div>
+        <button type="button" className="cerrar" data-cerrar aria-label="Cerrar cuenta">×</button>
       </div>
+      {/* Fila 2: las acciones */}
       <div className="cuenta-botones">
         <button type="button" className="btn ok" id="cRegistrar" onClick={() => setFormAbierto(true)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>{yo.esAdmin ? "Registrar pago o ajuste" : "Registrar movimiento"}</span></button>
         <button type="button" className="btn sec" id="cEdit" onClick={editar}><IconoEditar /><span>Editar cliente</span></button>
-        <button type="button" className="cerrar" data-cerrar aria-label="Cerrar cuenta">×</button>
       </div>
     </header>
     <div className="cuenta-cuerpo">
@@ -414,6 +418,18 @@ export function AbrirCuenta({ cid, enFicha, volver }: { cid: string; enFicha?: b
         {rows.map((r, i) => <tr key={(r.pid || r.mid || "") + i}><td className="cuenta-fecha">{hora(r.fecha)}</td><td className="cuenta-det">{r.det}</td><td className={"n " + (r.v < 0 ? "neg" : "pos")}>{pesos(r.v)}</td>
           <td className="n">{r.mid ? (yo.esAdmin ? <button className="btn peligro chico" onClick={() => quitarMov(r.mid!)}>Quitar</button> : null) : r.pid && (r.v < 0 || r.dp) ? <button className="btn sec chico" onClick={() => domi(r.pid!)}>{r.dp ? "Desmarcar pago" : "Ya pagó domicilio"}</button> : null}</td></tr>)}
       </tbody></table></div> : <div className="vacio">Sin movimientos.</div>}
+      {/* En el celular la tabla no cabe: cada movimiento es una fila compacta (fecha y detalle, valor y Quitar) */}
+      {rows.length > 0 && <ul className="cuenta-movs-compacta" aria-label="Movimientos">
+        {rows.map((r, i) => <li key={(r.pid || r.mid || "") + i}>
+          <div className="cmc-txt">
+            <b>{hora(r.fecha)}</b>
+            <span>{r.det}</span>
+            {!r.mid && r.pid && (r.v < 0 || r.dp) ? <button type="button" className="cmc-domi" onClick={() => domi(r.pid!)}>{r.dp ? "Desmarcar pago" : "Ya pagó domicilio"}</button> : null}
+          </div>
+          <span className={"cmc-valor " + (r.v < 0 ? "neg" : r.v > 0 ? "pos" : "cero")}>{pesos(r.v)}</span>
+          {yo.esAdmin && <div className="cmc-accion">{r.mid ? <button type="button" onClick={() => quitarMov(r.mid!)}>Quitar</button> : null}</div>}
+        </li>)}
+      </ul>}
     </div>
     {formAbierto && <ModalMovimiento cid={cid} alCerrar={cerrarForm} />}
   </div>;

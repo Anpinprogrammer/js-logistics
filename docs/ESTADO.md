@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Ver cuenta del cliente: cabecera en 2 filas y movimientos compactos en el celular — 2026-11-14
+
+- `AbrirCuenta` suelta (panel de "Ver cuenta" desde Clientes y desde el Panel): la cabecera tiene **fila 1** (nombre y celular, separador, saldo con su estado, y el cerrar a la derecha) y **fila 2** (Registrar pago o ajuste y Editar cliente). En el celular los botones quedan uno debajo del otro. Ojo: el CSS usa `.jsl .dlg .cuenta-cab` porque `.jsl .dlg header` (estilos.css) fuerza `align-items:start`.
+- En menos de 768 px la tabla de 4 columnas se oculta y se pinta `.cuenta-movs-compacta`: fecha en negrita y detalle debajo, valor (verde, rojo o gris en cero) y el botón Quitar con un ancho reservado de 56 px para que los valores queden alineados (solo si es admin). "Ya pagó domicilio / Desmarcar pago" sigue disponible, debajo del detalle. La tabla de escritorio no cambió.
+- La ficha móvil de Clientes (pestaña "Ver cuenta", `enFicha`) no cambió: ya tenía sus tarjetas.
+
 ## Tarjeta de solicitud de envío rediseñada — 2026-11-14
 
 - `TarjetaSolicitud` (`interna/Solicitudes.tsx`), que usan el drawer de la campanita, el aviso de solicitud nueva y el detalle de Solicitudes, ahora tiene tres zonas: cabecera (nombre, hora con reloj, estado con punto que late si es "Nueva" y píldora de paquetes con el peso), chips de contacto (teléfono `tel:` y correo `mailto:` recortado), la **ruta** Recoger en (punto azul) → Entregar a (punto verde, con destinatario y su teléfono) y, debajo, valor con prefijo `$` y botones Aceptar / Rechazar en dos columnas con íconos de lucide-react.
