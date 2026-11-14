@@ -1744,3 +1744,74 @@
 @media (min-width:1280px){.jsl .cli-filtros{flex-wrap:nowrap}}
 .jsl .cli-filtros .cli-filtros-buscar{margin:0;flex:1 1 240px;min-width:240px;max-width:384px}
 .jsl .cli-filtros .seg,.jsl .cli-filtros .filtro-dia{flex:none}
+
+/* ---- Tarjeta de solicitud de envío: cabecera con contacto, ruta Recoger en → Entregar a, valor y acciones ----
+   La usan el drawer de la campanita, el aviso de solicitud nueva y el detalle de Solicitudes (sin la cabecera del nombre). */
+.jsl .solicitud{padding:16px;border-radius:24px;gap:14px;box-shadow:var(--sombra)}
+@media (min-width:640px){.jsl .solicitud{padding:20px}}
+.jsl .solicitud .sol-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+.jsl .sol-cab-txt{display:grid;gap:6px;min-width:0}
+.jsl .sol-cab-txt h3{margin:0;font-size:1rem;font-weight:800;line-height:1.25;color:var(--tinta);overflow-wrap:anywhere}
+.jsl .sol-cab-lado{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
+.jsl .sol-estado{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;font-size:.7rem;font-weight:800;white-space:nowrap}
+.jsl .sol-estado::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+.jsl .sol-estado-nueva::before{animation:sol-pulso 1.6s ease-out infinite}
+@keyframes sol-pulso{0%{box-shadow:0 0 0 0 currentColor}70%{box-shadow:0 0 0 6px transparent}100%{box-shadow:0 0 0 0 transparent}}
+@media (prefers-reduced-motion:reduce){.jsl .sol-estado-nueva::before{animation:none}}
+.jsl .sol-hora{display:inline-flex;align-items:center;gap:4px;font-size:.75rem;font-weight:500;color:var(--suave);white-space:nowrap}
+.jsl .sol-contacto{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;margin-top:-6px;font-size:.75rem}
+.jsl .sol-hora svg,.jsl .sol-contacto svg,.jsl .sol-paquetes svg,.jsl .sol-destinatario svg{width:13px;height:13px;flex:none}
+.jsl .sol-chip{display:inline-flex;align-items:center;gap:5px;min-width:0;max-width:100%;min-height:26px;padding:2px 9px;border-radius:9px;background:var(--hueco);color:var(--tinta);font-weight:600;text-decoration:none}
+.jsl .sol-chip:hover{color:var(--mango)}
+.jsl .sol-chip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsl .sol-chip-correo{max-width:220px;color:var(--suave);font-weight:500}
+.jsl .sol-ico-tel{color:var(--mango)}
+.jsl .sol-paquetes{display:inline-flex;align-items:center;gap:6px;flex:none;padding:5px 10px;border-radius:14px;border:1px solid color-mix(in srgb,var(--mango) 25%,transparent);background:color-mix(in srgb,var(--mango) 10%,transparent);color:var(--mango);font-size:.75rem;font-weight:800;white-space:nowrap}
+.jsl .solicitud .solicitud-origen{margin-top:-4px}
+/* Ruta: dos puntos unidos por una línea punteada */
+.jsl .sol-ruta{padding:14px;border-radius:16px;background:var(--hueco);border:1px solid var(--linea);min-width:0}
+.jsl .sol-ruta-puntos{display:grid;gap:14px;margin:0;padding:0 0 0 22px;list-style:none}
+.jsl .sol-punto-origen::after{content:"";position:absolute;left:-17px;top:19px;bottom:-15px;border-left:2px dashed var(--linea)}
+.jsl .sol-punto{position:relative;min-width:0}
+.jsl .sol-punto-marca{position:absolute;left:-22px;top:3px;width:12px;height:12px;border-radius:50%}
+.jsl .sol-punto-origen .sol-punto-marca{background:var(--mango);box-shadow:0 0 0 4px color-mix(in srgb,var(--mango) 18%,transparent)}
+.jsl .sol-punto-destino .sol-punto-marca{background:var(--verde);box-shadow:0 0 0 4px color-mix(in srgb,var(--verde) 18%,transparent)}
+.jsl .sol-punto small{display:block;font-size:.64rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.jsl .sol-punto-origen small{color:var(--mango)}
+.jsl .sol-punto-destino small{color:var(--verde)}
+.jsl .sol-punto p{margin:2px 0 0;font-size:.8rem;font-weight:700;line-height:1.35;color:var(--tinta);overflow-wrap:anywhere}
+@media (min-width:640px){.jsl .sol-punto p{font-size:.875rem}}
+.jsl .sol-destinatario{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:5px;font-size:.75rem;color:var(--suave);min-width:0}
+.jsl .sol-destinatario span,.jsl .sol-destinatario a{display:inline-flex;align-items:center;gap:4px;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.jsl .sol-destinatario a{color:var(--tinta);font-weight:700;text-decoration:none}
+.jsl .sol-destinatario a svg{color:var(--verde)}
+.jsl .sol-destinatario a:hover{color:var(--verde)}
+/* Notas dentro de la ruta: remitente, valor, a quién se asignó o por qué se rechazó */
+.jsl .solicitud .sol-notas,.jsl .sol-detalle .solicitud .sol-notas{display:grid;gap:4px;margin:12px 0 0;padding:10px 0 0;border:0;border-top:1px solid var(--linea);border-radius:0;background:none}
+.jsl .solicitud .sol-notas div,.jsl .sol-detalle .solicitud .sol-notas div{display:block;font-size:.75rem;line-height:1.45}
+.jsl .solicitud .sol-notas dt,.jsl .solicitud .sol-notas dd{display:inline;margin:0;font-size:inherit}
+.jsl .solicitud .sol-notas dt{color:var(--tinta);font-weight:800}
+.jsl .solicitud .sol-notas dt::after{content:": "}
+.jsl .solicitud .sol-notas dd{color:var(--suave);overflow-wrap:anywhere}
+.jsl .solicitud .sol-nota-rechazo dd{color:var(--rojo)}
+/* Valor del domicilio con prefijo $ */
+.jsl .sol-valor label{font-size:.68rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--suave)}
+.jsl .sol-valor-caja{position:relative}
+.jsl .sol-valor-caja span{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:.875rem;font-weight:800;color:var(--suave);pointer-events:none}
+.jsl .solicitud .form-modal .sol-valor-caja input{padding-left:30px;border-radius:14px;font-size:.875rem;font-weight:800}
+/* Acciones: Aceptar y Rechazar en dos columnas */
+.jsl .solicitud .sol-acciones{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.jsl .solicitud .sol-acciones .btn{gap:6px;min-height:46px;border-radius:14px;font-weight:800;white-space:normal;text-align:center}
+.jsl .solicitud .sol-acciones .btn>svg{width:16px;height:16px;flex:none}
+.jsl .solicitud .sol-acciones .sol-btn-ancho{grid-column:1/-1}
+.jsl .sol-btn-aceptar.ok{box-shadow:0 6px 16px color-mix(in srgb,var(--verde) 25%,transparent)}
+.jsl .sol-btn-aceptar:disabled{opacity:.45;box-shadow:none}
+.jsl .sol-btn-rechazar{background:var(--papel);color:var(--tinta);border:1px solid var(--linea);font-weight:700}
+.jsl .sol-btn-rechazar:hover:not(:disabled){background:var(--rojo-claro);color:var(--rojo);border-color:color-mix(in srgb,var(--rojo) 35%,transparent)}
+.jsl .solicitud .sol-acciones .btn:active:not(:disabled){transform:scale(.97)}
+/* En el detalle de Solicitudes la cabecera del nombre ya está arriba: solo contacto y paquetes */
+.jsl .sol-detalle .solicitud .sol-contacto{margin-top:0}
+.jsl .sol-detalle .solicitud .sol-contacto .sol-paquetes{padding:3px 9px;border-radius:9px}
+.jsl .solicitud a.sol-chip{color:var(--tinta)}
+.jsl .solicitud a.sol-chip-correo{color:var(--suave)}
+.jsl .solicitud a.sol-chip:hover{color:var(--mango)}

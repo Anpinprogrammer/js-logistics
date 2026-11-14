@@ -10,6 +10,7 @@ import { DEMO } from "./demo";
 import { S, hora, pesos, linkWhatsApp, telWhatsApp } from "./motor";
 import { Cab, useVentana } from "./ui";
 import { WhatsAppIcon } from "../components/icons/WhatsAppIcon";
+import { Check, Clock, Mail, Package, Phone, User, X } from "lucide-react";
 
 /* ---- Modo demo: las solicitudes viven en memoria ---- */
 const ahora = Date.now();
@@ -154,21 +155,55 @@ export function TarjetaSolicitud({ s, enDetalle = false, alCompletar }: { s: Sol
   const [cls, etq] = ETQ[s.estado] ?? ["gris", s.estado];
   const wa = s.estado === "cotizada" ? linkWhatsApp(s.telefono, mensajeCotizacion(s)) : "";
   const hayTel = !!telWhatsApp(s.telefono);
+  const paquetes = <span className="sol-paquetes"><Package aria-hidden="true" />{s.paquetes} {s.paquetes === 1 ? "paquete" : "paquetes"}{s.pesoKg ? ` · ${String(s.pesoKg).replace(".", ",")} kg` : ""}</span>;
+  // Lo que no es la ruta pero no debe pasar desapercibido: quién es el remitente, el valor, a quién se asignó o por qué se rechazó.
+  const notas: [string, string][] = [];
+  if (s.origen === "portal" && s.estado !== "asignada") notas.push(["Remitente", s.clienteNombre || "La ficha del cliente ya no existe: se creará una nueva"]);
+  if (s.valor && s.estado !== "pendiente") notas.push(["Domicilio", pesos(s.valor)]);
+  if (s.estado === "asignada") notas.push(["Asignada a", (s.mensajeroNombre || "—") + (s.guia ? ` · guía ${s.guia}` : "")]);
+  if (s.estado === "rechazada" && s.motivoRechazo) notas.push(["Motivo", s.motivoRechazo]);
+  const pidioRechazo = !rechazando && <button className="btn sol-btn-rechazar" disabled={ocupado} onClick={rechazar}><X aria-hidden="true" />Rechazar</button>;
   return (
     <article className={"solicitud" + (enDetalle ? " solicitud-en-detalle" : "")}>
-      {!enDetalle && <><header><b>{s.nombre}</b><span className={"etq " + cls}>{etq}</span></header>
-        {s.origen === "portal" && <span className="solicitud-origen">Cliente existente · la pidió desde su portal</span>}
-        <small className="suave">{hora(new Date(s.creado).getTime())} · {s.telefono} · {s.email}</small></>}
-      {enDetalle && <div className="sol-detalle-contacto"><a href={`tel:${s.telefono}`}>{s.telefono}</a>{s.email && <a href={`mailto:${s.email}`}>{s.email}</a>}</div>}
-      <dl>
-        <div><dt>Recoger en</dt><dd>{s.direccionRecogida}</dd></div>
-        <div><dt>Entregar a</dt><dd>{s.destinatarioNombre}{s.destinatarioTelefono ? ` · ${s.destinatarioTelefono}` : ""}<br />{s.direccionEntrega}</dd></div>
-        <div><dt>Paquetes</dt><dd>{s.paquetes}{s.pesoKg ? ` · ${s.pesoKg} kg` : ""}</dd></div>
-        {s.origen === "portal" && s.estado !== "asignada" ? <div><dt>Remitente</dt><dd>{s.clienteNombre || "La ficha del cliente ya no existe: se creará una nueva"}</dd></div> : null}
-        {s.valor ? <div><dt>Domicilio</dt><dd>{pesos(s.valor)}</dd></div> : null}
-        {s.estado === "asignada" ? <div><dt>Asignada a</dt><dd>{s.mensajeroNombre || "—"}{s.guia ? ` · guía ${s.guia}` : ""}</dd></div> : null}
-        {s.estado === "rechazada" && s.motivoRechazo ? <div><dt>Motivo</dt><dd>{s.motivoRechazo}</dd></div> : null}
-      </dl>
+      {/* 1. Cabecera: quién la pide, cuándo, cómo contactarlo, estado y paquetes */}
+      {/* En el detalle de Solicitudes el nombre, el estado y la fecha ya están en la cabecera de la ventana */}
+      {!enDetalle && <header className="sol-cab">
+        <div className="sol-cab-txt">
+          <h3>{s.nombre}</h3>
+          <span className="sol-hora"><Clock aria-hidden="true" />{hora(new Date(s.creado).getTime())}</span>
+        </div>
+        <div className="sol-cab-lado">
+          <span className={"etq " + cls + " sol-estado" + (s.estado === "pendiente" ? " sol-estado-nueva" : "")}>{etq}</span>
+          {paquetes}
+        </div>
+      </header>}
+      {(s.telefono || s.email || enDetalle) && <div className="sol-contacto">
+        {enDetalle && paquetes}
+        {s.telefono && <a className="sol-chip" href={`tel:${s.telefono}`} aria-label={`Llamar a ${s.nombre}: ${s.telefono}`}><Phone aria-hidden="true" className="sol-ico-tel" /><span>{s.telefono}</span></a>}
+        {s.email && <a className="sol-chip sol-chip-correo" href={`mailto:${s.email}`} title={s.email}><Mail aria-hidden="true" /><span>{s.email}</span></a>}
+      </div>}
+      {s.origen === "portal" && <span className="solicitud-origen">Cliente existente · la pidió desde su portal</span>}
+
+      {/* 2. Ruta: Recoger en → Entregar a */}
+      <div className="sol-ruta">
+        <ol className="sol-ruta-puntos">
+          <li className="sol-punto sol-punto-origen">
+            <span className="sol-punto-marca" aria-hidden="true" />
+            <small>Recoger en</small>
+            <p>{s.direccionRecogida}</p>
+          </li>
+          <li className="sol-punto sol-punto-destino">
+            <span className="sol-punto-marca" aria-hidden="true" />
+            <small>Entregar a</small>
+            <p>{s.direccionEntrega}</p>
+            <div className="sol-destinatario">
+              <span><User aria-hidden="true" />{s.destinatarioNombre}</span>
+              {s.destinatarioTelefono && <a href={`tel:${s.destinatarioTelefono}`} aria-label={`Llamar a ${s.destinatarioNombre}: ${s.destinatarioTelefono}`}><Phone aria-hidden="true" />{s.destinatarioTelefono}</a>}
+            </div>
+          </li>
+        </ol>
+        {notas.length > 0 && <dl className="sol-notas">{notas.map(([k, x]) => <div key={k} className={k === "Motivo" ? "sol-nota-rechazo" : undefined}><dt>{k}</dt><dd>{x}</dd></div>)}</dl>}
+      </div>
       {error && <div className="aviso alerta" role="alert">{error}</div>}
 
       {rechazando && ["pendiente", "cotizada", "confirmada"].includes(s.estado) && <div className="form-modal solicitud-rechazo">
@@ -183,30 +218,32 @@ export function TarjetaSolicitud({ s, enDetalle = false, alCompletar }: { s: Sol
         </div>
       </div>}
 
+      {/* 3. Cotización y acciones */}
       {s.estado === "pendiente" && <>
-        <div className="form-modal"><div className="campo">
+        <div className="form-modal"><div className="campo sol-valor">
           <label htmlFor={"val" + s.id}>Valor del domicilio</label>
-          <input id={"val" + s.id} inputMode="numeric" placeholder="Ej: 9.000" value={valor} onChange={e => setValor(e.target.value.replace(/[^\d.]/g, ""))} aria-describedby={tarifa ? "tar" + s.id : undefined} />
+          <div className="sol-valor-caja"><span aria-hidden="true">$</span>
+            <input id={"val" + s.id} inputMode="numeric" placeholder="Ej: 9.000" value={valor} onChange={e => setValor(e.target.value.replace(/[^\d.]/g, ""))} aria-describedby={tarifa ? "tar" + s.id : undefined} /></div>
           {tarifa > 0 && <small id={"tar" + s.id} className="suave">
             {monto === tarifa
               ? `Es su domicilio asignado (${pesos(tarifa)}). Al aceptar pasa directo a asignar mensajero.`
               : `Su domicilio asignado es ${pesos(tarifa)}. Con otro valor tendrás que confirmarlo con el cliente por WhatsApp.`}
           </small>}
         </div></div>
-        <div className="acciones">
-          <button className="btn ok" disabled={ocupado || monto <= 0} onClick={aceptar}>Aceptar</button>
-          {!rechazando && <button className="btn sec" disabled={ocupado} onClick={rechazar}>Rechazar</button>}
+        <div className="acciones sol-acciones">
+          <button className="btn ok sol-btn-aceptar" disabled={ocupado || monto <= 0} onClick={aceptar}><Check aria-hidden="true" />Aceptar</button>
+          {pidioRechazo}
         </div>
       </>}
 
       {s.estado === "cotizada" && <>
         <p className="suave">Envíale el valor al cliente y, cuando responda que sí, márcalo.</p>
-        <div className="acciones">
+        <div className="acciones sol-acciones">
           {hayTel
-            ? <a className="btn ok" href={wa} target="_blank" rel="noopener noreferrer"><WhatsAppIcon />Enviar valor por WhatsApp</a>
-            : <span className="aviso alerta">El teléfono no sirve para WhatsApp: llámalo.</span>}
-          <button className="btn" disabled={ocupado} onClick={confirmar}>El cliente está de acuerdo</button>
-          {!rechazando && <button className="btn sec" disabled={ocupado} onClick={rechazar}>Rechazar</button>}
+            ? <a className="btn ok sol-btn-ancho" href={wa} target="_blank" rel="noopener noreferrer"><WhatsAppIcon />Enviar valor por WhatsApp</a>
+            : <span className="aviso alerta sol-btn-ancho">El teléfono no sirve para WhatsApp: llámalo.</span>}
+          <button className="btn sol-btn-aceptar" disabled={ocupado} onClick={confirmar}><Check aria-hidden="true" />El cliente está de acuerdo</button>
+          {pidioRechazo}
         </div>
       </>}
 
@@ -218,9 +255,9 @@ export function TarjetaSolicitud({ s, enDetalle = false, alCompletar }: { s: Sol
             {mensajeros.map(m => <option key={m.id} value={m.id}>{m.nombre}{m.tipo === "patinador" ? " (patinador)" : ""}</option>)}
           </select>
         </div></div>
-        <div className="acciones">
-          <button className="btn ok" disabled={ocupado || !mensajero} onClick={asignar}>Asignar y crear guía</button>
-          {!rechazando && <button className="btn sec" disabled={ocupado} onClick={rechazar}>Rechazar</button>}
+        <div className="acciones sol-acciones">
+          <button className="btn ok sol-btn-aceptar" disabled={ocupado || !mensajero} onClick={asignar}><Check aria-hidden="true" />Asignar y crear guía</button>
+          {pidioRechazo}
         </div>
       </>}
     </article>

@@ -1,5 +1,12 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Tarjeta de solicitud de envío rediseñada — 2026-11-14
+
+- `TarjetaSolicitud` (`interna/Solicitudes.tsx`), que usan el drawer de la campanita, el aviso de solicitud nueva y el detalle de Solicitudes, ahora tiene tres zonas: cabecera (nombre, hora con reloj, estado con punto que late si es "Nueva" y píldora de paquetes con el peso), chips de contacto (teléfono `tel:` y correo `mailto:` recortado), la **ruta** Recoger en (punto azul) → Entregar a (punto verde, con destinatario y su teléfono) y, debajo, valor con prefijo `$` y botones Aceptar / Rechazar en dos columnas con íconos de lucide-react.
+- Remitente (portal), domicilio, a quién se asignó y motivo del rechazo van como notas dentro del bloque de la ruta. La solicitud no tiene campo de notas ni de valor a recaudar: si el backend los agrega, van ahí.
+- En el detalle (`enDetalle`) no se repite la cabecera: nombre, estado y fecha ya están en la ventana; los paquetes van con los chips.
+- Estilos en `ajustes.css` (clases `sol-*`, con las variables de `.jsl` para claro y oscuro), no Tailwind, por la regla de `frontend/CLAUDE.md`. Handlers, estados y validaciones no cambiaron.
+
 ## Clientes en escritorio: acciones junto al título y menú Exportar / Imprimir — 2026-11-14
 
 - Desde 768 px la cabecera de Clientes (`.cli-cab`) lleva el título a la izquierda y tres acciones a la derecha: **Enviar saldos por WhatsApp** (verde `#059669`), el menú **Exportar / Imprimir** (`MenuExportar` en `oficina/Clientes.tsx`, con los grupos "Reportes Excel", solo administración, e "Impresión") y **Registrar cliente** (azul `#0284c7`). El menú se cierra al elegir, al hacer clic afuera (mousedown) o con Escape, y se recorre con las flechas. Íconos de `lucide-react`.
