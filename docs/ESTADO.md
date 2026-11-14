@@ -1,5 +1,10 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Modal de Liquidación rediseñado (Caja → Liquidaciones recientes) — 2026-11-14
+
+- `VerLiquidacion` (`oficina/Caja.tsx`) usa la variante de ventana `"liquidacion"` (hoja inferior en el celular, modal de 768 px en escritorio; reglas `liq-*` al final de `ajustes.css`). Cabecera fija, banner compacto de resultado, dos subpestañas locales (Resumen financiero / Entregas incluidas) y pie fijo con "Reabrir período". Los datos y la función de reabrir no cambiaron.
+- Las entregas son tabla en escritorio (`.liq-tabla`) y tarjetas de dos niveles en el celular (`.liq-entregas`); ninguna da scroll horizontal. La tabla baja el relleno y deja que Remitente/Recibió/Método partan línea.
+
 ## Ver cuenta del cliente: cabecera en 2 filas y movimientos compactos en el celular — 2026-11-14
 
 - `AbrirCuenta` suelta (panel de "Ver cuenta" desde Clientes y desde el Panel): la cabecera tiene **fila 1** (nombre y celular, separador, saldo con su estado, y el cerrar a la derecha) y **fila 2** (Registrar pago o ajuste y Editar cliente). En el celular los botones quedan uno debajo del otro. Ojo: el CSS usa `.jsl .dlg .cuenta-cab` porque `.jsl .dlg header` (estilos.css) fuerza `align-items:start`.
