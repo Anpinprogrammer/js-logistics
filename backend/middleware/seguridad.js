@@ -149,3 +149,28 @@ export const limiteSolicitudGlobal = rateLimit({
   legacyHeaders: false,
   handler: respuesta429("SOLICITUDES_SATURADAS", "Tenemos muchas solicitudes hoy. Escríbenos por WhatsApp y te atendemos.")
 });
+
+/* Rastreo público de una guía: sin sesión, así que va con límites por IP (por minuto y por día) y un tope global diario. */
+const respuestaRastreo429 = message => respuesta429("RASTREO_DEMASIADO_RAPIDO", message);
+export const limiteRastreoMinuto = rateLimit({
+  windowMs: 60_000,
+  limit: env.RASTREO_POR_MINUTO,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: respuestaRastreo429("Hiciste muchas consultas seguidas. Espera un momento e intenta de nuevo.")
+});
+export const limiteRastreoDia = rateLimit({
+  windowMs: 24 * 60 * 60_000,
+  limit: env.RASTREO_POR_DIA,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: respuestaRastreo429("Llegaste al límite de consultas de hoy. Escríbenos por WhatsApp o inicia sesión en tu portal.")
+});
+export const limiteRastreoGlobal = rateLimit({
+  windowMs: 24 * 60 * 60_000,
+  limit: env.RASTREO_DIA_TOTAL,
+  keyGenerator: () => "global",
+  standardHeaders: false,
+  legacyHeaders: false,
+  handler: respuestaRastreo429("El rastreo tiene mucha demanda hoy. Escríbenos por WhatsApp y te ayudamos.")
+});
