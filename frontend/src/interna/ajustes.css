@@ -2054,3 +2054,30 @@
   .jsl .cifras-mens{grid-template-columns:repeat(4,minmax(0,1fr))}
   .jsl .cifras-mens .cifra:is(:first-child,:last-child){grid-column:auto}
 }
+
+/* Mi caja (mensajero): cifras simétricas (3 columnas en escritorio, 2 en celular, sin huecos) y entregas en lista en el celular */
+.jsl .cifras-mi-caja{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+.jsl .cifras-mi-caja .cifra{display:flex;flex-direction:column;justify-content:space-between;gap:6px;height:100%;min-width:0}
+.jsl .cifras-mi-caja .cifra b{margin:0;margin-top:auto}
+.jsl .cifras-mi-caja .cifra:first-child,.jsl .cifras-mi-caja .cifra:last-child:nth-child(even){grid-column:1/-1}
+@media (min-width:768px){
+  .jsl .cifras-mi-caja{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .jsl .cifras-mi-caja .cifra:first-child,.jsl .cifras-mi-caja .cifra:last-child:nth-child(even){grid-column:auto}
+  .jsl .cifras-mi-caja .cifra:last-child:nth-child(3n+1){grid-column:span 3}
+  .jsl .cifras-mi-caja .cifra:last-child:nth-child(3n+2){grid-column:span 2}
+}
+.jsl .te-lista{display:block;margin:0 0 calc(104px + env(safe-area-inset-bottom,0px));padding:0;list-style:none;border:1px solid var(--linea);border-radius:16px;background:var(--papel);overflow:hidden}
+.jsl .te-lista li{display:grid;gap:6px;min-width:0;padding:11px 14px}
+.jsl .te-lista li+li{border-top:1px solid var(--linea)}
+.jsl .te-lista li>div{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.jsl .te-lista li>div:first-child>b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.88rem}
+.jsl .te-lista li>div:first-child>strong{flex:none;font-size:.9rem;font-variant-numeric:tabular-nums}
+.jsl .te-lista li>div:first-child>strong.nulo{color:var(--suave);font-weight:600}
+.jsl .te-lista .guia{flex:none;padding:2px 7px;border-radius:6px;background:var(--azul-claro);color:var(--azul);font-family:ui-monospace,monospace;font-size:.7rem;font-weight:800}
+.jsl .te-lista li>div:last-child{font-size:.74rem;color:var(--suave)}
+.jsl .te-lista li>div:last-child>span{flex:none;text-align:right;overflow-wrap:anywhere}
+.jsl .te-lista li>div:last-child>span b{color:var(--tinta);font-weight:700}
+.jsl .te-metodo{min-width:0;padding:2px 9px;border-radius:999px;background:var(--hueco);color:var(--tinta);font-style:normal;font-size:.72rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsl .te-total{background:var(--hueco)}
+.jsl .te-tabla{display:none}
+@media (min-width:768px){.jsl .te-lista{display:none}.jsl .te-tabla{display:block}}

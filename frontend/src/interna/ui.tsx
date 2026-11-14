@@ -165,12 +165,21 @@ export function TablaEntregas({ ps, conCliente }: { ps: Pedido[]; conCliente: bo
   if (!ps.length) return <div className="vacio">No hay entregas.</div>;
   const conGasto = ps.some(p => gastoDe(p)), suma = (f: (p: Pedido) => number) => ps.reduce((a, p) => a + f(p), 0);
   const orden = ps.slice().sort((a, b) => (a.entregado || 0) - (b.entregado || 0));
-  return (
-    <div className="tabla-env"><table><thead><tr><th>Guía</th>{conCliente && <th>Remitente</th>}<th>Recibió</th><th>Método</th><th className="n">Servicio</th>{conGasto && <th className="n">Flete</th>}<th className="n">Cobrado</th></tr></thead><tbody>
+  const totCobrado = suma(p => Number(p.valorCobrado) || 0);
+  return (<>
+    {/* Celular: una tarjeta por entrega en dos niveles, sin scroll horizontal. Desde 768 px se ve la tabla. */}
+    <ul className="te-lista">
+      {orden.map(p => <li key={p.guia}>
+        <div><span className="guia">{p.guia}</span><b>{conCliente ? (nombreCliente(p.clienteId) || "—") + " · " : ""}{p.destinatario || "Sin destinatario"}</b><strong className={Number(p.valorCobrado) > 0 ? "" : "nulo"}>{pesos(p.valorCobrado)}</strong></div>
+        <div><em className="te-metodo">{metodoTxt(p)}</em><span>Servicio: <b>{pesos(servicio(p))}</b>{gastoDe(p) ? " · Flete: " + pesos(gastoDe(p)) : ""}</span></div>
+      </li>)}
+      <li className="te-total"><div><b>Total ({ps.length} {ps.length === 1 ? "entrega" : "entregas"})</b><strong>{pesos(totCobrado)}</strong></div><div><span>Servicio: <b>{pesos(suma(servicio))}</b>{conGasto ? " · Flete: " + pesos(suma(gastoDe)) : ""}</span></div></li>
+    </ul>
+    <div className="tabla-env te-tabla"><table><thead><tr><th>Guía</th>{conCliente && <th>Remitente</th>}<th>Recibió</th><th>Método</th><th className="n">Servicio</th>{conGasto && <th className="n">Flete</th>}<th className="n">Cobrado</th></tr></thead><tbody>
       {orden.map(p => <tr key={p.guia}><td className="guia">{p.guia}</td>{conCliente && <td>{nombreCliente(p.clienteId) || "—"}</td>}<td>{p.destinatario}</td><td>{metodoTxt(p)}</td><td className="n">{pesos(servicio(p))}</td>{conGasto && <td className="n">{gastoDe(p) ? pesos(gastoDe(p)) : "—"}</td>}<td className="n">{pesos(p.valorCobrado)}</td></tr>)}
       <tr><td colSpan={conCliente ? 4 : 3}><b>Total</b></td><td className="n"><b>{pesos(suma(servicio))}</b></td>{conGasto && <td className="n"><b>{pesos(suma(gastoDe))}</b></td>}<td className="n"><b>{pesos(suma(p => Number(p.valorCobrado) || 0))}</b></td></tr>
     </tbody></table></div>
-  );
+  </>);
 }
 
 /* ---------- gráficas del panel ---------- */
