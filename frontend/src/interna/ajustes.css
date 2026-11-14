@@ -1968,3 +1968,11 @@
 .jsl .lm-ver{flex:none;display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border:1px solid var(--linea);border-radius:12px;background:var(--hueco);font-size:.78rem;font-weight:700}
 @media (max-width:767px){.jsl .lm-lista{margin-bottom:calc(24px + env(safe-area-inset-bottom,0px))}}
 @media (min-width:768px){.jsl .lm-tabla{display:block}.jsl .lm-lista{display:none}}
+
+/* Caja en el celular: las 5 sub-pestañas en dos filas (3 + 2), todas visibles sin deslizar. */
+@media (max-width:767px){
+  .jsl .caja-cab .subtabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;width:100%;padding:6px;border-radius:16px;overflow:visible}
+  .jsl .caja-cab .subtabs button{grid-column:span 2;min-width:0;padding:9px 6px;border-radius:12px;font-size:.72rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jsl .caja-cab .subtabs button:nth-child(n+4){grid-column:span 3}
+}
+@media (max-width:359px){.jsl .caja-cab .subtabs button{padding-left:3px;padding-right:3px;font-size:.64rem}}
