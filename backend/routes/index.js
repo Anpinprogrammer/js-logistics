@@ -17,6 +17,7 @@ import sueldos from "./sueldos.routes.js";
 import chatbotPublico from "./chatbot-publico.routes.js";
 import chatbot from "./chatbot.routes.js";
 import datos from "./datos.routes.js";
+import rastreo from "./rastreo.routes.js";
 import solicitudesPublico from "./solicitudes-publico.routes.js";
 import solicitudes from "./solicitudes.routes.js";
 import patinador from "./patinador.routes.js";
@@ -30,6 +31,7 @@ r.get("/ready", listo);
 r.head("/ready", listo);
 r.use("/auth", auth);
 r.use("/chatbot/publico", chatbotPublico); // visitantes sin sesión: solo info general (ver el controlador)
+r.use("/rastreo", rastreo); // rastreo de una guía para cualquiera: solo pasos y fechas, con límites por IP
 r.use("/solicitudes/publico", solicitudesPublico); // "Solicitar envío" de la landing: sin sesión, con límites por IP
 
 // Desde aquí, todo exige sesión
