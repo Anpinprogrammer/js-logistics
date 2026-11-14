@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Inicio del patinador rediseñado (2026-11-14)
+
+- `patinador/Vista.tsx › Inicio`: cabecera con el nombre del patinador (y "cambiar" en el modo de administración), accesos "Registrar pago" (abre la ventana de pago ahí mismo, `useAbrirPago`, que también usa Mi caja) y "Solicitudes" con el número de pendientes; tres cifras (dinero en mano, recogidas pendientes, pagos recibidos) y dos cuadros (3 solicitudes y 3 últimos movimientos, con su estado vacío). Sin endpoints nuevos: usa la caja y las solicitudes que ya había. Estilos `pat-*` al final de `ajustes.css`.
+
 ## Menú lateral del modo Patinador igual al del celular (2026-11-14)
 
 - El menú de escritorio del modo Patinador solo mostraba "Mi caja" porque `SECCIONES_PATINADOR` (Marco.tsx) listaba las claves `caja` e `historial`. Ahora `ITEMS_PATINADOR` (Inicio, Mi caja, Solicitudes) es la única lista: el celular y el menú lateral la usan los dos. Ninguna de esas pestañas lleva contador en el celular, así que tampoco en escritorio.

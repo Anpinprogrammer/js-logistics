@@ -1327,7 +1327,7 @@
 /* Patinador: Inicio con dos tarjetas (su caja y sus solicitudes de recogida) y la lista de recogidas. */
 .jsl .lista-patinador .fila-pago-valor{color:var(--verde)}
 .jsl .lista-patinador .fila-entrega .fila-pago-valor{color:var(--rojo)}
-.jsl .pat-tarjetas{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:12px}
+.jsl .pat-tarjetas{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:16px}
 @media (min-width:1100px){.jsl .pat-tarjetas{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}}
 .jsl .pat-tarjeta{background:var(--papel);border-radius:24px;padding:18px;box-shadow:var(--sombra);min-width:0;display:flex;flex-direction:column;gap:12px}
 .jsl .pat-tarjeta h2,.jsl .pat-tarjeta h3{margin:0}
@@ -2139,3 +2139,39 @@
 .jsl .ep-esq i:nth-child(1){width:22%}.jsl .ep-esq i:nth-child(2){flex:1}.jsl .ep-esq i:nth-child(3){width:18%}
 @keyframes ep-pulso{50%{opacity:.45}}
 @media (prefers-reduced-motion:reduce){.jsl .ep-esq i{animation:none}}
+
+/* Inicio del patinador: accesos rápidos, tres cifras y dos cuadros */
+.jsl .pat-inicio{min-width:0;padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))}
+.jsl .pat-cab{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}
+.jsl .pat-cab-txt{min-width:0;flex:1 1 280px}
+.jsl .pat-cab-txt h1{margin-bottom:4px}
+.jsl .pat-cab-txt .sub{margin:6px 0 0}
+.jsl .pat-nombre{display:inline-flex;align-items:center;gap:8px;max-width:100%;font-size:.8rem}
+.jsl .pat-nombre b{padding:3px 11px;border-radius:999px;background:var(--azul-claro);color:var(--azul);font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsl .pat-acciones{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%}
+.jsl .pat-acciones .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;min-width:0;white-space:nowrap}
+.jsl .pat-num{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--rojo);color:#fff;font-size:.66rem;font-weight:800}
+.jsl .pat-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.jsl .pat-kpi{display:flex;flex-direction:column;justify-content:space-between;gap:10px;min-width:0;padding:16px 18px;border:0;border-radius:24px;background:var(--papel);box-shadow:var(--sombra);color:var(--tinta);font:inherit;text-align:left;cursor:pointer}
+.jsl .pat-kpi.fuerte{grid-column:1/-1;background:linear-gradient(135deg,#0B0F14 0%,#123049 70%,#115072 100%);color:#fff}
+.jsl .pat-kpi-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.78rem;font-weight:600;color:var(--suave)}
+.jsl .pat-kpi.fuerte .pat-kpi-cab{color:rgba(255,255,255,.75)}
+.jsl .pat-kpi-cab i{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:10px;background:var(--azul-claro);color:var(--azul)}
+.jsl .pat-kpi.fuerte .pat-kpi-cab i{background:rgba(255,255,255,.12);color:#7dd3fc}
+.jsl .pat-kpi-cab i.ambar{background:rgba(245,158,11,.14);color:#b45309}
+.jsl .pat-kpi-cab i.verde{background:rgba(16,185,129,.14);color:#047857}
+.jsl .pat-kpi b{font-size:1.45rem;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.jsl .pat-kpi.fuerte b{font-size:1.8rem}
+.jsl .pat-kpi small{color:var(--suave);font-size:.72rem}
+.jsl .pat-kpi.fuerte small{color:rgba(255,255,255,.7)}
+.jsl .pat-kpi:focus-visible{outline:2px solid var(--marca2);outline-offset:2px}
+.jsl .pat-vacio{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 16px;text-align:center}
+.jsl .pat-vacio svg{color:var(--suave)}
+.jsl .pat-vacio b{color:var(--tinta)}
+.jsl .pat-tarjeta-cab .btn{display:inline-flex;align-items:center;gap:5px;flex:none}
+@media (min-width:640px){.jsl .pat-acciones{display:flex;width:auto}}
+@media (min-width:768px){
+  .jsl .pat-inicio{padding-bottom:32px}
+  .jsl .pat-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .jsl .pat-kpi.fuerte{grid-column:auto}
+}
