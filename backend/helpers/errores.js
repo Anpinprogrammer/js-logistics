@@ -25,6 +25,9 @@ export const enlaceInvalido = (m = "Este enlace no es válido, ya se usó o lo r
   new HttpError(400, "ENLACE_INVALIDO", m);
 export const enlaceVencido = (m = "Este enlace venció. Pide uno nuevo.") =>
   new HttpError(410, "ENLACE_VENCIDO", m);
+/** Un solo mensaje para código malo, vencido o sin pedir: así no se sabe si la cuenta existe. */
+export const codigoInvalido = (m = "El código no es correcto o ya venció. Revisa el último correo que te llegó o pide uno nuevo.") =>
+  new HttpError(400, "CODIGO_INVALIDO", m);
 export const cuentaInactiva = (m = "Esta cuenta está desactivada. Pídele a administración que la active.") =>
   new HttpError(403, "CUENTA_INACTIVA", m);
 export const correoNoConfigurado = (m = "El envío de correos no está configurado. Avísale a administración.") =>

@@ -21,6 +21,9 @@ r.post("/send-bulk-reset-emails", autenticar, permitir("admin"), limiteCorreo, v
 // Públicas: los enlaces llegan por correo y la persona todavía no tiene sesión.
 r.post("/recuperar", limiteCorreo, validar({ body: V.recuperar }), C.recuperar);
 r.get("/enlace/:token", limiteEnlace, validar({ params: V.paramToken }), C.verEnlace);
+// Recuperación por código: /recuperar manda el código de 6 dígitos y esta ruta lo canjea por la contraseña nueva.
+r.post("/restablecer-con-codigo", limiteEnlace, validar({ body: V.restablecerConCodigo }), C.restablecerConCodigo);
+// El enlace sigue sirviendo para activar cuentas nuevas y para el restablecimiento que manda administración.
 r.post("/restablecer", limiteEnlace, validar({ body: V.restablecer }), C.restablecer);
 r.post("/activar", limiteEnlace, validar({ body: V.activar }), C.activar);
 r.post("/activate-account", limiteEnlace, validar({ body: V.activarCuenta }), C.activarCuenta);

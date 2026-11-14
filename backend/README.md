@@ -179,6 +179,7 @@ La API funciona sin correo configurado: si falta `RESEND_API_KEY`, no se envía 
 | `URL_CLIENTES` | Portal de clientes, para armar los enlaces. En producción: `https://jslogistics.pro`. |
 | `URL_EQUIPO` | App de oficina y mensajeros. En producción: `https://app.jslogistics.pro`. |
 | `ENLACE_CLAVE_MINUTOS` | Vigencia del enlace de contraseña (60 por defecto). |
+| `CODIGO_MINUTOS`, `CODIGO_INTENTOS`, `CODIGO_ENVIOS_HORA` | Código de recuperación: vigencia (10), intentos por código (5) y códigos por cuenta por hora (3). |
 | `ENLACE_ACTIVACION_DIAS` | Vigencia del enlace de activación (7 por defecto). |
 
 Cómo funciona:
@@ -225,11 +226,12 @@ Errores: `{ "error": { "code", "message", "campos"? } }`. JSON en camelCase, din
 | `POST /auth/salir-de-todo` | con sesión | Cierra la sesión en todos los dispositivos |
 | `GET /auth/yo` | con sesión | `{ usuario: { id, email, nombre, rol, clienteId, mensajeroId } }` |
 | `POST /auth/clave` | con sesión | Cambia la propia contraseña |
-| `POST /auth/recuperar` | público | `{ email }`: manda un enlace de activación o de contraseña. Responde siempre `204` |
+| `POST /auth/recuperar` | público | `{ email }`: manda un **código de 6 dígitos** por correo (sirve también para crear la contraseña de una cuenta sin activar). Responde siempre `204`, exista o no la cuenta. Máximo 3 códigos por cuenta por hora |
+| `POST /auth/restablecer-con-codigo` | público | `{ email, codigo, clave }`: cambia la contraseña con el código. Responde `204`; cualquier fallo es `400 CODIGO_INVALIDO` con el mismo texto (vence a los 10 min, 5 intentos por código, se quema al usarlo) |
 | `POST /auth/send-reset-email` | admin | `{ usuarioId }` o `{ email }`: manda a esa cuenta el enlace de restablecimiento con Resend. Responde `{ enviado, email }`; 404 si la cuenta no existe, 409 si está inactiva y 502/503 si el correo falla |
 | `POST /auth/send-bulk-reset-emails` | admin | `{ emails: string[] }` (1 a 100, sin repetidos): encola los enlaces en `resetEmailQueue` (BullMQ/Redis) y responde **202** `{ mensaje, total, modo }`. Sin `REDIS_URL` o si Redis no responde, el lote se procesa en segundo plano en el mismo proceso |
 | `GET /auth/enlace/:token` | público | Revisa el enlace: `{ enlace: { tipo, nombre, email (tapado), expira } }` |
-| `POST /auth/restablecer` | público | `{ token, clave }`: cambia la contraseña con el enlace del correo |
+| `POST /auth/restablecer` | público | `{ token, clave }`: cambia la contraseña con el enlace que manda administración (`send-reset-email`) |
 | `POST /auth/activar` | público | `{ token, clave }`: crea la contraseña de una cuenta nueva |
 | `POST /auth/activate-account` | público | `{ token, newPassword }`: alias de la activación con los nombres de la API nueva; consume el mismo enlace |
 | `GET/POST /usuarios`, `PATCH/DELETE /usuarios/:id`, `PUT /usuarios/:id/clave` | admin | Accesos a la app. `POST /usuarios` acepta `{ role, entityId, email }` (el nombre sale de la ficha de Personal o del cliente) o la forma antigua con `nombre` y vínculos; `clave` es opcional y sin ella manda la activación. Responde `201 { message, usuario, user: { id, nombre, email, telefono, activationUrl, status }, correo }` |

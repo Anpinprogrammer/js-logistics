@@ -37,31 +37,37 @@ after(async () => {
   await pool.end();
 });
 
-test("pedir recuperación manda un enlace al portal de clientes y no delata correos inexistentes", async () => {
+test("pedir recuperación manda un código de 6 dígitos y no delata correos inexistentes", async () => {
   capturados.length = 0;
   const r = await conCabeceras(request(app).post("/api/auth/recuperar")).send({ email: "CLIENTE@js.co" });
   assert.equal(r.status, 204);
   assert.equal(capturados.length, 1);
   assert.equal(capturados[0].to[0], "cliente@js.co");
-  assert.match(capturados[0].subject, /Restablece tu contraseña/);
-  assert.match(capturados[0].html, /http:\/\/localhost:3000\/restablecer\?token=/);
+  assert.match(capturados[0].subject, /^\d{6} es tu código/);
+  assert.doesNotMatch(capturados[0].html, /token=/); // sin enlace de recuperación
 
-  const token = tokenDe(capturados[0], "restablecer");
-  assert.ok(token);
+  const codigo = capturados[0].subject.slice(0, 6);
   const { rows } = await pool.query(
-    `SELECT tipo, token_hash, usado FROM enlaces WHERE usuario_id = (SELECT id FROM usuarios WHERE email = 'cliente@js.co')`
+    `SELECT codigo_hash, usado, intentos FROM codigos_clave WHERE usuario_id = (SELECT id FROM usuarios WHERE email = 'cliente@js.co')`
   );
   assert.equal(rows.length, 1);
-  assert.equal(rows[0].tipo, "clave");
-  assert.equal(rows[0].token_hash, hashDe(token));
   assert.equal(rows[0].usado, null);
-  // El token en claro no queda en la base.
-  assert.notEqual(rows[0].token_hash, token);
+  assert.notEqual(rows[0].codigo_hash, codigo); // el código en claro no queda en la base
+  assert.equal(rows[0].codigo_hash.length, 64);
 
   const antes = capturados.length;
   const nadie = await conCabeceras(request(app).post("/api/auth/recuperar")).send({ email: "nadie@js.co" });
   assert.equal(nadie.status, 204);
   assert.equal(capturados.length, antes);
+});
+
+test("administración sigue pudiendo mandar el enlace de restablecimiento", async () => {
+  const admin = await sesion("admin@js.co");
+  capturados.length = 0;
+  const r = await admin.post("/api/auth/send-reset-email").send({ email: "cliente@js.co" });
+  assert.ok([200, 204].includes(r.status), `status ${r.status}`);
+  assert.equal(capturados.length, 1);
+  assert.match(capturados[0].html, /http:\/\/localhost:3000\/restablecer\?token=/);
 });
 
 test("el enlace se puede revisar antes de usarlo, sin mostrar el correo completo", async () => {
