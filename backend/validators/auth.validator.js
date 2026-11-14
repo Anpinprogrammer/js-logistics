@@ -36,3 +36,10 @@ export const activar = z.object({ token, clave });
 export const activarCuenta = z.object({ token, newPassword: clave });
 
 export const paramToken = z.object({ token });
+
+/** Cambiar la contraseña con el código de 6 dígitos que llegó al correo. */
+export const restablecerConCodigo = z.object({
+  email,
+  codigo: z.string().trim().regex(/^\d{6}$/, "El código tiene 6 números"),
+  clave
+});

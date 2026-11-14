@@ -3,6 +3,7 @@ import * as Usuario from "../models/usuario.model.js";
 import * as Enlace from "../models/enlace.model.js";
 import * as Enlaces from "../servicios/enlaces.js";
 import * as Auditoria from "../models/auditoria.model.js";
+import * as Codigos from "../servicios/codigos.js";
 import { encolarCorreosReset } from "../queues/emailQueue.js";
 import { compararClave, hashClave } from "../helpers/claves.js";
 import { firmarToken } from "../helpers/jwt.js";
@@ -59,19 +60,19 @@ export async function cambiarMiClave(req, res) {
 }
 
 /**
- * Pide un enlace de contraseña por correo. La respuesta es siempre 204, exista o no la cuenta:
- * así nadie puede usar esta ruta para averiguar qué correos tienen acceso.
+ * Pide un código de 6 dígitos para cambiar la contraseña; llega por correo. La respuesta es siempre 204,
+ * exista o no la cuenta: así nadie puede usar esta ruta para averiguar qué correos tienen acceso.
  */
 export async function recuperar(req, res) {
   const u = await Usuario.buscarParaEnlace(req.valido.body.email);
-  if (u?.activo) {
-    await Enlaces.crearYEnviar({
-      usuario: u,
-      // Si la cuenta se creó y nunca se activó, el enlace es de activación; si ya tiene contraseña, de reinicio.
-      tipo: u.tieneClave ? "clave" : "activacion",
-      origen: "autoservicio"
-    });
-  }
+  if (u?.activo) await Codigos.solicitar({ usuario: u });
+  res.status(204).end();
+}
+
+/** Cambia la contraseña con el código de 6 dígitos del correo. Cierra las demás sesiones de la cuenta. */
+export async function restablecerConCodigo(req, res) {
+  const { email, codigo, clave } = req.valido.body;
+  await Codigos.consumir({ email, codigo, clave });
   res.status(204).end();
 }
 

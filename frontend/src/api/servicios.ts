@@ -11,11 +11,15 @@ export const auth = {
   ingresar: (email: string, clave: string) => datos<{ usuario: Usuario }>(api.post("/auth/ingresar", { email, clave })).then(d => d.usuario),
   salir: () => api.post("/auth/salir"),
   cambiarClave: (claveActual: string, claveNueva: string) => api.post("/auth/clave", { claveActual, claveNueva }),
-  /** Pide por correo un enlace de activación o de contraseña. Responde 204 exista o no la cuenta. */
+  /** Pide un código de 6 dígitos por correo para cambiar la contraseña. Responde 204 exista o no la cuenta. */
   recuperar: (email: string) => api.post("/auth/recuperar", { email }),
   /** Revisa el enlace antes de mostrar el formulario. */
   enlace: (token: string) =>
     datos<{ enlace: EnlaceCorreo }>(api.get(`/auth/enlace/${encodeURIComponent(token)}`)).then(d => d.enlace),
+  /** Cambia la contraseña con el código de 6 dígitos del correo. Cualquier fallo llega como CODIGO_INVALIDO. */
+  restablecerConCodigo: (email: string, codigo: string, clave: string) =>
+    api.post("/auth/restablecer-con-codigo", { email, codigo, clave }),
+  /** Cambia la contraseña con el enlace que manda administración. */
   restablecer: (token: string, clave: string) => api.post("/auth/restablecer", { token, clave }),
   activar: (token: string, clave: string) => api.post("/auth/activar", { token, clave }),
   activarCuenta: (token: string, newPassword: string) => api.post("/auth/activate-account", { token, newPassword })

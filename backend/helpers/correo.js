@@ -197,3 +197,77 @@ export function correoDeEnlace({ usuario, tipo, enlace, origen = "sistema" }) {
     ...(env.CORREO_RESPUESTA ? { reply_to: env.CORREO_RESPUESTA } : {})
   };
 }
+
+/**
+ * Correo con el código de 6 dígitos para recuperar la contraseña. No lleva enlaces: la persona copia
+ * el código y lo escribe en la pantalla de Recuperar, así no hay un enlace que reenviar o que un filtro
+ * de correo pueda abrir por su cuenta.
+ */
+export function correoDeCodigo({ usuario, codigo }) {
+  const nombre = usuario.nombre?.trim() || usuario.email;
+  const minutosVida = env.CODIGO_MINUTOS;
+  const asunto = `${codigo} es tu código de JS Logistics`;
+  const mensaje = "Recibimos una solicitud para cambiar la contraseña de tu cuenta en JS Logistics. Escribe este código en la pantalla de recuperación:";
+  const vence = `Este código vence en ${minutos(minutosVida)} y solo sirve una vez.`;
+  const aviso = "Si no lo pediste, ignora este correo: tu contraseña no cambia. Nunca compartas este código; nadie de JS Logistics te lo va a pedir.";
+  const logo = escapar(env.CORREO_LOGO_URL);
+  const cifras = String(codigo).split("").join(" ");
+
+  const texto = [
+    `Hola, ${nombre}.`, "", mensaje, "", `Código: ${codigo}`, "", vence, aviso, "",
+    "JS Logistics · Cali, Colombia",
+    "Este es un mensaje automático, por favor no respondas a este correo."
+  ].join("\n");
+
+  const html = `<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>${escapar(asunto)}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+    <div style="display:none;font-size:1px;line-height:1px;max-height:0;overflow:hidden;color:#f1f5f9;">Tu código es ${escapar(codigo)}. Vence en ${minutos(minutosVida)}.</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#f1f5f9;border-collapse:collapse;">
+      <tr><td align="center" style="padding:28px 12px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;border-collapse:separate;">
+          <tr><td align="center" bgcolor="#0b192c" style="background:#0b192c;padding:24px 28px;">
+            <img src="${logo}" alt="JS Logistics Cali" width="64" style="display:block;width:64px;max-width:64px;height:auto;border:0;" />
+          </td></tr>
+          <tr><td style="padding:32px 32px 8px;">
+            <h1 style="margin:0 0 20px;font-size:24px;line-height:1.3;color:#111827;">Tu código de recuperación</h1>
+            <p style="margin:0 0 12px;font-size:16px;line-height:1.6;color:#374151;">Hola, <strong style="color:#111827;">${escapar(nombre)}</strong>.</p>
+            <p style="margin:0 0 24px;font-size:16px;line-height:1.65;color:#374151;">${escapar(mensaje)}</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0 0 24px;border-collapse:separate;">
+              <tr><td align="center" bgcolor="#f0f9ff" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:18px 8px;">
+                <span style="font-family:'Courier New',Courier,monospace;font-size:34px;line-height:1.2;font-weight:bold;letter-spacing:6px;color:#075985;white-space:nowrap;" aria-label="${escapar(cifras)}">${escapar(codigo)}</span>
+              </td></tr>
+            </table>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;border-collapse:separate;">
+              <tr><td style="padding:16px 18px;">
+                <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#111827;"><strong>${escapar(vence)}</strong></p>
+                <p style="margin:0;font-size:14px;line-height:1.6;color:#475569;">${escapar(aviso)}</p>
+                <p style="margin:10px 0 0;font-size:12px;line-height:1.5;color:#64748b;">Si pides un código nuevo, el anterior deja de servir.</p>
+              </td></tr>
+            </table>
+          </td></tr>
+          <tr><td style="padding:24px 32px 28px;">
+            <hr style="border:0;border-top:1px solid #e2e8f0;margin:0 0 16px;" />
+            <p style="margin:0;font-size:12px;line-height:1.6;color:#94a3b8;">JS Logistics · Cali, Colombia | Este es un mensaje automático, por favor no respondas a este correo.</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`;
+
+  return {
+    from: `${env.CORREO_NOMBRE} <${env.CORREO_REMITENTE}>`,
+    to: [usuario.email],
+    subject: asunto,
+    html,
+    text: texto,
+    ...(env.CORREO_RESPUESTA ? { reply_to: env.CORREO_RESPUESTA } : {})
+  };
+}

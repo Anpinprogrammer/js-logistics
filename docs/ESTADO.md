@@ -1,5 +1,13 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Recuperar la contraseña con código de 6 dígitos por correo (2026-11-14)
+
+- **Decisión:** el autoservicio de "Olvidé mi contraseña" ya no manda un enlace: manda un código numérico de 6 dígitos por correo (Resend). `POST /auth/recuperar` crea el código (`servicios/codigos.js`, tabla `codigos_clave`) y `POST /auth/restablecer-con-codigo { email, codigo, clave }` lo canjea. Funciona para todos los roles y también activa una cuenta sin contraseña.
+- **Seguridad:** el código se guarda como HMAC (JWT_SECRET + id de la cuenta), vence a los 10 min (`CODIGO_MINUTOS`), admite 5 intentos (`CODIGO_INTENTOS`; el intento se cuenta antes de comparar, en una sola sentencia, para que peticiones en paralelo no prueben de más), 3 códigos por cuenta por hora (`CODIGO_ENVIOS_HORA`, sin avisar) y los límites por IP de siempre. Todo fallo responde el mismo `400 CODIGO_INVALIDO`: no se sabe si la cuenta existe. Al cambiar la clave se suben `version_sesion` y se anulan enlaces y códigos pendientes.
+- **Se conservan los enlaces** para activar cuentas nuevas y para el restablecimiento que manda administración (`send-reset-email` y el envío masivo): ahí la persona no pidió nada y un enlace es más cómodo. Pendiente de decidir si también pasan a código.
+- **Siguiente:** el código por celular. Pensado: WhatsApp (API de Meta) con SMS de respaldo; la columna `canal` de `codigos_clave` ya admite `whatsapp` y `sms`. Falta el celular verificado por la propia persona (la oficina no puede marcarlo verificado) y el proveedor. Ver el análisis en el hilo del proyecto.
+- Frontend: `pages/Recuperar.tsx` (panel) y `src/pages/Recuperar.tsx` del portal de clientes tienen tres pasos (correo, código con contraseña nueva, listo). El portal necesita el mismo cambio de API (`restablecerConCodigo` en `api/auth.ts`).
+
 ## Inicio del mensajero en el celular rediseñado (2026-11-14)
 
 - `mensajero/Mensajero.tsx › InicioMensajero`: bajo 768 px se pinta `.im-movil` (accesos 2×2: Tomar foto, Subir galería, Recibir pago → Recepción/`E.subRecM="dinero"`, En ruta con contador; franja oscura "Te falta entregar" → Mi caja; 3 mini-cifras que llevan a Pedidos, Entregados y Mi sueldo). Desde 768 px sigue el bloque de siempre, ahora dentro de `.im-esc`. Mismos handlers y cálculos; `.im-fin` deja espacio para que la barra inferior no tape "Recomendaciones para ti". Estilos `im-*` al final de `ajustes.css` (sin Tailwind, con las variables de `.jsl`).

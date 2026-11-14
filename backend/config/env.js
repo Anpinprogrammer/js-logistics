@@ -44,6 +44,10 @@ const esquema = z.object({
   // Vigencia de los enlaces. La contraseña vence rápido; la activación da tiempo para abrir el correo.
   ENLACE_CLAVE_MINUTOS: z.coerce.number().int().positive().default(60),
   ENLACE_ACTIVACION_DIAS: z.coerce.number().int().positive().default(7),
+  // Código numérico de 6 dígitos para recuperar la contraseña: vigencia, intentos por código y envíos por cuenta.
+  CODIGO_MINUTOS: z.coerce.number().int().positive().default(10),
+  CODIGO_INTENTOS: z.coerce.number().int().positive().default(5),
+  CODIGO_ENVIOS_HORA: z.coerce.number().int().positive().default(3),
   // Chatbot de clientes (Claude). Sin ANTHROPIC_API_KEY el chat responde 503 y manda al cliente a WhatsApp.
   // La llave se crea en https://console.anthropic.com → API Keys y solo vive en el backend.
   ANTHROPIC_API_KEY: z.string().optional().transform(v => v || undefined),

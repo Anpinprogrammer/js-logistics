@@ -72,6 +72,21 @@ CREATE TABLE IF NOT EXISTS enlaces (
 );
 CREATE INDEX IF NOT EXISTS enlaces_usuario_idx ON enlaces (usuario_id, tipo, creado DESC);
 
+-- Código numérico de un solo uso para recuperar la contraseña (reemplaza al enlace del autoservicio).
+-- Se guarda solo su HMAC (con JWT_SECRET y el id de la cuenta), nunca el código; vence en minutos y
+-- se quema al agotar los intentos. Un código nuevo anula el anterior.
+CREATE TABLE IF NOT EXISTS codigos_clave (
+  id          TEXT PRIMARY KEY,
+  usuario_id  TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  canal       TEXT NOT NULL DEFAULT 'correo' CHECK (canal IN ('correo', 'whatsapp', 'sms')),
+  codigo_hash TEXT NOT NULL,
+  expira      TIMESTAMPTZ NOT NULL,
+  intentos    INTEGER NOT NULL DEFAULT 0,
+  usado       TIMESTAMPTZ,
+  creado      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS codigos_clave_usuario_idx ON codigos_clave (usuario_id, creado DESC);
+
 CREATE TABLE IF NOT EXISTS cuentas (               -- cuentas internas: JS Envíos, MT Store, Base de JS
   id     TEXT PRIMARY KEY,
   nombre TEXT NOT NULL,
@@ -457,7 +472,7 @@ CREATE INDEX IF NOT EXISTS caja_patinador_cliente_idx ON caja_patinador (cliente
 DO $$
 DECLARE t TEXT;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['clientes', 'mensajeros', 'usuarios', 'enlaces', 'cuentas', 'contadores', 'ajustes', 'pedidos',
+  FOREACH t IN ARRAY ARRAY['clientes', 'mensajeros', 'usuarios', 'enlaces', 'codigos_clave', 'cuentas', 'contadores', 'ajustes', 'pedidos',
     'pedido_intentos', 'pedido_archivos', 'movimientos', 'recaudos', 'liquidaciones', 'cajamovs', 'jornadas',
     'historial', 'papelera', 'solicitudes', 'caja_patinador']
   LOOP
