@@ -1,11 +1,11 @@
 /* Oficina → Caja: cierre del día, caja general, mensajeros, cajas de oficina, dinero recibido y liquidaciones (igual al prototipo). */
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Clock, RotateCcw } from "lucide-react";
+import { ChevronDown, Clock, Eye, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, horaCorta, listaOrdenada, periodoMensajero, totales, tipoDe, esRepartidor, sueldoTexto, textoLiq, ajusteTxt, ganaPorcentaje, sueldoPedidos,
   sueldoPersonaSemana, semanasAdelanto, semanasSueldo, liquidacionesDe, asistentes, cajaOficina, sumaMedios, yaContado, puedoCambiarMedio, yaLiquidado, resumenCaja, arqueosCaja,
-  netoArqueo, resultadoArqueo, pendientesCierre, esperadoArqueo, sinServicio, diaMinCaja, fechaCaja, nombreCliente, sinTildes, servicio, gastoDe, metodoTxt, type Pedido,
+  netoArqueo, resultadoArqueo, pendientesCierre, esperadoArqueo, sinServicio, diaMinCaja, fechaCaja, nombreCliente, sinTildes, servicio, gastoDe, metodoTxt, type Pedido, type Arqueo,
   MEDIOS, MEDIOS_CAJA, CATS, CATS_TIPO, CATS_PERSONA, CATS_SEMANA, type Medio, type UsuarioS, type CajaMov, type Liquidacion as LiqS,
 } from "../motor";
 import { Cab, Paginador, pl, useVentana } from "../ui";
@@ -306,28 +306,87 @@ function CajaGeneral({ pintar }: { pintar: () => void }) {
   </>;
 }
 
-/* ---------- Arqueos recientes (administración), en la pestaña de liquidaciones ---------- */
+/* ---------- Arqueos recientes (administración), en la pestaña de arqueos ---------- */
+type EstadoArqueo = "todos" | "faltante" | "sobrante" | "exacto";
+const ESTADOS_ARQUEO: [EstadoArqueo, string][] = [["todos", "Todos"], ["faltante", "Faltante"], ["sobrante", "Sobrante"], ["exacto", "Exacto"]];
+const estadoDeArqueo = (a: Arqueo): EstadoArqueo => { const n = netoArqueo(a); return n < 0 ? "faltante" : n > 0 ? "sobrante" : "exacto"; };
+const resumenArqueo = (a: Arqueo) => { const n = netoArqueo(a); return n < 0 ? "Faltó " + pesos(-n) : n > 0 ? "Sobró " + pesos(n) : "Exacto"; };
+const pildoraArqueo = (a: Arqueo) => <span className={"aq-pildora " + estadoDeArqueo(a)}>{resumenArqueo(a)}</span>;
+
 function Arqueos() {
-  const v = useVentana(), ultimos = arqueosCaja().slice(0, 10);
-  const deshacer = async (id: string) => {
-    const a = arqueosCaja().find(x => x.id === id); if (!a) return;
-    if (!await v.confirmar("Deshacer el arqueo del " + hora(a.fecha), "Se quitan el conteo y su faltante o sobrante. La caja vuelve a quedar abierta hasta el arqueo anterior.", "Deshacer")) return;
-    try { await deshacerArqueo(id); v.avisar("Arqueo deshecho"); } catch (e) { noSePudo(v, "No se pudo deshacer")(e); }
-  };
-  if (!ultimos.length) return <>
-    <h2>Arqueos recientes</h2>
-    <p className="sub">El conteo real contra lo que esperaba la app. Solo el último se puede deshacer.</p>
-    <div className="vacio">Todavía no se ha hecho ningún arqueo.</div>
-  </>;
+  const v = useVentana(), todos = arqueosCaja(), ultimoId = todos[0]?.id;
+  const [texto, setTexto] = useState(""), [estado, setEstado] = useState<EstadoArqueo>("todos"), [dia, setDia] = useState(""), [filtros, setFiltros] = useState(false), [borrador, setBorrador] = useState({ estado: "todos" as EstadoArqueo, dia: "" }), [visibles, setVisibles] = useState(10);
+  const q = sinTildes(texto.trim());
+  const lista = todos.filter(a => (estado === "todos" || estadoDeArqueo(a) === estado) && (!dia || diaDe(a.fecha) === dia)
+    && (!q || sinTildes([a.por, a.nota, resultadoArqueo(a)].join(" ")).includes(q)));
+  const activos = Number(estado !== "todos") + Number(!!dia), hay = activos > 0 || !!q;
+  const limpiar = () => { setTexto(""); setEstado("todos"); setDia(""); setVisibles(10); };
+  const abrirFiltros = () => { setBorrador({ estado, dia }); setFiltros(true); };
+  const cambiarEstado = (e: EstadoArqueo) => { setEstado(e); setVisibles(10); };
+  const cambiarDia = (d: string) => { setDia(d); setVisibles(10); };
+  const ver = (id: string) => v.abrir(<DetalleArqueo id={id} />, "arqueo");
+  const buscador = <div className="liq-buscar aq-buscar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+    <input type="search" placeholder="Buscar quién contó…" aria-label="Buscar por quién contó o por el resultado" value={texto} onChange={e => { setTexto(e.target.value); setVisibles(10); }} /></div>;
   return <>
     <h2>Arqueos recientes</h2>
     <p className="sub">El conteo real contra lo que esperaba la app. Solo el último se puede deshacer.</p>
-    <div className="tabla-env"><table><thead><tr><th>Fecha</th>{MEDIOS_K.map(k => <th className="n" key={k}>{MEDIOS[k]}<br /><small>contado / esperado</small></th>)}<th>Resultado</th><th>Contó</th><th></th></tr></thead><tbody>
-      {ultimos.map((a, i) => <tr key={a.id}><td>{hora(a.fecha)}{a.nota ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>{a.nota}</span></> : null}</td>
-        {MEDIOS_K.map(k => <td className="n" key={k}>{a.contado ? pesos(a.contado[k]) : "—"}<br /><span className="sub" style={{ fontSize: ".8rem" }}>{a.esperado ? pesos(a.esperado[k]) : ""}</span></td>)}
-        <td className={netoArqueo(a) < 0 ? "neg" : "pos"}>{resultadoArqueo(a)}</td><td>{a.por || ""}</td><td>{i === 0 ? <button className="btn sec chico" onClick={() => deshacer(a.id)}>Deshacer</button> : null}</td></tr>)}
-    </tbody></table></div>
+    {!todos.length ? <div className="vacio">Todavía no se ha hecho ningún arqueo.</div> : <>
+      <div className="aq-filtros-movil">{buscador}
+        <button type="button" className="btn sec" onClick={abrirFiltros} aria-label={`Filtros${activos ? `, ${activos} activos` : ""}`}><SlidersHorizontal size={15} aria-hidden="true" /> Filtros{activos > 0 && <b>{activos}</b>}</button></div>
+      <div className="aq-filtros-escritorio">{buscador}
+        <div className="seg seg-estado" role="group" aria-label="Filtrar por estado">{ESTADOS_ARQUEO.map(([k, t]) => <button key={k} type="button" aria-pressed={estado === k} onClick={() => cambiarEstado(k)}>{t}</button>)}</div>
+        <div className="aq-fecha"><SelectorFecha valor={dia} alCambiar={cambiarDia} vacio="Todas las fechas" />{hay ? <button type="button" className="btn sec chico" onClick={limpiar}>Limpiar</button> : null}</div></div>
+      {filtros && <div className="tp-capa" onMouseDown={e => { if (e.target === e.currentTarget) setFiltros(false); }}><div className="tp-hoja" role="dialog" aria-modal="true" aria-labelledby="aq-filtros-titulo">
+        <header><h2 id="aq-filtros-titulo"><SlidersHorizontal size={16} aria-hidden="true" /> Filtrar arqueos</h2><button type="button" className="cerrar" aria-label="Cerrar filtros" onClick={() => setFiltros(false)}>×</button></header>
+        <div className="tp-hoja-cuerpo">
+          <div className="campo"><label htmlFor="aq-estado">Estado</label><div className="tp-hoja-select"><select id="aq-estado" value={borrador.estado} onChange={e => setBorrador(b => ({ ...b, estado: e.target.value as EstadoArqueo }))}>{ESTADOS_ARQUEO.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select><ChevronDown size={16} aria-hidden="true" /></div></div>
+          <div className="campo"><label htmlFor="aq-dia">Fecha</label><div className="aq-hoja-fecha"><SelectorFecha id="aq-dia" valor={borrador.dia} alCambiar={d => setBorrador(b => ({ ...b, dia: d }))} vacio="Todas las fechas" /><button type="button" className="btn sec chico" onClick={() => setBorrador(b => ({ ...b, dia: hoy() }))}>Hoy</button></div></div>
+        </div>
+        <footer><button type="button" className="btn sec" onClick={() => { limpiar(); setFiltros(false); }}>Limpiar filtros</button><button type="button" className="btn" onClick={() => { cambiarEstado(borrador.estado); cambiarDia(borrador.dia); setFiltros(false); }}>Aplicar filtros</button></footer></div></div>}
+      {!lista.length ? <div className="vacio">Ningún arqueo coincide con los filtros. <button type="button" className="btn sec chico" onClick={limpiar}>Limpiar filtros</button></div> : <>
+        <div className="tabla-env aq-tabla"><table><thead><tr><th>Fecha</th>{MEDIOS_K.map(k => <th className="n" key={k}>{MEDIOS[k]}<br /><small>contado / esperado</small></th>)}<th>Resultado</th><th>Contó</th><th></th></tr></thead><tbody>
+          {lista.slice(0, visibles).map(a => <tr key={a.id}><td>{hora(a.fecha)}{a.nota ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>{a.nota}</span></> : null}</td>
+            {MEDIOS_K.map(k => <td className="n" key={k}><b>{a.contado ? pesos(a.contado[k]) : "—"}</b><br /><span className="sub" style={{ fontSize: ".8rem" }}>{a.esperado ? pesos(a.esperado[k]) : ""}</span></td>)}
+            <td>{pildoraArqueo(a)}</td><td><b style={{ fontSize: ".8rem" }}>{a.por || ""}</b></td>
+            <td className="aq-acciones"><button type="button" className="btn sec chico" title="Ver detalle" aria-label={"Ver el detalle del arqueo del " + hora(a.fecha)} onClick={() => ver(a.id)}><Eye size={14} aria-hidden="true" /><span className="aq-txt">Ver detalle</span></button>
+              {a.id === ultimoId ? <button type="button" className="btn peligro chico" title="Deshacer" aria-label="Deshacer el último arqueo" onClick={() => deshacerArqueoConfirmado(v, a.id)}><RotateCcw size={14} aria-hidden="true" /><span className="aq-txt">Deshacer</span></button> : null}</td></tr>)}
+        </tbody></table></div>
+        <ul className="aq-lista" aria-label="Arqueos">
+          {lista.slice(0, visibles).map(a => <li key={a.id}><button type="button" onClick={() => ver(a.id)} aria-label={"Ver el arqueo del " + hora(a.fecha)}>
+            <span className="aq-izq"><b>{hora(a.fecha)}</b><span>{a.por ? "Contó: " + a.por : "Sin nombre"}</span></span>
+            {pildoraArqueo(a)}<span className="aq-ver"><Eye size={16} aria-hidden="true" /></span></button></li>)}
+        </ul>
+        {lista.length > visibles ? <div className="aq-mas"><button type="button" className="btn sec" onClick={() => setVisibles(n => n + 10)}>Ver más ({lista.length - visibles} {pl(lista.length - visibles, "arqueo")})</button></div> : null}
+      </>}
+    </>}
   </>;
+}
+
+async function deshacerArqueoConfirmado(v: ReturnType<typeof useVentana>, id: string) {
+  const a = arqueosCaja().find(x => x.id === id); if (!a) return;
+  if (!await v.confirmar("Deshacer el arqueo del " + hora(a.fecha), "Se quitan el conteo y su faltante o sobrante. La caja vuelve a quedar abierta hasta el arqueo anterior.", "Deshacer")) return;
+  try { await deshacerArqueo(id); v.avisar("Arqueo deshecho"); v.cerrar(); } catch (e) { noSePudo(v, "No se pudo deshacer")(e); }
+}
+
+function DetalleArqueo({ id }: { id: string }) {
+  useDatos();
+  const v = useVentana(), a = arqueosCaja().find(x => x.id === id);
+  if (!a) return <div className="vacio">Este arqueo ya no existe.</div>;
+  const est = estadoDeArqueo(a), n = netoArqueo(a), puede = arqueosCaja()[0]?.id === id;
+  const titulo = n < 0 ? "Faltó " + pesos(-n) + " en total" : n > 0 ? "Sobró " + pesos(n) + " en total" : Object.values(a.dif).some(x => Math.round(x)) ? resultadoArqueo(a) : "La plata da exacto";
+  return <div className="entrega-modal liq-modal aq-modal">
+    <header className="entrega-cab"><div className="liq-titulo"><h2>Detalle de arqueo</h2><p>{hora(a.fecha)}{a.por ? " · Contó: " : ""}{a.por ? <b>{a.por}</b> : null}</p></div>
+      <button type="button" className="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <div className="liq-cuerpo">
+      <div className={"aq-banner " + est}>{titulo}</div>
+      {a.nota ? <p className="sub" style={{ margin: 0 }}>Nota: {a.nota}</p> : null}
+      {MEDIOS_K.map(k => { const dif = Math.round(a.dif[k] || 0); return <section className="liq-grupo" key={k}>
+        <div className="aq-medio-cab"><h3>{MEDIOS[k]}</h3><span className={"aq-pildora " + (dif < 0 ? "faltante" : dif > 0 ? "sobrante" : "exacto")}>{dif < 0 ? "− " + pesos(-dif) : dif > 0 ? "+ " + pesos(dif) : "$ 0"}</span></div>
+        <div className="aq-cifras"><div><small>Contado real</small><b>{a.contado ? pesos(a.contado[k]) : "—"}</b></div><div><small>Esperado por la app</small><span>{a.esperado ? pesos(a.esperado[k]) : "—"}</span></div></div></section>; })}
+    </div>
+    {puede && <footer className="liq-pie"><p>Solo el último arqueo registrado se puede revertir.</p>
+      <button type="button" className="btn peligro chico" onClick={() => deshacerArqueoConfirmado(v, id)}><RotateCcw size={14} aria-hidden="true" /> Deshacer este arqueo</button></footer>}
+  </div>;
 }
 
 /** Arqueo: el conteo real de la plata. La diferencia queda como faltante o sobrante y lo contado ya no se cambia. */
