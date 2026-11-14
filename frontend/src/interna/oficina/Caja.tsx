@@ -1,13 +1,14 @@
 /* Oficina → Caja: cierre del día, caja general, mensajeros, cajas de oficina, dinero recibido y liquidaciones (igual al prototipo). */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Clock, RotateCcw } from "lucide-react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   S, yo, hoy, hora, pesos, diaDe, horaCorta, listaOrdenada, periodoMensajero, totales, tipoDe, esRepartidor, sueldoTexto, textoLiq, ajusteTxt, ganaPorcentaje, sueldoPedidos,
   sueldoPersonaSemana, semanasAdelanto, semanasSueldo, liquidacionesDe, asistentes, cajaOficina, sumaMedios, yaContado, puedoCambiarMedio, yaLiquidado, resumenCaja, arqueosCaja,
-  netoArqueo, resultadoArqueo, pendientesCierre, esperadoArqueo, sinServicio, diaMinCaja, fechaCaja, nombreCliente, sinTildes,
+  netoArqueo, resultadoArqueo, pendientesCierre, esperadoArqueo, sinServicio, diaMinCaja, fechaCaja, nombreCliente, sinTildes, servicio, gastoDe, metodoTxt, type Pedido,
   MEDIOS, MEDIOS_CAJA, CATS, CATS_TIPO, CATS_PERSONA, CATS_SEMANA, type Medio, type UsuarioS, type CajaMov, type Liquidacion as LiqS,
 } from "../motor";
-import { Cab, Paginador, TablaEntregas, pl, useVentana } from "../ui";
+import { Cab, Paginador, pl, useVentana } from "../ui";
 import { E, guardarLocal } from "../estado";
 import { usePorPaginaLiquidaciones } from "../../lib/pantalla";
 import { liquidaciones as apiLiquidaciones, patinador as apiPatinador } from "../../api/servicios";
@@ -198,7 +199,7 @@ export default function Caja({ pintar }: { pintar: () => void }) {
               {liqs.map(l => <tr key={l.id}><td>{hora(l.fecha)}</td><td>{S.mensajeros[l.mensajeroId]?.nombre || ""}</td><td className="n">{l.entregas || 0}</td><td className="n"><b>{pesos(l.recibido)}</b></td>
                 <td>{l.debe > 0 ? <span className="etq sin">Por cobrar</span> : l.debe < 0 ? <span className="etq ent">A favor</span> : <span className="etq gris">Paz y salvo</span>}{l.adelanto ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>Adelanto {pesos(l.adelanto)}</span></> : null}</td>
                 <td className={"n " + (l.debe > 0 ? "neg" : l.debe < 0 ? "pos" : "")}>{l.debe ? (l.debe > 0 ? "Falta " : "A favor ") + pesos(Math.abs(l.debe)) : "—"}</td>
-                <td><button className="btn sec chico" onClick={() => v.abrir(<VerLiquidacion id={l.id} />, "centrada")}>Ver</button></td></tr>)}
+                <td><button className="btn sec chico" onClick={() => v.abrir(<VerLiquidacion id={l.id} />, "liquidacion")}>Ver</button></td></tr>)}
             </tbody></table></div>
             <Paginador pagina={pagLiq.pagina} paginas={pagLiq.paginas} total={pagLiq.total} porPagina={pagLiq.porPagina} ir={irLiq} cargando={qLiq.isPlaceholderData} />
           </> : <div className="vacio">{hayFiltrosLiq ? "No hay liquidaciones con esos filtros." : "Aún no has liquidado a ningún mensajero."}</div>}
@@ -499,7 +500,7 @@ function Liquidar({ mid }: { mid: string }) {
       const queda = pm.debe - valor, ad = adelanto(queda);
       const id = await liquidar({ mensajeroId: mid, desde: pm.desde, dia: hoy(), entregas: pm.ps.length, guias: pm.ps.map(p => p.guia), efectivo: t.efectivo, base: pm.base, gastos: pm.gastos, cobros: pm.cobros, anterior: pm.anterior,
         recibidoAntes: pm.recibido, entregaFinal: valor, recibido: pm.recibido + valor, debe: queda - ad, adelanto: ad, ajuste: pm.ajuste, transfJs: t.transfJs, transfCli: t.transfCli, sueldo, enRuta, medio, semanaAdelanto: ad ? sem : "" });
-      v.avisar(`${m.nombre}: ${ad ? "adelanto de " + pesos(ad) + " en su sueldo" : textoLiq(queda).toLowerCase()}`); v.abrir(<VerLiquidacion id={id} />, "centrada");
+      v.avisar(`${m.nombre}: ${ad ? "adelanto de " + pesos(ad) + " en su sueldo" : textoLiq(queda).toLowerCase()}`); v.abrir(<VerLiquidacion id={id} />, "liquidacion");
     } catch (e) { setGuardando(false); noSePudo(v, "No se pudo guardar")(e); }
   };
   return <>
@@ -528,33 +529,55 @@ function Liquidar({ mid }: { mid: string }) {
 
 export function VerLiquidacion({ id }: { id: string }) {
   useDatos();
-  const v = useVentana(), l = S.liquidaciones[id];
+  const v = useVentana(), l = S.liquidaciones[id], [sub, setSub] = useState<"resumen" | "entregas">("resumen");
   if (!l) return <div className="vacio">Esta liquidación ya no existe.</div>;
   const nom = S.mensajeros[l.mensajeroId]?.nombre || "Mensajero", esUltima = liquidacionesDe(l.mensajeroId)[0]?.id === id, ps = (l.guias || []).map(g => S.pedidos[g]).filter(Boolean);
+  const orden = ps.slice().sort((a, b) => (a.entregado || 0) - (b.entregado || 0)), conGasto = ps.some(p => gastoDe(p));
+  const suma = (f: (p: Pedido) => number) => ps.reduce((a, p) => a + f(p), 0), totServ = suma(servicio), totGasto = suma(gastoDe), totCobrado = suma(p => Number(p.valorCobrado) || 0);
   const reabrir = async () => { try { await reabrirLiquidacion(id); v.avisar("Período reabierto"); v.cerrar(); } catch (e) { noSePudo(v, "No se pudo reabrir")(e); } };
-  return <>
-    <Cab sub={<span className="sub">{nom} · {l.desde ? "desde " + hora(l.desde) + " " : ""}hasta {hora(l.fecha)}</span>}><h2>Liquidación</h2></Cab>
-    <div className={"res-liq " + (l.debe > 0 ? "debe" : l.debe < 0 ? "sobra" : "cero")}><span>Resultado</span><b>{textoLiq(l.debe)}{l.adelanto ? " · adelanto de " + pesos(l.adelanto) : ""}</b></div>
-    <dl className="datos">
-      <dt>Entregas</dt><dd>{l.entregas}</dd>
-      <dt>Efectivo cobrado</dt><dd>{pesos(l.efectivo)}</dd>
-      {l.base ? <><dt>Base para vueltos</dt><dd>{pesos(l.base)}</dd></> : null}
-      {l.gastos ? <><dt>Fletes / gastos pagados</dt><dd>− {pesos(l.gastos)}</dd></> : null}
-      {l.cobros ? <><dt>Pagos de clientes que recibió</dt><dd>{pesos(l.cobros)}</dd></> : null}
-      {l.anterior ? <><dt>Pendiente anterior</dt><dd>{pesos(l.anterior)}</dd></> : null}
-      {l.ajuste ? <><dt>Correcciones a liquidaciones anteriores</dt><dd>{ajusteTxt(l.ajuste)}</dd></> : null}
-      <dt>Entregó durante el período</dt><dd>{pesos(l.recibidoAntes ?? l.recibido)}</dd>
-      <dt>Entrega final</dt><dd>{pesos(l.entregaFinal || 0)}</dd>
-      <dt>Total entregado</dt><dd>{pesos(l.recibido)}</dd>
-      {l.adelanto ? <><dt>Pasado a adelanto de sueldo</dt><dd className="neg">{pesos(l.adelanto)}</dd></> : null}
-      <dt>Transferencias a JS</dt><dd>{pesos(l.transfJs)}</dd>
-      <dt>Pagado directo al cliente</dt><dd>{pesos(l.transfCli)}</dd>
-      <dt>Sueldo del período</dt><dd>{pesos(l.sueldo)}</dd>
-    </dl>
-    {ps.length ? <><h2>Entregas incluidas</h2><TablaEntregas ps={ps} conCliente /></> : null}
-    {esUltima && <><div className="acciones" style={{ marginTop: 14 }}><button className="btn peligro chico" id="lReabrir" onClick={reabrir}>Reabrir período</button></div>
-      <p className="sub" style={{ marginTop: 8, fontSize: ".85rem" }}>Reabrir borra esta liquidación y junta sus entregas con el período actual. El dinero recibido se conserva en la caja.{l.adelanto ? " El adelanto que salió de esta liquidación se quita del sueldo." : ""}</p></>}
-  </>;
+  const fila = (t: string, val: ReactNode, cls = "") => <div className="liq-fila"><dt>{t}</dt><dd className={cls}>{val}</dd></div>;
+  return <div className="entrega-modal liq-modal">
+    <header className="entrega-cab"><div className="liq-titulo"><h2>Liquidación <span className="entrega-estado">{nom}</span></h2>
+      <p><Clock size={13} aria-hidden="true" /> {l.desde ? hora(l.desde) : "El inicio"} → {hora(l.fecha)}</p></div>
+      <button type="button" className="cerrar" data-cerrar aria-label="Cerrar">×</button></header>
+    <div className="liq-superior">
+      <div className={"liq-resultado " + (l.debe > 0 ? "debe" : l.debe < 0 ? "sobra" : "cero")}><b>Resultado: {textoLiq(l.debe)}</b>{l.adelanto ? <span>Adelanto de sueldo: {pesos(l.adelanto)}</span> : null}</div>
+      <div className="seg liq-seg" role="tablist" aria-label="Detalle de la liquidación">
+        <button type="button" role="tab" aria-selected={sub === "resumen"} onClick={() => setSub("resumen")}>Resumen financiero</button>
+        <button type="button" role="tab" aria-selected={sub === "entregas"} onClick={() => setSub("entregas")}>Entregas incluidas ({ps.length})</button>
+      </div>
+    </div>
+    <div className="liq-cuerpo">
+      {sub === "resumen" ? <>
+        <section className="liq-grupo"><h3>Recaudo y base</h3><dl>
+          {fila("Entregas", l.entregas)}{fila("Efectivo cobrado", pesos(l.efectivo))}
+          {l.base ? fila("Base para vueltos", pesos(l.base)) : null}{l.gastos ? fila("Fletes / gastos pagados", "− " + pesos(l.gastos)) : null}
+          {l.cobros ? fila("Pagos de clientes que recibió", pesos(l.cobros)) : null}{l.anterior ? fila("Pendiente anterior", pesos(l.anterior)) : null}
+          {l.ajuste ? fila("Correcciones a liquidaciones anteriores", ajusteTxt(l.ajuste)) : null}
+        </dl></section>
+        <section className="liq-grupo"><h3>Entregas y descuentos</h3><dl>
+          {fila("Entregó durante el período", pesos(l.recibidoAntes ?? l.recibido))}{fila("Entrega final", pesos(l.entregaFinal || 0))}{fila("Total entregado", pesos(l.recibido))}
+          {l.adelanto ? fila("Pasado a adelanto de sueldo", pesos(l.adelanto), "neg") : null}
+          {fila("Transferencias a JS", pesos(l.transfJs))}{fila("Pagado directo al cliente", pesos(l.transfCli))}
+        </dl></section>
+        <div className="liq-sueldo"><span>Sueldo del período</span><b>{pesos(l.sueldo)}</b></div>
+      </> : ps.length ? <>
+        <div className="tabla-env liq-tabla"><table><thead><tr><th>Guía</th><th>Remitente</th><th>Recibió</th><th>Método</th><th className="n">Servicio</th>{conGasto && <th className="n">Flete</th>}<th className="n">Cobrado</th></tr></thead><tbody>
+          {orden.map(p => <tr key={p.guia}><td className="guia">{p.guia}</td><td>{nombreCliente(p.clienteId) || "—"}</td><td>{p.destinatario}</td><td>{metodoTxt(p)}</td><td className="n">{pesos(servicio(p))}</td>{conGasto && <td className="n">{gastoDe(p) ? pesos(gastoDe(p)) : "—"}</td>}<td className="n">{pesos(p.valorCobrado)}</td></tr>)}
+          <tr><td colSpan={4}><b>Total</b></td><td className="n"><b>{pesos(totServ)}</b></td>{conGasto && <td className="n"><b>{pesos(totGasto)}</b></td>}<td className="n"><b>{pesos(totCobrado)}</b></td></tr>
+        </tbody></table></div>
+        <ul className="liq-entregas">
+          {orden.map(p => <li key={p.guia}>
+            <div><span className="guia">{p.guia}</span><b>{nombreCliente(p.clienteId) || "—"}</b><strong>{pesos(p.valorCobrado)}</strong></div>
+            <div><span>{p.destinatario ? "Recibió: " + p.destinatario + " · " : ""}{metodoTxt(p)}</span><span>Servicio: {pesos(servicio(p))}{gastoDe(p) ? " · Flete: " + pesos(gastoDe(p)) : ""}</span></div>
+          </li>)}
+          <li className="liq-totales"><div><b>Totales ({ps.length} {pl(ps.length, "entrega")})</b></div><div><span>Servicio: <b>{pesos(totServ)}</b></span><span>Cobrado: <b>{pesos(totCobrado)}</b></span></div></li>
+        </ul>
+      </> : <div className="vacio">Esta liquidación no tiene entregas.</div>}
+    </div>
+    {esUltima && <footer className="liq-pie"><p>Al reabrir, las entregas vuelven al período actual y se revierte el adelanto. El dinero recibido se conserva en la caja.</p>
+      <button type="button" className="btn peligro chico" id="lReabrir" onClick={reabrir}><RotateCcw size={14} aria-hidden="true" /> Reabrir período</button></footer>}
+  </div>;
 }
 
 /* ---------- Cajas de oficina: la plata que maneja cada asistente ---------- */

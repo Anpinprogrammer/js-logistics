@@ -1826,3 +1826,57 @@
   .jsl .cmc-accion button{padding:4px 10px;border-radius:12px;border:1px solid color-mix(in srgb,var(--rojo) 40%,transparent);background:color-mix(in srgb,var(--rojo) 8%,transparent);color:var(--rojo);font:inherit;font-size:.69rem;font-weight:800;cursor:pointer}
   .jsl .cmc-domi{margin-top:6px;padding:3px 10px;border:1px solid var(--linea);border-radius:10px;background:none;color:var(--tinta);font:inherit;font-size:.69rem;font-weight:700;cursor:pointer}
 }
+
+/* Liquidación (Caja → Liquidaciones recientes): hoja inferior en el celular, modal ancho en escritorio, sin scroll horizontal. */
+.jsl dialog[data-variante="liquidacion"]{position:fixed;inset:auto 0 0;margin:0;width:100%;max-width:100%;max-height:92dvh;border-radius:24px 24px 0 0;overflow:hidden}
+.jsl dialog[data-variante="liquidacion"] .dlg{padding:0;max-height:92dvh;overflow:hidden}
+.jsl dialog[data-variante="liquidacion"] .dlg::before{display:none}
+.jsl .liq-modal{max-height:92dvh}
+.jsl .liq-titulo{min-width:0}
+.jsl .liq-titulo p{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.jsl .liq-superior{display:grid;gap:10px;flex:none;padding:12px 20px;border-bottom:1px solid var(--linea)}
+.jsl .liq-resultado{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-radius:14px;font-size:.88rem}
+.jsl .liq-resultado b{font-size:.92rem}
+.jsl .liq-resultado span{padding:4px 10px;border-radius:10px;background:var(--papel);font-weight:700;font-size:.78rem;font-variant-numeric:tabular-nums}
+.jsl .liq-resultado.cero{background:var(--verde-claro);color:var(--verde)}
+.jsl .liq-resultado.debe{background:var(--rojo-claro);color:var(--rojo)}
+.jsl .liq-resultado.sobra{background:var(--azul-claro);color:var(--azul)}
+.jsl .liq-seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;border-radius:14px}
+.jsl .liq-seg button{min-width:0;white-space:normal;border-radius:11px;padding:8px 6px;font-size:.8rem}
+.jsl .liq-cuerpo{display:grid;align-content:start;gap:12px;min-height:0;padding:14px 20px;overflow-y:auto;overscroll-behavior:contain}
+.jsl .liq-grupo{padding:12px 14px;border:1px solid var(--linea);border-radius:14px;background:var(--hueco)}
+.jsl .liq-grupo h3{margin:0 0 4px;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--suave)}
+.jsl .liq-grupo dl{margin:0}
+.jsl .liq-fila{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:6px 0;border-bottom:1px solid var(--linea);font-size:.85rem}
+.jsl .liq-fila:last-child{border-bottom:0}
+.jsl .liq-fila dt{min-width:0;color:var(--suave)}
+.jsl .liq-fila dd{margin:0;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.jsl .liq-fila dd.neg{color:var(--rojo)}
+.jsl .liq-sueldo{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--azul);border-radius:14px;background:var(--azul-claro);color:var(--azul)}
+.jsl .liq-sueldo b{font-size:1.15rem;font-variant-numeric:tabular-nums}
+.jsl .liq-tabla{display:none;box-shadow:none;border:1px solid var(--linea);overflow-x:visible}
+.jsl .liq-tabla table{width:100%;table-layout:auto}
+.jsl .liq-entregas{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.jsl .liq-entregas li{display:grid;gap:4px;min-width:0;padding:10px 12px;border:1px solid var(--linea);border-radius:14px;background:var(--hueco)}
+.jsl .liq-entregas li>div{display:flex;justify-content:space-between;align-items:baseline;gap:8px;min-width:0;font-size:.76rem;color:var(--suave)}
+.jsl .liq-entregas li>div:first-child{font-size:.85rem;color:var(--tinta)}
+.jsl .liq-entregas li>div>b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsl .liq-entregas li>div>span:first-child{min-width:0;overflow-wrap:anywhere}
+.jsl .liq-entregas li>div>span:last-child,.jsl .liq-entregas li>div>strong{flex:none;font-variant-numeric:tabular-nums}
+.jsl .liq-entregas .guia{flex:none;font-family:ui-monospace,monospace;font-size:.72rem;font-weight:700}
+.jsl .liq-totales{background:var(--papel)!important}
+.jsl .liq-pie{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;padding:12px 20px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--linea);background:var(--hueco)}
+.jsl .liq-pie p{margin:0;max-width:34rem;color:var(--suave);font-size:.72rem;line-height:1.3}
+.jsl .liq-pie .btn{flex:none;display:inline-flex;align-items:center;gap:6px}
+@media (min-width:768px){
+  .jsl dialog[data-variante="liquidacion"]{inset:0;margin:auto;width:min(768px,calc(100vw - 48px));max-width:768px;max-height:88dvh;border-radius:24px}
+  .jsl dialog[data-variante="liquidacion"] .dlg,.jsl .liq-modal{max-height:88dvh}
+  .jsl .liq-tabla{display:block}
+  .jsl .liq-entregas{display:none}
+  .jsl .liq-cuerpo{padding:16px 24px}
+  .jsl .liq-superior,.jsl .liq-pie{padding-left:24px;padding-right:24px}
+}
+@media (max-width:480px){.jsl .liq-pie{flex-direction:column;align-items:stretch}.jsl .liq-pie .btn{justify-content:center;min-height:44px}}
+.jsl .liq-tabla table{font-size:.8rem}
+.jsl .liq-tabla th,.jsl .liq-tabla td{padding:9px 8px;white-space:normal;overflow-wrap:anywhere}
+.jsl .liq-tabla th.n,.jsl .liq-tabla td.n,.jsl .liq-tabla td.guia{white-space:nowrap}
