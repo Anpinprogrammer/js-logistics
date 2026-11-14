@@ -91,7 +91,7 @@ export default function Mensajero({ pintar }: { pintar: () => void }) {
   } else {
     const pm = periodoMensajero(E.miMensajero), t = totales(pm.ps), ul = pm.ul;
     h = <><h1>Mi caja</h1><p className="sub">Período actual: {ul ? "desde la liquidación del " + hora(ul.fecha) : "desde el inicio"} hasta ahora.</p>
-      <div className="cifras">
+      <div className="cifras cifras-mi-caja">
         <div className="cifra fuerte"><span>Te falta entregar</span><b>{pesos(pm.debe)}</b></div>
         <div className="cifra"><span>Sueldo del período</span><b>{sueldoTexto(E.miMensajero, pm.ps)}</b></div>
         <div className="cifra"><span>Efectivo cobrado</span><b>{pesos(t.efectivo)}</b></div>

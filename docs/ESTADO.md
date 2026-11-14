@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Mi caja del mensajero: cifras simétricas y entregas en lista en el celular — 2026-11-14
+
+Las cifras llevan `cifras-mi-caja`: 3 columnas en escritorio y 2 en el celular, con la primera a todo el ancho, montos anclados abajo y, como algunas cifras solo aparecen si tienen valor, la última se estira para no dejar hueco. `TablaEntregas` (`ui.tsx`) pinta además una lista de tarjetas en dos niveles (`te-lista`) que se ve bajo 768 px; la tabla queda desde 768 px. Solo CSS y marcado, sin cambios de cálculo.
+
 ## Caja → Mensajeros: cifras alineadas y sin huecos — 2026-11-14
 
 Las 4 cifras llevan `cifras-mens`: en escritorio son 4 columnas con el monto anclado abajo (misma línea aunque el título ocupe 1 o 2 renglones); en el celular son 2 columnas con la primera y la última a todo el ancho, para que no quede un hueco. Solo CSS.
