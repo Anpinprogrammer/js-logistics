@@ -41,14 +41,30 @@ function paginaLiquidacionesDemo(f: { dia: string; estado: string; buscar: strin
   return { liquidaciones: lista.slice((actual - 1) * porPagina, actual * porPagina), pagina: actual, porPagina, total: lista.length, paginas };
 }
 
+type EstadoMens = "todos" | "con_deuda" | "en_ruta" | "sin_pendiente";
+type OrdenMens = "nombre" | "mayor_deuda";
+const ESTADOS_MENS: [EstadoMens, string][] = [["todos", "Todos"], ["con_deuda", "Con deuda"], ["en_ruta", "En ruta"], ["sin_pendiente", "Al día"]];
+const ESTADOS_MENS_LARGO: [EstadoMens, string][] = [["todos", "Todos los mensajeros"], ["con_deuda", "Con saldo pendiente (Debe)"], ["en_ruta", "Con entregas en ruta"], ["sin_pendiente", "Al día (Sin deuda)"]];
+const ORDENES_MENS: [OrdenMens, string][] = [["nombre", "Nombre (A-Z)"], ["mayor_deuda", "Mayor deuda primero"]];
+
 export default function Caja({ pintar }: { pintar: () => void }) {
   const v = useVentana();
+  // Filtros de la sub-pestaña Mensajeros: buscar por nombre, estado de la cuenta y orden.
+  const [buscarMens, setBuscarMens] = useState(""), [estadoMens, setEstadoMens] = useState<EstadoMens>("todos"), [ordenMens, setOrdenMens] = useState<OrdenMens>("nombre");
+  const [hojaMens, setHojaMens] = useState(false), [borradorMens, setBorradorMens] = useState<{ estado: EstadoMens; orden: OrdenMens }>({ estado: "todos", orden: "nombre" });
   // Lo de la sub-pestaña Mensajeros (el período de cada uno recorre todos los pedidos) solo se calcula si está abierta.
   const verMens = E.tabCaja === "mensajeros";
   const pendM: Record<string, number> = {}; if (verMens) Object.values(S.pedidos).filter(p => p.estado === "pendiente").forEach(p => (pendM[p.mensajeroId] = (pendM[p.mensajeroId] || 0) + 1));
   const pms: Record<string, ReturnType<typeof periodoMensajero>> = {}; if (verMens) Object.keys(S.mensajeros).forEach(id => (pms[id] = periodoMensajero(id)));
   // los mensajeros siempre, para poder darles base al empezar el día
   const ids = !verMens ? [] : listaOrdenada(S.mensajeros, "nombre").filter(esRepartidor).map(m => m.id).filter(id => { const pm = pms[id]; return tipoDe(S.mensajeros[id]) === "mensajero" || pm.ps.length || pm.recs.length || pm.debe || pendM[id]; });
+  // Las KPI de arriba suman a todos; los filtros solo cambian qué tarjetas se ven.
+  const qMens = sinTildes(buscarMens.trim()), activosMens = (estadoMens !== "todos" ? 1 : 0) + (ordenMens !== "nombre" ? 1 : 0);
+  const idsVis = !verMens ? [] : ids.filter(id => (!qMens || sinTildes(S.mensajeros[id].nombre).includes(qMens)) && (estadoMens === "todos" || (estadoMens === "con_deuda" ? pms[id].debe > 0 : estadoMens === "en_ruta" ? (pendM[id] || 0) > 0 : pms[id].debe === 0)))
+    .sort((a, b) => ordenMens === "mayor_deuda" ? pms[b].debe - pms[a].debe : 0);
+  const limpiarMens = () => { setBuscarMens(""); setEstadoMens("todos"); setOrdenMens("nombre"); };
+  const buscadorMens = <div className="liq-buscar aq-buscar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+    <input type="search" placeholder="Buscar mensajero…" aria-label="Buscar mensajero por nombre" autoComplete="off" value={buscarMens} onChange={e => setBuscarMens(e.target.value)} /></div>;
   const tot = { debe: 0, ef: 0, tj: 0, tc: 0 }; ids.forEach(id => { const pm = pms[id], tt = totales(pm.ps); tot.debe += pm.debe; tot.ef += tt.efectivo; tot.tj += tt.transfJs; tot.tc += tt.transfCli; });
   // El dinero recibido del día se reparte: mensajeros en su sub-pestaña y patinadores en la suya (son las mismas entregas de dinero).
   const verPat = E.tabCaja === "patinadores";
@@ -145,7 +161,23 @@ export default function Caja({ pintar }: { pintar: () => void }) {
         <div className="cifra"><span>Pagado directo a clientes</span><b>{pesos(tot.tc)}</b></div>
       </div>
       <div style={{ height: 14 }} />
-      {ids.length ? <div className="mgrid mgrid-mens">{ids.map(id => { const pm = pms[id], tt = totales(pm.ps); return <div className="mcard mcard-mens" key={id}>
+      {ids.length > 0 && <>
+        <div className="aq-filtros-movil">{buscadorMens}
+          <button type="button" className="btn sec" onClick={() => { setBorradorMens({ estado: estadoMens, orden: ordenMens }); setHojaMens(true); }} aria-haspopup="dialog" aria-label={`Filtros${activosMens ? `, ${activosMens} activos` : ""}`}><SlidersHorizontal size={15} aria-hidden="true" /> Filtros{activosMens > 0 && <b>{activosMens}</b>}</button></div>
+        <div className="aq-filtros-escritorio">{buscadorMens}
+          <div className="seg seg-estado" role="group" aria-label="Filtrar por estado">{ESTADOS_MENS.map(([k, t]) => <button key={k} type="button" aria-pressed={estadoMens === k} onClick={() => setEstadoMens(k)}>{t}</button>)}</div>
+          <div className="aq-fecha"><div className="tp-hoja-select mc-orden"><select aria-label="Ordenar mensajeros" value={ordenMens} onChange={e => setOrdenMens(e.target.value as OrdenMens)}>{ORDENES_MENS.map(([k, t]) => <option key={k} value={k}>{k === "nombre" ? "Orden: A-Z" : t}</option>)}</select></div>
+            <span className="sub mc-cuenta" role="status">Mostrando {idsVis.length} de {ids.length}</span></div></div>
+        {hojaMens && <div className="tp-capa" onMouseDown={e => { if (e.target === e.currentTarget) setHojaMens(false); }}><div className="tp-hoja" role="dialog" aria-modal="true" aria-labelledby="mc-filtros-titulo">
+          <header><h2 id="mc-filtros-titulo"><SlidersHorizontal size={16} aria-hidden="true" /> Filtrar mensajeros</h2><button type="button" className="cerrar" aria-label="Cerrar filtros" onClick={() => setHojaMens(false)}>×</button></header>
+          <div className="tp-hoja-cuerpo">
+            <div className="campo"><label htmlFor="mc-estado">Estado de cuenta</label><div className="tp-hoja-select"><select id="mc-estado" value={borradorMens.estado} onChange={e => setBorradorMens(b => ({ ...b, estado: e.target.value as EstadoMens }))}>{ESTADOS_MENS_LARGO.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select><ChevronDown size={16} aria-hidden="true" /></div></div>
+            <div className="campo"><label htmlFor="mc-orden">Ordenar por</label><div className="tp-hoja-select"><select id="mc-orden" value={borradorMens.orden} onChange={e => setBorradorMens(b => ({ ...b, orden: e.target.value as OrdenMens }))}>{ORDENES_MENS.map(([k, t]) => <option key={k} value={k}>{k === "mayor_deuda" ? "Mayor saldo pendiente primero" : t}</option>)}</select><ChevronDown size={16} aria-hidden="true" /></div></div>
+          </div>
+          <footer><button type="button" className="btn sec" onClick={() => { limpiarMens(); setHojaMens(false); }}>Limpiar filtros</button><button type="button" className="btn" onClick={() => { setEstadoMens(borradorMens.estado); setOrdenMens(borradorMens.orden); setHojaMens(false); }}>Aplicar filtros</button></footer></div></div>}
+      </>}
+      {ids.length && !idsVis.length ? <div className="vacio">No se encontraron mensajeros con ese filtro. <button type="button" className="btn sec chico" onClick={limpiarMens}>Limpiar filtros</button></div> : null}
+      {ids.length ? <div className="mgrid mgrid-mens">{idsVis.map(id => { const pm = pms[id], tt = totales(pm.ps); return <div className="mcard mcard-mens" key={id}>
         <div className="mcard-top"><b>{S.mensajeros[id].nombre}</b><span className="acciones"><button className="btn sec chico" onClick={() => base(id)}>Dar base</button><button className="btn ok chico" onClick={() => v.abrir(<RecibirDinero mid={id} />, "centrada")}>Recibir dinero</button></span></div>
         <span className="sub mcard-periodo">Período desde {pm.ul ? hora(pm.ul.fecha) : "el inicio"}</span>
         <dl className="datos">
