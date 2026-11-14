@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Caja: sub-pestañas en dos filas en el celular — 2026-11-14
+
+- Por debajo de 768 px las 5 sub-pestañas de Caja (`.caja-cab .subtabs`) se acomodan en una cuadrícula de 6 columnas: 3 arriba y 2 abajo, todas visibles sin deslizar. En escritorio no cambian. A menos de 360 px baja un poco la letra para que "Liquidaciones recientes" quepa.
+
 ## Liquidaciones recientes: lista compacta en el celular — 2026-11-14
 
 - En Caja → Liquidaciones recientes, por debajo de 768 px la tabla se oculta (`.lm-tabla`) y se muestra una lista de dos líneas (`.lm-lista`): mensajero y estado, y debajo fecha, entregas, adelanto y faltante o sobrante, con el botón Ver que abre el mismo detalle. La tabla de escritorio no cambió. La barra de sub-pestañas ya se desplaza sola (`.subtabs`).
