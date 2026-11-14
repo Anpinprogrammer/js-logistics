@@ -465,6 +465,23 @@ END $$;
 CREATE INDEX IF NOT EXISTS caja_patinador_mensajero_idx ON caja_patinador (mensajero_id, fecha DESC);
 CREATE INDEX IF NOT EXISTS caja_patinador_cliente_idx ON caja_patinador (cliente_id);
 
+-- ---------- Solicitudes por el asistente (JSBot) — 2026-11-14 ----------
+-- El asistente nunca crea la solicitud solo: prepara un borrador con lo que dijo el cliente y la persona lo confirma con un
+-- botón en pantalla (POST /chatbot/borradores/:id/confirmar). El borrador es de un solo uso, vence a los 30 minutos y
+-- queda ligado a la cuenta que lo pidió; confirmar dos veces devuelve la misma solicitud.
+ALTER TABLE solicitudes ADD COLUMN IF NOT EXISTS via_chatbot BOOLEAN NOT NULL DEFAULT false;
+CREATE TABLE IF NOT EXISTS chatbot_borradores (
+  id          TEXT PRIMARY KEY,                       -- token aleatorio de 192 bits: no se puede adivinar
+  usuario_id  TEXT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  cliente_id  TEXT NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+  datos       JSONB NOT NULL,                         -- los campos ya validados de la solicitud
+  estado      TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'confirmado', 'cancelado')),
+  solicitud_id TEXT REFERENCES solicitudes(id) ON DELETE SET NULL,
+  creado      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  vence       TIMESTAMPTZ NOT NULL DEFAULT now() + interval '30 minutes'
+);
+CREATE INDEX IF NOT EXISTS chatbot_borradores_cliente_idx ON chatbot_borradores (cliente_id, creado DESC);
+
 -- ---------- Supabase: cerrar la API pública ----------
 -- Supabase expone las tablas de "public" por su Data API (PostgREST) con la anon key.
 -- Toda la app pasa por Express, que se conecta con el rol dueño de las tablas (no lo afecta RLS).
@@ -474,7 +491,7 @@ DECLARE t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY['clientes', 'mensajeros', 'usuarios', 'enlaces', 'codigos_clave', 'cuentas', 'contadores', 'ajustes', 'pedidos',
     'pedido_intentos', 'pedido_archivos', 'movimientos', 'recaudos', 'liquidaciones', 'cajamovs', 'jornadas',
-    'historial', 'papelera', 'solicitudes', 'caja_patinador']
+    'historial', 'papelera', 'solicitudes', 'caja_patinador', 'chatbot_borradores']
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
   END LOOP;

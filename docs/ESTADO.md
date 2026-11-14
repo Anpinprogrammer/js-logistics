@@ -1,5 +1,11 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## JSBot: solicitudes de envío y evidencias (2026-11-14)
+
+- **Decisión:** el asistente nunca crea una solicitud. `preparar_solicitud` deja un borrador (`chatbot_borradores`, un solo uso, 30 min) y solo el botón Confirmar (`POST /chatbot/borradores/:id/confirmar`) llama a `servicios/solicitudes.js › crearSolicitudDeCliente`, la misma función de `POST /solicitudes/portal`. Así la confirmación y la cuenta no dependen de lo que diga el modelo. Detalle y variables en `backend/README.md`.
+- `mostrar_evidencias` manda las fotos y la firma (URL firmadas, 15 min) directo a la pantalla en `archivos`; el modelo no recibe URL. Se necesita `npm run db:migrar` al desplegar. El portal de clientes ya muestra el resumen y las fotos (`JSBotPanel.tsx`).
+- El modelo por defecto sigue siendo Haiku 5.5; si arma mal los borradores, probar `CHATBOT_MODELO=claude-sonnet-5-5`.
+
 ## Recuperar y restablecer con modo claro (2026-11-14)
 
 - Por pedido del dueño, `/recuperar` y `/restablecer` (también `/activar`) siguen el tema claro/oscuro como el ingreso, con el mismo botón flotante Sol/Luna (`BotonTema` en `pages/AccesoComun.tsx`, guardado en `js_tema`). `MarcoAcceso` ya no fuerza `dark` y se quitó la prop `seguirTema`.

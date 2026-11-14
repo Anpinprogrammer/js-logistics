@@ -13,3 +13,6 @@ export const mensajes = z.object({
     .refine(m => m.at(-1)?.rol === "user", "El último mensaje debe ser del cliente")
     .refine(m => m[0]?.rol === "user", "La conversación debe empezar con un mensaje del cliente")
 }).strict();
+
+/** Token del borrador: base64url de 24 bytes (32 caracteres). */
+export const paramBorrador = z.object({ id: z.string().regex(/^[A-Za-z0-9_-]{20,64}$/, "El resumen no es válido") });
