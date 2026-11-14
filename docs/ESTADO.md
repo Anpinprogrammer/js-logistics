@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Menú lateral del modo Patinador igual al del celular (2026-11-14)
+
+- El menú de escritorio del modo Patinador solo mostraba "Mi caja" porque `SECCIONES_PATINADOR` (Marco.tsx) listaba las claves `caja` e `historial`. Ahora `ITEMS_PATINADOR` (Inicio, Mi caja, Solicitudes) es la única lista: el celular y el menú lateral la usan los dos. Ninguna de esas pestañas lleva contador en el celular, así que tampoco en escritorio.
+
 ## Mi caja → Entregas del período con filtros y páginas en el servidor (2026-11-14)
 
 - Nuevo `GET /mensajeros/:id/periodo/entregas` (`servicios/mensajeros.js › entregasPeriodo`): mismas reglas del período abierto que `periodoMensajero` (sin guías liquidadas, y por hora las de liquidaciones viejas), búsqueda por guía o quien recibió (con `%`, `_` y `\` escapados), filtro por método y `LIMIT/OFFSET`, lo más nuevo primero. Los totales son de lo filtrado; las 9 cifras de arriba siguen saliendo de `/periodo`. Prueba: `test/entregas-periodo.test.js`.

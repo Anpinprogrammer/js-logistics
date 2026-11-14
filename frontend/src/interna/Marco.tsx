@@ -37,7 +37,9 @@ const SECCIONES: [string, string[]][] = [
   ["Administración", ["mas", ...ADMIN_ESCRITORIO.map(([k]) => k)]],
 ];
 /** Modo Patinador de administración: las tres pestañas del patinador (Inicio, Mi caja y Solicitudes), en su propio grupo. */
-const SECCIONES_PATINADOR: [string, string[]][] = [["Patinador", ["caja", "historial"]]];
+const ITEMS_PATINADOR: ItemNav[] = [["inicio", "Inicio"], ["caja", "Mi caja"], ["solicitudes", "Solicitudes"]];
+/** Una sola lista para el celular y el menú lateral: así no se vuelven a desajustar. */
+const SECCIONES_PATINADOR: [string, string[]][] = [["Patinador", ITEMS_PATINADOR.map(([k]) => k)]];
 const NOMBRE_MODO = { admin: "Administración", mensajero: "Mensajero", patinador: "Patinador" } as const;
 
 const iconoTema = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
@@ -84,7 +86,7 @@ function Marco({ oscuro, cambiarTema, colapsado, alternarMenu }: { oscuro: boole
     items = [["inicio", "Inicio"], ["recepcion", "Recepción"], ["pend", "Pedidos", pendientesMios().length + porRecogerMios().length + devolucionesPorDefinirMios().length], ["caja", "Mi caja"], ["sueldo", "Mi sueldo"], ["entregados", "Entregados"]];
     actual = E.tabM; elegir = k => { E.tabM = k; };
   } else if (enPatinador) {
-    items = [["inicio", "Inicio"], ["caja", "Mi caja"], ["solicitudes", "Solicitudes"]];
+    items = ITEMS_PATINADOR;
     actual = E.tabP; elegir = k => { E.tabP = k === "caja" || k === "solicitudes" ? k : "inicio"; };
   } else {
     const sin = Object.values(S.pedidos).filter((p: Pedido) => !p.clienteId).length;
