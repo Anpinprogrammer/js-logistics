@@ -154,7 +154,7 @@ export default function Caja({ pintar }: { pintar: () => void }) {
     <div role="tabpanel" id="panelCaja-mensajeros" aria-labelledby="tabCaja-mensajeros" hidden={E.tabCaja !== "mensajeros"}>
       {verMens && <>
       <h2>Mensajeros</h2><p className="sub">{yo.esAdmin ? "Cada mensajero lleva un período abierto que se cierra cuando lo liquidas. Lo que entregue después cuenta para el siguiente período." : "Lo que cada mensajero debe entregar. Toca “Recibir dinero” cada vez que te entregue plata."}</p>
-      <div className="cifras">
+      <div className="cifras cifras-mens">
         <div className="cifra fuerte"><span>Pendiente por entregar (todos)</span><b>{pesos(tot.debe)}</b></div>
         <div className="cifra"><span>Efectivo cobrado en períodos abiertos</span><b>{pesos(tot.ef)}</b></div>
         <div className="cifra"><span>Transferencias a JS (verificar en banco)</span><b>{pesos(tot.tj)}</b></div>

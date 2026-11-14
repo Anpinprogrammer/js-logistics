@@ -2044,3 +2044,13 @@
 }
 .jsl .lq-pie .liq-resultado{flex-wrap:nowrap}
 .jsl .lq-pie .liq-resultado .lq-res-t{padding:0;background:none;font-size:.78rem;white-space:nowrap}
+
+/* Caja → Mensajeros: 4 cifras. Celular: 2 columnas con la primera y la última a todo el ancho (sin hueco); escritorio: 4 columnas con los montos alineados abajo */
+.jsl .cifras-mens{grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch}
+.jsl .cifras-mens .cifra{display:flex;flex-direction:column;justify-content:space-between;gap:6px;height:100%;min-width:0}
+.jsl .cifras-mens .cifra:is(:first-child,:last-child){grid-column:1/-1}
+.jsl .cifras-mens .cifra b{margin:0;margin-top:auto}
+@media (min-width:768px){
+  .jsl .cifras-mens{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .jsl .cifras-mens .cifra:is(:first-child,:last-child){grid-column:auto}
+}
