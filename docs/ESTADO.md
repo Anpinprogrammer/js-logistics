@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Inicio del mensajero en el celular rediseñado (2026-11-14)
+
+- `mensajero/Mensajero.tsx › InicioMensajero`: bajo 768 px se pinta `.im-movil` (accesos 2×2: Tomar foto, Subir galería, Recibir pago → Recepción/`E.subRecM="dinero"`, En ruta con contador; franja oscura "Te falta entregar" → Mi caja; 3 mini-cifras que llevan a Pedidos, Entregados y Mi sueldo). Desde 768 px sigue el bloque de siempre, ahora dentro de `.im-esc`. Mismos handlers y cálculos; `.im-fin` deja espacio para que la barra inferior no tape "Recomendaciones para ti". Estilos `im-*` al final de `ajustes.css` (sin Tailwind, con las variables de `.jsl`).
+
 ## Inicio del patinador rediseñado (2026-11-14)
 
 - `patinador/Vista.tsx › Inicio`: cabecera con el nombre del patinador (y "cambiar" en el modo de administración), accesos "Registrar pago" (abre la ventana de pago ahí mismo, `useAbrirPago`, que también usa Mi caja) y "Solicitudes" con el número de pendientes; tres cifras (dinero en mano, recogidas pendientes, pagos recibidos) y dos cuadros (3 solicitudes y 3 últimos movimientos, con su estado vacío). Sin endpoints nuevos: usa la caja y las solicitudes que ya había. Estilos `pat-*` al final de `ajustes.css`.

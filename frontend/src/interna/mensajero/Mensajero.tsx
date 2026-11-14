@@ -1,6 +1,6 @@
 /* App del mensajero, igual al prototipo (pintarMensajero, inicioMensajeroHtml, miSueldoHtml y los diálogos de entrega). */
 import { useEffect, useRef, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, ChevronDown, Plus, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Camera, ChevronDown, ChevronRight, HandCoins, ImagePlus, Plus, SlidersHorizontal, Truck, X } from "lucide-react";
 import { SelectorFecha } from "../Calendario";
 import { useQuery } from "@tanstack/react-query";
 import { useUsuario } from "../../auth/Sesion";
@@ -331,6 +331,27 @@ function InicioMensajero({ mid, enlace, irM, btnFoto, btnGaleria }: { mid: strin
   const dias = entregasPorDia(mis, 14), tot14 = dias.reduce((a, d) => a + d.n, 0);
   return <>
     <div className="dash-cab"><div><h1>Hola, {m.nombre}</h1><p className="sub">Así va tu trabajo{enlace}</p></div></div>
+    {/* Celular (< 768 px): accesos 2×2 y cifras compactas. Los mismos handlers y valores de abajo, sin cambiar el escritorio. */}
+    <div className="im-movil">
+      <div className="im-accesos">
+        <button type="button" className="im-acc im-acc-foto" onClick={btnFoto}><Camera aria-hidden /><span>Tomar foto</span></button>
+        <button type="button" className="im-acc" onClick={btnGaleria}><ImagePlus aria-hidden className="im-ic-azul" /><span>Subir galería</span></button>
+        <button type="button" className="im-acc im-acc-verde" onClick={() => { E.subRecM = "dinero"; irM("recepcion"); }}><HandCoins aria-hidden /><span>Recibir pago</span></button>
+        <button type="button" className="im-acc im-acc-sec" onClick={() => irM("entregar")}><Truck aria-hidden /><span>En ruta</span>{enRuta.length > 0 && <b className="im-num">{enRuta.length}</b>}</button>
+      </div>
+      <button type="button" className="im-falta" onClick={() => irM("caja")}>
+        <span className="im-falta-txt"><small>Te falta entregar</small><b>{pesos(pm.debe)}</b><em>{pm.debe > 0 ? "Plata que debes llevar a la oficina" : "Estás al día con la oficina"}</em></span>
+        <span className="im-pildora">Mi caja<ChevronRight aria-hidden /></span>
+      </button>
+      <div className="im-mini">
+        <button type="button" onClick={() => irM("entregar")}><span>En ruta</span><b className="im-azul">{enRuta.length}</b><small className={viejos.length ? "neg" : ""}>{viejos.length ? viejos.length + " con +1 día" : "Por entregar"}</small></button>
+        <button type="button" onClick={() => irM("entregados")}><span>Entregados</span><b className="im-verde">{entHoy}</b><small>{devHoy ? devHoy + " " + pl(devHoy, "devuelto") : "Sin devoluc."}</small></button>
+        {esMens
+          ? <button type="button" onClick={() => irM("sueldo")}><span>Sueldo sem.</span><b className="im-sueldo">{pesos(su.neto)}</b><small>{su.adel ? "Con adelantos" : "Acumulado"}</small></button>
+          : <button type="button" onClick={() => irM("entregados")}><span>Del mes</span><b className="im-sueldo">{ent.length}</b><small>Entregas</small></button>}
+      </div>
+    </div>
+    <div className="im-esc">
     <div className="acciones" style={{ margin: "0 0 16px" }}><button className="btn" id="btnFoto" onClick={btnFoto}><Icono n="nuevo" /> Tomar foto del pedido</button><button className="btn sec" id="btnGaleria" onClick={btnGaleria}>Subir de la galería</button></div>
     <div className="kpis">
       <Kpi ico="ruta" lbl="En ruta" val={enRuta.length} pie={<small>{viejos.length ? <span className="neg">{viejos.length} con más de un día</span> : "Por entregar ahora"}</small>} onClick={() => irM("entregar")} />
@@ -338,6 +359,7 @@ function InicioMensajero({ mid, enlace, irM, btnFoto, btnGaleria }: { mid: strin
       {esMens ? <Kpi ico="sueldos" lbl="Sueldo de la semana" val={pesos(su.neto)} pie={<small>{su.adel ? "Ya descontados " + pesos(su.adel) + " de adelantos" : "Lo que te deben esta semana"}</small>} />
         : <Kpi ico="pedidos" lbl="Entregas del mes" val={ent.length} pie={<small>{coma(porDia)} por día trabajado</small>} />}
       <Kpi ico="plata" lbl="Te falta entregar" val={pesos(pm.debe)} pie={<small>{pm.debe > 0 ? "Plata que debes llevar a la oficina" : "Estás al día con la oficina"}</small>} onClick={() => irM("caja")} cls="oscuro" />
+    </div>
     </div>
     <section className="tarjeta" style={{ marginBottom: 16 }}><h3>Recomendaciones para ti</h3>
       <div className="recos">{R.slice(0, 4).map(([cls, ic, t, txt, ir], i) => <div key={i} className={"reco " + cls}><span className="reco-ic"><Icono n={ic} /></span><div><b>{t}</b><p>{txt}</p>{ir && <button className="btn sec chico" onClick={() => irM(ir)}>{ir === "entregar" ? "Ver por entregar" : ir === "recoger" ? "Ver por recoger" : "Ver mi caja"}</button>}</div></div>)}</div></section>
@@ -359,6 +381,7 @@ function InicioMensajero({ mid, enlace, irM, btnFoto, btnGaleria }: { mid: strin
         <div><span>Cobros con diferencia</span><b className={conDif ? "neg" : ""}>{conDif}</b></div>
       </div></section>
     </div>
+    <div className="im-fin" aria-hidden="true" />
   </>;
 }
 
