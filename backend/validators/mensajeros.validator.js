@@ -24,3 +24,11 @@ export const paginaPersonal = z.object({
   pagina: z.coerce.number().int().min(1).optional(),
   porPagina: z.coerce.number().int().min(1).max(100).optional()
 });
+
+/** Mi caja → Entregas del período: página (5 en celular, 10 en escritorio), búsqueda por guía o quien recibió, y método. */
+export const entregasPeriodo = z.object({
+  buscar: texto(60).optional(),
+  metodo: z.enum(["todos", "efectivo", "transf_js", "transf_cliente", "devuelto"]).default("todos"),
+  pagina: z.coerce.number().int().min(1).optional(),
+  porPagina: z.coerce.number().int().min(1).max(100).optional()
+});

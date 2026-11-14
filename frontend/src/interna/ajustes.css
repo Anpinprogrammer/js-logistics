@@ -2105,3 +2105,37 @@
 .jsl .hm-fila-t.sal .hm-valor-t b{color:var(--rojo)}
 .jsl .hm-filtros .tp-movil-buscar button{display:grid}
 .jsl .hm-fecha .tp-hoja-select select{padding:8px 14px;border:1px solid var(--linea);border-radius:14px;background:var(--papel);color:var(--tinta);font:inherit;font-size:.85rem;font-weight:700}
+
+/* Mi caja → Entregas del período: filtros, lista paginada y barra de páginas */
+.jsl .ep-cab{display:flex;align-items:baseline;justify-content:space-between;gap:10px;min-width:0}
+.jsl .ep-cuenta{flex:none;font-size:.78rem;font-weight:700;color:var(--suave);font-variant-numeric:tabular-nums}
+.jsl .ep .hm-barra{margin:8px 0 12px}
+.jsl .ep-filtros{margin:10px 0 12px}
+.jsl .ep-cuerpo{min-width:0;transition:opacity .15s}
+.jsl .ep-cuerpo.cargando{opacity:.55}
+.jsl .ep .te-lista{margin:0}
+.jsl .ep .te-tabla{display:block}
+.jsl .ep-lista{min-height:calc(5 * 72px)}
+.jsl .ep-tabla{min-height:calc(10 * 45px)}
+.jsl .ep-total td{background:var(--hueco)}
+.jsl .ep-pie{display:flex;flex-direction:column;gap:10px;margin:14px 0 calc(104px + env(safe-area-inset-bottom,0px));min-width:0}
+.jsl .ep-rango{margin:0;font-size:.78rem}
+.jsl .ep-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.jsl .ep-nav .btn{flex:none;min-height:44px}
+.jsl .ep-nav .btn:disabled{opacity:.45;cursor:default}
+.jsl .ep-nav .sub{flex:1;min-width:0;margin:0;text-align:center;font-size:.8rem}
+@media (min-width:768px){
+  .jsl .ep-pie{flex-direction:row;align-items:center;justify-content:space-between;margin-bottom:32px}
+  .jsl .ep-nav{flex:none;gap:12px}
+  .jsl .ep-nav .btn{min-height:38px}
+}
+.jsl .tp-capa.ep-capa{display:flex}
+.jsl .ep-esq{display:grid;gap:0;border:1px solid var(--linea);border-radius:14px;overflow:hidden;background:var(--papel)}
+.jsl .ep-esq>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px}
+.jsl .ep-esq-tarjeta{height:72px}
+.jsl .ep-esq-fila{height:45px}
+.jsl .ep-esq>div+div{border-top:1px solid var(--linea)}
+.jsl .ep-esq i{display:block;height:12px;border-radius:6px;background:var(--hueco);animation:ep-pulso 1.2s ease-in-out infinite}
+.jsl .ep-esq i:nth-child(1){width:22%}.jsl .ep-esq i:nth-child(2){flex:1}.jsl .ep-esq i:nth-child(3){width:18%}
+@keyframes ep-pulso{50%{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.jsl .ep-esq i{animation:none}}

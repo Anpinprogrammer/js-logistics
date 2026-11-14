@@ -151,11 +151,11 @@ export const COLOR_ESTADO = { entregado: "var(--verde)", ruta: "var(--mango)", d
 
 /* ---------- pedidos ---------- */
 export const cerrado = (p: Pedido) => p.estado === "entregado" || p.estado === "devuelto";
-export const servicio = (p: Pedido) => (p.estado === "devuelto" && !p.cobrarDev ? 0 : Number(p.valorServicio) || 0);
-export const metodoTxt = (p: Pedido) => p.estado === "devuelto"
+export const servicio = (p: Pick<Pedido, "estado" | "cobrarDev" | "valorServicio">) => (p.estado === "devuelto" && !p.cobrarDev ? 0 : Number(p.valorServicio) || 0);
+export const metodoTxt = (p: Pick<Pedido, "estado" | "motivoDev" | "metodo">) => p.estado === "devuelto"
   ? "Devolución" + (p.motivoDev ? " (" + (MOTIVOS[p.motivoDev] || "").toLowerCase() + ")" : "")
   : (METODOS[p.metodo as Metodo]?.t || "");
-export const gastoDe = (p: Pedido) => Number(p.gasto) || 0;
+export const gastoDe = (p: Pick<Pedido, "gasto">) => Number(p.gasto) || 0;
 export const pagoDomi = (p: Pedido) => !p.domiPagado ? 0 : p.domiPagoValor != null ? (Number(p.domiPagoValor) || 0) : servicio(p);
 export const cargoEnvio = (p: Pedido) => servicio(p) + gastoDe(p);
 export function saldoPedido(p: Pedido) {

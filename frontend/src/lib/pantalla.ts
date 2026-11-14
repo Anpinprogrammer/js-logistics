@@ -20,6 +20,13 @@ export function usePorPagina() {
   return esComputador ? POR_PAGINA.computador : POR_PAGINA.celular;
 }
 
+/** Mi caja → Entregas del período: 5 filas en celular y 10 en computador. */
+export const POR_PAGINA_ENTREGAS = { celular: 5, computador: 10 } as const;
+export function usePorPaginaEntregas() {
+  const esComputador = useSyncExternalStore(suscribirComputador, esComputadorAhora, () => false);
+  return esComputador ? POR_PAGINA_ENTREGAS.computador : POR_PAGINA_ENTREGAS.celular;
+}
+
 /** Cuentas → Movimientos y Ganancias: 6 filas en celular y 15 en computador. */
 export const POR_PAGINA_CUENTAS = { celular: 6, computador: 15 } as const;
 export function usePorPaginaCuentas() {

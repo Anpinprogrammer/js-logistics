@@ -10,11 +10,12 @@ import {
   MEDIOS, MOTIVOS, metodoTxt, moverDia, pct, nivelEfectividad, CONSEJOS_MOTIVO, semanaDe, tipoDe, sueldoPersonaSemana, entregasPorDia, COLOR_ESTADO,
   moverSemana, diaSueldo, servicio, DIAS_SEM, fechaLarga, pendienteAnterior, DESC_SUELDO,
 } from "../motor";
-import { Columnas, Dona, EtqEstado, FiltroDia, Icono, IconoCamara, Kpi, Mini, Paginador, TablaEntregas, pl, useVentana } from "../ui";
+import { Columnas, Dona, EtqEstado, FiltroDia, Icono, IconoCamara, Kpi, Mini, Paginador, pl, useVentana } from "../ui";
 import { FormPago, type Anotar } from "../pagos";
 import { historialDe, recibidosDe, recibirDeCliente } from "../acciones";
 import { motivoError } from "../datos";
 import { useComputador, usePorPagina } from "../../lib/pantalla";
+import { EntregasPeriodo } from "./EntregasPeriodo";
 import { abrirEntregaEn, VerEntregado } from "./Entrega";
 import { DlgNuevaGuia } from "./NuevaGuia";
 import { DlgRecoger } from "./Recoger";
@@ -107,7 +108,7 @@ export default function Mensajero({ pintar }: { pintar: () => void }) {
       </div>
       {ul && <p className="sub" style={{ marginTop: 12 }}>Última liquidación ({hora(ul.fecha)}): {textoLiq(ul.debe).toLowerCase()}.</p>}
       {pm.recs.length > 0 && <><h2>Dinero que entregaste</h2><div className="tabla-env"><table><thead><tr><th>Hora</th><th>Medio</th><th className="n">Valor</th></tr></thead><tbody>{pm.recs.map(r => <tr key={r.id}><td>{hora(r.fecha)}</td><td>{MEDIOS[r.medio] || ""}</td><td className="n">{pesos(r.valor)}</td></tr>)}</tbody></table></div></>}
-      <h2>Entregas del período</h2><TablaEntregas ps={pm.ps} conCliente={false} /></>;
+      <EntregasPeriodo mid={E.miMensajero} /></>;
   }
   return <>{entradas}{h}</>;
 }

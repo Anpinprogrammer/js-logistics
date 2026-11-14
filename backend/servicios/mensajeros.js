@@ -1,7 +1,7 @@
 /* Mensajeros: dinero que entregan (recaudos), período abierto y liquidaciones. */
 import { Recaudos, Mensajeros, Liquidaciones } from "../models/documentos.js";
 import { nuevoId } from "../helpers/ids.js";
-import { paginaEnParalelo } from "../helpers/sql.js";
+import { paginaEnParalelo, filaAObjeto } from "../helpers/sql.js";
 import { ahora } from "../helpers/reloj.js";
 import { diaDe, hora } from "../helpers/fechas.js";
 import { datosInvalidos, noEncontrado, permisoNegado, conflicto } from "./errores.js";
@@ -57,6 +57,49 @@ export async function periodo(ctx, mid) {
   const calc = await calculosDe(ctx.db, COLS_PERIODO);
   if (!calc.S.mensajeros[mid]) throw noEncontrado("Esa persona no está en Personal.");
   return vistaPeriodo(calc, mid);
+}
+
+/** Entregas del período abierto de un mensajero, de a una página (Mi caja → Entregas del período): 5 en celular y 10 en escritorio.
+    Las mismas reglas de `periodoMensajero`: entregas y devoluciones que no están en ninguna liquidación (por guía), y las de
+    liquidaciones viejas sin guías, por hora. Lo más nuevo primero. Los totales son de lo filtrado (todas las páginas); las
+    cifras del período siguen saliendo de `GET /mensajeros/:id/periodo`. */
+export async function entregasPeriodo(ctx, mid, { pagina, porPagina, buscar = "", metodo = "todos" } = {}) {
+  const a = ctx.actor;
+  if (!a.esOficina && !esMio(a, mid)) throw permisoNegado();
+  if (!(await ctx.db.query("SELECT 1 FROM mensajeros WHERE id = $1", [mid])).rows.length) throw noEncontrado("Esa persona no está en Personal.");
+  const params = [mid];
+  const cond = [
+    "p.mensajero_id = $1", "p.estado IN ('entregado', 'devuelto')",
+    "NOT EXISTS (SELECT 1 FROM liquidaciones l WHERE l.mensajero_id = p.mensajero_id AND p.guia = ANY(l.guias))",
+    "p.entregado > COALESCE((SELECT max(l.fecha) FROM liquidaciones l WHERE l.mensajero_id = p.mensajero_id AND l.guias IS NULL), 'epoch'::timestamptz)"
+  ];
+  if (metodo === "devuelto") cond.push("p.estado = 'devuelto'");
+  else if (metodo !== "todos") { params.push(metodo); cond.push(`p.estado = 'entregado' AND p.metodo = $${params.length}`); }
+  const q = String(buscar || "").trim();
+  if (q) {
+    params.push("%" + q.slice(0, 60).replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_") + "%"); // % _ y \ del texto no son comodines
+    cond.push(`(p.guia ILIKE $${params.length} OR p.destinatario ILIKE $${params.length})`);
+  }
+  const donde = "WHERE " + cond.join(" AND ");
+  const tam = Math.max(1, Math.min(100, Number(porPagina) || 10));
+  let totales = { servicio: 0, flete: 0, cobrado: 0 };
+  const r = await paginaEnParalelo({
+    pagina, porPagina: tam,
+    contar: async () => {
+      const t = (await ctx.db.query(
+        `SELECT count(*)::int AS total,
+                COALESCE(sum(CASE WHEN p.estado = 'devuelto' AND NOT p.cobrar_dev THEN 0 ELSE p.valor_servicio END), 0)::bigint AS servicio,
+                COALESCE(sum(p.gasto), 0)::bigint AS flete, COALESCE(sum(p.valor_cobrado), 0)::bigint AS cobrado
+         FROM pedidos p ${donde}`, params)).rows[0];
+      totales = { servicio: Number(t.servicio), flete: Number(t.flete), cobrado: Number(t.cobrado) };
+      return t.total;
+    },
+    traer: async offset => (await ctx.db.query(
+      `SELECT p.guia, p.estado, p.entregado, p.destinatario, p.metodo, p.cuenta_js, p.motivo_dev, p.cobrar_dev, p.valor_servicio, p.valor_cobrado, p.gasto
+       FROM pedidos p ${donde} ORDER BY p.entregado DESC, p.guia DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, tam, offset])).rows
+  });
+  return { entregas: r.filas.map(filaAObjeto), pagina: r.pagina, porPagina: tam, total: r.total, paginas: r.paginas, totales };
 }
 
 /** Recibir dinero de un mensajero o de un patinador (entra igual a la caja). Si lo recibe un asistente, la plata queda en su caja de oficina. */
