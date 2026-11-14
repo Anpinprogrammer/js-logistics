@@ -2175,3 +2175,40 @@
   .jsl .pat-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
   .jsl .pat-kpi.fuerte{grid-column:auto}
 }
+
+/* ---- Inicio del mensajero en el celular: accesos 2×2 y cifras compactas ---- */
+.jsl .im-movil{display:flex;flex-direction:column;gap:12px;margin:0 0 16px;min-width:0}
+.jsl .im-esc{display:none}
+.jsl .im-fin{height:calc(96px + env(safe-area-inset-bottom,0px))}
+@media (min-width:768px){
+  .jsl .im-movil,.jsl .im-fin{display:none}
+  .jsl .im-esc{display:block}
+}
+.jsl .im-accesos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.jsl .im-acc{display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;min-height:48px;padding:10px 12px;border-radius:16px;border:1px solid var(--linea);background:var(--papel);color:var(--tinta);font:inherit;font-size:.82rem;font-weight:700;box-shadow:var(--sombra);cursor:pointer;transition:transform .12s}
+.jsl .im-acc:active{transform:scale(.96)}
+.jsl .im-acc svg{width:18px;height:18px;flex:none}
+.jsl .im-acc span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsl .im-acc-foto{background:var(--marca);border-color:var(--marca);color:#fff;font-weight:800}
+.jsl .im-ic-azul{color:var(--marca2)}
+.jsl .im-acc-verde{background:var(--verde-claro);border-color:color-mix(in srgb,var(--verde) 35%,transparent);color:var(--verde);box-shadow:none}
+.jsl .im-acc-sec svg{color:var(--suave)}
+.jsl .im-num{flex:none;min-width:18px;padding:2px 6px;border-radius:999px;background:var(--rojo);color:#fff;font-size:.68rem;font-weight:800;line-height:1.2;text-align:center}
+.jsl .im-falta{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-width:0;padding:16px;border:1px solid #1e293b;border-radius:24px;background:linear-gradient(135deg,#020617,#0f172a 55%,#082f49);color:#fff;font:inherit;text-align:left;cursor:pointer}
+.jsl .im-falta-txt{display:flex;flex-direction:column;min-width:0}
+.jsl .im-falta-txt small{font-size:.72rem;font-weight:600;color:#cbd5e1}
+.jsl .im-falta-txt b{font-size:1.6rem;font-weight:800;line-height:1.2;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsl .im-falta-txt em{font-style:normal;font-size:.72rem;color:#94a3b8;margin-top:2px}
+.jsl .im-pildora{flex:none;display:inline-flex;align-items:center;gap:2px;padding:8px 10px 8px 12px;border-radius:12px;background:rgba(255,255,255,.12);color:#7dd3fc;font-size:.78rem;font-weight:800}
+.jsl .im-pildora svg{width:15px;height:15px}
+.jsl .im-mini{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.jsl .im-mini button{display:flex;flex-direction:column;justify-content:space-between;gap:2px;min-width:0;min-height:88px;padding:12px;border:1px solid var(--linea);border-radius:18px;background:var(--papel);color:var(--tinta);font:inherit;text-align:left;box-shadow:var(--sombra);cursor:pointer;transition:transform .12s}
+.jsl .im-mini button:active{transform:scale(.96)}
+.jsl .im-mini span,.jsl .im-mini small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsl .im-mini span{font-size:.72rem;font-weight:700;color:var(--suave)}
+.jsl .im-mini small{font-size:.66rem;color:var(--suave)}
+.jsl .im-mini b{display:block;font-size:1.35rem;font-weight:800;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jsl .im-mini b.im-sueldo{font-size:1rem}
+.jsl .im-azul{color:var(--marca2)}
+.jsl .im-verde{color:var(--verde)}
+@media (max-width:359px){.jsl .im-acc{font-size:.76rem;padding:10px 8px;gap:6px}.jsl .im-falta-txt b{font-size:1.4rem}.jsl .im-mini button{padding:10px}}
