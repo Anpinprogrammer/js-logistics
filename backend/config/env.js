@@ -62,6 +62,11 @@ const esquema = z.object({
   // Límites por cliente (por cuenta, no por IP)
   CHATBOT_LIMITE_MINUTO: z.coerce.number().int().min(1).default(8),
   CHATBOT_LIMITE_DIA: z.coerce.number().int().min(1).default(100),
+  // Solicitudes de envío por el asistente: borradores que puede armar un cliente por hora, solicitudes que puede
+  // confirmar por día y cuánto duran las fotos de evidencia (URL firmadas) que se le muestran en el chat.
+  CHATBOT_BORRADORES_HORA: z.coerce.number().int().min(1).default(6),
+  CHATBOT_SOLICITUDES_DIA: z.coerce.number().int().min(1).default(10),
+  CHATBOT_FOTOS_SEGUNDOS: z.coerce.number().int().min(60).max(3600).default(900),
   // Chat público (visitantes sin sesión): solo info general y estado de un envío, sin nombres ni dinero.
   // Los límites van por IP y hay un tope global por día, porque cualquiera en internet puede llamarlo.
   CHATBOT_PUBLICO_ACTIVO: z.enum(["true", "false"]).default("true").transform(v => v === "true"),

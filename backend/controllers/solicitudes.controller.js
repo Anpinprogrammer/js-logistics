@@ -15,6 +15,7 @@ import { limpiarTexto } from "../helpers/textoSeguro.js";
 import { nuevoId } from "../helpers/ids.js";
 import { filaAObjeto } from "../helpers/sql.js";
 import { eventos } from "../servicios/eventos.js";
+import { crearSolicitudDeCliente } from "../servicios/solicitudes.js";
 
 // Texto libre de un visitante: sin caracteres invisibles ni espacios de más.
 const limpio = t => limpiarTexto(t).replace(/\s+/g, " ").trim();
@@ -46,30 +47,11 @@ export async function crear(req, res) {
   recibida();
 }
 
-// Tope de solicitudes sin revisar por cliente desde el portal: evita que una cuenta llene la campanita.
-const MAX_PENDIENTES_CLIENTE = 20;
-
 /** Desde el portal: un cliente con sesión pide un envío. La ficha sale de la sesión (req.usuario.clienteId),
-    nunca del cuerpo; así la oficina sabe que es un cliente que ya existe y le propone su domicilio de siempre. */
+    nunca del cuerpo; así la oficina sabe que es un cliente que ya existe y le propone su domicilio de siempre.
+    Las reglas viven en servicios/solicitudes.js: el asistente (JSBot) usa exactamente las mismas. */
 export async function crearDesdePortal(req, res) {
-  const clienteId = req.usuario.clienteId;
-  if (!clienteId) throw prohibido("Tu cuenta no está vinculada con un cliente. Escríbenos por WhatsApp.");
-  if (!(await Cliente.buscarPorId(clienteId))) throw prohibido("Tu ficha de cliente ya no existe. Escríbenos por WhatsApp.");
-  const b = req.valido.body;
-  const d = {
-    nombre: limpio(b.nombre), telefono: limpio(b.telefono), email: b.email || req.usuario.email || "",
-    direccionRecogida: limpio(b.direccionRecogida), paquetes: b.paquetes, pesoKg: b.pesoKg,
-    destinatarioNombre: limpio(b.destinatarioNombre), destinatarioTelefono: limpio(b.destinatarioTelefono),
-    direccionEntrega: limpio(b.direccionEntrega), origen: "portal", clienteId
-  };
-  if (!d.nombre || !d.direccionRecogida || !d.destinatarioNombre || !d.direccionEntrega) throw invalido("Completa los campos obligatorios");
-  if (await Solicitud.hayRepetidaReciente(d)) return res.status(201).json({ solicitud: { recibida: true } });
-  if ((await Solicitud.contarPendientesDeCliente(clienteId)) >= MAX_PENDIENTES_CLIENTE) {
-    throw new HttpError(429, "DEMASIADAS_SOLICITUDES", "Tienes muchas solicitudes sin revisar. Espera a que la oficina las atienda o escríbenos por WhatsApp.");
-  }
-  const s = await Solicitud.crear(d);
-  await Auditoria.registrar({ uid: req.usuario.id, accion: `Pidió un envío desde su portal (${d.direccionRecogida} → ${d.direccionEntrega})`, tabla: "solicitudes", registro: s.id });
-  eventos.emitir(["solicitudes"], { solicitudClienteId: clienteId });
+  await crearSolicitudDeCliente({ usuario: req.usuario, datos: req.valido.body });
   res.status(201).json({ solicitud: { recibida: true } });
 }
 

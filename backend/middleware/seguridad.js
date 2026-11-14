@@ -98,6 +98,16 @@ export const limiteChatDia = rateLimit({
   handler: respuestaChat429("CHAT_LIMITE_DIARIO", "Llegaste al límite de mensajes de hoy con el asistente. Escríbenos por WhatsApp y te atendemos.")
 });
 
+/** Confirmar o cancelar un borrador de solicitud: pocas veces por minuto y por cuenta (no gasta Claude, pero escribe en la base). */
+export const limiteBorradorMinuto = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  keyGenerator: porCuenta,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  handler: respuestaChat429("CHAT_DEMASIADO_RAPIDO", "Estás confirmando muy rápido. Espera un momento e intenta de nuevo.")
+});
+
 /* Chat público (sin sesión): por IP, y un tope global por día para que nadie pueda vaciar el presupuesto.
    Cada mensaje cuesta dinero y cualquiera en internet puede llamarlo, así que los límites son más estrictos
    que los del cliente con sesión. */

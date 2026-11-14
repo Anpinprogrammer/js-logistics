@@ -22,10 +22,10 @@ const CON_NOMBRES = `
 export async function crear(d) {
   const { rows } = await query(
     `INSERT INTO solicitudes (id, nombre, telefono, email, direccion_recogida, paquetes, peso_kg,
-       destinatario_nombre, destinatario_telefono, direccion_entrega, origen, cliente_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+       destinatario_nombre, destinatario_telefono, direccion_entrega, origen, cliente_id, via_chatbot)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
     [nuevoId(), d.nombre, d.telefono, d.email, d.direccionRecogida, d.paquetes, d.pesoKg ?? null,
-      d.destinatarioNombre, d.destinatarioTelefono || "", d.direccionEntrega, d.origen || "publico", d.clienteId || null]
+      d.destinatarioNombre, d.destinatarioTelefono || "", d.direccionEntrega, d.origen || "publico", d.clienteId || null, !!d.viaChatbot]
   );
   return buscarPorId(rows[0].id);
 }
