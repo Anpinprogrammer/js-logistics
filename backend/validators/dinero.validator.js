@@ -33,6 +33,7 @@ export const recibidos = z.object({
 export const recibidosHistorial = recibidos.extend({
   buscar: z.string().trim().max(60).optional(),
   tipo: z.enum(["todos", "ingresos", "salidas"]).default("todos"),
+  medio: z.enum(["efectivo", "nequi", "bancolombia"]).optional(),
   dia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida").optional()
 });
 export const reversar = z.object({ ids: z.array(id).min(1).max(500) });

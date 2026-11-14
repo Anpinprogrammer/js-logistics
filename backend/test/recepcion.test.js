@@ -152,6 +152,11 @@ test("el historial mezcla lo recibido con las entregas y la liquidación, y se f
   assert.equal((await h("?dia=2000-01-01")).body.total, 0);
   assert.equal((await h("?dia=hoy")).status, 400);
   assert.equal((await h("?tipo=otro")).status, 400);
+  // El medio filtra pagos y entregas por igual.
+  const porMedio = (await h("?medio=efectivo")).body.registros;
+  assert.ok(porMedio.length > 0 && porMedio.every(x => x.medio === "efectivo"));
+  assert.equal((await h("?medio=bancolombia&buscar=tarde")).body.total, 0);
+  assert.equal((await h("?medio=cheque")).status, 400);
   // Lo que mande la petición no cuenta; la oficina dice de cuál mensajero; el cliente no entra.
   assert.equal((await mensajero.get(`/api/movimientos/recibidos/historial?mensajeroId=${idOtro}&tipo=salidas`)).body.total, todo.registros.filter(x => x.tipo === "entrega").length);
   assert.equal((await asistente.get("/api/movimientos/recibidos/historial")).status, 400);
