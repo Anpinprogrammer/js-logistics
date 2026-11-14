@@ -195,12 +195,22 @@ export default function Caja({ pintar }: { pintar: () => void }) {
         {qLiq.isError ? <div className="aviso alerta">No se pudieron traer las liquidaciones: {motivoError(qLiq.error)} <button className="btn chico" onClick={() => qLiq.refetch()}>Intentar otra vez</button></div>
           : !pagLiq ? <div className="vacio">Cargando liquidaciones…</div>
           : liqs.length ? <>
-            <div className="tabla-env" aria-busy={qLiq.isFetching} style={qLiq.isPlaceholderData ? { opacity: .6 } : undefined}><table><thead><tr><th>Liquidado</th><th>Mensajero</th><th className="n">Entregas</th><th className="n">Monto liquidado</th><th>Estado</th><th className="n">Faltante / sobrante</th><th></th></tr></thead><tbody>
+            <div className="tabla-env lm-tabla" aria-busy={qLiq.isFetching} style={qLiq.isPlaceholderData ? { opacity: .6 } : undefined}><table><thead><tr><th>Liquidado</th><th>Mensajero</th><th className="n">Entregas</th><th className="n">Monto liquidado</th><th>Estado</th><th className="n">Faltante / sobrante</th><th></th></tr></thead><tbody>
               {liqs.map(l => <tr key={l.id}><td>{hora(l.fecha)}</td><td>{S.mensajeros[l.mensajeroId]?.nombre || ""}</td><td className="n">{l.entregas || 0}</td><td className="n"><b>{pesos(l.recibido)}</b></td>
                 <td>{l.debe > 0 ? <span className="etq sin">Por cobrar</span> : l.debe < 0 ? <span className="etq ent">A favor</span> : <span className="etq gris">Paz y salvo</span>}{l.adelanto ? <><br /><span className="sub" style={{ fontSize: ".8rem" }}>Adelanto {pesos(l.adelanto)}</span></> : null}</td>
                 <td className={"n " + (l.debe > 0 ? "neg" : l.debe < 0 ? "pos" : "")}>{l.debe ? (l.debe > 0 ? "Falta " : "A favor ") + pesos(Math.abs(l.debe)) : "—"}</td>
                 <td><button className="btn sec chico" onClick={() => v.abrir(<VerLiquidacion id={l.id} />, "liquidacion")}>Ver</button></td></tr>)}
             </tbody></table></div>
+            <ul className="lm-lista" aria-label="Liquidaciones recientes" aria-busy={qLiq.isFetching} style={qLiq.isPlaceholderData ? { opacity: .6 } : undefined}>
+              {liqs.map(l => <li key={l.id}><button type="button" onClick={() => v.abrir(<VerLiquidacion id={l.id} />, "liquidacion")} aria-label={"Ver la liquidación de " + (S.mensajeros[l.mensajeroId]?.nombre || "") + " del " + hora(l.fecha)}>
+                <span className="lm-izq">
+                  <span className="lm-l1"><b>{S.mensajeros[l.mensajeroId]?.nombre || ""}</b>{l.debe > 0 ? <span className="etq sin">Por cobrar</span> : l.debe < 0 ? <span className="etq ent">A favor</span> : <span className="etq gris">Paz y salvo</span>}</span>
+                  <span className="lm-l2"><span>{hora(l.fecha)}</span><span>·</span><span className="lm-n">{l.entregas || 0} {pl(l.entregas || 0, "entrega")}</span>
+                    {l.adelanto ? <><span>·</span><span className="lm-adel">Adelanto {pesos(l.adelanto)}</span></> : null}
+                    {l.debe ? <><span>·</span><span className={l.debe > 0 ? "neg" : "pos"}>{l.debe > 0 ? "Falta " : "A favor "}{pesos(Math.abs(l.debe))}</span></> : null}</span>
+                </span>
+                <span className="lm-ver"><Eye size={14} aria-hidden="true" /> Ver</span></button></li>)}
+            </ul>
             <Paginador pagina={pagLiq.pagina} paginas={pagLiq.paginas} total={pagLiq.total} porPagina={pagLiq.porPagina} ir={irLiq} cargando={qLiq.isPlaceholderData} />
           </> : <div className="vacio">{hayFiltrosLiq ? "No hay liquidaciones con esos filtros." : "Aún no has liquidado a ningún mensajero."}</div>}
       </> : <div className="vacio">Las liquidaciones las maneja administración.</div>}

@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Liquidaciones recientes: lista compacta en el celular — 2026-11-14
+
+- En Caja → Liquidaciones recientes, por debajo de 768 px la tabla se oculta (`.lm-tabla`) y se muestra una lista de dos líneas (`.lm-lista`): mensajero y estado, y debajo fecha, entregas, adelanto y faltante o sobrante, con el botón Ver que abre el mismo detalle. La tabla de escritorio no cambió. La barra de sub-pestañas ya se desplaza sola (`.subtabs`).
+
 ## Ficha del cliente (celular) → Registrar pago compacto — 2026-11-14
 
 - En la ficha del celular el formulario `FormMovimiento` ya no va dentro de una tarjeta con borde: se pinta directo sobre el cuerpo, con etiquetas y campos más bajos (reglas `.cli-ficha .cuenta-form` al final de `ajustes.css`). Tipo, Medio y Nota ocupan todo el ancho; Día y Valor van lado a lado. La ventana del computador (`.cuenta-modal`) no cambia.

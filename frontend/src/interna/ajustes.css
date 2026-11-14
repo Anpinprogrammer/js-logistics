@@ -1950,3 +1950,21 @@
 .jsl .cli-ficha .cuenta-form .cuenta-fila .fecha-valor{font-size:.78rem;font-weight:700}
 .jsl .cli-ficha .cuenta-form .cuenta-registrar{min-height:46px;margin-top:2px;font-size:.82rem}
 @media (max-width:359px){.jsl .cli-ficha .cuenta-form input::placeholder{font-size:.7rem}.jsl .cli-ficha .cuenta-form #mNota{padding-left:10px;padding-right:8px}}
+
+/* Liquidaciones recientes: en el celular una lista de dos líneas en vez de la tabla (sin scroll horizontal). */
+.jsl .lm-tabla{display:none}
+.jsl .lm-lista{display:block;margin:0 0 12px;padding:0;list-style:none;border:1px solid var(--linea);border-radius:16px;background:var(--papel);overflow:hidden}
+.jsl .lm-lista li+li{border-top:1px solid var(--linea)}
+.jsl .lm-lista button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-width:0;padding:12px 14px;border:0;background:none;color:inherit;text-align:left;font:inherit;cursor:pointer}
+.jsl .lm-lista button:active{background:var(--hueco)}
+.jsl .lm-izq{display:grid;flex:1;min-width:0;gap:4px}
+.jsl .lm-l1{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0}
+.jsl .lm-l1 b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.88rem}
+.jsl .lm-l2{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;color:var(--suave);font-size:.75rem}
+.jsl .lm-n{font-weight:700;color:var(--tinta)}
+.jsl .lm-adel{font-weight:700;color:var(--azul)}
+.jsl .lm-l2 .neg{color:var(--rojo);font-weight:700}
+.jsl .lm-l2 .pos{color:var(--verde);font-weight:700}
+.jsl .lm-ver{flex:none;display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border:1px solid var(--linea);border-radius:12px;background:var(--hueco);font-size:.78rem;font-weight:700}
+@media (max-width:767px){.jsl .lm-lista{margin-bottom:calc(24px + env(safe-area-inset-bottom,0px))}}
+@media (min-width:768px){.jsl .lm-tabla{display:block}.jsl .lm-lista{display:none}}
