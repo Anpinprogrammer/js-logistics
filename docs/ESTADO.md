@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Ficha del cliente (celular) → Registrar pago compacto — 2026-11-14
+
+- En la ficha del celular el formulario `FormMovimiento` ya no va dentro de una tarjeta con borde: se pinta directo sobre el cuerpo, con etiquetas y campos más bajos (reglas `.cli-ficha .cuenta-form` al final de `ajustes.css`). Tipo, Medio y Nota ocupan todo el ancho; Día y Valor van lado a lado. La ventana del computador (`.cuenta-modal`) no cambia.
+
 ## Arqueos recientes: filtros, tabla compacta y detalle en hoja — 2026-11-14
 
 - `Arqueos` (`oficina/Caja.tsx`) filtra por texto (quién contó, nota o resultado), estado (Faltante, Sobrante, Exacto) y día (`SelectorFecha`). En el celular los filtros están en la hoja `tp-hoja`. Los filtros son locales y recorren todos los arqueos; se muestran de 10 en 10 con "Ver más".

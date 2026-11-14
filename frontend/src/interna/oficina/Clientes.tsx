@@ -308,7 +308,7 @@ function FormMovimiento({ cid, alListo, alCancelar }: { cid: string; alListo: ()
     </div>
     <div className="cuenta-fila cuenta-fila-medio">
       <div className="campo"><label htmlFor="mMedio">{alCancelar ? "Medio (para pagos)" : "Medio"}</label><div className="cuenta-select"><select id="mMedio" value={medio} onChange={e => setMedio(e.target.value as Medio)}>{Object.entries(MEDIOS).map(([x, t]) => <option key={x} value={x}>{t}</option>)}</select>{flecha}</div></div>
-      <div className="campo"><label htmlFor="mNota">Nota (opcional)</label><input id="mNota" placeholder="Ej: compra, transferencia Nequi" value={nota} onChange={e => setNota(e.target.value)} /></div>
+      <div className="campo"><label htmlFor="mNota">Nota (opcional)</label><input id="mNota" placeholder="Ej: compra, transferencia Nequi..." value={nota} onChange={e => setNota(e.target.value)} /></div>
     </div>
     {alCancelar
       ? <div className="cuenta-modal-pie"><button type="button" className="btn sec" onClick={alCancelar}>Cancelar</button><button type="button" className="btn ok" id="mReg" disabled={guardando} onClick={registrar}>{guardando ? "Registrando…" : "Registrar"}</button></div>
