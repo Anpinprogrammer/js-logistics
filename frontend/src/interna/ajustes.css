@@ -1935,3 +1935,18 @@
 .jsl .aq-txt{display:none}
 @media (min-width:768px){.jsl .aq-filtros-escritorio{flex-wrap:wrap}.jsl .aq-filtros-escritorio .aq-buscar{flex:1 1 180px}.jsl .aq-filtros-escritorio .aq-buscar input{width:100%}}
 @media (min-width:1280px){.jsl .aq-tabla th small{display:inline}.jsl .aq-txt{display:inline}.jsl .aq-filtros-escritorio .aq-buscar{flex:0 1 240px}}
+
+/* Ficha del cliente (celular) → Registrar pago: sin tarjeta doble, campos compactos y Medio y Nota a todo el ancho. */
+.jsl .cli-ficha .cuenta-form{gap:10px;margin:0;padding:0;border:0;border-radius:0;background:none}
+.jsl .cli-ficha .cuenta-form h2{font-size:.88rem;font-weight:800}
+.jsl .cli-ficha .cuenta-form label{margin-bottom:4px;font-size:.69rem;font-weight:700;color:var(--suave)}
+.jsl .cli-ficha .cuenta-form :is(select,input){min-height:40px;border-radius:12px;font-size:.78rem;font-weight:700}
+.jsl .cli-ficha .cuenta-form input::placeholder{font-weight:500;color:var(--suave)}
+.jsl .cli-ficha .cuenta-form .cuenta-select select{padding:8px 34px 8px 12px}
+.jsl .cli-ficha .cuenta-form .cuenta-pesos input{padding:8px 10px 8px 24px}
+.jsl .cli-ficha .cuenta-form .cuenta-fila-medio{grid-template-columns:minmax(0,1fr);gap:10px}
+.jsl .cli-ficha .cuenta-form .cuenta-fila-medio input{padding:8px 12px}
+.jsl .cli-ficha .cuenta-form .cuenta-fila .fecha-btn{min-height:40px;padding:4px 12px}
+.jsl .cli-ficha .cuenta-form .cuenta-fila .fecha-valor{font-size:.78rem;font-weight:700}
+.jsl .cli-ficha .cuenta-form .cuenta-registrar{min-height:46px;margin-top:2px;font-size:.82rem}
+@media (max-width:359px){.jsl .cli-ficha .cuenta-form input::placeholder{font-size:.7rem}.jsl .cli-ficha .cuenta-form #mNota{padding-left:10px;padding-right:8px}}
