@@ -133,3 +133,30 @@ test("no anota en nombre de otro, ni con datos inválidos, ni otros roles", asyn
   assert.equal(a.body.movimiento.mensajeroId, idOtro);
   assert.equal((await admin.post("/api/movimientos/recibidos").send({ clienteId: idCliente, concepto: "x", valor: 2000, mensajeroId: idPatinador })).status, 400);
 });
+
+test("el historial mezcla lo recibido con las entregas y la liquidación, y se filtra en el servidor", async () => {
+  // Una entrega suelta que la oficina le recibe, además de la liquidación que ya hay de la prueba anterior.
+  assert.equal((await admin.post("/api/recaudos").send({ mensajeroId: idMensajero, valor: 5000, medio: "efectivo", nota: "Entrega de la tarde" })).status, 201);
+  const h = (q = "") => mensajero.get("/api/movimientos/recibidos/historial" + q);
+  const todo = (await h()).body;
+  assert.ok(todo.registros.some(x => x.tipo === "pago" && x.clienteNombre === "Panadería La Espiga"));
+  const entrega = todo.registros.find(x => x.tipo === "entrega" && x.valor === 5000);
+  assert.equal(entrega.clienteNombre, "Entregado en oficina");
+  assert.match(entrega.concepto, /Entrega de la tarde/);
+  assert.ok(todo.registros.some(x => x.tipo === "entrega" && x.clienteNombre === "Liquidación de período"));
+  // Ingresos son solo pagos; salidas, solo entregas; la búsqueda mira el título y el detalle.
+  assert.ok((await h("?tipo=ingresos")).body.registros.every(x => x.tipo === "pago"));
+  assert.ok((await h("?tipo=salidas")).body.registros.every(x => x.tipo === "entrega"));
+  assert.equal((await h("?buscar=tarde")).body.registros.length, 1);
+  assert.equal((await h("?buscar=100%25")).body.total, 0);
+  assert.equal((await h("?dia=2000-01-01")).body.total, 0);
+  assert.equal((await h("?dia=hoy")).status, 400);
+  assert.equal((await h("?tipo=otro")).status, 400);
+  // Lo que mande la petición no cuenta; la oficina dice de cuál mensajero; el cliente no entra.
+  assert.equal((await mensajero.get(`/api/movimientos/recibidos/historial?mensajeroId=${idOtro}&tipo=salidas`)).body.total, todo.registros.filter(x => x.tipo === "entrega").length);
+  assert.equal((await asistente.get("/api/movimientos/recibidos/historial")).status, 400);
+  assert.equal((await asistente.get(`/api/movimientos/recibidos/historial?mensajeroId=${idOtro}&tipo=salidas`)).body.total, 0);
+  assert.equal((await cliente.get("/api/movimientos/recibidos/historial")).status, 403);
+  // Quita la entrega de prueba para no cambiar las cuentas de las pruebas siguientes.
+  assert.equal((await admin.delete(`/api/recaudos/${entrega.id}`)).status, 200);
+});

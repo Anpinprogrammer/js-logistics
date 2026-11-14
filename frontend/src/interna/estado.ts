@@ -38,8 +38,8 @@ export const E = {
   // Mensajero
   // subPedM: sub-pestaña de Pedidos (Todos, Por entregar, Por recoger), guardada en js_pedidos_m
   subPedM: (subPedMGuardada === "entregar" || subPedMGuardada === "recoger" ? subPedMGuardada : "todos") as "todos" | "entregar" | "recoger",
-  // subRecM: sub-pestaña de Recepción (Nuevo pedido o Recibir dinero); se recuerda en la URL al recargar (navegacion.ts)
-  subRecM: "pedido" as "pedido" | "dinero",
+  // subRecM: sub-pestaña de Recepción (Nuevo pedido, Recibir dinero o Historial); se recuerda en la URL al recargar (navegacion.ts)
+  subRecM: "pedido" as "pedido" | "dinero" | "historial",
   miMensajero: leer("js_mensajero"), actuarComo: false, diaPedM: "", diaEntM: hoy(), semM: semanaDe(hoy()), ultimaGuia: "",
   // Modo Patinador de administración: pestaña (Caja o Historial) y el patinador elegido, guardado en js_patinador
   tabP: "inicio" as "inicio" | "caja" | "solicitudes", miPatinador: leer("js_patinador"),

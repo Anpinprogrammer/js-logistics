@@ -1,5 +1,7 @@
 /* App del mensajero, igual al prototipo (pintarMensajero, inicioMensajeroHtml, miSueldoHtml y los diálogos de entrega). */
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowDownLeft, ArrowUpRight, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { SelectorFecha } from "../Calendario";
 import { useQuery } from "@tanstack/react-query";
 import { useUsuario } from "../../auth/Sesion";
 import { E, guardarLocal } from "../estado";
@@ -9,8 +11,8 @@ import {
   moverSemana, diaSueldo, servicio, DIAS_SEM, fechaLarga, pendienteAnterior, DESC_SUELDO,
 } from "../motor";
 import { Columnas, Dona, EtqEstado, FiltroDia, Icono, IconoCamara, Kpi, Mini, Paginador, TablaEntregas, pl, useVentana } from "../ui";
-import { FormPago, Lista, type Anotar } from "../pagos";
-import { recibidosDe, recibirDeCliente } from "../acciones";
+import { FormPago, type Anotar } from "../pagos";
+import { historialDe, recibidosDe, recibirDeCliente } from "../acciones";
 import { motivoError } from "../datos";
 import { usePorPagina } from "../../lib/pantalla";
 import { abrirEntregaEn, VerEntregado } from "./Entrega";
@@ -112,14 +114,15 @@ export default function Mensajero({ pintar }: { pintar: () => void }) {
 
 /* ---- Recepción: lo que le llega al mensajero. Nuevo pedido (la foto al salir, lo que antes era la pestaña Nuevo) y
    Recibir dinero (lo que le paga un cliente en la calle: abona a su cuenta y suma a lo que el mensajero debe entregar). ---- */
-const SUBS_REC: [k: "pedido" | "dinero", t: string][] = [["pedido", "Nuevo pedido"], ["dinero", "Recibir dinero"]];
+const SUBS_REC: [k: "pedido" | "dinero" | "historial", t: string][] = [["pedido", "Nuevo pedido"], ["dinero", "Recibir dinero"], ["historial", "Historial"]];
 
 function Recepcion({ pintar, nombre, nuevoPedido }: { pintar: () => void; nombre: React.ReactNode; nuevoPedido: React.ReactNode }) {
   const barra = useRef<HTMLDivElement>(null), sub = E.subRecM;
   const ir = (k: typeof sub) => { E.subRecM = k; pintar(); };
   const alTeclear = (e: React.KeyboardEvent) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-    ir(sub === "pedido" ? "dinero" : "pedido"); setTimeout(() => barra.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus(), 0);
+    const i = SUBS_REC.findIndex(([k]) => k === sub), n = SUBS_REC.length;
+    ir(SUBS_REC[(i + (e.key === "ArrowRight" ? 1 : n - 1)) % n][0]); setTimeout(() => barra.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus(), 0);
   };
   return <>
     <h1>Recepción</h1><p className="sub">{nombre}</p>
@@ -128,14 +131,14 @@ function Recepcion({ pintar, nombre, nuevoPedido }: { pintar: () => void; nombre
         onClick={() => ir(k)} onKeyDown={alTeclear}>{t}</button>)}
     </div>
     <div id="panelRecM" role="tabpanel" aria-labelledby={"subRecM-" + sub}>
-      {sub === "pedido" ? nuevoPedido : <RecibirDinero mid={E.miMensajero} />}
+      {sub === "pedido" ? nuevoPedido : sub === "dinero" ? <RecibirDinero mid={E.miMensajero} /> : <HistorialRecepcion mid={E.miMensajero} />}
     </div>
   </>;
 }
 
 function RecibirDinero({ mid }: { mid: string }) {
-  const porPagina = usePorPagina(), [pagina, setPagina] = useState(1);
-  const q = useQuery({ queryKey: ["recibidos", mid, pagina, porPagina], queryFn: () => recibidosDe(mid, pagina, porPagina), placeholderData: prev => prev });
+  // Solo se usa el resumen (lo de hoy); la lista de movimientos vive en la pestaña Historial.
+  const q = useQuery({ queryKey: ["recibidos", mid, "resumen"], queryFn: () => recibidosDe(mid, 1, 1), placeholderData: prev => prev });
   const r = q.data?.resumen, pm = periodoMensajero(mid);
   const anotar: Anotar = d => recibirDeCliente({ ...d, mensajeroId: mid });
   return <>
@@ -146,9 +149,55 @@ function RecibirDinero({ mid }: { mid: string }) {
       <Kpi ico="caja" lbl="Recibido hoy" val={r ? pesos(r.totalHoy) : "…"} pie={<small>{r ? `${r.registrosHoy} ${r.registrosHoy === 1 ? "pago" : "pagos"}` : ""}</small>} />
     </div>
     <FormPago anotar={anotar} invalidar={["recibidos"]} titulo="Recibir dinero" boton="Registrar pago" conMedio />
-    <h2>Lo que has recibido</h2>
-    <Lista registros={q.data?.registros} cargando={q.isLoading} vacio="Todavía no has recibido pagos de clientes. Cuando te paguen, anótalo arriba." />
+  </>;
+}
+
+type TipoHist = "todos" | "ingresos" | "salidas";
+const TIPOS_HIST: [TipoHist, string][] = [["todos", "Todos los movimientos"], ["ingresos", "Dinero recibido (Ingresos)"], ["salidas", "Dinero entregado (Salidas)"]];
+
+/** Recepción → Historial: lo que recibió de clientes (entradas) y lo que entregó a la oficina o en la liquidación (salidas), lo más nuevo primero. */
+function HistorialRecepcion({ mid }: { mid: string }) {
+  const porPagina = usePorPagina(), [pagina, setPagina] = useState(1);
+  const [texto, setTexto] = useState(""), [buscar, setBuscar] = useState(""), [tipo, setTipo] = useState<TipoHist>("todos"), [dia, setDia] = useState("");
+  const [abierto, setAbierto] = useState(false), [borrador, setBorrador] = useState<{ tipo: TipoHist; dia: string }>({ tipo: "todos", dia: "" });
+  useEffect(() => { const t = setTimeout(() => { setBuscar(texto.trim()); setPagina(1); }, 300); return () => clearTimeout(t); }, [texto]);
+  const q = useQuery({
+    queryKey: ["recibidos", "historial", mid, pagina, porPagina, tipo, dia, buscar],
+    queryFn: () => historialDe(mid, pagina, porPagina, { buscar, tipo, dia }), placeholderData: prev => prev
+  });
+  const activos = (tipo !== "todos" ? 1 : 0) + (dia ? 1 : 0), hay = activos > 0 || buscar !== "";
+  const limpiar = () => { setTexto(""); setBuscar(""); setTipo("todos"); setDia(""); setPagina(1); };
+  const aplicar = () => { setTipo(borrador.tipo); setDia(borrador.dia); setPagina(1); setAbierto(false); };
+  const regs = q.data?.registros;
+  return <>
+    <h2>Historial de dinero</h2>
+    <p className="sub">Lo que te han pagado los clientes y lo que has entregado en la oficina.</p>
+    <div className="hm-barra">
+      <div className="tp-movil-buscar" role="search"><input type="search" value={texto} onChange={e => setTexto(e.target.value)} placeholder="Buscar por cliente, concepto o detalle..." autoComplete="off" aria-label="Buscar en el historial" /></div>
+      <button type="button" className="tp-movil-abrir" onClick={() => { setBorrador({ tipo, dia }); setAbierto(true); }} aria-haspopup="dialog" aria-label={`Filtros${activos ? `, ${activos} activos` : ""}`}>
+        <SlidersHorizontal aria-hidden="true" /> Filtros{activos > 0 && <b>{activos}</b>}</button>
+    </div>
+    {q.isError && <div className="aviso alerta">No se pudo traer el historial: {motivoError(q.error)}</div>}
+    {q.isLoading ? <div className="vacio" role="status">Cargando…</div> : !regs?.length ? (
+      <div className="vacio">{hay ? <>Ningún movimiento coincide con los filtros. <button type="button" className="btn sec chico" onClick={limpiar}>Limpiar filtros</button></> : "Todavía no hay movimientos. Cuando recibas o entregues dinero, aparecerá aquí."}</div>
+    ) : <div className="hm-lista">{regs.map(r => {
+      const salida = r.tipo === "entrega", medio = MEDIOS[(r.medio || "efectivo") as keyof typeof MEDIOS] || r.medio;
+      return <div className={"hm-fila " + (salida ? "sal" : "ent")} key={r.id}>
+        <span className="hm-ico" aria-hidden="true">{salida ? <ArrowUpRight size={18} /> : <ArrowDownLeft size={18} />}</span>
+        <span className="hm-info"><b>{r.clienteNombre}</b>
+          <span className="hm-sub">{r.concepto ? <span>{r.concepto}</span> : null}<em className="hm-pildora">{medio}</em></span>
+          <small>{hora(Date.parse(r.fecha))}</small></span>
+        <span className="hm-valor"><b>{salida ? "−" : "+"}{pesos(r.valor)}</b><small>{salida ? "Entregado" : "Recibido"}</small></span>
+      </div>;
+    })}</div>}
     {q.data && q.data.paginas > 1 && <Paginador pagina={q.data.pagina} paginas={q.data.paginas} total={q.data.total} porPagina={q.data.porPagina} cargando={q.isFetching} ir={p => setPagina(p)} />}
+    {abierto && <div className="tp-capa hm-capa" onMouseDown={e => { if (e.target === e.currentTarget) setAbierto(false); }}><div className="tp-hoja" role="dialog" aria-modal="true" aria-labelledby="hm-filtros-titulo">
+      <header><h2 id="hm-filtros-titulo"><SlidersHorizontal size={16} aria-hidden="true" /> Filtrar movimientos</h2><button type="button" className="cerrar" aria-label="Cerrar filtros" onClick={() => setAbierto(false)}>×</button></header>
+      <div className="tp-hoja-cuerpo">
+        <div className="campo"><label htmlFor="hm-tipo">Tipo de movimiento</label><div className="tp-hoja-select"><select id="hm-tipo" value={borrador.tipo} onChange={e => setBorrador(b => ({ ...b, tipo: e.target.value as TipoHist }))}>{TIPOS_HIST.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select><ChevronDown size={16} aria-hidden="true" /></div></div>
+        <div className="campo"><label htmlFor="hm-dia">Fecha</label><div className="aq-hoja-fecha"><SelectorFecha id="hm-dia" valor={borrador.dia} alCambiar={d => setBorrador(b => ({ ...b, dia: d }))} vacio="Todas las fechas" /><button type="button" className="btn sec chico" onClick={() => setBorrador(b => ({ ...b, dia: hoy() }))}>Hoy</button></div></div>
+      </div>
+      <footer><button type="button" className="btn sec" onClick={() => { limpiar(); setAbierto(false); }}>Limpiar filtros</button><button type="button" className="btn" onClick={aplicar}>Aplicar filtros</button></footer></div></div>}
   </>;
 }
 

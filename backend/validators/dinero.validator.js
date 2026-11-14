@@ -29,6 +29,12 @@ export const recibidos = z.object({
   pagina: z.coerce.number().int().min(1).default(1),
   porPagina: z.coerce.number().int().min(1).max(100).default(8)
 });
+/** Historial de Recepción: lo recibido y lo entregado, con texto, tipo (ingresos = pagos, salidas = entregas) y día de Colombia. */
+export const recibidosHistorial = recibidos.extend({
+  buscar: z.string().trim().max(60).optional(),
+  tipo: z.enum(["todos", "ingresos", "salidas"]).default("todos"),
+  dia: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida").optional()
+});
 export const reversar = z.object({ ids: z.array(id).min(1).max(500) });
 
 /** Pestaña Cuentas: página de movimientos de clientes y ganancias por cliente. */

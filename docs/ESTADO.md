@@ -1,5 +1,9 @@
 # Estado del proyecto y memoria para agentes de IA
 
+## Recepción del mensajero: pestaña Historial — 2026-11-14
+
+Recepción tiene tres sub-pestañas: Nuevo pedido, Recibir dinero e Historial (`E.subRecM` acepta `"historial"`). Recibir dinero ya no lista lo recibido: deja los dos KPI y el formulario, y pide solo el resumen. Historial junta, de más nuevo a más viejo, los pagos de clientes (entradas, `+` verde) y las entregas a la oficina o liquidaciones (salidas, `−` rojo) con `GET /movimientos/recibidos/historial` (`buscar`, `tipo`, `dia`, páginas; en demo se arma en memoria con `historialDe`). Las claves empiezan por `["recibidos", …]`, así registrar un pago refresca KPIs e historial. Las clases son `hm-*` en `ajustes.css`; la lista deja 112 px abajo para que la barra inferior no tape la última fila.
+
 ## Caja: sub-pestañas en dos filas en el celular — 2026-11-14
 
 - Por debajo de 768 px las 5 sub-pestañas de Caja (`.caja-cab .subtabs`) se acomodan en una cuadrícula de 6 columnas: 3 arriba y 2 abajo, todas visibles sin deslizar. En escritorio no cambian. A menos de 360 px baja un poco la letra para que "Liquidaciones recientes" quepa.

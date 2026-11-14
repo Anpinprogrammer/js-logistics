@@ -24,7 +24,7 @@ const SUB_OFICINA: Record<string, Sub> = {
   pedidos: { leer: () => E.filtroA, poner: v => { E.filtroA = v; }, validos: FILTROS_PEDIDOS },
 };
 const SUB_MENSAJERO: Record<string, Sub> = {
-  recepcion: { leer: () => E.subRecM, poner: v => { E.subRecM = v as typeof E.subRecM; }, validos: ["pedido", "dinero"] },
+  recepcion: { leer: () => E.subRecM, poner: v => { E.subRecM = v as typeof E.subRecM; }, validos: ["pedido", "dinero", "historial"] },
   pend: { leer: () => E.subPedM, poner: v => { E.subPedM = v as typeof E.subPedM; }, validos: ["todos", "entregar", "recoger"] },
 };
 

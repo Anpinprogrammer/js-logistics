@@ -1976,3 +1976,22 @@
   .jsl .caja-cab .subtabs button:nth-child(n+4){grid-column:span 3}
 }
 @media (max-width:359px){.jsl .caja-cab .subtabs button{padding-left:3px;padding-right:3px;font-size:.64rem}}
+
+/* Recepción del mensajero → Historial: buscador, filas de entradas (verde) y salidas (rojo) */
+.jsl .hm-barra{display:flex;align-items:center;gap:8px;min-width:0;margin:12px 0}
+.jsl .tp-capa.hm-capa{display:flex}
+.jsl .hm-lista{display:flex;flex-direction:column;gap:8px;padding-bottom:112px}
+.jsl .hm-fila{display:flex;align-items:center;gap:12px;min-width:0;padding:12px;border:1px solid var(--linea);border-radius:16px;background:var(--papel)}
+.jsl .hm-ico{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:50%}
+.jsl .hm-fila.ent .hm-ico{background:var(--verde-claro);color:var(--verde)}
+.jsl .hm-fila.sal .hm-ico{background:var(--rojo-claro);color:var(--rojo)}
+.jsl .hm-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.jsl .hm-info>b{overflow-wrap:anywhere;font-size:.92rem}
+.jsl .hm-sub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;font-size:.8rem;color:var(--suave);overflow-wrap:anywhere}
+.jsl .hm-pildora{font-style:normal;padding:1px 8px;border-radius:999px;background:var(--hueco);font-size:.7rem;font-weight:600;color:var(--tinta)}
+.jsl .hm-info small,.jsl .hm-valor small{font-size:11px;color:var(--suave)}
+.jsl .hm-valor{flex:none;display:flex;flex-direction:column;align-items:flex-end;text-align:right}
+.jsl .hm-valor b{font-size:.95rem;white-space:nowrap}
+.jsl .hm-fila.ent .hm-valor b{color:var(--verde)}
+.jsl .hm-fila.sal .hm-valor b{color:var(--rojo)}
+@media (min-width:768px){.jsl .hm-lista{padding-bottom:32px}}
