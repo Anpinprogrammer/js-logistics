@@ -233,6 +233,20 @@ export async function recibidosDe(mensajeroId: string, pagina: number, porPagina
     pagina: p, porPagina, total: todos.length, paginas
   };
 }
+/** Historial de dinero del mensajero (Recepción → Historial): lo recibido de clientes y lo entregado a la oficina, con filtros y páginas. */
+export async function historialDe(mensajeroId: string, pagina: number, porPagina: number, f: T.FiltrosCajaPatinador = {}): Promise<T.HistorialRecibidos> {
+  if (!DEMO) return api.recibidos.historial(pagina, porPagina, f, yo.esAdmin ? mensajeroId : undefined);
+  const pagos = Object.values(S.movimientos).filter(m => m.mensajeroId === mensajeroId && m.tipo === "pago_de_cliente").map(m => ({
+    id: m.id, mensajeroId, clienteId: m.clienteId, clienteNombre: S.clientes[m.clienteId]?.nombre || remitentesDemo.find(c => c.id === m.clienteId)?.nombre || "", concepto: m.nota, valor: m.valor, fecha: new Date(m.fecha).toISOString(), medio: m.medio || "efectivo" as Medio, tipo: "pago" as const }));
+  const entregas = Object.values(S.recaudos).filter(r => r.mensajeroId === mensajeroId).map(r => ({
+    id: r.id, mensajeroId, clienteId: "", clienteNombre: r.nota === "Liquidación" ? "Liquidación de período" : "Entregado en oficina",
+    concepto: r.nota === "Liquidación" ? "Cierre del período" : [r.nota, r.porNombre && "Recibió " + r.porNombre].filter(Boolean).join(" · "), valor: r.valor, fecha: new Date(r.fecha).toISOString(), medio: r.medio || "efectivo" as Medio, tipo: "entrega" as const }));
+  const q = (f.buscar || "").trim().toLowerCase();
+  const todos = [...pagos, ...entregas].filter(x => (f.tipo !== "ingresos" || x.tipo === "pago") && (f.tipo !== "salidas" || x.tipo === "entrega")
+    && (!f.dia || diaDe(Date.parse(x.fecha)) === f.dia) && (!q || (x.clienteNombre + " " + x.concepto).toLowerCase().includes(q))).sort((a, b) => Date.parse(b.fecha) - Date.parse(a.fecha));
+  const paginas = Math.max(1, Math.ceil(todos.length / porPagina)), p = Math.min(pagina, paginas);
+  return { registros: todos.slice((p - 1) * porPagina, p * porPagina), pagina: p, porPagina, total: todos.length, paginas };
+}
 export async function movCaja(d: Omit<CajaMov, "id">) {
   if (DEMO) { const k = id(); tocar(s => { s.cajamovs[k] = { porUid: yo.uid, porNombre: yo.nombre, ...d, id: k }; }); return; }
   await tras(api.cajaMovimientos.crear({ ...d, fecha: iso(d.fecha) } as Partial<T.CajaMovimiento>));

@@ -9,7 +9,8 @@ const r = Router();
 r.get("/", permitir(EQUIPO), C.listar); // cada rol lee lo suyo (lecturasDe): el mensajero, solo los pagos que él recibió
 // Recepción → Recibir dinero: el mensajero anota lo que le paga un cliente en la calle y ve lo que ha recibido.
 r.get("/recibidos", permitir(EQUIPO), validar({ query: V.recibidos }), C.recibidos);
-r.post("/recibidos", permitir("mensajero", "admin"), validar({ body: V.recibido }), C.recibir);
+r.get("/recibidos/historial", permitir(EQUIPO), validar({ query: V.recibidosHistorial }), C.historialRecibidos);
+r.post("/recibidos",permitir("mensajero", "admin"), validar({ body: V.recibido }), C.recibir);
 r.get("/pagina", permitir(OFICINA), validar({ query: V.movimientosPagina }), C.pagina);
 r.get("/ganancias", permitir(OFICINA), validar({ query: V.gananciasPagina }), C.ganancias);
 r.post("/", permitir(OFICINA), validar({ body: V.movimiento }), C.crear);

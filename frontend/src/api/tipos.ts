@@ -318,6 +318,8 @@ export interface RegistroCajaPatinador { id: string; mensajeroId: string; client
 /** Total acumulado de su caja y lo de hoy (día de Colombia), calculados por el servidor. */
 /** `total` es todo lo que recibió; `entregado` lo que ya le dio a la oficina (se descuenta solo cuando administración lo registra); `enCaja` lo que le queda en la mano. Solo los trae la caja del patinador (el recibido del mensajero no). */
 export interface ResumenCajaPatinador { total: number; registros: number; totalHoy: number; registrosHoy: number; entregado?: number; entregadoHoy?: number; enCaja?: number }
+/** Respuesta de GET /movimientos/recibidos/historial: pagos recibidos y entregas a la oficina, sin resumen. En las entregas `clienteNombre` es el título ("Entregado en oficina" o "Liquidación de período") y `concepto` el detalle. */
+export type HistorialRecibidos = Omit<CajaPatinador, "resumen">;
 export interface CajaPatinador { resumen: ResumenCajaPatinador; registros: RegistroCajaPatinador[]; pagina: number; porPagina: number; total: number; paginas: number }
 
 /** Filtros del historial de la caja (celular): texto en el cliente o el concepto, ingresos (pagos) o salidas (entregas a administración) y un día. */

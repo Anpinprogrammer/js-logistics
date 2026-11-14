@@ -44,3 +44,45 @@ export async function recibidosPagina({ mensajeroId, pagina = 1, porPagina = 8 }
   });
   return { registros: r.filas.map(filaAObjeto), pagina: r.pagina, porPagina, total: r.total, paginas: r.paginas };
 }
+
+/** Historial de dinero de un mensajero (Recepción → Historial): los pagos que recibió de clientes (`tipo: "pago"`) mezclados con
+    el dinero que entregó a la oficina (`tipo: "entrega"`, de `recaudos`; la liquidación del período es una entrega con nota
+    "Liquidación"). Lo más nuevo primero. En las entregas `clienteNombre` es el título y `concepto` el detalle. */
+const HISTORIAL_RECIBIDOS = `
+  SELECT m.id, m.mensajero_id, m.cliente_id, c.nombre AS cliente_nombre, m.nota AS concepto, m.valor, coalesce(m.medio, 'efectivo') AS medio, m.fecha, 'pago' AS tipo
+  FROM movimientos m JOIN clientes c ON c.id = m.cliente_id WHERE m.mensajero_id = $1 AND m.tipo = 'pago_de_cliente'
+  UNION ALL
+  SELECT e.id, e.mensajero_id, NULL,
+         CASE WHEN e.nota = 'Liquidación' THEN 'Liquidación de período' ELSE 'Entregado en oficina' END,
+         CASE WHEN e.nota = 'Liquidación' THEN concat_ws(' · ', 'Cierre del período', nullif(e.por_nombre, ''))
+              ELSE concat_ws(' · ', nullif(e.nota, ''), CASE WHEN e.por_nombre <> '' THEN 'Recibió ' || e.por_nombre END) END,
+         e.valor, coalesce(e.medio, 'efectivo'), e.fecha, 'entrega'
+  FROM recaudos e WHERE e.mensajero_id = $1`;
+
+/** Filtros del historial: `tipo` (ingresos = pagos, salidas = entregas), `dia` (día de Colombia) y `buscar` (en el título o el detalle). */
+function filtrosHistorial({ tipo = "todos", dia, buscar }, params) {
+  const cond = [];
+  if (tipo === "ingresos") cond.push(`h.tipo = 'pago'`);
+  if (tipo === "salidas") cond.push(`h.tipo = 'entrega'`);
+  if (dia) { params.push(dia); cond.push(`(h.fecha AT TIME ZONE 'America/Bogota')::date = $${params.length}::date`); }
+  if (buscar) {
+    params.push("%" + buscar.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_") + "%"); // % _ y \ del texto no son comodines
+    cond.push(`(h.cliente_nombre ILIKE $${params.length} OR h.concepto ILIKE $${params.length})`);
+  }
+  return cond.length ? " WHERE " + cond.join(" AND ") : "";
+}
+
+export async function historialRecibidos({ mensajeroId, pagina = 1, porPagina = 8, tipo, dia, buscar }) {
+  const r = await paginaEnParalelo({
+    pagina, porPagina,
+    contar: async () => {
+      const params = [mensajeroId], donde = filtrosHistorial({ tipo, dia, buscar }, params);
+      return (await query(`SELECT count(*)::int AS total FROM (${HISTORIAL_RECIBIDOS}) h${donde}`, params)).rows[0].total;
+    },
+    traer: async offset => {
+      const params = [mensajeroId, porPagina, offset], donde = filtrosHistorial({ tipo, dia, buscar }, params);
+      return (await query(`SELECT * FROM (${HISTORIAL_RECIBIDOS}) h${donde} ORDER BY h.fecha DESC, h.id LIMIT $2 OFFSET $3`, params)).rows;
+    }
+  });
+  return { registros: r.filas.map(filaAObjeto), pagina: r.pagina, porPagina, total: r.total, paginas: r.paginas };
+}

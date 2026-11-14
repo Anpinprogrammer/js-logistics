@@ -1,7 +1,7 @@
 /* Llamadas al backend, agrupadas por recurso. */
 import { api } from "./cliente";
 import type { GrupoSolicitud, PaginaSolicitudes, FiltrosSolicitudes, PaginaSolicitudesFiltradas, Archivo, TipoArchivo, Cliente, ClienteBreve, Mensajero, Movimiento, Pedido, Usuario, Motivo, MetodoEntrega, Rol, TipoPersonal, Medio, EstadoPedido,
-  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PagoDeSaldos, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal, Solicitud, ListaSolicitudes, CajaPatinador, RegistroCajaPatinador, ResumenCajaPatinador, ResumenPatinador, PaginaSolicitudesRecogida, FiltrosCajaPatinador } from "./tipos";
+  Recaudo, Liquidacion, Jornada, CajaMovimiento, CuentaInterna, Cambio, EnPapelera, PaginaPedidos, EnlaceCorreo, PaginaClientes, PagoDeSaldos, PaginaMovimientos, PaginaGanancias, PaginaCajaMovimientos, PaginaUsuarios, AccesoCreado, PaginaHistorial, PaginaLiquidaciones, PaginaPersonal, Solicitud, ListaSolicitudes, CajaPatinador, RegistroCajaPatinador, ResumenCajaPatinador, ResumenPatinador, PaginaSolicitudesRecogida, FiltrosCajaPatinador, HistorialRecibidos } from "./tipos";
 import { FalloApi } from "./cliente";
 
 const datos = <T>(p: Promise<{ data: T }>) => p.then(r => r.data);
@@ -157,6 +157,9 @@ export const recibidos = {
   /** Lo que ha recibido (el servidor pone el mensajero si quien pide es mensajero; la oficina o un admin dicen cuál). */
   listar: (pagina: number, porPagina: number, mensajeroId?: string) =>
     datos<CajaPatinador>(api.get("/movimientos/recibidos", { params: limpio({ pagina, porPagina, mensajeroId }) })),
+  /** Historial de Recepción: lo recibido de clientes (`tipo: "pago"`) mezclado con lo entregado a la oficina (`tipo: "entrega"`, incluye la liquidación). */
+  historial: (pagina: number, porPagina: number, f: FiltrosCajaPatinador = {}, mensajeroId?: string) =>
+    datos<HistorialRecibidos>(api.get("/movimientos/recibidos/historial", { params: limpio({ pagina, porPagina, mensajeroId, buscar: f.buscar, tipo: f.tipo && f.tipo !== "todos" ? f.tipo : undefined, dia: f.dia }) })),
   /** Anota un pago de un cliente. Efectivo y con la hora del servidor; abona a la cuenta del cliente. */
   registrar: (d: { clienteId: string; concepto: string; valor: number; medio: Medio; mensajeroId?: string }) =>
     datos<{ movimiento: Movimiento; clienteNombre: string; saldoCliente: number; debe: number }>(api.post("/movimientos/recibidos", d))
